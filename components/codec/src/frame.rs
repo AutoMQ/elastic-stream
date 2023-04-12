@@ -168,22 +168,21 @@ impl Frame {
         let header_length = src.get_u16() as u32 + (header_length << 16);
         if header_length > frame_length - MIN_FRAME_LENGTH {
             return Err(FrameError::BadFrame(format!(
-                "Header length is: {}, but max header length is {} as frame length is: {}",
-                header_length,
-                frame_length - MIN_FRAME_LENGTH,
-                frame_length
+                "Header length[{}] exceeds maximum value possbile given that frame-length is {}",
+                header_length, frame_length
             )));
         }
         src.advance(header_length as usize);
 
         let mut payload = None;
-        if header_length + 16 < frame_length {
-            let payload_length = frame_length - header_length - 16;
+        if header_length + MIN_FRAME_LENGTH < frame_length {
+            let payload_length = frame_length - header_length - MIN_FRAME_LENGTH;
             if payload_length > src.remaining() as u32 {
                 return Err(FrameError::BadFrame(format!(
-                    "Payload length is: {}, but only {} bytes in buffer",
+                    "Payload length[{}] exceeds maximum value possbile given that frame-length is {} and header-length is {}",
                     payload_length,
-                    src.remaining()
+                    frame_length,
+                    header_length
                 )));
             }
             let body = src.copy_to_bytes(payload_length as usize);
@@ -191,12 +190,10 @@ impl Frame {
         }
 
         // Remaining bytes are checksum
-        if src.remaining() < 4 {
-            return Err(FrameError::BadFrame(format!(
-                "Payload checksum is incomplete, only {} bytes in buffer",
-                src.remaining()
-            )));
-        }
+        debug_assert!(
+            src.remaining() >= 4,
+            "There is at least 4 bytes in the buffer, holding checksum of the payload"
+        );
 
         if let Some(body) = payload {
             let checksum = src.get_u32();
