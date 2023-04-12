@@ -553,9 +553,9 @@ impl IO {
     ///
     /// For example, the underlying storage device has an alignment of 4KiB and the 6KiB of data is
     /// requested to write. IO module would generate two writes to block layer: one is a full-4KiB and the
-    /// other is also 4KiB, yet carrying 2KiB valid data. Given than underying io_uring cannot guarantee
+    /// other is also 4KiB, yet carrying 2KiB valid data. Given than underlying io_uring cannot guarantee
     /// ordering of the submitted write tasks, data appended to the partially-filled block-page must NOT
-    /// submit to io_uring/block-layer untill the prior one is completed.
+    /// submit to io_uring/block-layer until the prior one is completed.
     ///
     /// In this example, this method tells whether
     fn has_write_sqe_unblocked(&self) -> bool {

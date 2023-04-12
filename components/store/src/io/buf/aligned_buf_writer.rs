@@ -86,11 +86,6 @@ impl AlignedBufWriter {
     ) -> Result<(), StoreError> {
         trace!(self.log, "Reserve memory for WAL up to {}", wal_offset);
 
-        // TODO: Debug code. Remove it later.
-        if wal_offset > 1024_u64 * 1024 * 1024 {
-            panic!("WAL offset is too large: {}", wal_offset);
-        }
-
         let max_allocated_wal_offset = self.max_allocated_wal_offset();
         if wal_offset <= max_allocated_wal_offset {
             return Ok(());
