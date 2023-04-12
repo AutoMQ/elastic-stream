@@ -61,6 +61,9 @@ impl CompositeSession {
         true
     }
 
+    /// Broadcast heartbeat requests to all nested sessions.
+    /// 
+    /// 
     pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
         if let Some(session) = self.sessions.first() {
             let request = Request::Heartbeat {

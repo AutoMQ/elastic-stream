@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use thiserror::Error;
 
 use crate::client::session_state::SessionState;
@@ -30,6 +32,9 @@ pub enum ClientError {
 
     #[error("Client internal error")]
     ClientInternal,
+
+    #[error("Client fails to recieve response from server within {timeout:#?}")]
+    RpcTimeout { timeout: Duration },
 }
 
 #[derive(Debug, Error)]

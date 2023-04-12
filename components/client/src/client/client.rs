@@ -65,7 +65,7 @@ impl Client {
         let future = session.list_range(criteria);
         time::timeout(timeout, future).await.map_err(|elapsed| {
             warn!(self.log, "Timeout when list range. {}", elapsed);
-            ClientError::ClientInternal
+            ClientError::RpcTimeout { timeout }
         })?.map_err(|e| {
             error!(
                 self.log,
@@ -73,6 +73,30 @@ impl Client {
             );
             ClientError::ClientInternal
         })
+    }
+
+    /// Broadcast heartbeats to all sessions in the `CompositeSession`.
+    ///
+    /// # Arguments
+    /// `target` - Placement manager access URL.
+    ///
+    /// # Returns
+    ///
+    pub async fn broadcast_heartbeat(&self, target: &str) -> Result<(), ClientError> {
+        let session_manager = unsafe { &mut *self.session_manager.get() };
+        let session = session_manager.get_session(target).await?;
+        time::timeout(self.config.io_timeout, session.heartbeat())
+            .await
+            .map_err(|_elapsed| {
+                error!(self.log, "Timeout when heartbeat to {}", target);
+                ClientError::RpcTimeout {
+                    timeout: self.config.io_timeout,
+                }
+            })
+            .and_then(|_res| {
+                trace!(self.log, "Heartbeat to {} OK", target);
+                Ok(())
+            })
     }
 }
 
