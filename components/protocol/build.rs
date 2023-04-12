@@ -31,7 +31,7 @@ fn main() {
         extra: &[
             "--gen-object-api",
             "--java-package-prefix",
-            "sdk.elastic.storage.flatc",
+            "sdk.elastic.stream.flatc",
         ],
         ..Default::default()
     })

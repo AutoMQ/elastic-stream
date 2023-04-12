@@ -7,7 +7,7 @@
  */
 
 allprojects {
-    group = 'sdk.elastic.storage'
+    group = 'sdk.elastic.stream'
     version = '0.0.1-SNAPSHOT'
 
     repositories {
