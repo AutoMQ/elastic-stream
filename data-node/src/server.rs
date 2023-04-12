@@ -76,8 +76,8 @@ pub fn launch(
                         fetcher,
                         Rc::clone(&store),
                     )));
-                    let mut node = Worker::new(worker_config, store, stream_manager, None, &logger);
-                    node.serve(shutdown_rx)
+                    let mut worker = Worker::new(worker_config, store, stream_manager, None, &logger);
+                    worker.serve(shutdown_rx)
                 })
         })
         .collect::<Vec<_>>();
@@ -128,9 +128,9 @@ pub fn launch(
                     Rc::clone(&store),
                 )));
 
-                let mut node =
+                let mut worker =
                     Worker::new(worker_config, store, stream_manager, Some(channels), &log);
-                node.serve(shutdown_rx)
+                worker.serve(shutdown_rx)
             });
         handles.push(handle);
     }

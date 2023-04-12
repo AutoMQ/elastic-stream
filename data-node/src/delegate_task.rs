@@ -1,2 +1,2 @@
-/// For inter-node communication
+/// For inter-worker communication
 pub(crate) enum DelegateTask {}

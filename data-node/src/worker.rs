@@ -50,12 +50,12 @@ impl Worker {
         if self.config.primary {
             info!(
                 self.logger,
-                "Bind primary node to processor-{}", self.config.core_id.id
+                "Bind primary worker to processor-{}", self.config.core_id.id
             );
         } else {
             info!(
                 self.logger,
-                "Bind worker node to processor-{}", self.config.core_id.id
+                "Bind worker to processor-{}", self.config.core_id.id
             );
         }
 
