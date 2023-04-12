@@ -166,11 +166,12 @@ impl Frame {
         // header length
         let header_length: u32 = src.get_u8() as u32;
         let header_length = src.get_u16() as u32 + (header_length << 16);
-        if src.remaining() < header_length as usize {
+        if header_length > frame_length - MIN_FRAME_LENGTH {
             return Err(FrameError::BadFrame(format!(
-                "Header length is: {}, but only {} bytes in buffer",
+                "Header length is: {}, but max header length is {} as frame length is: {}",
                 header_length,
-                src.remaining()
+                frame_length - MIN_FRAME_LENGTH,
+                frame_length
             )));
         }
         src.advance(header_length as usize);
@@ -190,10 +191,11 @@ impl Frame {
         }
 
         // Remaining bytes are checksum
-        if src.remaining() != 4 {
-            return Err(FrameError::BadFrame(
-                "The remaining bytes are not checksum".to_string(),
-            ));
+        if src.remaining() < 4 {
+            return Err(FrameError::BadFrame(format!(
+                "Payload checksum is incomplete, only {} bytes in buffer",
+                src.remaining()
+            )));
         }
 
         if let Some(body) = payload {
@@ -709,9 +711,10 @@ mod tests {
         for ele in encode_result.unwrap() {
             bytes_mute.put_slice(&ele);
         }
+        bytes_mute.put_slice("dummy".as_bytes());
         let buf = bytes_mute.freeze();
 
-        assert_eq!(29, buf.remaining());
+        assert_eq!(29 + 5, buf.remaining());
 
         let mut cursor = Cursor::new(&buf[..]);
 
