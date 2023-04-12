@@ -40,6 +40,23 @@ impl Node {
 
     pub fn serve(&mut self, shutdown_rx: broadcast::Receiver<()>) {
         core_affinity::set_for_current(self.config.core_id);
+        if self.config.primary {
+            info!(
+                self.logger,
+                "Bind primary node to processor-{}", self.config.core_id.id
+            );
+        } else {
+            info!(
+                self.logger,
+                "Bind worker node to processor-{}", self.config.core_id.id
+            );
+        }
+
+        info!(
+            self.logger,
+            "The number of Submission Queue entries in uring: {}",
+            self.config.server_config.server.uring.queue_depth
+        );
         tokio_uring::builder()
             .entries(self.config.server_config.server.uring.queue_depth)
             .uring_builder(
@@ -151,7 +168,12 @@ impl Node {
         stream: TcpStream,
         logger: Logger,
     ) {
+        // Channel to transfer responses from handlers to the coroutine that is in charge of response write.
         let (tx, mut rx) = mpsc::unbounded_channel();
+
+        // Put current connection into connection-tracker, such that when TERM/STOP signal is received,
+        // nodes send go-away frame to each connection, requesting clients to complete and migrate as soon
+        // as possible.
         connection_tracker
             .borrow_mut()
             .insert(peer_address, tx.clone());
@@ -161,6 +183,7 @@ impl Node {
             logger.new(o!()),
         ));
 
+        // Coroutine to read requests from network connection
         let request_logger = logger.clone();
         let _channel = Rc::clone(&channel);
         tokio_uring::spawn(async move {
@@ -201,6 +224,7 @@ impl Node {
             connection_tracker.borrow_mut().remove(&peer_address);
         });
 
+        // Coroutine to write responses to network connection
         tokio_uring::spawn(async move {
             let peer_address = channel.peer_address().to_owned();
             loop {
