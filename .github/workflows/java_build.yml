@@ -30,8 +30,8 @@ jobs:
       - name: Generate flatbuffers java classes
         run: |
           flatc --version
-          flatc --java -o 'sdks/java/flatc/src/main/java' --java-package-prefix 'sdk.elastic.storage.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
-          tree sdks/java/flatc/src/main/java/sdk/elastic/storage/flatc
+          flatc --java -o 'sdks/java/flatc/src/main/java' --java-package-prefix 'sdk.elastic.stream.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
+          tree sdks/java/flatc/src/main/java/sdk/elastic/stream/flatc
       - name: Set up JDK ${{ matrix.jdk }}
         uses: actions/setup-java@v3
         with:
