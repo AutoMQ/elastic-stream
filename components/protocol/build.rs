@@ -19,8 +19,11 @@ fn main() {
     println!("cargo:rerun-if-changed=fbs/");
     let out_dir = Path::new("../../sdks/java/flatc/src/main/java");
     // clean up the directory
-    std::fs::remove_dir_all(out_dir).expect("Failed to remove directory");
+    if out_dir.exists() {
+        std::fs::remove_dir_all(out_dir).expect("Failed to remove directory");
+    }
     std::fs::create_dir_all(out_dir).expect("Failed to create directory");
+
     flatc_rust::run(flatc_rust::Args {
         lang: "java",
         inputs: &[Path::new("fbs/rpc.fbs"), Path::new("fbs/model.fbs")],

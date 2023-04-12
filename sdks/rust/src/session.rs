@@ -171,7 +171,8 @@ impl Session {
                     ErrorCode::PM_NOT_LEADER => {
                         warn!(self.log, "Failed to create stream: targeting placement manager node is not leader");
                         if let Some(detail) = status.detail {
-                            let placement_manager_cluster = flatbuffers::root::<PlacementManagerCluster>(&detail)?;
+                            let placement_manager_cluster =
+                                flatbuffers::root::<PlacementManagerCluster>(&detail)?;
                             let placement_manager_cluster = placement_manager_cluster.unpack();
                             let nodes = placement_manager_cluster
                                 .nodes
