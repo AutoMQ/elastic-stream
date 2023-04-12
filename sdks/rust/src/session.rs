@@ -11,7 +11,7 @@ use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
 use model::stream::Stream;
 use protocol::rpc::header::{
-    CreateStreamsRequestT, CreateStreamsResponse, ErrorCode, PlacementManager, StreamT,
+    CreateStreamsRequestT, CreateStreamsResponse, ErrorCode, PlacementManagerCluster, StreamT,
     SystemErrorResponse,
 };
 use slog::{error, info, trace, warn, Logger};
@@ -171,9 +171,9 @@ impl Session {
                     ErrorCode::PM_NOT_LEADER => {
                         warn!(self.log, "Failed to create stream: targeting placement manager node is not leader");
                         if let Some(detail) = status.detail {
-                            let placement_manager = flatbuffers::root::<PlacementManager>(&detail)?;
-                            let placement_manager = placement_manager.unpack();
-                            let nodes = placement_manager
+                            let placement_manager_cluster = flatbuffers::root::<PlacementManagerCluster>(&detail)?;
+                            let placement_manager_cluster = placement_manager_cluster.unpack();
+                            let nodes = placement_manager_cluster
                                 .nodes
                                 .iter()
                                 .flat_map(|nodes| nodes.iter())

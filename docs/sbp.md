@@ -64,6 +64,7 @@ The table below shows all the supported frame types along with a preallocated op
 | 0x3004 | DESCRIBE_STREAMS | Fetch the details of a batch of streams. |
 | 0x3005 | TRIM_STREAMS | Trim the min offset of a batch of streams. |
 | 0x4001 | REPORT_METRICS | Data node reports metrics to the PM. |
+| 0x4002 | DESCRIBE_PM_MEMBERS| Describe placement manager cluster membership |
 
 The below sub-sections describe the details of each frame type, including their usage, their binary format, and the meaning of their fields.
 
@@ -812,6 +813,48 @@ Response Header => data_node
 
 Response Payload => Empty
 ```
+
+### DESCRIBE_PM_CLUSTER
+The DESCRIBE_PM_CLUSTER frame(opcode=0x4002) requests placement manager to describe its current cluster membership. Embedded clients of the data-node MUST send heartbeats / load metrics to all PM nodes.
+
+** Request Frame**
+```
+Request Header => data_node
+  data_node => node_id advertise_addr
+    node_id => int32
+    advertise_addr => string
+  timeout_ms
+
+Request Payload => Empty
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| timeout_ms | int32 | The timeout in milliseconds to wait for the response. |
+| node_id| int32 | The request data-node ID |
+| advertise_addr| string | advertise address of the data-node |
+
+**Response Frame:**
+```
+Response Header=> status
+  status =>
+    code => int16
+    message => string
+    detail => bytes
+  cluster => PlacementManagerCluster
+
+Response Body => Empty
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| throttle_time_ms | int32 | The time in milliseconds to throttle the client, due to a quota violation or the server is too busy. |
+| status | struct | The error status of the response. |
+| code | int16 | The top level error code of the response. |
+| message | string | The top level error message of the response. |
+| detail | bytes | Additional information about the error. |
+
+
 
 ## Error Codes
 

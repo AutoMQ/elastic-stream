@@ -75,7 +75,7 @@ table Status {
 
 // The Placement Manager information.
 // It will be set in `Status.detail` if the `Status.code` is `PM_NOT_LEADER`.
-table PlacementManager {
+table PlacementManagerCluster {
     nodes: [PlacementManagerNode] (id: 0);
 }
 
@@ -533,4 +533,17 @@ table ReportMetricsRequest {
 table ReportMetricsResponse {
     data_node: DataNode (id: 0);
     status: Status (id: 1);
+}
+
+table DescribePlacementManagerClusterRequest {
+    // Data node that needs to know PM membership
+    data_node: DataNode (id: 0);
+
+    // The timeout in milliseconds to wait for the response.
+    timeout_ms: int32 (id: 1);
+}
+
+table DescribePlacementManagerClusterResponse {
+    status: Status (id: 0);
+    cluster: PlacementManagerCluster (id: 1);
 }
