@@ -64,7 +64,7 @@ The table below shows all the supported frame types along with a preallocated op
 | 0x3004 | DESCRIBE_STREAMS | Fetch the details of a batch of streams. |
 | 0x3005 | TRIM_STREAMS | Trim the min offset of a batch of streams. |
 | 0x4001 | REPORT_METRICS | Data node reports metrics to the PM. |
-| 0x4002 | DESCRIBE_PM_MEMBERS| Describe placement manager cluster membership |
+| 0x4002 | DESCRIBE_PM_CLUSTER| Describe placement manager cluster membership |
 
 The below sub-sections describe the details of each frame type, including their usage, their binary format, and the meaning of their fields.
 
