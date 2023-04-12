@@ -1,7 +1,7 @@
 package sdk.elastic.storage.client.common;
 
 import sdk.elastic.storage.client.route.Address;
-import sdk.elastic.storage.flatc.header.PlacementManager;
+import sdk.elastic.storage.flatc.header.PlacementManagerCluster;
 import sdk.elastic.storage.flatc.header.Status;
 
 import static sdk.elastic.storage.flatc.header.ErrorCode.PM_NOT_LEADER;
@@ -19,7 +19,7 @@ public class PmUtil {
             return null;
         }
 
-        PlacementManager manager = PlacementManager.getRootAsPlacementManager(FlatBuffersUtil.byteVector2ByteBuffer(status.detailVector()));
+        PlacementManagerCluster manager = PlacementManagerCluster.getRootAsPlacementManagerCluster(FlatBuffersUtil.byteVector2ByteBuffer(status.detailVector()));
         for (int i = 0; i < manager.nodesLength(); i++) {
             if (manager.nodes(i).isLeader()) {
                 String hostPortString = manager.nodes(i).advertiseAddr();
