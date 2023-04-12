@@ -18,6 +18,7 @@ package sdk.elastic.stream.client.netty;
 
 import io.netty.channel.Channel;
 import java.util.concurrent.CompletableFuture;
+import sdk.elastic.stream.client.common.SemaphoreReleaseOnlyOnce;
 import sdk.elastic.stream.client.protocol.SbpFrame;
 
 public class ResponseFuture {
@@ -26,19 +27,29 @@ public class ResponseFuture {
     private final SbpFrame request;
     private final long timeoutMillis;
     private final CompletableFuture<SbpFrame> completableFuture;
+    private final SemaphoreReleaseOnlyOnce once;
     private final long beginTimestamp = System.currentTimeMillis();
     private volatile boolean sendRequestOK = true;
 
-    public ResponseFuture(Channel channel, int id, long timeoutMillis, CompletableFuture<SbpFrame> completableFuture) {
-        this(channel, id, null, timeoutMillis, completableFuture);
+    public ResponseFuture(Channel channel, int id, long timeoutMillis, CompletableFuture<SbpFrame> completableFuture,
+        SemaphoreReleaseOnlyOnce once) {
+        this(channel, id, null, timeoutMillis, completableFuture, once);
     }
 
-    public ResponseFuture(Channel channel, int id, SbpFrame request, long timeoutMillis, CompletableFuture<SbpFrame> completableFuture) {
+    public ResponseFuture(Channel channel, int id, SbpFrame request, long timeoutMillis,
+        CompletableFuture<SbpFrame> completableFuture, SemaphoreReleaseOnlyOnce once) {
         this.id = id;
         this.channel = channel;
         this.request = request;
         this.timeoutMillis = timeoutMillis;
         this.completableFuture = completableFuture;
+        this.once = once;
+    }
+
+    public void release() {
+        if (this.once != null) {
+            this.once.release();
+        }
     }
 
     public boolean isTimeout() {

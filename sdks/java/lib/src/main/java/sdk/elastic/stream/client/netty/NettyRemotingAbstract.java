@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sdk.elastic.stream.apis.exception.ClientException;
 import sdk.elastic.stream.client.common.RemotingUtil;
+import sdk.elastic.stream.client.common.SemaphoreReleaseOnlyOnce;
 import sdk.elastic.stream.client.protocol.SbpFrame;
 
 public abstract class NettyRemotingAbstract {
@@ -112,6 +113,7 @@ public abstract class NettyRemotingAbstract {
                 responseFuture.getCompletableFuture().complete(frame);
             }
             responseTable.remove(opaque);
+            responseFuture.release();
         } else {
             log.warn("receive response, but not matched any request, " + RemotingUtil.parseChannelRemoteAddr(ctx.channel()));
             log.warn(frame.toString());
@@ -131,6 +133,7 @@ public abstract class NettyRemotingAbstract {
             ResponseFuture rep = next.getValue();
 
             if ((rep.getBeginTimestamp() + rep.getTimeoutMillis() + 1000) <= System.currentTimeMillis()) {
+                rep.release();
                 it.remove();
                 aliveChannelTable.remove(rep.getChannel());
                 rfList.add(rep);
@@ -153,7 +156,8 @@ public abstract class NettyRemotingAbstract {
         try {
             boolean acquired = this.semaphoreAsync.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS);
             if (acquired) {
-                final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis, future);
+                final SemaphoreReleaseOnlyOnce once = new SemaphoreReleaseOnlyOnce(this.semaphoreAsync);
+                final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis, future, once);
 
                 this.responseTable.put(opaque, responseFuture);
                 channel.writeAndFlush(request).addListener((ChannelFutureListener) f -> {
@@ -162,7 +166,7 @@ public abstract class NettyRemotingAbstract {
                         return;
                     }
                     requestFail(opaque);
-                    log.warn("send a request SbpFrame to channel <{}> failed.", RemotingUtil.parseChannelRemoteAddr(channel));
+                    log.warn("send a request SbpFrame to channel <{}> failed. Error Msg: {}", RemotingUtil.parseChannelRemoteAddr(channel), f.cause().getMessage());
                 });
             } else {
                 if (timeoutMillis <= 0) {
@@ -199,6 +203,7 @@ public abstract class NettyRemotingAbstract {
         if (responseFuture != null) {
             responseFuture.setSendRequestOK(false);
             responseFuture.getCompletableFuture().completeExceptionally(new ClientException("fail fast due to channel problem"));
+            responseFuture.release();
         }
     }
 
