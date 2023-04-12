@@ -9,21 +9,28 @@ use transport::connection::Connection;
 use crate::{
     connection_tracker::ConnectionTracker,
     handler::ServerCall,
-    node_config::NodeConfig,
     stream_manager::{fetcher::FetchRangeTask, StreamManager},
+    worker_config::WorkerConfig,
 };
 
-pub(crate) struct Node {
+/// A server aggregates one or more `Worker`s and each `Worker` takes up a dedicated CPU
+/// processor, following the Thread-per-Core design paradigm.
+///
+/// There is only one primary worker, which is in charge of the stream/range management
+/// and communication with the placement manager.
+///
+/// Inter-worker communications are achieved via channels.
+pub(crate) struct Worker {
     logger: Logger,
-    config: NodeConfig,
+    config: WorkerConfig,
     store: Rc<ElasticStore>,
     stream_manager: Rc<RefCell<StreamManager>>,
     channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
 }
 
-impl Node {
+impl Worker {
     pub fn new(
-        config: NodeConfig,
+        config: WorkerConfig,
         store: Rc<ElasticStore>,
         stream_manager: Rc<RefCell<StreamManager>>,
         channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
@@ -133,7 +140,7 @@ impl Node {
                     let stream_manager = Rc::clone(&self.stream_manager);
                     let connection_tracker = Rc::clone(&connection_tracker);
                     tokio_uring::spawn(async move {
-                        Node::process(store, stream_manager, connection_tracker, peer_socket_address, stream, logger).await;
+                        Worker::process(store, stream_manager, connection_tracker, peer_socket_address, stream, logger).await;
                     });
                 }
             }

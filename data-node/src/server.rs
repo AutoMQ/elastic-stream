@@ -1,7 +1,7 @@
 use crate::{
-    node::Node,
-    node_config::NodeConfig,
     stream_manager::{fetcher::Fetcher, StreamManager},
+    worker::Worker,
+    worker_config::WorkerConfig,
 };
 use client::{ClientBuilder, ClientConfig};
 use config::Configuration;
@@ -45,7 +45,7 @@ pub fn launch(
 
     let mut channels = vec![];
 
-    // Build non-primary nodes first
+    // Build non-primary workers first
     let mut handles = core_ids
         .iter()
         .skip(available_core_len - cfg.server.concurrency + 1)
@@ -61,9 +61,9 @@ pub fn launch(
             thread::Builder::new()
                 .name("DataNode".to_owned())
                 .spawn(move || {
-                    let node_config = NodeConfig {
+                    let worker_config = WorkerConfig {
                         core_id,
-                        server_config: server_config.clone(),
+                        server_config,
                         sharing_uring: store.as_raw_fd(),
                         primary: false,
                     };
@@ -76,13 +76,13 @@ pub fn launch(
                         fetcher,
                         Rc::clone(&store),
                     )));
-                    let mut node = Node::new(node_config, store, stream_manager, None, &logger);
+                    let mut node = Worker::new(worker_config, store, stream_manager, None, &logger);
                     node.serve(shutdown_rx)
                 })
         })
         .collect::<Vec<_>>();
 
-    // Build primary node
+    // Build primary worker
     {
         let core_id = core_ids
             .get(available_core_len - cfg.server.concurrency)
@@ -93,7 +93,7 @@ pub fn launch(
         let handle = thread::Builder::new()
             .name("DataNode[Primary]".to_owned())
             .spawn(move || {
-                let node_config = NodeConfig {
+                let worker_config = WorkerConfig {
                     core_id,
                     server_config,
                     sharing_uring: store.as_raw_fd(),
@@ -105,8 +105,8 @@ pub fn launch(
                     node_id: store.id(),
                     advertise_address: format!(
                         "{}:{}",
-                        node_config.server_config.server.host,
-                        node_config.server_config.server.port
+                        worker_config.server_config.server.host,
+                        worker_config.server_config.server.port
                     ),
                 });
 
@@ -118,7 +118,7 @@ pub fn launch(
 
                 let fetcher = Fetcher::PlacementClient {
                     client: placement_client,
-                    target: node_config.server_config.server.placement_manager.clone(),
+                    target: worker_config.server_config.server.placement_manager.clone(),
                 };
                 let store = Rc::new(store);
 
@@ -128,7 +128,8 @@ pub fn launch(
                     Rc::clone(&store),
                 )));
 
-                let mut node = Node::new(node_config, store, stream_manager, Some(channels), &log);
+                let mut node =
+                    Worker::new(worker_config, store, stream_manager, Some(channels), &log);
                 node.serve(shutdown_rx)
             });
         handles.push(handle);
