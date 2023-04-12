@@ -48,7 +48,7 @@ public class Record {
         this.timestamp = timestamp;
         this.headers = headers;
         this.properties = properties;
-        this.body = body;
+        this.body = body.duplicate();
     }
 
     public Record(long streamId, long offset, Headers headers, Map<String, String> properties, ByteBuffer body) {
@@ -101,7 +101,7 @@ public class Record {
     }
 
     public ByteBuffer getBody() {
-        return body;
+        return body.duplicate();
     }
 
     public Headers getHeaders() {
@@ -151,7 +151,7 @@ public class Record {
             .append(this.timestamp)
             .append(this.headers)
             .append(this.properties)
-            .append(this.body)
+            .append(this.body.duplicate())
             .toHashCode();
     }
 }
