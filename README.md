@@ -1,4 +1,11 @@
+## Introduction
+ElasticStream is an open-source, elastic streaming platform. ElasticStream is designed to stand on shoulders of cloud infra-structure,
+excelling itself in scalability, fault-tolerance, cost-effectiveness and security.
+
+ElasticStream has three components: placement-manager, data-node and frontend.
+
 ## How to Build
+
 
 ## Collect and Report Unit Test Coverage
 

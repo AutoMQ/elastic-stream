@@ -2,7 +2,7 @@
 # Server configuration
 server:
   # Advertise host address
-  host: "114.116.40.8"
+  host: "127.0.0.1"
   # Listening port
   port: 10911
   # Number of Thread-per-Core Nodes
@@ -11,7 +11,7 @@ server:
     # Network io_uring queue depth
     queue-depth: 128
   # Placement manager address
-  placement-manager: "114.116.40.8:2378"
+  placement-manager: "127.0.0.1:2378"
 # Store configuration
 store:
   # Whether mkdirs if missing
