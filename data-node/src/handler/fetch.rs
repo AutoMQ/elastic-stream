@@ -164,7 +164,11 @@ impl<'a> Fetch<'a> {
             .iter()
             .flatten()
             .map(|req| {
-                let stream_id = req.stream_id();
+                // Retrieve stream id from req.range, return error if it's a bad request
+                let stream_id = match req.range().and_then(|r| Some(r.stream_id())) {
+                    Some(stream_id) => stream_id,
+                    None => return Err(FetchError::BadRequest),
+                };
 
                 // If the stream-range exists and contains the requested offset, build the read options
                 if let Some(range) = stream_manager
@@ -179,7 +183,7 @@ impl<'a> Fetch<'a> {
                         None => Some(range.limit() as i64),
                     };
                     return Ok(ReadOptions {
-                        stream_id: req.stream_id(),
+                        stream_id: stream_id,
                         offset: req.fetch_offset(),
                         max_offset: max_offset,
                         max_wait_ms: self.fetch_request.max_wait_ms(),
@@ -193,6 +197,17 @@ impl<'a> Fetch<'a> {
     }
 
     fn convert_store_error(&self, err: &FetchError) -> (ErrorCode, Option<String>) {
-        (ErrorCode::PM_INTERNAL_SERVER_ERROR, Some(err.to_string()))
+        match err {
+            FetchError::SubmissionQueue => {
+                (ErrorCode::DN_INTERNAL_SERVER_ERROR, Some(err.to_string()))
+            }
+            FetchError::ChannelRecv => (ErrorCode::DN_INTERNAL_SERVER_ERROR, Some(err.to_string())),
+            FetchError::TranslateIndex => {
+                (ErrorCode::DN_INTERNAL_SERVER_ERROR, Some(err.to_string()))
+            }
+            FetchError::NoRecord => (ErrorCode::NO_NEW_RECORD, Some(err.to_string())),
+            FetchError::RangeNotFound => (ErrorCode::RANGE_NOT_FOUND, Some(err.to_string())),
+            FetchError::BadRequest => (ErrorCode::BAD_REQUEST, Some(err.to_string())),
+        }
     }
 }
