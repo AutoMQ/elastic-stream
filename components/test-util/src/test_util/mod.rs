@@ -6,8 +6,10 @@ use std::time::Duration;
 use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
 use protocol::rpc::header::{
-    ErrorCode, HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
-    ListRangesRequest, ListRangesResponseT, ListRangesResultT, RangeT, StatusT,
+    DescribePlacementManagerClusterRequest, DescribePlacementManagerClusterResponseT, ErrorCode,
+    HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
+    ListRangesRequest, ListRangesResponseT, ListRangesResultT, PlacementManagerClusterT,
+    PlacementManagerNodeT, RangeT, StatusT,
 };
 use slog::{debug, error, info, trace, warn, Logger};
 
@@ -63,6 +65,43 @@ fn serve_list_ranges(log: &Logger, request: &ListRangesRequest, frame: &mut Fram
 
         result.ranges = Some(ranges);
         resp.list_responses = Some(vec![result]);
+    }
+
+    let resp = resp.pack(&mut builder);
+    builder.finish(resp, None);
+    let buf = builder.finished_data();
+    frame.header = Some(Bytes::copy_from_slice(buf));
+}
+
+fn serve_describe_placement_manager_cluster(
+    log: &Logger,
+    request: &DescribePlacementManagerClusterRequest,
+    frame: &mut Frame,
+) {
+    trace!(log, "Received a list-ranges request: {:?}", request);
+    let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
+    let mut resp = DescribePlacementManagerClusterResponseT::default();
+
+    {
+        let mut cluster = PlacementManagerClusterT::default();
+
+        cluster.nodes = (0..3)
+            .into_iter()
+            .map(|i| {
+                let mut node = PlacementManagerNodeT::default();
+                node.is_leader = i == 0;
+                node.name = format!("node-{}", i);
+                node.advertise_addr = format!("localhost:{}", 1080 + i);
+                node
+            })
+            .collect();
+
+        let mut status = StatusT::default();
+        status.code = ErrorCode::OK;
+        status.message = Some(String::from("OK"));
+        resp.status = Box::new(status);
+
+        resp.cluster = Box::new(cluster);
     }
 
     let resp = resp.pack(&mut builder);
@@ -150,6 +189,31 @@ pub async fn run_listener(logger: Logger) -> u16 {
                                                 error!(
                                                     log,
                                                     "Failed to decode id-allocation-request header"
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+
+                                OperationCode::DescribePlacementManager => {
+                                    response_frame.operation_code =
+                                        OperationCode::DescribePlacementManager;
+                                    if let Some(ref buf) = frame.header {
+                                        match flatbuffers::root::<
+                                            DescribePlacementManagerClusterRequest,
+                                        >(buf)
+                                        {
+                                            Ok(request) => {
+                                                serve_describe_placement_manager_cluster(
+                                                    &log,
+                                                    &request,
+                                                    &mut response_frame,
+                                                )
+                                            }
+                                            Err(e) => {
+                                                error!(
+                                                    log,
+                                                    "Failed to decode describe-placement-manager-request header"
                                                 );
                                             }
                                         }

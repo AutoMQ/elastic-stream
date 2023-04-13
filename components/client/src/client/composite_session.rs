@@ -1,10 +1,11 @@
-use super::{lb_policy::LbPolicy, session::Session};
+use super::{lb_policy::LbPolicy, response, session::Session};
 use crate::{error::ClientError, ClientConfig, Response};
 use model::{
     client_role::ClientRole, range::StreamRange, range_criteria::RangeCriteria, request::Request,
+    PlacementManagerNode,
 };
 use protocol::rpc::header::ErrorCode;
-use slog::{error, info, trace, Logger};
+use slog::{error, info, trace, warn, Logger};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -210,7 +211,9 @@ impl CompositeSession {
     ///  1.2 If the result `SocketAddress` is completely new, connect and build a new `Session`
     /// Step 2: Send DescribePlacementManagerRequest to the `Session` discovered in step 1;
     /// Step 3: Once response is received from placement manager server, update the aggregated `Session` table, including leadership
-    async fn describe_placement_manager_cluster(&self) -> Result<(), ClientError> {
+    async fn describe_placement_manager_cluster(
+        &self,
+    ) -> Result<Option<Vec<PlacementManagerNode>>, ClientError> {
         let addrs = self
             .target
             .to_socket_addrs()
@@ -233,32 +236,58 @@ impl CompositeSession {
         let request = Request::DescribePlacementManager { data_node };
 
         let mut request_sent = false;
-        for addr in &addrs {
-            if let Some(session) = self.sessions.borrow().get(addr) {
-                if let Err(tx_) = session.write(&request, tx).await {
-                    tx = tx_;
-                    error!(self.log, "Failed to send request to {}", addr);
-                    continue;
+        'outer: loop {
+            for addr in &addrs {
+                if let Some(session) = self.sessions.borrow().get(addr) {
+                    if let Err(tx_) = session.write(&request, tx).await {
+                        tx = tx_;
+                        error!(self.log, "Failed to send request to {}", addr);
+                        continue;
+                    }
+                    request_sent = true;
+                    break 'outer;
                 }
-                request_sent = true;
-                break;
+            }
+
+            if !request_sent {
+                if let Some(addr) = addrs.first() {
+                    let session = Self::connect(
+                        addr.clone(),
+                        self.config.connect_timeout,
+                        &self.config,
+                        &self.log,
+                    )
+                    .await?;
+                    self.sessions.borrow_mut().insert(addr.clone(), session);
+                } else {
+                    break;
+                }
             }
         }
 
         if !request_sent {
-            if let Some(addr) = addrs.first() {
-                let session = Self::connect(
-                    addr.clone(),
-                    self.config.connect_timeout,
-                    &self.config,
-                    &self.log,
-                )
-                .await?;
-                self.sessions.borrow_mut().insert(addr.clone(), session);
-            }
+            return Err(ClientError::ClientInternal);
         }
 
-        Ok(())
+        match rx.await {
+            Ok(response) => {
+                if let response::Response::DescribePlacementManager { status, nodes } = response {
+                    if ErrorCode::OK == status.code {
+                        trace!(self.log, "Received placement manager cluster {:?}", nodes);
+                        Ok(nodes)
+                    } else {
+                        warn!(
+                            self.log,
+                            "Failed to describe placement manager cluster: {:?}", status
+                        );
+                        Err(ClientError::ServerInternal)
+                    }
+                } else {
+                    Err(ClientError::ClientInternal)
+                }
+            }
+            Err(e) => Err(ClientError::ClientInternal),
+        }
     }
 
     async fn connect(
@@ -324,7 +353,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_describe_placement_manager_cluster() -> Result<(), Box<dyn Error>> {
         let log = test_util::terminal_logger();
         let mut client_config = ClientConfig::default();
@@ -340,10 +368,12 @@ mod tests {
             let composite_session =
                 CompositeSession::new(&target, client_config, LbPolicy::PickFirst, log.clone())
                     .await?;
-            composite_session
+            let nodes = composite_session
                 .describe_placement_manager_cluster()
                 .await
+                .unwrap()
                 .unwrap();
+            assert_eq!(3, nodes.len());
             Ok(())
         })
     }
