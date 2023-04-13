@@ -12,7 +12,7 @@ use std::{
     io::ErrorKind,
     net::{SocketAddr, ToSocketAddrs},
     rc::Rc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{sync::oneshot, time::timeout};
 use tokio_uring::net::TcpStream;
@@ -23,6 +23,8 @@ pub(crate) struct CompositeSession {
     lb_policy: LbPolicy,
     sessions: RefCell<HashMap<SocketAddr, Session>>,
     log: Logger,
+    refresh_cluster_instant: RefCell<Instant>,
+    heartbeat_instant: RefCell<Instant>,
 }
 
 impl CompositeSession {
@@ -58,17 +60,34 @@ impl CompositeSession {
             lb_policy,
             sessions,
             log,
+            refresh_cluster_instant: RefCell::new(Instant::now()),
+            heartbeat_instant: RefCell::new(Instant::now()),
         })
     }
 
-    pub(crate) fn need_heartbeat(&self, interval: &Duration) -> bool {
-        true
+    pub(crate) fn need_heartbeat(&self) -> bool {
+        let now = Instant::now();
+        let last = self.heartbeat_instant.borrow();
+        last.clone() + self.config.heartbeat_interval >= now
+    }
+
+    fn need_refresh_cluster(&self) -> bool {
+        let now = Instant::now();
+        todo!()
     }
 
     /// Broadcast heartbeat requests to all nested sessions.
     ///
     ///
     pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
+        if !self.need_heartbeat() {
+            trace!(self.log, "No need to broadcast heartbeat yet");
+            return Ok(());
+        }
+
+        let now = Instant::now();
+        *self.heartbeat_instant.borrow_mut() = now;
+
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
             let request = Request::Heartbeat {
                 client_id: self.config.client_id.clone(),
