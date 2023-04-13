@@ -63,7 +63,7 @@ impl SessionManager {
                         let sessions_ = unsafe {&*sessions.get()};
                         let mut futures = Vec::with_capacity(sessions_.len());
                         for (_addr, session) in sessions_.iter() {
-                            if session.need_heartbeat(&heartbeat_interval) {
+                            if session.need_heartbeat() {
                                 trace!(logger, "Heartbeat to {:?}", _addr);
                                 futures.push(timeout(io_timeout, session.heartbeat()));
                             }
