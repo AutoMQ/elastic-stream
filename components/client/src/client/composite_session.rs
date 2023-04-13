@@ -35,7 +35,7 @@ impl CompositeSession {
     where
         T: ToSocketAddrs + ToString,
     {
-        let mut sessions = RefCell::new(HashMap::new());
+        let sessions = RefCell::new(HashMap::new());
         // For now, we just resolve one session out of the target.
         // In the future, we would support multiple internal connection and load balancing among them.
         for socket_addr in target
