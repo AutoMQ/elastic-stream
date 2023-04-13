@@ -31,7 +31,7 @@ public interface OperationClient extends Closeable {
     CompletableFuture<AppendResultT> appendBatch(RecordBatch recordBatch, Duration timeout);
 
     /**
-     * Fetch batches from data nodes.
+     * Fetch batches from data nodes. Null will be returned if the request failed.
      *
      * @param streamId    stream id.
      * @param startOffset start offset.

@@ -1,5 +1,6 @@
 package sdk.elastic.stream.models;
 
+import java.util.Arrays;
 import sdk.elastic.stream.flatc.header.DataNodeT;
 import sdk.elastic.stream.flatc.header.RangeT;
 
@@ -17,6 +18,19 @@ public class RangeTDecorator extends RangeT {
      */
     public DataNodeT getPrimaryNode() {
         return decoratedRangeT.getReplicaNodes()[getPrimaryDnIndex()].getDataNode();
+    }
+
+    /**
+     * Get non-primary data node. If there is no non-primary data node, return the primary data node.
+     *
+     * @return a non-primary data node if possible. Otherwise, return the primary data node
+     */
+    public DataNodeT maybeGetNonPrimaryNode() {
+        return Arrays.stream(decoratedRangeT.getReplicaNodes())
+            .filter(replicaNodeT -> !replicaNodeT.getIsPrimary())
+            .findAny()
+            .orElse(decoratedRangeT.getReplicaNodes()[getPrimaryDnIndex()])
+            .getDataNode();
     }
 
     /**

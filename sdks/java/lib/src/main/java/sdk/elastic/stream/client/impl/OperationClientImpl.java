@@ -19,11 +19,14 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sdk.elastic.stream.apis.ClientConfiguration;
 import sdk.elastic.stream.apis.OperationClient;
 import sdk.elastic.stream.apis.exception.ClientException;
+import sdk.elastic.stream.apis.exception.OutdatedCacheException;
+import sdk.elastic.stream.apis.exception.RetryableException;
 import sdk.elastic.stream.apis.manager.ResourceManager;
 import sdk.elastic.stream.client.common.ClientId;
 import sdk.elastic.stream.client.common.PmUtil;
@@ -39,6 +42,7 @@ import sdk.elastic.stream.flatc.header.AppendResponse;
 import sdk.elastic.stream.flatc.header.AppendResultT;
 import sdk.elastic.stream.flatc.header.ClientRole;
 import sdk.elastic.stream.flatc.header.CreateStreamResultT;
+import sdk.elastic.stream.flatc.header.DataNodeT;
 import sdk.elastic.stream.flatc.header.FetchInfoT;
 import sdk.elastic.stream.flatc.header.FetchRequest;
 import sdk.elastic.stream.flatc.header.FetchRequestT;
@@ -158,7 +162,22 @@ public class OperationClientImpl implements OperationClient {
     public CompletableFuture<List<RecordBatch>> fetchBatches(long streamId, long startOffset, int minBytes,
         int maxBytes, Duration timeout) {
         // Batches will be fetched from the primary node. If the primary node is unavailable, the next node will be accessed.
-        return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, 2, -1);
+        return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, true)
+            .exceptionally(ex -> {
+                // invalid the cache and retry.
+                if (ex instanceof OutdatedCacheException) {
+                    this.streamRangeCache.invalidate(streamId);
+                    return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, true).join();
+                }
+                // just retry.
+                if (ex instanceof RetryableException) {
+                    return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, false).join();
+                }
+
+                // In other cases, do not retry and return null;
+                log.error("Failed to fetch batches for streamId {} from offset {}. minBytes {}, maxBytes {}, timeout {}", streamId, startOffset, minBytes, maxBytes, timeout, ex);
+                return null;
+            });
     }
 
     @Override
@@ -275,23 +294,16 @@ public class OperationClientImpl implements OperationClient {
     /**
      * Fetch batches from data nodes with retry.
      *
-     * @param streamId      stream id
-     * @param startOffset   start offset
-     * @param minBytes      min bytes to fetch
-     * @param maxBytes      max bytes to fetch
-     * @param timeout       timeout
-     * @param retryTimes    retry times
-     * @param dataNodeIndex data node index. A negative value means to fetch from the primary node.
+     * @param streamId       stream id
+     * @param startOffset    start offset
+     * @param minBytes       min bytes to fetch
+     * @param maxBytes       max bytes to fetch
+     * @param timeout        timeout
+     * @param usePrimaryNode whether to use primary node
      * @return record batches
      */
     private CompletableFuture<List<RecordBatch>> fetchBatches0(long streamId, long startOffset, int minBytes,
-        int maxBytes, Duration timeout, int retryTimes, int dataNodeIndex) {
-        if (retryTimes <= 0) {
-            CompletableFuture<List<RecordBatch>> future = new CompletableFuture<>();
-            future.completeExceptionally(new Exception("Retry times exceeded"));
-            return future;
-        }
-
+        int maxBytes, Duration timeout, boolean usePrimaryNode) {
         FetchInfoT fetchInfoT = new FetchInfoT();
         fetchInfoT.setRequestIndex(0);
         fetchInfoT.setFetchOffset(startOffset);
@@ -301,57 +313,58 @@ public class OperationClientImpl implements OperationClient {
         fetchRequestT.setMinBytes(minBytes);
         fetchRequestT.setFetchRequests(new FetchInfoT[] {fetchInfoT});
 
-        return this.streamRangeCache.getFloorRange(streamId, startOffset).thenCompose(rangeT -> {
-            fetchInfoT.setRange(rangeT);
-            FlatBufferBuilder builder = new FlatBufferBuilder();
-            int fetchRequestOffset = FetchRequest.pack(builder, fetchRequestT);
-            builder.finish(fetchRequestOffset);
-            SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.FETCH, builder.dataBuffer());
+        AtomicReference<Address> dataNodeAddress = new AtomicReference<>();
 
-            RangeTDecorator rangeTDecorator = new RangeTDecorator(rangeT);
+        CompletableFuture<SbpFrame> sbpFrameCompletableFuture = this.streamRangeCache.getFloorRange(streamId, startOffset)
+            .thenApply(rangeT -> {
+                fetchInfoT.setRange(rangeT);
+                FlatBufferBuilder builder = new FlatBufferBuilder();
+                int fetchRequestOffset = FetchRequest.pack(builder, fetchRequestT);
+                builder.finish(fetchRequestOffset);
 
-            // If dataNode is not specified, fetch from the primary node.
-            int dnIndex = dataNodeIndex >= 0 ? dataNodeIndex : rangeTDecorator.getPrimaryDnIndex();
-            Address dataNodeAddress = Address.fromAddress(rangeT.getReplicaNodes()[dnIndex].getDataNode().getAdvertiseAddr());
-            log.debug("trying to fetch batches from datanode {}, streamId {}, rangeIndex {}, startOffset {}", dataNodeAddress, rangeT.getStreamId(), rangeT.getRangeIndex(), startOffset);
+                RangeTDecorator rangeTDecorator = new RangeTDecorator(rangeT);
+                DataNodeT dataNodeT = usePrimaryNode ? rangeTDecorator.getPrimaryNode() : rangeTDecorator.maybeGetNonPrimaryNode();
+                dataNodeAddress.set(Address.fromAddress(dataNodeT.getAdvertiseAddr()));
 
-            return nettyClient.invokeAsync(dataNodeAddress, sbpFrame, timeout)
-                .thenCompose(responseFrame -> {
-                    FetchResponse response = FetchResponse.getRootAsFetchResponse(responseFrame.getHeader());
-                    return extractResponse(response).thenCompose(list -> {
-                        CompletableFuture<List<RecordBatch>> future = new CompletableFuture<>();
-                        short code = list.get(0).getStatus().getCode();
-                        // Get valid batches.
-                        if (code == OK) {
-                            int count = list.get(0).getBatchCount();
-                            future.complete(RecordBatch.decode(responseFrame.getPayload()[0], count));
-                            return future;
-                        }
+                return ProtocolUtil.constructRequestSbpFrame(OperationCode.FETCH, builder.dataBuffer());
+            });
 
-                        // return empty List if no new record.
-                        if (code == NO_NEW_RECORD) {
-                            future.complete(Collections.emptyList());
-                            return future;
-                        }
+        AtomicReference<ByteBuffer[]> payload = new AtomicReference<>();
 
-                        log.warn("Fetch batches from datanode {} failed, error code {}, msg {} ", dataNodeAddress, code, list.get(0).getStatus().getMessage());
+        CompletableFuture<FetchResultT> fetchResultFuture = sbpFrameCompletableFuture.thenCompose(sbpFrame -> nettyClient.invokeAsync(dataNodeAddress.get(), sbpFrame, timeout))
+            .thenCompose(responseFrame -> {
+                payload.set(responseFrame.getPayload());
+                return extractResponse(FetchResponse.getRootAsFetchResponse(responseFrame.getHeader()));
+            }).thenApply(list -> list.get(0));
 
-                        // No need to retry.
-                        if (code == OFFSET_OVERFLOW) {
-                            future.completeExceptionally(new ClientException("Fetch batches failed with code " + code + ", msg: " + list.get(0).getStatus().getMessage()));
-                            return future;
-                        }
+        return fetchResultFuture.thenCompose(fetchResultT -> {
+            CompletableFuture<List<RecordBatch>> future = new CompletableFuture<>();
+            short code = fetchResultT.getStatus().getCode();
+            // Get valid batches.
+            if (code == OK) {
+                int count = fetchResultT.getBatchCount();
+                future.complete(RecordBatch.decode(payload.get()[0], count));
+                return future;
+            }
 
-                        // invalid the cache and retry.
-                        if (code == RANGE_NOT_FOUND || code == OFFSET_OUT_OF_RANGE_BOUNDS) {
-                            this.streamRangeCache.invalidate(streamId);
-                            return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, retryTimes - 1, -1);
-                        }
+            // return empty List if no new record.
+            if (code == NO_NEW_RECORD) {
+                future.complete(Collections.emptyList());
+                return future;
+            }
 
-                        // Try next node again if possible.
-                        return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, retryTimes - 1, rangeTDecorator.getNextDnIndex(dnIndex));
-                    });
-                });
+            log.warn("Fetch batches from datanode {} failed, error code {}, msg {} ", dataNodeAddress.get(), code, fetchResultT.getStatus().getMessage());
+
+            String throwMessage = "Fetch batches from datanode " + dataNodeAddress.get() + " failed, error code " + code + ", msg " + fetchResultT.getStatus().getMessage();
+            if (code == OFFSET_OVERFLOW) {
+                future.completeExceptionally(new ClientException(throwMessage));
+            } else if (code == RANGE_NOT_FOUND || code == OFFSET_OUT_OF_RANGE_BOUNDS) {
+                future.completeExceptionally(new OutdatedCacheException(throwMessage));
+            } else {
+                future.completeExceptionally(new RetryableException(throwMessage));
+            }
+
+            return future;
         });
     }
 
