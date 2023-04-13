@@ -62,8 +62,8 @@ impl CompositeSession {
     }
 
     /// Broadcast heartbeat requests to all nested sessions.
-    /// 
-    /// 
+    ///
+    ///
     pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
         if let Some(session) = self.sessions.first() {
             let request = Request::Heartbeat {
@@ -192,6 +192,22 @@ impl CompositeSession {
         }
         Err(ClientError::ClientInternal)
     }
+
+    /// Describe current placement manager cluster membership.
+    ///
+    /// There are multiple rationales for this RPC.
+    /// 1. Placement manager is built on top of RAFT consensus algorithm and election happens in case of leader outage. Some RPCs
+    ///    should steer to the leader node and need to refresh the leadership on failure;
+    /// 2. Heartbeat, metrics-reporting RPC requests should broadcast to all placement manager nodes, so that when leader changes,
+    ///    data-node liveness and load evaluation are not impacted.
+    ///
+    /// # Implementation walkthrough
+    /// Step 1: If placement manager access URL uses domain name, resolve it;
+    ///  1.1 If the result `SocketAddress` has an existing `Session`, re-use it and go to step 2;
+    ///  1.2 If the result `SocketAddress` is completely new, connect and build a new `Session`
+    /// Step 2: Send DescribePlacementManagerRequest to the `Session` discovered in step 1;
+    /// Step 3: Once response is received from placement manager server, update the aggregated `Session` table, including leadership
+    async fn describe_placement_manager_cluster(&self) {}
 
     async fn connect(
         addr: SocketAddr,
