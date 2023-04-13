@@ -12,6 +12,14 @@ server:
     queue-depth: 128
   # Placement manager address
   placement-manager: "127.0.0.1:2378"
+  # Unit of interval in milliseconds
+  tick: 100
+  # Refresh placement manager cluster interval in ticks
+  refresh-pm-cluster-interval: 300
+  # Heartbeat interval in ticks
+  heartbeat-interval: 30
+  # Connection idle duration in ticks
+  connection-idle-duration: 60
 # Store configuration
 store:
   # Whether mkdirs if missing

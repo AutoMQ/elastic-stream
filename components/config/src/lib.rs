@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use error::ConfigurationError;
 use nix::sys::stat;
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,17 @@ pub struct Server {
 
     #[serde(rename = "placement-manager")]
     pub placement_manager: String,
+
+    pub tick: u64,
+
+    #[serde(rename = "refresh-pm-cluster-interval")]
+    pub refresh_pm_cluster_interval: u64,
+
+    #[serde(rename = "heartbeat-interval")]
+    pub heartbeat_interval: u64,
+
+    #[serde(rename = "connection-idle-duration")]
+    pub connection_idle_duration: u64,
 }
 
 impl Default for Server {
@@ -23,7 +36,25 @@ impl Default for Server {
             concurrency: 1,
             uring: Uring::default(),
             placement_manager: "localhost:2378".to_owned(),
+            tick: 100,
+            refresh_pm_cluster_interval: 300,
+            heartbeat_interval: 30,
+            connection_idle_duration: 60,
         }
+    }
+}
+
+impl Server {
+    pub fn refresh_placement_manager_cluster_interval(&self) -> Duration {
+        Duration::from_millis(self.tick * self.refresh_pm_cluster_interval)
+    }
+
+    pub fn heartbeat_interval(&self) -> Duration {
+        Duration::from_millis(self.tick * self.heartbeat_interval)
+    }
+
+    pub fn connection_idle_duration(&self) -> Duration {
+        Duration::from_millis(self.tick * self.connection_idle_duration)
     }
 }
 

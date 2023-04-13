@@ -88,7 +88,7 @@ impl Client {
         time::timeout(self.config.io_timeout, session.heartbeat())
             .await
             .map_err(|_elapsed| {
-                error!(self.log, "Timeout when heartbeat to {}", target);
+                error!(self.log, "Timeout when broadcasting heartbeat to {}", target);
                 ClientError::RpcTimeout {
                     timeout: self.config.io_timeout,
                 }
