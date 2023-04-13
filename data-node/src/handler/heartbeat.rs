@@ -46,7 +46,7 @@ impl<'a> Heartbeat<'a> {
         let mut status = StatusT::default();
         status.code = ErrorCode::OK;
         status.message = Some(String::from("OK"));
-        response_header.status = Some(Box::new(status));
+        response_header.status = Box::new(status);
 
         response_header.client_id = self.request.client_id().map(|id| id.to_owned());
         response_header.client_role = self.request.client_role();

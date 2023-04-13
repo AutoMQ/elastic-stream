@@ -66,7 +66,7 @@ impl<'a> DescribeRange<'a> {
         let mut status = StatusT::default();
         status.code = ErrorCode::OK;
         status.message = Some(String::from("OK"));
-        describe_range_response.status = Some(Box::new(status));
+        describe_range_response.status = Box::new(status);
         let mut manager = stream_manager.borrow_mut();
 
         if let Some(ranges) = request.ranges {
@@ -99,7 +99,7 @@ impl<'a> DescribeRange<'a> {
                         status.message = Some(format!("{}", e));
                     }
                 };
-                result.status = Some(Box::new(status));
+                result.status = Box::new(status);
                 results.push(result);
             }
             describe_range_response.describe_responses = Some(results);

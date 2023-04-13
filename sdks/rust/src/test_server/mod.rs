@@ -24,7 +24,7 @@ fn serve_heartbeat(log: &Logger, request: &HeartbeatRequest, frame: &mut Frame) 
     let mut status = StatusT::default();
     status.code = ErrorCode::OK;
     status.message = Some("OK".to_owned());
-    response.status = Some(Box::new(status));
+    response.status = Box::new(status);
     let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
     let resp = response.pack(&mut builder);
     builder.finish(resp, None);
@@ -46,7 +46,7 @@ fn serve_list_ranges(log: &Logger, request: &ListRangesRequest, frame: &mut Fram
         let mut status = StatusT::default();
         status.code = ErrorCode::OK;
         status.message = Some(String::from("OK"));
-        result.status = Some(Box::new(status));
+        result.status = Box::new(status);
 
         let ranges = (0..10)
             .map(|i| {
@@ -225,13 +225,17 @@ fn serve_create_streams(log: &Logger, req: &CreateStreamsRequest, response_frame
             let mut status = StatusT::default();
             status.code = ErrorCode::OK;
             status.message = Some(String::from("OK"));
-            result.status = Some(Box::new(status));
+            result.status = Box::new(status);
 
             result
         })
         .collect();
 
     response.create_responses = Some(results);
+    let mut status = StatusT::default();
+    status.code = ErrorCode::OK;
+    status.message = Some("OK".to_owned());
+    response.status = Box::new(status);
 
     let mut stream = StreamT::default();
     stream.stream_id = 1;

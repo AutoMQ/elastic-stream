@@ -2,6 +2,7 @@ pub(crate) mod client;
 pub(crate) mod client_builder;
 pub(crate) mod composite_session;
 pub mod config;
+pub(crate) mod handler;
 pub(crate) mod lb_policy;
 pub(crate) mod response;
 pub(crate) mod response_observer;

@@ -76,22 +76,22 @@ table Status {
 // The Placement Manager information.
 // It will be set in `Status.detail` if the `Status.code` is `PM_NOT_LEADER`.
 table PlacementManagerCluster {
-    nodes: [PlacementManagerNode] (id: 0);
+    nodes: [PlacementManagerNode] (id: 0, required);
 }
 
 // A node in the Placement Manager.
 table PlacementManagerNode {
     // The name of the PM node.
-    name: string (id: 0);
+    name: string (id: 0, required);
     // The advertise address of the PM node, for client traffic from outside.
     // The schema of the address is `host:port`, while host supports both domain name and IPv4/IPv6 address.
-    advertise_addr: string (id: 1);
+    advertise_addr: string (id: 1, required);
     is_leader: bool (id: 2);
 }
 
 // The system error response is used to return the error code and error message if the system error flag of sbp is set.
 table SystemErrorResponse {
-    status: Status (id: 0);
+    status: Status (id: 0, required);
 }
 
 enum ClientRole : byte {
@@ -115,7 +115,7 @@ table HeartbeatResponse {
     client_id: string (id: 0);
     client_role: ClientRole (id: 1);
     data_node: DataNode (id: 2);
-    status: Status (id: 3);
+    status: Status (id: 3, required);
 }
 
 // Request placement manager to allocate a unique ID. 
@@ -127,7 +127,7 @@ table IdAllocationRequest {
 // Unique ID allocation response
 table IdAllocationResponse {
     id: int32 (id: 0);
-    status: Status (id: 1);
+    status: Status (id: 1, required);
 }
 
 // The append request is used to append records to the data node.
@@ -152,7 +152,7 @@ table AppendResponse {
     throttle_time_ms: int32 (id: 0);
     // A batch of append responses.
     append_responses: [AppendResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table AppendResult {
@@ -164,7 +164,7 @@ table AppendResult {
     base_offset: int64 (id: 2);
     // The timestamp returned by the data node server after appending the records.
     stream_append_time_ms: int64 (id: 3);
-    status: Status (id: 4);
+    status: Status (id: 4, required);
 }
 
 // The fetch request is used to fetch records from the data node.
@@ -195,7 +195,7 @@ table FetchResponse {
     throttle_time_ms: int32 (id: 0);
     // A batch of fetch responses.
     fetch_responses: [FetchResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table FetchResult {
@@ -210,7 +210,7 @@ table FetchResult {
     // This field defines the quantity of record batches that are belonging to the current FetchResult.
     batch_count: int32 (id: 2);
 
-    status: Status (id: 3);
+    status: Status (id: 3, required);
 }
 
 // Used to fetch the ranges from a specific data node or a specific stream list.
@@ -245,7 +245,7 @@ table ListRangesResponse {
     throttle_time_ms: int32 (id: 0);
     // The responses of list ranges request
     list_responses: [ListRangesResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table ListRangesResult {
@@ -254,7 +254,7 @@ table ListRangesResult {
     range_criteria: RangeCriteria (id: 0);
     // The list of ranges.
     ranges: [Range] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table Range {
@@ -303,14 +303,14 @@ table SealRangesResponse {
     throttle_time_ms: int32 (id: 0);
     // The responses of seal ranges request
     seal_responses: [SealRangesResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table SealRangesResult {
     // Both the PM and the data node will handle the seal ranges request.
     // The data node returns the sealed range, while the PM returns the newly writable range.
     range: Range (id: 0);
-    status: Status (id: 1);
+    status: Status (id: 1, required);
 }
 
 // The sync ranges request is used to sync newly writable ranges to accelerate the availability of a newly created writable range.
@@ -332,7 +332,7 @@ table SyncRangesResponse {
     throttle_time_ms: int32 (id: 0);
     // The responses of sync ranges request
     sync_responses: [SyncRangesResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table SyncRangesResult {
@@ -340,7 +340,7 @@ table SyncRangesResult {
     stream_id: int64 = -1 (id: 0);
     // The array of ranges, returned by the sync ranges request.
     ranges: [Range] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 // The describe ranges request is used to describe the ranges of a batch of streams.
@@ -356,14 +356,14 @@ table DescribeRangesResponse {
     throttle_time_ms: int32 (id: 0);
     // The responses of describe ranges request
     describe_responses: [DescribeRangeResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table DescribeRangeResult {
     // The id of the stream
     stream_id: int64 = -1 (id: 0);
     range: Range (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table Stream {
@@ -392,7 +392,7 @@ table CreateStreamsResponse {
     create_responses: [CreateStreamResult] (id: 1);
 
     // Flag status of the RPC.
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table CreateStreamResult {
@@ -400,7 +400,7 @@ table CreateStreamResult {
     stream: Stream (id: 0);
     // The created range, which is the first range of the stream.
     range: Range (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 // The delete streams request is used to delete a batch of streams to PM or data node.
@@ -417,13 +417,13 @@ table DeleteStreamsResponse {
     throttle_time_ms: int32 (id: 0);
     // The responses of delete streams request
     delete_responses: [DeleteStreamResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table DeleteStreamResult {
     // The deleted stream, or omitted if the stream is not deleted.
     deleted_stream: Stream (id: 0);
-    status: Status (id: 1);
+    status: Status (id: 1, required);
 }
 
 table UpdateStreamsRequest {
@@ -438,13 +438,13 @@ table UpdateStreamsResponse {
     throttle_time_ms: int32 (id: 0);
     // The responses of update streams request
     update_responses: [UpdateStreamResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table UpdateStreamResult {
     // The updated stream
     stream: Stream (id: 0);
-    status: Status (id: 1);
+    status: Status (id: 1, required);
 }
 
 table DescribeStreamsRequest {
@@ -459,13 +459,13 @@ table DescribeStreamsResponse {
     throttle_time_ms: int32 (id: 0);
     // The responses of describe streams request
     describe_responses: [DescribeStreamResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table DescribeStreamResult {
     // The stream, returned by the describe streams request.
     stream: Stream (id: 0);
-    status: Status (id: 1);
+    status: Status (id: 1, required);
 }
 
 // The trim streams request is used to trim a batch of streams to PM.
@@ -498,7 +498,7 @@ table TrimStreamsResponse {
     throttle_time_ms: int32 (id: 0);
     // The responses of trim streams request
     trim_responses: [TrimStreamResult] (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table TrimStreamResult {
@@ -506,7 +506,7 @@ table TrimStreamResult {
     trimmed_stream: Stream (id: 0);
     // The smallest range of the stream after a trim operation.
     range: Range (id: 1);
-    status: Status (id: 2);
+    status: Status (id: 2, required);
 }
 
 table ReportMetricsRequest {
@@ -532,18 +532,18 @@ table ReportMetricsRequest {
 
 table ReportMetricsResponse {
     data_node: DataNode (id: 0);
-    status: Status (id: 1);
+    status: Status (id: 1, required);
 }
 
 table DescribePlacementManagerClusterRequest {
     // Data node that needs to know PM membership
-    data_node: DataNode (id: 0);
+    data_node: DataNode (id: 0, required);
 
     // The timeout in milliseconds to wait for the response.
     timeout_ms: int32 (id: 1);
 }
 
 table DescribePlacementManagerClusterResponse {
-    status: Status (id: 0);
-    cluster: PlacementManagerCluster (id: 1);
+    status: Status (id: 0, required);
+    cluster: PlacementManagerCluster (id: 1, required);
 }

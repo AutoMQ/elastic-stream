@@ -397,6 +397,9 @@ pub enum OperationCode {
 
     // Data node reports metrics to the PM.
     ReportMetrics = 0x4001,
+
+    // Describe placement manager cluster membership.
+    DescribePlacementManager = 0x4002,
 }
 
 impl Display for OperationCode {

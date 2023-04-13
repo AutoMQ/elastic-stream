@@ -7,6 +7,7 @@
 //! For applications that need to talk to `PlacementManager` and `DataNode`, please use crate `front-end-sdk`.
 
 #![feature(try_find)]
+#![feature(iterator_try_collect)]
 
 pub mod client;
 pub mod error;

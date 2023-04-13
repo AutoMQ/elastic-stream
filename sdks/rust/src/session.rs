@@ -141,15 +141,9 @@ impl Session {
         // Check if RPC is OK
         if frame.system_error() {
             if let Some(ref buf) = frame.header {
-                let system_error = flatbuffers::root::<SystemErrorResponse>(buf)?;
-                let system_error = system_error.unpack();
-                if let Some(status) = system_error.status.map(|st| model::Status {
-                    code: st.code,
-                    message: st.message.unwrap_or_default(),
-                    details: st.detail.map(|details| Bytes::copy_from_slice(&details)),
-                }) {
-                    return Err(ClientError::Internal(status));
-                }
+                let response = flatbuffers::root::<SystemErrorResponse>(buf)?;
+                let response = response.unpack();
+                return Err(ClientError::Internal(response.status.as_ref().into()));
             } else {
                 return Err(ClientError::UnexpectedResponse(String::from(
                     "Mal-formed system error frame",
@@ -162,54 +156,44 @@ impl Session {
             let response = flatbuffers::root::<CreateStreamsResponse>(buf)?;
             trace!(self.log, "CreateStreamsResponse: {:?}", response);
             let response = response.unpack();
-            if let Some(status) = response.status {
-                match status.code {
-                    ErrorCode::OK => {
-                        trace!(self.log, "Stream created");
-                    }
+            let status = response.status;
+            match status.code {
+                ErrorCode::OK => {
+                    trace!(self.log, "Stream created");
+                }
 
-                    ErrorCode::PM_NOT_LEADER => {
-                        warn!(self.log, "Failed to create stream: targeting placement manager node is not leader");
-                        if let Some(detail) = status.detail {
-                            let placement_manager_cluster =
-                                flatbuffers::root::<PlacementManagerCluster>(&detail)?;
-                            let placement_manager_cluster = placement_manager_cluster.unpack();
-                            let nodes = placement_manager_cluster
-                                .nodes
-                                .iter()
-                                .flat_map(|nodes| nodes.iter())
-                                .map(|node| Node {
-                                    name: node.name.clone().unwrap_or_default(),
-                                    advertise_address: node
-                                        .advertise_addr
-                                        .clone()
-                                        .unwrap_or_default(),
-                                    role: if node.is_leader {
-                                        Role::Leader
-                                    } else {
-                                        Role::Follower
-                                    },
-                                })
-                                .collect::<Vec<_>>();
-                            return Err(ClientError::LeadershipChanged { nodes });
-                        }
+                ErrorCode::PM_NOT_LEADER => {
+                    warn!(
+                        self.log,
+                        "Failed to create stream: targeting placement manager node is not leader"
+                    );
+                    if let Some(detail) = status.detail {
+                        let placement_manager_cluster =
+                            flatbuffers::root::<PlacementManagerCluster>(&detail)?;
+                        let placement_manager_cluster = placement_manager_cluster.unpack();
+                        let nodes = placement_manager_cluster
+                            .nodes
+                            .iter()
+                            .map(Into::into)
+                            .collect::<Vec<_>>();
+                        return Err(ClientError::LeadershipChanged { nodes });
                     }
+                }
 
-                    ErrorCode::PM_NO_AVAILABLE_DN => {
-                        error!(self.log, "Placement manager has no enough data nodes");
-                        return Err(ClientError::DataNodeNotAvailable);
-                    }
+                ErrorCode::PM_NO_AVAILABLE_DN => {
+                    error!(self.log, "Placement manager has no enough data nodes");
+                    return Err(ClientError::DataNodeNotAvailable);
+                }
 
-                    _ => {
-                        error!(
-                            self.log,
-                            "Unexpected error code from server: {}", self.peer_address
-                        );
-                        return Err(ClientError::UnexpectedResponse(format!(
-                            "Unexpected response status: {:?}",
-                            status
-                        )));
-                    }
+                _ => {
+                    error!(
+                        self.log,
+                        "Unexpected error code from server: {}", self.peer_address
+                    );
+                    return Err(ClientError::UnexpectedResponse(format!(
+                        "Unexpected response status: {:?}",
+                        status
+                    )));
                 }
             }
 
@@ -217,12 +201,7 @@ impl Session {
                 trace!(self.log, "CreateStreamsResults: {:?}", results);
                 let streams = results
                     .into_iter()
-                    .filter(|result| {
-                        if let Some(ref status) = result.status {
-                            return status.code == ErrorCode::OK && result.stream.is_some();
-                        }
-                        false
-                    })
+                    .filter(|result| result.status.code == ErrorCode::OK && result.stream.is_some())
                     .map(|result| {
                         let created = result.stream.expect("Stream should be present");
                         Stream::with_id(created.stream_id)

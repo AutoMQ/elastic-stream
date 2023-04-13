@@ -1,7 +1,8 @@
 use crate::{client_role::ClientRole, data_node::DataNode, range_criteria::RangeCriteria};
 use bytes::{Bytes, BytesMut};
 use protocol::rpc::header::{
-    HeartbeatRequestT, IdAllocationRequestT, ListRangesRequestT, RangeCriteriaT,
+    DescribePlacementManagerClusterRequestT, HeartbeatRequestT, IdAllocationRequestT,
+    ListRangesRequestT, RangeCriteriaT,
 };
 use std::time::Duration;
 
@@ -21,6 +22,10 @@ pub enum Request {
     AllocateId {
         timeout: Duration,
         host: String,
+    },
+
+    DescribePlacementManager {
+        data_node: DataNode,
     },
 }
 
@@ -65,9 +70,16 @@ impl From<&Request> for Bytes {
                 builder.finish(req, None);
             }
 
-            Request::AllocateId { timeout, host } => {
+            Request::AllocateId { timeout: _, host } => {
                 let mut request = IdAllocationRequestT::default();
                 request.host = Some(host.clone());
+                let request = request.pack(&mut builder);
+                builder.finish(request, None);
+            }
+
+            Request::DescribePlacementManager { data_node } => {
+                let mut request = DescribePlacementManagerClusterRequestT::default();
+                request.data_node = Box::new(data_node.into());
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }

@@ -48,7 +48,7 @@ impl<'a> SealRange<'a> {
         let mut status = StatusT::default();
         status.code = ErrorCode::OK;
         status.message = Some(String::from("OK"));
-        seal_response.status = Some(Box::new(status));
+        seal_response.status = Box::new(status);
         let mut manager = stream_manager.borrow_mut();
 
         let mut results = vec![];
@@ -77,7 +77,7 @@ impl<'a> SealRange<'a> {
                     status.message = Some(format!("{:?}", e));
                 }
             }
-            result.status = Some(Box::new(status));
+            result.status = Box::new(status);
             results.push(result);
         }
         seal_response.seal_responses = Some(results);

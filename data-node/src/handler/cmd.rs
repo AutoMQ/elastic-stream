@@ -62,6 +62,9 @@ impl<'a> Command<'a> {
             OperationCode::DescribeStreams => todo!(),
             OperationCode::TrimStreams => todo!(),
             OperationCode::ReportMetrics => todo!(),
+            OperationCode::DescribePlacementManager => {
+                todo!()
+            }
         }
     }
 

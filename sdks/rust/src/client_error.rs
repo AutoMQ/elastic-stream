@@ -1,9 +1,8 @@
 use std::io;
 
-use crate::node::Node;
 use codec::error::FrameError;
 use flatbuffers::InvalidFlatbuffer;
-use model::Status;
+use model::{PlacementManagerNode, Status};
 use thiserror::Error;
 use tokio::{sync::oneshot, time::error::Elapsed};
 
@@ -37,7 +36,7 @@ pub enum ClientError {
     DataNodeNotAvailable,
 
     #[error("Requested node is not playing leader role any more")]
-    LeadershipChanged { nodes: Vec<Node> },
+    LeadershipChanged { nodes: Vec<PlacementManagerNode> },
 
     #[error("Failed to spawn a thread")]
     Thread,
