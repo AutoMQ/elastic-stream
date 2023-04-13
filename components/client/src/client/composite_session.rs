@@ -6,6 +6,7 @@ use model::{
 use protocol::rpc::header::ErrorCode;
 use slog::{error, info, trace, Logger};
 use std::{
+    collections::HashMap,
     io::ErrorKind,
     net::{SocketAddr, ToSocketAddrs},
     rc::Rc,
@@ -18,7 +19,7 @@ pub(crate) struct CompositeSession {
     target: String,
     config: Rc<ClientConfig>,
     lb_policy: LbPolicy,
-    sessions: Vec<Session>,
+    sessions: HashMap<SocketAddr, Session>,
     log: Logger,
 }
 
@@ -32,15 +33,16 @@ impl CompositeSession {
     where
         T: ToSocketAddrs + ToString,
     {
-        let mut sessions = vec![];
+        let mut sessions = HashMap::new();
         // For now, we just resolve one session out of the target.
         // In the future, we would support multiple internal connection and load balancing among them.
         for socket_addr in target
             .to_socket_addrs()
             .map_err(|_e| ClientError::BadAddress)?
         {
-            let session = Self::connect(socket_addr, config.connect_timeout, &config, &log).await?;
-            sessions.push(session);
+            let session =
+                Self::connect(socket_addr.clone(), config.connect_timeout, &config, &log).await?;
+            sessions.insert(socket_addr, session);
         }
         info!(
             log,
@@ -65,7 +67,7 @@ impl CompositeSession {
     ///
     ///
     pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
-        if let Some(session) = self.sessions.first() {
+        if let Some((_, session)) = self.sessions.iter().next() {
             let request = Request::Heartbeat {
                 client_id: self.config.client_id.clone(),
                 role: ClientRole::DataNode,
@@ -109,7 +111,7 @@ impl CompositeSession {
         host: &str,
         timeout: Duration,
     ) -> Result<i32, ClientError> {
-        if let Some(session) = self.sessions.first() {
+        if let Some((_, session)) = self.sessions.iter().next() {
             let request = Request::AllocateId {
                 timeout: self.config.io_timeout,
                 host: host.to_owned(),
@@ -153,7 +155,7 @@ impl CompositeSession {
         criteria: RangeCriteria,
     ) -> Result<Vec<StreamRange>, ClientError> {
         // TODO: apply load-balancing among `self.sessions`.
-        if let Some(session) = self.sessions.first() {
+        if let Some((_, session)) = self.sessions.iter().next() {
             let request = Request::ListRanges {
                 timeout: self.config.io_timeout,
                 criteria: vec![criteria],
@@ -207,7 +209,28 @@ impl CompositeSession {
     ///  1.2 If the result `SocketAddress` is completely new, connect and build a new `Session`
     /// Step 2: Send DescribePlacementManagerRequest to the `Session` discovered in step 1;
     /// Step 3: Once response is received from placement manager server, update the aggregated `Session` table, including leadership
-    async fn describe_placement_manager_cluster(&self) {}
+    async fn describe_placement_manager_cluster(&self) -> Result<(), ClientError> {
+        let addrs = self
+            .target
+            .to_socket_addrs()
+            .map_err(|e| {
+                error!(
+                    self.log,
+                    "Failed to parse {} into SocketAddr: {:?}", self.target, e
+                );
+                ClientError::BadAddress
+            })?
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        for addr in &addrs {
+            if let Some(session) = self.sessions.get(addr) {
+                break;
+            }
+        }
+
+        Ok(())
+    }
 
     async fn connect(
         addr: SocketAddr,
@@ -250,11 +273,9 @@ impl CompositeSession {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, rc::Rc};
-
-    use crate::{client::lb_policy::LbPolicy, ClientConfig};
-
     use super::CompositeSession;
+    use crate::{client::lb_policy::LbPolicy, ClientConfig};
+    use std::{error::Error, rc::Rc};
 
     #[test]
     fn test_new() -> Result<(), Box<dyn Error>> {
@@ -267,6 +288,24 @@ mod tests {
                 CompositeSession::new(&target, client_config, LbPolicy::PickFirst, log.clone())
                     .await?;
 
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_describe_placement_manager_cluster() -> Result<(), Box<dyn Error>> {
+        let log = test_util::terminal_logger();
+        let client_config = Rc::new(ClientConfig::default());
+        tokio_uring::start(async {
+            let port = test_util::run_listener(log.clone()).await;
+            let target = format!("{}:{}", "localhost", port);
+            let composite_session =
+                CompositeSession::new(&target, client_config, LbPolicy::PickFirst, log.clone())
+                    .await?;
+            composite_session
+                .describe_placement_manager_cluster()
+                .await
+                .unwrap();
             Ok(())
         })
     }
