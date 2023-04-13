@@ -1,8 +1,9 @@
 plugins {
     id 'java-library'
+    id 'application'
 }
 
-group 'elastic.stream'
+group 'elastic.stream.benchmark'
 version '1.0-SNAPSHOT'
 
 repositories {
@@ -10,4 +11,15 @@ repositories {
 }
 
 dependencies {
+    implementation 'sdk.elastic.stream:client-java:0.0.1-SNAPSHOT'
+    implementation 'sdk.elastic.stream:flatc:0.0.1-SNAPSHOT'
+    implementation 'org.openjdk.jmh:jmh-core:1.36'
+    implementation 'org.openjdk.jmh:jmh-generator-annprocess:1.36'
+    implementation 'org.projectlombok:lombok:1.18.26'
+    annotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.36'
+    annotationProcessor 'org.projectlombok:lombok:1.18.26'
+}
+
+application {
+    getMainClass().set('elastic.stream.benchmark.Main')
 }
