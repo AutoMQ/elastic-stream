@@ -31,11 +31,11 @@ enum ErrorCode : int16 {
     UNAVAILABLE_FOR_LEGAL_REASONS = 1451,
     // Invalid request for a sealed range, such as appending.
     RANGE_ALREADY_SEALED = 1460,
-    // Requested offset > next_offset. Note that this code only applies to open ranges.
+    // For an open range, the requested offset > next_offset. 
     OFFSET_OVERFLOW = 1461,
     // Requested range not found.
     RANGE_NOT_FOUND = 1462,
-    // Requested offset is out of range bounds. Note that this code only applies to sealed ranges.
+    // For a sealded range, the requested offset is out of range bounds. For an open range, the requested offset < start_offset.
     OFFSET_OUT_OF_RANGE_BOUNDS = 1463,
 
     // 15xx is reserved for placement manager errors
@@ -186,16 +186,14 @@ table FetchRequest {
 }
 
 table FetchInfo {
-    // A specfic stream to fetch data from.
-    stream_id: int64 = -1 (id: 0);
+    // The stream range to fetch.
+    range: Range (id: 0);
     // The index of the request in the batch.
     request_index: int32 (id: 1);
-    // The stream range to fetch.
-    range: Range (id: 2);
     // The offset to fetch from.
-    fetch_offset: int64 (id: 3);
+    fetch_offset: int64 (id: 2);
     // The maximum number of bytes to fetch.
-    batch_max_bytes: int32 (id: 4);
+    batch_max_bytes: int32 (id: 3);
 }
 
 table FetchResponse {

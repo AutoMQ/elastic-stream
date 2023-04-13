@@ -26,7 +26,6 @@ import sdk.elastic.stream.apis.OperationClient;
 import sdk.elastic.stream.apis.exception.ClientException;
 import sdk.elastic.stream.apis.manager.ResourceManager;
 import sdk.elastic.stream.client.common.ClientId;
-import sdk.elastic.stream.client.common.DnUtil;
 import sdk.elastic.stream.client.common.PmUtil;
 import sdk.elastic.stream.client.common.ProtocolUtil;
 import sdk.elastic.stream.client.common.RemotingUtil;
@@ -54,6 +53,7 @@ import sdk.elastic.stream.flatc.header.RangeT;
 import sdk.elastic.stream.flatc.header.SealRangesResultT;
 import sdk.elastic.stream.flatc.header.StreamT;
 import sdk.elastic.stream.models.OperationCode;
+import sdk.elastic.stream.models.RangeTDecorator;
 import sdk.elastic.stream.models.RecordBatch;
 
 import static sdk.elastic.stream.flatc.header.ErrorCode.DN_NOT_LEADER_RANGE;
@@ -228,8 +228,8 @@ public class OperationClientImpl implements OperationClient {
 
             SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.APPEND, builder.dataBuffer(), new ByteBuffer[] {encodedBuffer});
 
-            Address targetDataNode = Address.fromAddress(DnUtil.findPrimaryDn(rangeT).getAdvertiseAddr());
-            assert targetDataNode != null;
+            RangeTDecorator rangeTDecorator = new RangeTDecorator(rangeT);
+            Address targetDataNode = Address.fromAddress(rangeTDecorator.getPrimaryNode().getAdvertiseAddr());
             log.debug("trying to append a batch for streamId {} to datanode {}", streamId, targetDataNode.getAddress());
 
             return nettyClient.invokeAsync(targetDataNode, sbpFrame, timeout)
@@ -293,7 +293,6 @@ public class OperationClientImpl implements OperationClient {
         }
 
         FetchInfoT fetchInfoT = new FetchInfoT();
-        fetchInfoT.setStreamId(streamId);
         fetchInfoT.setRequestIndex(0);
         fetchInfoT.setFetchOffset(startOffset);
         fetchInfoT.setBatchMaxBytes(maxBytes);
@@ -309,8 +308,10 @@ public class OperationClientImpl implements OperationClient {
             builder.finish(fetchRequestOffset);
             SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.FETCH, builder.dataBuffer());
 
+            RangeTDecorator rangeTDecorator = new RangeTDecorator(rangeT);
+
             // If dataNode is not specified, fetch from the primary node.
-            int dnIndex = dataNodeIndex >= 0 ? dataNodeIndex : DnUtil.findPrimaryDnIndex(rangeT);
+            int dnIndex = dataNodeIndex >= 0 ? dataNodeIndex : rangeTDecorator.getPrimaryDnIndex();
             Address dataNodeAddress = Address.fromAddress(rangeT.getReplicaNodes()[dnIndex].getDataNode().getAdvertiseAddr());
             log.debug("trying to fetch batches from datanode {}, streamId {}, rangeIndex {}, startOffset {}", dataNodeAddress, rangeT.getStreamId(), rangeT.getRangeIndex(), startOffset);
 
@@ -321,11 +322,18 @@ public class OperationClientImpl implements OperationClient {
                         CompletableFuture<List<RecordBatch>> future = new CompletableFuture<>();
                         short code = list.get(0).getStatus().getCode();
                         // Get valid batches.
-                        if (code == OK || code == NO_NEW_RECORD) {
+                        if (code == OK) {
                             int count = list.get(0).getBatchCount();
                             future.complete(RecordBatch.decode(responseFrame.getPayload()[0], count));
                             return future;
                         }
+
+                        // return empty List if no new record.
+                        if (code == NO_NEW_RECORD) {
+                            future.complete(Collections.emptyList());
+                            return future;
+                        }
+
                         log.warn("Fetch batches from datanode {} failed, error code {}, msg {} ", dataNodeAddress, code, list.get(0).getStatus().getMessage());
 
                         // No need to retry.
@@ -336,13 +344,12 @@ public class OperationClientImpl implements OperationClient {
 
                         // invalid the cache and retry.
                         if (code == RANGE_NOT_FOUND || code == OFFSET_OUT_OF_RANGE_BOUNDS) {
-                            this.streamRangeCache.invalidate(rangeT.getStreamId());
+                            this.streamRangeCache.invalidate(streamId);
                             return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, retryTimes - 1, -1);
                         }
 
                         // Try next node again if possible.
-                        int nextDnIndex = DnUtil.findNextDnIndex(rangeT, dnIndex);
-                        return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, retryTimes - 1, nextDnIndex);
+                        return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, retryTimes - 1, rangeTDecorator.getNextDnIndex(dnIndex));
                     });
                 });
         });
