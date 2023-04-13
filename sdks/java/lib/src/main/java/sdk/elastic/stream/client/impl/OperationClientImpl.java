@@ -26,6 +26,7 @@ import sdk.elastic.stream.apis.OperationClient;
 import sdk.elastic.stream.apis.exception.ClientException;
 import sdk.elastic.stream.apis.manager.ResourceManager;
 import sdk.elastic.stream.client.common.ClientId;
+import sdk.elastic.stream.client.common.DnUtil;
 import sdk.elastic.stream.client.common.PmUtil;
 import sdk.elastic.stream.client.common.ProtocolUtil;
 import sdk.elastic.stream.client.common.RemotingUtil;
@@ -50,17 +51,19 @@ import sdk.elastic.stream.flatc.header.HeartbeatResponse;
 import sdk.elastic.stream.flatc.header.RangeCriteriaT;
 import sdk.elastic.stream.flatc.header.RangeIdT;
 import sdk.elastic.stream.flatc.header.RangeT;
-import sdk.elastic.stream.flatc.header.ReplicaNodeT;
 import sdk.elastic.stream.flatc.header.SealRangesResultT;
 import sdk.elastic.stream.flatc.header.StreamT;
 import sdk.elastic.stream.models.OperationCode;
 import sdk.elastic.stream.models.RecordBatch;
 
 import static sdk.elastic.stream.flatc.header.ErrorCode.DN_NOT_LEADER_RANGE;
+import static sdk.elastic.stream.flatc.header.ErrorCode.NO_NEW_RECORD;
+import static sdk.elastic.stream.flatc.header.ErrorCode.OFFSET_OUT_OF_RANGE_BOUNDS;
+import static sdk.elastic.stream.flatc.header.ErrorCode.OFFSET_OVERFLOW;
 import static sdk.elastic.stream.flatc.header.ErrorCode.OK;
 import static sdk.elastic.stream.flatc.header.ErrorCode.PM_INTERNAL_SERVER_ERROR;
 import static sdk.elastic.stream.flatc.header.ErrorCode.RANGE_ALREADY_SEALED;
-import static sdk.elastic.stream.flatc.header.ErrorCode.RANGE_NOT_FOUND_FOR_GIVEN_OFFSET;
+import static sdk.elastic.stream.flatc.header.ErrorCode.RANGE_NOT_FOUND;
 
 public class OperationClientImpl implements OperationClient {
     private static final Logger log = LoggerFactory.getLogger(OperationClientImpl.class);
@@ -154,55 +157,8 @@ public class OperationClientImpl implements OperationClient {
     @Override
     public CompletableFuture<List<RecordBatch>> fetchBatches(long streamId, long startOffset, int minBytes,
         int maxBytes, Duration timeout) {
-        FetchInfoT fetchInfoT = new FetchInfoT();
-        fetchInfoT.setStreamId(streamId);
-        fetchInfoT.setRequestIndex(0);
-        fetchInfoT.setFetchOffset(startOffset);
-        fetchInfoT.setBatchMaxBytes(maxBytes);
-        FetchRequestT fetchRequestT = new FetchRequestT();
-        fetchRequestT.setMaxWaitMs((int) timeout.toMillis());
-        fetchRequestT.setMinBytes(minBytes);
-        fetchRequestT.setFetchRequests(new FetchInfoT[] {fetchInfoT});
-        FlatBufferBuilder builder = new FlatBufferBuilder();
-        int fetchRequestOffset = FetchRequest.pack(builder, fetchRequestT);
-        builder.finish(fetchRequestOffset);
-        SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.FETCH, builder.dataBuffer());
-
-        return this.streamRangeCache.getFloorRange(streamId, startOffset).thenCompose(rangeT -> {
-            // No need to fetch from primary node. Fetch from the first node.
-            String targetDataNodeAddress = rangeT.getReplicaNodes()[0].getDataNode().getAdvertiseAddr();
-            return nettyClient.invokeAsync(Address.fromAddress(targetDataNodeAddress), sbpFrame, timeout)
-                .thenCompose(responseFrame -> {
-                    FetchResponse response = FetchResponse.getRootAsFetchResponse(responseFrame.getHeader());
-                    return extractResponse(response).thenCompose(list -> {
-                        short code = list.get(0).getStatus().getCode();
-
-                        // If the range is not found, we need to retry based on the updated cache.
-                        if (code == RANGE_NOT_FOUND_FOR_GIVEN_OFFSET) {
-                            streamRangeCache.invalidate(list.get(0).getStreamId());
-                            return this.streamRangeCache.getFloorRange(streamId, startOffset).thenCompose(rangeT1 -> {
-                                String targetDataNodeAddress1 = rangeT1.getReplicaNodes()[0].getDataNode().getAdvertiseAddr();
-                                return fetchBatches0(Address.fromAddress(targetDataNodeAddress1), sbpFrame, timeout).exceptionally(ex -> {
-                                    String nextAddress = rangeT1.getReplicaNodes().length > 1 ? rangeT1.getReplicaNodes()[1].getDataNode().getAdvertiseAddr() : targetDataNodeAddress1;
-                                    log.warn("Fetch batches from datanode {} failed, and try another node {}. Error details: {} ", targetDataNodeAddress1, nextAddress, ex.getMessage());
-                                    return fetchBatches0(Address.fromAddress(nextAddress), sbpFrame, timeout).join();
-                                });
-                            });
-                        }
-
-                        // If failed to fetch, try another node.
-                        if (code != OK) {
-                            String nextAddress = rangeT.getReplicaNodes().length > 1 ? rangeT.getReplicaNodes()[1].getDataNode().getAdvertiseAddr() : targetDataNodeAddress;
-                            log.warn("Fetch batches from datanode {} failed, and try another node {}. Error code {}, msg {} ", targetDataNodeAddress, nextAddress, code, list.get(0).getStatus().getMessage());
-                            return fetchBatches0(Address.fromAddress(nextAddress), sbpFrame, timeout);
-                        }
-
-                        // Fetch successfully for the first time.
-                        int count = list.get(0).getBatchCount();
-                        return CompletableFuture.completedFuture(RecordBatch.decode(responseFrame.getPayload()[0], count));
-                    });
-                });
-        });
+        // Batches will be fetched from the primary node. If the primary node is unavailable, the next node will be accessed.
+        return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, 2, -1);
     }
 
     @Override
@@ -272,13 +228,7 @@ public class OperationClientImpl implements OperationClient {
 
             SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.APPEND, builder.dataBuffer(), new ByteBuffer[] {encodedBuffer});
 
-            Address targetDataNode = null;
-            for (ReplicaNodeT node : rangeT.getReplicaNodes()) {
-                if (node.getIsPrimary()) {
-                    targetDataNode = Address.fromAddress(node.getDataNode().getAdvertiseAddr());
-                    break;
-                }
-            }
+            Address targetDataNode = Address.fromAddress(DnUtil.findPrimaryDn(rangeT).getAdvertiseAddr());
             assert targetDataNode != null;
             log.debug("trying to append a batch for streamId {} to datanode {}", streamId, targetDataNode.getAddress());
 
@@ -322,24 +272,80 @@ public class OperationClientImpl implements OperationClient {
         });
     }
 
-    private CompletableFuture<List<RecordBatch>> fetchBatches0(Address targetDataNodeAddress, SbpFrame sbpFrame,
-        Duration timeout) {
-        log.debug("trying to fetch batches from datanode {}", targetDataNodeAddress);
-        return nettyClient.invokeAsync(targetDataNodeAddress, sbpFrame, timeout)
-            .thenCompose(responseFrame -> {
-                FetchResponse response = FetchResponse.getRootAsFetchResponse(responseFrame.getHeader());
-                return extractResponse(response).thenCompose(list -> {
-                    CompletableFuture<List<RecordBatch>> future = new CompletableFuture<>();
-                    short code = list.get(0).getStatus().getCode();
-                    if (code != OK) {
-                        future.completeExceptionally(new ClientException("Fetch batches failed with code " + code + ", msg: " + list.get(0).getStatus().getMessage()));
-                        return future;
-                    }
-                    int count = list.get(0).getBatchCount();
-                    future.complete(RecordBatch.decode(responseFrame.getPayload()[0], count));
-                    return future;
+    /**
+     * Fetch batches from data nodes with retry.
+     *
+     * @param streamId      stream id
+     * @param startOffset   start offset
+     * @param minBytes      min bytes to fetch
+     * @param maxBytes      max bytes to fetch
+     * @param timeout       timeout
+     * @param retryTimes    retry times
+     * @param dataNodeIndex data node index. A negative value means to fetch from the primary node.
+     * @return record batches
+     */
+    private CompletableFuture<List<RecordBatch>> fetchBatches0(long streamId, long startOffset, int minBytes,
+        int maxBytes, Duration timeout, int retryTimes, int dataNodeIndex) {
+        if (retryTimes <= 0) {
+            CompletableFuture<List<RecordBatch>> future = new CompletableFuture<>();
+            future.completeExceptionally(new Exception("Retry times exceeded"));
+            return future;
+        }
+
+        FetchInfoT fetchInfoT = new FetchInfoT();
+        fetchInfoT.setStreamId(streamId);
+        fetchInfoT.setRequestIndex(0);
+        fetchInfoT.setFetchOffset(startOffset);
+        fetchInfoT.setBatchMaxBytes(maxBytes);
+        FetchRequestT fetchRequestT = new FetchRequestT();
+        fetchRequestT.setMaxWaitMs((int) timeout.toMillis());
+        fetchRequestT.setMinBytes(minBytes);
+        fetchRequestT.setFetchRequests(new FetchInfoT[] {fetchInfoT});
+
+        return this.streamRangeCache.getFloorRange(streamId, startOffset).thenCompose(rangeT -> {
+            fetchInfoT.setRange(rangeT);
+            FlatBufferBuilder builder = new FlatBufferBuilder();
+            int fetchRequestOffset = FetchRequest.pack(builder, fetchRequestT);
+            builder.finish(fetchRequestOffset);
+            SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.FETCH, builder.dataBuffer());
+
+            // If dataNode is not specified, fetch from the primary node.
+            int dnIndex = dataNodeIndex >= 0 ? dataNodeIndex : DnUtil.findPrimaryDnIndex(rangeT);
+            Address dataNodeAddress = Address.fromAddress(rangeT.getReplicaNodes()[dnIndex].getDataNode().getAdvertiseAddr());
+            log.debug("trying to fetch batches from datanode {}, streamId {}, rangeIndex {}, startOffset {}", dataNodeAddress, rangeT.getStreamId(), rangeT.getRangeIndex(), startOffset);
+
+            return nettyClient.invokeAsync(dataNodeAddress, sbpFrame, timeout)
+                .thenCompose(responseFrame -> {
+                    FetchResponse response = FetchResponse.getRootAsFetchResponse(responseFrame.getHeader());
+                    return extractResponse(response).thenCompose(list -> {
+                        CompletableFuture<List<RecordBatch>> future = new CompletableFuture<>();
+                        short code = list.get(0).getStatus().getCode();
+                        // Get valid batches.
+                        if (code == OK || code == NO_NEW_RECORD) {
+                            int count = list.get(0).getBatchCount();
+                            future.complete(RecordBatch.decode(responseFrame.getPayload()[0], count));
+                            return future;
+                        }
+                        log.warn("Fetch batches from datanode {} failed, error code {}, msg {} ", dataNodeAddress, code, list.get(0).getStatus().getMessage());
+
+                        // No need to retry.
+                        if (code == OFFSET_OVERFLOW) {
+                            future.completeExceptionally(new ClientException("Fetch batches failed with code " + code + ", msg: " + list.get(0).getStatus().getMessage()));
+                            return future;
+                        }
+
+                        // invalid the cache and retry.
+                        if (code == RANGE_NOT_FOUND || code == OFFSET_OUT_OF_RANGE_BOUNDS) {
+                            this.streamRangeCache.invalidate(rangeT.getStreamId());
+                            return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, retryTimes - 1, -1);
+                        }
+
+                        // Try next node again if possible.
+                        int nextDnIndex = DnUtil.findNextDnIndex(rangeT, dnIndex);
+                        return fetchBatches0(streamId, startOffset, minBytes, maxBytes, timeout, retryTimes - 1, nextDnIndex);
+                    });
                 });
-            });
+        });
     }
 
     private CompletableFuture<List<AppendResultT>> extractResponse(AppendResponse response) {
