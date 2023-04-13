@@ -1,0 +1,13 @@
+plugins {
+    id 'java-library'
+}
+
+group 'elastic.stream'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+}
