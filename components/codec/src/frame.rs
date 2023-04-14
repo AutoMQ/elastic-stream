@@ -168,7 +168,7 @@ impl Frame {
         let header_length = src.get_u16() as u32 + (header_length << 16);
         if header_length > frame_length - MIN_FRAME_LENGTH {
             return Err(FrameError::BadFrame(format!(
-                "Header length[{}] exceeds maximum value possbile given that frame-length is {}",
+                "Header length[{}] exceeds maximum value possible given that frame-length is {}",
                 header_length, frame_length
             )));
         }
