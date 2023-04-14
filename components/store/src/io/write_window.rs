@@ -106,7 +106,7 @@ impl WriteWindow {
                     );
                     *prev_len = length;
                 } else {
-                    // Should not reach here, as [offset, e.get()) truly includes [offset, length). This violates
+                    // Should not reach here, as [offset, e.get()) strictly includes [offset, length). This violates
                     // barrier mechanism.
                     error!(
                         self.log,
