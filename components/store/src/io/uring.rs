@@ -9,6 +9,7 @@ use crate::io::wal::Wal;
 use crate::io::write_window::WriteWindow;
 use crate::AppendResult;
 use crate::BufSlice;
+use std::io::{self, Error, ErrorKind};
 
 use crossbeam::channel::{Receiver, Sender, TryRecvError};
 use io_uring::register;
@@ -111,6 +112,9 @@ pub(crate) struct IO {
     /// so we use this mechanism to avoid memory corruption.
     blocked: HashMap<u64, (*mut Context, squeue::Entry)>,
 
+    /// Collects the SQEs that need to be re-submitted.
+    resubmit_sqes: VecDeque<squeue::Entry>,
+
     /// Provide index service for building read index, shared with the upper store layer.
     indexer: Arc<IndexDriver>,
 }
@@ -199,6 +203,7 @@ impl IO {
             inflight_read_tasks: BTreeMap::new(),
             barrier: HashSet::new(),
             blocked: HashMap::new(),
+            resubmit_sqes: VecDeque::new(),
             indexer,
         })
     }
@@ -526,7 +531,7 @@ impl IO {
                         );
 
                         let sqe = opcode::Read::new(types::Fd(sd.fd), ptr, read_len)
-                            .offset(read_from as i64)
+                            .offset(read_from as libc::off_t)
                             .build()
                             .user_data(context as u64);
 
@@ -833,6 +838,11 @@ impl IO {
         if self.has_write_sqe_unblocked() || need_write {
             self.build_write_sqe(entries);
         }
+
+        // Drain the SQEs that need to be re-submitted.
+        self.resubmit_sqes.drain(..).for_each(|sqe| {
+            entries.push(sqe);
+        });
     }
 
     fn await_data_task_completion(&self, mut wanted: usize) {
@@ -915,7 +925,88 @@ impl IO {
                                 "io_uring opcode `{}` failed. errno: `{}`", context.opcode, errno
                             );
 
-                            // TODO: Check if the errno is recoverable...
+                            let error = io::Error::from_raw_os_error(errno);
+                            // Some errors are not fatal, we should retry the task.
+                            // TODO: Add more error kinds to retry.
+                            if error.kind() == io::ErrorKind::Interrupted
+                                || error.kind() == io::ErrorKind::WouldBlock
+                            {
+                                if self.blocked.contains_key(&context.wal_offset) {
+                                    // There is a pending write task for this block, skip this task.
+                                    trace!(
+                                        self.log,
+                                        "Skip retrying the failed write task for wal offset {} as there is a pending write task for this block",
+                                        context.wal_offset
+                                    );
+                                    continue;
+                                }
+
+                                let wal_offset = context.wal_offset;
+                                let buf = context.buf.clone();
+
+                                if buf.partial() {
+                                    // Partial write, set the barrier.
+                                    self.barrier.insert(buf.wal_offset);
+                                }
+
+                                let sg = match self.wal.segment_file_of(wal_offset) {
+                                    Some(sg) => sg,
+                                    None => {
+                                        error!(
+                                            self.log,
+                                            "Log segment not found for wal offset {}", wal_offset
+                                        );
+                                        continue;
+                                    }
+                                };
+
+                                let sd = match &sg.sd {
+                                    Some(sd) => sd,
+                                    None => {
+                                        error!(
+                                            self.log,
+                                            "Log segment {} does not have a valid descriptor",
+                                            sg.wal_offset
+                                        );
+                                        continue;
+                                    }
+                                };
+
+                                let file_offset = wal_offset - sg.wal_offset;
+                                let buf_ptr = buf.as_ptr() as *mut u8;
+
+                                match context.opcode {
+                                    opcode::Read::CODE => {
+                                        let sqe = opcode::Read::new(
+                                            types::Fd(sd.fd),
+                                            buf_ptr,
+                                            context.len,
+                                        )
+                                        .offset(file_offset as libc::off_t)
+                                        .build()
+                                        .user_data(context.as_ptr() as u64);
+
+                                        self.resubmit_sqes.push_back(sqe);
+                                    }
+                                    opcode::Write::CODE => {
+                                        let sqe = opcode::Write::new(
+                                            types::Fd(sd.fd),
+                                            buf_ptr,
+                                            buf.capacity as u32,
+                                        )
+                                        .offset64(file_offset as libc::off_t)
+                                        .build()
+                                        .user_data(context.as_ptr() as u64);
+
+                                        self.resubmit_sqes.push_back(sqe);
+                                    }
+                                    _ => (),
+                                };
+
+                                continue;
+                            }
+
+                            // TODO: handle the error that can't be recovered.
                         }
                     } else {
                         // Add block cache
@@ -1356,6 +1447,7 @@ mod tests {
     use slog::trace;
     use std::cell::RefCell;
     use std::error::Error;
+    use std::io;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
     use std::thread::JoinHandle;
@@ -1899,5 +1991,11 @@ mod tests {
             .collect();
         let buffer = random_string.as_bytes();
         BytesMut::from(buffer).freeze()
+    }
+
+    #[test]
+    fn test_err() {
+        let error = io::Error::from_raw_os_error(11);
+        assert_eq!(error.kind(), io::ErrorKind::WouldBlock);
     }
 }
