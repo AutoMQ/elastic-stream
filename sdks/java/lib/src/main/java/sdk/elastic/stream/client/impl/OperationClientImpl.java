@@ -59,6 +59,7 @@ import sdk.elastic.stream.flatc.header.StreamT;
 import sdk.elastic.stream.models.OperationCode;
 import sdk.elastic.stream.models.RangeTDecorator;
 import sdk.elastic.stream.models.RecordBatch;
+import sdk.elastic.stream.models.RecordBatchReader;
 
 import static sdk.elastic.stream.flatc.header.ErrorCode.DN_NOT_LEADER_RANGE;
 import static sdk.elastic.stream.flatc.header.ErrorCode.NO_NEW_RECORD;
@@ -315,7 +316,7 @@ public class OperationClientImpl implements OperationClient {
 
         AtomicReference<Address> dataNodeAddress = new AtomicReference<>();
 
-        CompletableFuture<SbpFrame> sbpFrameCompletableFuture = this.streamRangeCache.getFloorRange(streamId, startOffset)
+        CompletableFuture<SbpFrame> frameFuture = this.streamRangeCache.getFloorRange(streamId, startOffset)
             .thenApply(rangeT -> {
                 fetchInfoT.setRange(rangeT);
                 FlatBufferBuilder builder = new FlatBufferBuilder();
@@ -329,21 +330,27 @@ public class OperationClientImpl implements OperationClient {
                 return ProtocolUtil.constructRequestSbpFrame(OperationCode.FETCH, builder.dataBuffer());
             });
 
-        AtomicReference<ByteBuffer[]> payload = new AtomicReference<>();
-
-        CompletableFuture<FetchResultT> fetchResultFuture = sbpFrameCompletableFuture.thenCompose(sbpFrame -> nettyClient.invokeAsync(dataNodeAddress.get(), sbpFrame, timeout))
+        CompletableFuture<RecordBatchReader> fetchResultFuture = frameFuture
+            .thenCompose(sbpFrame -> nettyClient.invokeAsync(dataNodeAddress.get(), sbpFrame, timeout))
             .thenCompose(responseFrame -> {
-                payload.set(responseFrame.getPayload());
-                return extractResponse(FetchResponse.getRootAsFetchResponse(responseFrame.getHeader()));
-            }).thenApply(list -> list.get(0));
+                FetchResponse response = FetchResponse.getRootAsFetchResponse(responseFrame.getHeader());
+                CompletableFuture<RecordBatchReader> future = new CompletableFuture<>();
+                if (response.status().code() != OK) {
+                    future.completeExceptionally(new ClientException("Fetch batches failed with code " + response.status().code() + ", msg: " + response.status().message()));
+                    return future;
+                }
 
-        return fetchResultFuture.thenCompose(fetchResultT -> {
+                FetchResultT fetchResultT = response.unpack().getFetchResponses()[0];
+                future.complete(new RecordBatchReader(fetchResultT.getStatus(), responseFrame.getPayload(), fetchResultT.getBatchCount()));
+                return future;
+            });
+
+        return fetchResultFuture.thenCompose(batchReader -> {
             CompletableFuture<List<RecordBatch>> future = new CompletableFuture<>();
-            short code = fetchResultT.getStatus().getCode();
+            short code = batchReader.getStatusT().getCode();
             // Get valid batches.
             if (code == OK) {
-                int count = fetchResultT.getBatchCount();
-                future.complete(RecordBatch.decode(payload.get()[0], count));
+                future.complete(batchReader.getRecordBatches());
                 return future;
             }
 
@@ -353,9 +360,9 @@ public class OperationClientImpl implements OperationClient {
                 return future;
             }
 
-            log.warn("Fetch batches from datanode {} failed, error code {}, msg {} ", dataNodeAddress.get(), code, fetchResultT.getStatus().getMessage());
+            log.warn("Fetch batches from datanode {} failed, error code {}, msg {} ", dataNodeAddress.get(), code, batchReader.getStatusT().getMessage());
 
-            String throwMessage = "Fetch batches from datanode " + dataNodeAddress.get() + " failed, error code " + code + ", msg " + fetchResultT.getStatus().getMessage();
+            String throwMessage = "Fetch batches from datanode " + dataNodeAddress.get() + " failed, error code " + code + ", msg " + batchReader.getStatusT().getMessage();
             if (code == OFFSET_OVERFLOW) {
                 future.completeExceptionally(new ClientException(throwMessage));
             } else if (code == RANGE_NOT_FOUND || code == OFFSET_OUT_OF_RANGE_BOUNDS) {
@@ -427,16 +434,6 @@ public class OperationClientImpl implements OperationClient {
         }
         log.debug("Heartbeat success, clientId: {}", response.clientId());
         future.complete(true);
-        return future;
-    }
-
-    private CompletableFuture<List<FetchResultT>> extractResponse(FetchResponse response) {
-        CompletableFuture<List<FetchResultT>> future = new CompletableFuture<>();
-        if (response.status().code() != OK) {
-            future.completeExceptionally(new ClientException("Fetch batches failed with code " + response.status().code() + ", msg: " + response.status().message()));
-            return future;
-        }
-        future.complete(Arrays.asList(response.unpack().getFetchResponses()));
         return future;
     }
 
