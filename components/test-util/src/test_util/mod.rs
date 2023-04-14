@@ -213,7 +213,7 @@ pub async fn run_listener(logger: Logger) -> u16 {
                                             Err(e) => {
                                                 error!(
                                                     log,
-                                                    "Failed to decode describe-placement-manager-request header"
+                                                    "Failed to decode describe-placement-manager-request header: {:?}", e
                                                 );
                                             }
                                         }

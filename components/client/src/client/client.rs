@@ -1,18 +1,29 @@
-use super::{config::ClientConfig, session_manager::SessionManager};
+use super::session_manager::SessionManager;
 use crate::error::ClientError;
 use model::{range::StreamRange, range_criteria::RangeCriteria};
 use slog::{error, trace, warn, Logger};
-use std::{cell::UnsafeCell, rc::Rc, time::Duration};
+use std::{cell::UnsafeCell, rc::Rc, sync::Arc, time::Duration};
 use tokio::time;
 
 /// `Client` is used to send
 pub struct Client {
     pub(crate) session_manager: Rc<UnsafeCell<SessionManager>>,
     pub(crate) log: Logger,
-    pub(crate) config: Rc<ClientConfig>,
+    pub(crate) config: Arc<config::Configuration>,
 }
 
 impl Client {
+    pub fn new(config: Arc<config::Configuration>, log: &Logger) -> Self {
+        let (stop_tx, stop_rx) = async_channel::unbounded();
+        let session_manager = Rc::new(UnsafeCell::new(SessionManager::new(&config, stop_rx, log)));
+
+        Self {
+            session_manager,
+            log: log.clone(),
+            config,
+        }
+    }
+
     pub fn start(&self) {
         let session_manager = Rc::clone(&self.session_manager);
         let session_manager = unsafe { &*session_manager.get() };
@@ -49,15 +60,14 @@ impl Client {
         let criteria = if let Some(stream_id) = stream_id {
             trace!(self.log, "list_range from {}", target; "stream-id" => stream_id);
             RangeCriteria::StreamId(stream_id)
-        } else if let Some(ref data_node) = self.config.data_node {
+        } else {
+            let data_node = self.config.server.data_node();
             trace!(
                 self.log,
                 "List stream ranges from placement manager for {:?}",
                 data_node
             );
-            RangeCriteria::DataNode(data_node.clone())
-        } else {
-            return Err(ClientError::ClientInternal);
+            RangeCriteria::DataNode(data_node)
         };
 
         let session_manager = unsafe { &mut *self.session_manager.get() };
@@ -85,12 +95,15 @@ impl Client {
     pub async fn broadcast_heartbeat(&self, target: &str) -> Result<(), ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager.get_session(target).await?;
-        time::timeout(self.config.io_timeout, session.heartbeat())
+        time::timeout(self.config.client_io_timeout(), session.heartbeat())
             .await
             .map_err(|_elapsed| {
-                error!(self.log, "Timeout when broadcasting heartbeat to {}", target);
+                error!(
+                    self.log,
+                    "Timeout when broadcasting heartbeat to {}", target
+                );
                 ClientError::RpcTimeout {
-                    timeout: self.config.io_timeout,
+                    timeout: self.config.client_io_timeout(),
                 }
             })
             .and_then(|_res| {
@@ -102,13 +115,11 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, time::Duration};
-
-    use model::data_node::DataNode;
     use slog::trace;
+    use std::{error::Error, sync::Arc, time::Duration};
     use test_util::{run_listener, terminal_logger};
 
-    use crate::{error::ListRangeError, ClientBuilder, ClientConfig};
+    use crate::{error::ListRangeError, Client};
 
     #[test]
     fn test_allocate_id() -> Result<(), Box<dyn Error>> {
@@ -118,10 +129,11 @@ mod tests {
             let port = 2378;
             let port = run_listener(log.clone()).await;
             let addr = format!("localhost:{}", port);
-            let client = ClientBuilder::new()
-                .set_log(log.clone())
-                .build()
-                .map_err(|_e| ListRangeError::Internal)?;
+            let mut config = config::Configuration::default();
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            let config = Arc::new(config);
+            let client = Client::new(config, &log);
             client.start();
             let timeout = Duration::from_secs(3);
             let id = client.allocate_id(&addr, "localhost", timeout).await?;
@@ -140,16 +152,11 @@ mod tests {
 
             let port = run_listener(log.clone()).await;
             let addr = format!("localhost:{}", port);
-            let mut client_config = ClientConfig::default();
-            client_config.with_data_node(DataNode {
-                node_id: 1,
-                advertise_address: format!("{}:{}", "localhost", "10911"),
-            });
-            let client = ClientBuilder::new()
-                .set_log(log.clone())
-                .set_config(client_config)
-                .build()
-                .map_err(|_e| ListRangeError::Internal)?;
+            let mut config = config::Configuration::default();
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            let config = Arc::new(config);
+            let client = Client::new(config, &log);
 
             client.start();
 
@@ -184,17 +191,12 @@ mod tests {
 
             let port = run_listener(log.clone()).await;
             let addr = format!("localhost:{}", port);
-            let mut client_config = ClientConfig::default();
-            client_config.with_data_node(DataNode {
-                node_id: 1,
-                advertise_address: format!("{}:{}", "localhost", "10911"),
-            });
-            let client = ClientBuilder::new()
-                .set_log(log.clone())
-                .set_config(client_config)
-                .build()
-                .map_err(|_e| ListRangeError::Internal)?;
 
+            let mut config = config::Configuration::default();
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            let config = Arc::new(config);
+            let client = Client::new(config, &log);
             client.start();
 
             let timeout = Duration::from_secs(10);

@@ -3,20 +3,15 @@ use crate::{
     worker::Worker,
     worker_config::WorkerConfig,
 };
-use client::{ClientBuilder, ClientConfig};
 use config::Configuration;
-use model::data_node::DataNode;
 use slog::{error, o, warn, Drain, Logger};
 use slog_async::Async;
 use slog_term::{FullFormat, TermDecorator};
 use std::{cell::RefCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
-use store::{ElasticStore, Store};
+use store::ElasticStore;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
-pub fn launch(
-    cfg: Arc<Configuration>,
-    shutdown: broadcast::Sender<()>,
-) -> Result<(), Box<dyn Error>> {
+pub fn launch(config: Configuration, shutdown: broadcast::Sender<()>) -> Result<(), Box<dyn Error>> {
     let decorator = TermDecorator::new().build();
     let drain = FullFormat::new(decorator)
         .use_file_location()
@@ -33,13 +28,17 @@ pub fn launch(
 
     let (recovery_completion_tx, recovery_completion_rx) = oneshot::channel();
 
-    let store = match ElasticStore::new(log.clone(), &cfg, recovery_completion_tx) {
+    // Note we move the configuration into store, letting it either allocate or read existing node-id for us.
+    let store = match ElasticStore::new(log.clone(), config, recovery_completion_tx) {
         Ok(store) => store,
         Err(e) => {
             error!(log, "Failed to launch ElasticStore: {:?}", e);
             return Err(Box::new(e));
         }
     };
+
+    // Acquire a shared ref to full-fledged configuration.
+    let config = store.config();
 
     recovery_completion_rx.blocking_recv()?;
 
@@ -48,9 +47,9 @@ pub fn launch(
     // Build non-primary workers first
     let mut handles = core_ids
         .iter()
-        .skip(available_core_len - cfg.server.concurrency + 1)
+        .skip(available_core_len - config.server.concurrency + 1)
         .map(|core_id| {
-            let server_config = cfg.clone();
+            let server_config = config.clone();
             let logger = log.new(o!());
             let store = store.clone();
             let core_id = core_id.clone();
@@ -76,7 +75,8 @@ pub fn launch(
                         fetcher,
                         Rc::clone(&store),
                     )));
-                    let mut worker = Worker::new(worker_config, store, stream_manager, None, &logger);
+                    let mut worker =
+                        Worker::new(worker_config, store, stream_manager, None, &logger);
                     worker.serve(shutdown_rx)
                 })
         })
@@ -85,36 +85,22 @@ pub fn launch(
     // Build primary worker
     {
         let core_id = core_ids
-            .get(available_core_len - cfg.server.concurrency)
+            .get(available_core_len - config.server.concurrency)
             .expect("At least one core should be reserved for primary node")
             .clone();
-        let server_config = cfg.clone();
+        let server_config = config.clone();
         let shutdown_rx = shutdown.subscribe();
         let handle = thread::Builder::new()
             .name("DataNode[Primary]".to_owned())
             .spawn(move || {
                 let worker_config = WorkerConfig {
                     core_id,
-                    server_config,
+                    server_config: Arc::clone(&server_config),
                     sharing_uring: store.as_raw_fd(),
                     primary: true,
                 };
 
-                let mut client_config = ClientConfig::default();
-                client_config.with_data_node(DataNode {
-                    node_id: store.id(),
-                    advertise_address: format!(
-                        "{}:{}",
-                        worker_config.server_config.server.host,
-                        worker_config.server_config.server.port
-                    ),
-                });
-
-                let placement_client = ClientBuilder::new()
-                    .set_log(log.clone())
-                    .set_config(client_config)
-                    .build()
-                    .expect("Build placement client");
+                let placement_client = client::Client::new(Arc::clone(&server_config), &log);
 
                 let fetcher = Fetcher::PlacementClient {
                     client: placement_client,

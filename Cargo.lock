@@ -472,6 +472,9 @@ dependencies = [
 name = "config"
 version = "0.1.0"
 dependencies = [
+ "gethostname",
+ "lazy_static",
+ "model",
  "nix 0.26.2",
  "num_cpus",
  "serde",

@@ -1,5 +1,5 @@
+use super::response;
 use super::session_state::SessionState;
-use super::{config, response};
 use codec::frame::{Frame, OperationCode};
 use model::data_node::DataNode;
 use model::range::StreamRange;
@@ -13,6 +13,7 @@ use protocol::rpc::header::{
 use slog::{error, trace, warn, Logger};
 use std::cell::RefCell;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::{
     cell::UnsafeCell,
     collections::HashMap,
@@ -26,7 +27,7 @@ use transport::connection::Connection;
 pub(crate) struct Session {
     target: SocketAddr,
 
-    config: Rc<config::ClientConfig>,
+    config: Arc<config::Configuration>,
 
     log: Logger,
 
@@ -78,7 +79,7 @@ impl Session {
         target: SocketAddr,
         stream: TcpStream,
         endpoint: &str,
-        config: &Rc<config::ClientConfig>,
+        config: &Arc<config::Configuration>,
         log: &Logger,
     ) -> Self {
         let connection = Rc::new(Connection::new(stream, endpoint, log.clone()));
@@ -87,7 +88,7 @@ impl Session {
         Self::spawn_read_loop(Rc::clone(&connection), Rc::clone(&inflight), log.clone());
 
         Self {
-            config: Rc::clone(config),
+            config: Arc::clone(config),
             target,
             log: log.clone(),
             state: SessionState::Active,
@@ -237,9 +238,9 @@ impl Session {
         }
 
         let request = Request::Heartbeat {
-            client_id: self.config.client_id.clone(),
+            client_id: self.config.client.client_id.clone(),
             role: ClientRole::DataNode,
-            data_node: self.config.data_node.clone(),
+            data_node: Some(self.config.server.data_node()),
         };
         let (response_observer, rx) = oneshot::channel();
         if self.write(&request, response_observer).await.is_ok() {
@@ -558,7 +559,6 @@ impl Drop for Session {
 mod tests {
 
     use super::*;
-    use model::data_node::DataNode;
     use protocol::rpc::header::ErrorCode;
     use std::{error::Error, time::Duration};
     use test_util::{run_listener, terminal_logger};
@@ -572,7 +572,7 @@ mod tests {
             let port = run_listener(logger.clone()).await;
             let target = format!("127.0.0.1:{}", port);
             let stream = TcpStream::connect(target.parse()?).await?;
-            let config = Rc::new(config::ClientConfig::default());
+            let config = Arc::new(config::Configuration::default());
             let session = Session::new(target.parse()?, stream, &target, &config, &logger);
 
             assert_eq!(SessionState::Active, session.state());
@@ -594,13 +594,11 @@ mod tests {
             let port = run_listener(logger.clone()).await;
             let target = format!("127.0.0.1:{}", port);
             let stream = TcpStream::connect(target.parse()?).await?;
-            let mut config = config::ClientConfig::default();
-            let data_node = DataNode {
-                node_id: 1,
-                advertise_address: "localhost:1234".to_owned(),
-            };
-            config.with_data_node(data_node);
-            let config = Rc::new(config);
+            let mut config = config::Configuration::default();
+            config.server.node_id = 1;
+            config.server.host = "localhost".to_owned();
+            config.server.port = 1234;
+            let config = Arc::new(config);
             let mut session = Session::new(target.parse()?, stream, &target, &config, &logger);
 
             let result = session.heartbeat().await;
@@ -623,13 +621,9 @@ mod tests {
             let port = run_listener(logger.clone()).await;
             let target = format!("127.0.0.1:{}", port);
             let stream = TcpStream::connect(target.parse()?).await?;
-            let mut config = config::ClientConfig::default();
-            let data_node = DataNode {
-                node_id: 1,
-                advertise_address: "localhost:1234".to_owned(),
-            };
-            config.with_data_node(data_node);
-            let config = Rc::new(config);
+            let mut config = config::Configuration::default();
+            config.server.node_id = 1;
+            let config = Arc::new(config);
             let mut session = Session::new(target.parse()?, stream, &target, &config, &logger);
 
             if let Some(rx) = session.heartbeat().await {

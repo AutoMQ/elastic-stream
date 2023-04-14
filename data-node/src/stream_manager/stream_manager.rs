@@ -489,13 +489,13 @@ impl StreamManager {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, fs::OpenOptions, io::Write, rc::Rc, sync::Arc};
+    use std::{error::Error, fs::OpenOptions, io::Write, rc::Rc};
+    use tokio::sync::{mpsc, oneshot};
 
     use model::{range::StreamRange, stream::Stream};
     use protocol::rpc::header::{Range, RangeT};
     use slog::trace;
     use store::ElasticStore;
-    use tokio::sync::{mpsc, oneshot};
 
     use crate::stream_manager::{append_window::AppendWindow, fetcher::Fetcher, StreamManager};
     const TOTAL: i32 = 16;
@@ -657,11 +657,10 @@ mod tests {
             .set_base(store_path.as_path().to_str().unwrap());
         config.check_and_apply()?;
 
-        let config = Arc::new(config);
         let (recovery_completion_tx, _recovery_completion_rx) = tokio::sync::oneshot::channel();
         let store = Rc::new(ElasticStore::new(
             log.clone(),
-            &config,
+            config,
             recovery_completion_tx,
         )?);
         let mut stream_manager = StreamManager::new(log, fetcher, store);

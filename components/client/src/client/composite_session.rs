@@ -1,5 +1,5 @@
 use super::{lb_policy::LbPolicy, response, session::Session};
-use crate::{error::ClientError, ClientConfig, Response};
+use crate::{error::ClientError, Response};
 use model::{
     client_role::ClientRole, range::StreamRange, range_criteria::RangeCriteria, request::Request,
     PlacementManagerNode,
@@ -11,7 +11,7 @@ use std::{
     collections::HashMap,
     io::ErrorKind,
     net::{SocketAddr, ToSocketAddrs},
-    rc::Rc,
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{sync::oneshot, time::timeout};
@@ -19,7 +19,7 @@ use tokio_uring::net::TcpStream;
 
 pub(crate) struct CompositeSession {
     target: String,
-    config: Rc<ClientConfig>,
+    config: Arc<config::Configuration>,
     lb_policy: LbPolicy,
     sessions: RefCell<HashMap<SocketAddr, Session>>,
     log: Logger,
@@ -30,7 +30,7 @@ pub(crate) struct CompositeSession {
 impl CompositeSession {
     pub(crate) async fn new<T>(
         target: T,
-        config: Rc<ClientConfig>,
+        config: Arc<config::Configuration>,
         lb_policy: LbPolicy,
         log: Logger,
     ) -> Result<Self, ClientError>
@@ -44,8 +44,13 @@ impl CompositeSession {
             .to_socket_addrs()
             .map_err(|_e| ClientError::BadAddress)?
         {
-            let session =
-                Self::connect(socket_addr.clone(), config.connect_timeout, &config, &log).await?;
+            let session = Self::connect(
+                socket_addr.clone(),
+                config.client_connect_timeout(),
+                &config,
+                &log,
+            )
+            .await?;
             sessions.borrow_mut().insert(socket_addr, session);
         }
         info!(
@@ -68,7 +73,7 @@ impl CompositeSession {
     pub(crate) fn need_heartbeat(&self) -> bool {
         let now = Instant::now();
         let last = self.heartbeat_instant.borrow();
-        last.clone() + self.config.heartbeat_interval >= now
+        last.clone() + self.config.client_heartbeat_interval() >= now
     }
 
     fn need_refresh_cluster(&self) -> bool {
@@ -90,9 +95,9 @@ impl CompositeSession {
 
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
             let request = Request::Heartbeat {
-                client_id: self.config.client_id.clone(),
+                client_id: self.config.client.client_id.clone(),
                 role: ClientRole::DataNode,
-                data_node: self.config.data_node.clone(),
+                data_node: Some(self.config.server.data_node()),
             };
             let (tx, rx) = oneshot::channel();
             if let Err(e) = session.write(&request, tx).await {
@@ -134,7 +139,7 @@ impl CompositeSession {
     ) -> Result<i32, ClientError> {
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
             let request = Request::AllocateId {
-                timeout: self.config.io_timeout,
+                timeout: self.config.client_io_timeout(),
                 host: host.to_owned(),
             };
             let (tx, rx) = oneshot::channel();
@@ -178,7 +183,7 @@ impl CompositeSession {
         // TODO: apply load-balancing among `self.sessions`.
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
             let request = Request::ListRanges {
-                timeout: self.config.io_timeout,
+                timeout: self.config.client_io_timeout(),
                 criteria: vec![criteria],
             };
             let (tx, rx) = oneshot::channel();
@@ -247,11 +252,7 @@ impl CompositeSession {
             .collect::<Vec<_>>();
 
         let (mut tx, rx) = oneshot::channel();
-        let data_node = self
-            .config
-            .data_node
-            .clone()
-            .ok_or(ClientError::ClientInternal)?;
+        let data_node = self.config.server.data_node();
         let request = Request::DescribePlacementManager { data_node };
 
         let mut request_sent = false;
@@ -272,7 +273,7 @@ impl CompositeSession {
                 if let Some(addr) = addrs.first() {
                     let session = Self::connect(
                         addr.clone(),
-                        self.config.connect_timeout,
+                        self.config.client_connect_timeout(),
                         &self.config,
                         &self.log,
                     )
@@ -312,7 +313,7 @@ impl CompositeSession {
     async fn connect(
         addr: SocketAddr,
         duration: Duration,
-        config: &Rc<ClientConfig>,
+        config: &Arc<config::Configuration>,
         log: &Logger,
     ) -> Result<Session, ClientError> {
         trace!(log, "Establishing connection to {:?}", addr);
@@ -350,22 +351,19 @@ impl CompositeSession {
 
 #[cfg(test)]
 mod tests {
-    use model::DataNode;
-
     use super::CompositeSession;
-    use crate::{client::lb_policy::LbPolicy, ClientConfig};
-    use std::{error::Error, rc::Rc};
+    use crate::client::lb_policy::LbPolicy;
+    use std::{error::Error, sync::Arc};
 
     #[test]
     fn test_new() -> Result<(), Box<dyn Error>> {
         let log = test_util::terminal_logger();
-        let client_config = Rc::new(ClientConfig::default());
+        let config = Arc::new(config::Configuration::default());
         tokio_uring::start(async {
             let port = test_util::run_listener(log.clone()).await;
             let target = format!("{}:{}", "localhost", port);
             let _session =
-                CompositeSession::new(&target, client_config, LbPolicy::PickFirst, log.clone())
-                    .await?;
+                CompositeSession::new(&target, config, LbPolicy::PickFirst, log.clone()).await?;
 
             Ok(())
         })
@@ -374,19 +372,14 @@ mod tests {
     #[test]
     fn test_describe_placement_manager_cluster() -> Result<(), Box<dyn Error>> {
         let log = test_util::terminal_logger();
-        let mut client_config = ClientConfig::default();
-        let data_node = DataNode {
-            node_id: 1,
-            advertise_address: "localhost:1234".to_owned(),
-        };
-        client_config.with_data_node(data_node);
-        let client_config = Rc::new(client_config);
+        let mut config = config::Configuration::default();
+        config.server.node_id = 1;
+        let config = Arc::new(config);
         tokio_uring::start(async {
             let port = test_util::run_listener(log.clone()).await;
             let target = format!("{}:{}", "localhost", port);
             let composite_session =
-                CompositeSession::new(&target, client_config, LbPolicy::PickFirst, log.clone())
-                    .await?;
+                CompositeSession::new(&target, config, LbPolicy::PickFirst, log.clone()).await?;
             let nodes = composite_session
                 .describe_placement_manager_cluster()
                 .await

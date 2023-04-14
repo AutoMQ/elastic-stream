@@ -5,7 +5,6 @@ use std::{
     fs::File,
     io::{self, ErrorKind},
     path::Path,
-    sync::Arc,
 };
 
 #[derive(Debug, Parser, Clone)]
@@ -17,7 +16,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn create_config(&self) -> Result<Arc<Configuration>, Box<dyn Error>> {
+    pub fn create_config(&self) -> Result<Configuration, Box<dyn Error>> {
         let path = Path::new(&self.config);
         if !path.exists() {
             eprintln!(
@@ -35,6 +34,6 @@ impl Cli {
         let mut configuration: Configuration = serde_yaml::from_reader(config_file)?;
         configuration.check_and_apply()?;
 
-        Ok(Arc::new(configuration))
+        Ok(configuration)
     }
 }

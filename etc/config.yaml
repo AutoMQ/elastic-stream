@@ -21,6 +21,8 @@ server:
   host: "127.0.0.1"
   # Listening port
   port: 10911
+  # Automatically allocated unique node identifier. 
+  node_id: 0
   # Number of Thread-per-Core Nodes
   concurrency: 1
   uring:

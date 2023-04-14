@@ -1,15 +1,12 @@
-use super::{
-    composite_session::CompositeSession,
-    config::{self, ClientConfig},
-};
+use super::composite_session::CompositeSession;
 use crate::error::ClientError;
 use slog::{info, trace, Logger};
-use std::{cell::UnsafeCell, collections::HashMap, rc::Rc};
+use std::{cell::UnsafeCell, collections::HashMap, rc::Rc, sync::Arc};
 use tokio::time::{timeout, Instant};
 
 pub struct SessionManager {
     /// Configuration for the transport layer.
-    config: Rc<config::ClientConfig>,
+    config: Arc<config::Configuration>,
 
     log: Logger,
 
@@ -21,13 +18,13 @@ pub struct SessionManager {
 
 impl SessionManager {
     pub(crate) fn new(
-        config: &Rc<config::ClientConfig>,
+        config: &Arc<config::Configuration>,
         stop_rx: async_channel::Receiver<()>,
         log: &Logger,
     ) -> Self {
         let sessions = Rc::new(UnsafeCell::new(HashMap::new()));
         Self {
-            config: Rc::clone(config),
+            config: Arc::clone(config),
             log: log.clone(),
             sessions,
             stop_rx: Some(stop_rx),
@@ -36,12 +33,12 @@ impl SessionManager {
 
     fn start_heartbeat_loop(
         logger: Logger,
-        config: Rc<ClientConfig>,
+        config: Arc<config::Configuration>,
         stop_rx: async_channel::Receiver<()>,
         sessions: Rc<UnsafeCell<HashMap<String, Rc<CompositeSession>>>>,
     ) {
-        let heartbeat_interval = config.heartbeat_interval;
-        let io_timeout = config.io_timeout;
+        let heartbeat_interval = config.client_heartbeat_interval();
+        let io_timeout = config.client_io_timeout();
 
         tokio_uring::spawn(async move {
             tokio::pin! {
@@ -81,7 +78,7 @@ impl SessionManager {
         if let Some(ref stop_rx) = self.stop_rx {
             Self::start_heartbeat_loop(
                 self.log.clone(),
-                Rc::clone(&self.config),
+                Arc::clone(&self.config),
                 stop_rx.clone(),
                 Rc::clone(&self.sessions),
             );
@@ -103,7 +100,7 @@ impl SessionManager {
                 let session = Rc::new(
                     CompositeSession::new(
                         target,
-                        Rc::clone(&self.config),
+                        Arc::clone(&self.config),
                         super::lb_policy::LbPolicy::PickFirst,
                         self.log.clone(),
                     )

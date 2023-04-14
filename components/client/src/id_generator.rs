@@ -4,10 +4,7 @@ use slog::{error, trace, Logger};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::oneshot;
 
-use crate::{
-    client::{client_builder::ClientBuilder, config::ClientConfig},
-    error::ClientError,
-};
+use crate::{error::ClientError, Client};
 
 /// A trait that generates unique ID.
 pub trait IdGenerator {
@@ -22,10 +19,10 @@ pub struct PlacementManagerIdGenerator {
 }
 
 impl PlacementManagerIdGenerator {
-    pub fn new(log: Logger, config: &Arc<config::Configuration>) -> Self {
+    pub fn new(log: Logger, config: &config::Configuration) -> Self {
         Self {
             log,
-            config: Arc::clone(config),
+            config: Arc::new(config.clone()),
         }
     }
 }
@@ -34,15 +31,8 @@ impl IdGenerator for PlacementManagerIdGenerator {
     fn generate(&self) -> Result<i32, ClientError> {
         let (tx, rx) = oneshot::channel();
         tokio_uring::start(async {
-            let client_config = ClientConfig::default();
-            let client = match ClientBuilder::new().set_config(client_config).build() {
-                Ok(client) => client,
-                Err(_e) => {
-                    let _ = tx.send(Err(()));
-                    return;
-                }
-            };
-
+            let config = Arc::new(config::Configuration::default());
+            let client = Client::new(config, &self.log);
             client.start();
 
             match client

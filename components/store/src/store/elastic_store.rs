@@ -33,6 +33,8 @@ use tokio::sync::{mpsc, oneshot};
 
 #[derive(Clone)]
 pub struct ElasticStore {
+    config: Arc<config::Configuration>,
+
     lock: Arc<Lock>,
 
     /// The channel for server layer to communicate with io module.
@@ -58,14 +60,17 @@ pub struct ElasticStore {
 impl ElasticStore {
     pub fn new(
         log: Logger,
-        config: &Arc<config::Configuration>,
+        mut config: config::Configuration,
         recovery_completion_tx: oneshot::Sender<()>,
     ) -> Result<Self, StoreError> {
         let logger = log.clone();
 
-        let id_generator = Box::new(PlacementManagerIdGenerator::new(logger.clone(), config));
+        let id_generator = Box::new(PlacementManagerIdGenerator::new(logger.clone(), &config));
 
-        let lock = Arc::new(Lock::new(config, id_generator, &log)?);
+        let lock = Arc::new(Lock::new(&config, id_generator, &log)?);
+
+        // Fill node_id
+        config.server.node_id = lock.id();
 
         // Build wal offset manager
         let wal_offset_manager = Arc::new(WalOffsetManager::new());
@@ -89,7 +94,8 @@ impl ElasticStore {
         // IO thread will be left in detached state.
         // Copy a indexer
         let indexer_cp = Arc::clone(&indexer);
-        let cfg = Arc::clone(config);
+        let config = Arc::new(config);
+        let cfg = Arc::clone(&config);
         let _io_thread_handle = Self::with_thread(
             "IO",
             move || {
@@ -120,6 +126,7 @@ impl ElasticStore {
         handle_joiner.push(_io_thread_handle);
 
         let store = Self {
+            config,
             lock,
             io_tx: tx,
             indexer,
@@ -130,6 +137,10 @@ impl ElasticStore {
         };
         trace!(store.log, "ElasticStore launched");
         Ok(store)
+    }
+
+    pub fn config(&self) -> Arc<config::Configuration> {
+        Arc::clone(&self.config)
     }
 
     fn with_thread<F>(
@@ -402,13 +413,12 @@ mod tests {
 
     fn build_store(pm_address: &str, store_path: &str) -> ElasticStore {
         let log = test_util::terminal_logger();
-        let mut cfg = config::Configuration::default();
-        cfg.server.placement_manager = pm_address.to_owned();
-        cfg.store.path.set_base(store_path);
-        cfg.check_and_apply().expect("Configuration is invalid");
-        let config = Arc::new(cfg);
+        let mut config = config::Configuration::default();
+        config.server.placement_manager = pm_address.to_owned();
+        config.store.path.set_base(store_path);
+        config.check_and_apply().expect("Configuration is invalid");
         let (tx, rx) = oneshot::channel();
-        let store = match ElasticStore::new(log.clone(), &config, tx) {
+        let store = match ElasticStore::new(log.clone(), config, tx) {
             Ok(store) => store,
             Err(e) => {
                 panic!("Failed to launch ElasticStore: {:?}", e);

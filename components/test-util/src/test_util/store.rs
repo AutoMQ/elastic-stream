@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use store::ElasticStore;
 use tokio::sync::oneshot;
 
@@ -9,9 +7,8 @@ pub fn build_store(pm_address: String, store_path: &str) -> ElasticStore {
     cfg.server.placement_manager = pm_address;
     cfg.store.path.set_base(store_path);
     cfg.check_and_apply().expect("Configuration is invalid");
-    let config = Arc::new(cfg);
     let (recovery_completion_tx, recovery_completion_rx) = oneshot::channel();
-    let store = match ElasticStore::new(log.clone(), &config, recovery_completion_tx) {
+    let store = match ElasticStore::new(log.clone(), cfg, recovery_completion_tx) {
         Ok(store) => store,
         Err(e) => {
             panic!("Failed to launch ElasticStore: {:?}", e);

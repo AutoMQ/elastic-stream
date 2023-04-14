@@ -14,8 +14,6 @@ pub mod error;
 pub mod id_generator;
 
 pub use crate::client::client::Client;
-pub use crate::client::client_builder::ClientBuilder;
-pub use crate::client::config::ClientConfig;
 pub use crate::client::response::Response;
 pub use crate::id_generator::IdGenerator;
 pub use crate::id_generator::PlacementManagerIdGenerator;

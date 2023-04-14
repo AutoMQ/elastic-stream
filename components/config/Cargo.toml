@@ -11,3 +11,6 @@ serde_yaml = { workspace = true }
 num_cpus = { workspace = true }
 thiserror = { workspace = true }
 nix = { workspace = true }
+gethostname = { workspace = true }
+lazy_static = { workspace = true }
+model = { path = "../model" }

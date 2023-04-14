@@ -2,8 +2,6 @@ use std::{
     fs::{File, OpenOptions},
     io::Write,
     os::fd::{FromRawFd, IntoRawFd, RawFd},
-    path::Path,
-    sync::Arc,
 };
 
 use crate::error::StoreError;
@@ -20,7 +18,7 @@ pub(crate) struct Lock {
 
 impl Lock {
     pub(crate) fn new(
-        config: &Arc<config::Configuration>,
+        config: &config::Configuration,
         id_generator: Box<dyn IdGenerator>,
         log: &Logger,
     ) -> Result<Self, StoreError> {
