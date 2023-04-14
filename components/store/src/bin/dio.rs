@@ -9,7 +9,7 @@ use std::{
 
 const IO_DEPTH: u32 = 4096;
 
-const FILE_SIZE: i64 = 100i64 * 1024 * 1024 * 1024;
+const FILE_SIZE: i64 = 10i64 * 1024 * 1024 * 1024;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("PID: {}", std::process::id());
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     submitter.register_enable_rings()?;
 
-    const LATENCY_N: usize = 10000;
+    const LATENCY_N: usize = 128;
     let mut latency = [0u16; LATENCY_N];
     let mut latency_index = 0_usize;
 
@@ -89,6 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // calculate latency
         let elapsed = start.elapsed().as_micros();
         latency[latency_index] = elapsed as u16;
+        latency_index += 1;
         if latency_index + 1 >= LATENCY_N {
             latency_index = 0;
             let sum: u64 = latency.iter().map(|v| *v as u64).sum();
