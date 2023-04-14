@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +26,7 @@ import sdk.elastic.stream.apis.OperationClient;
 import sdk.elastic.stream.apis.exception.ClientException;
 import sdk.elastic.stream.apis.exception.OutdatedCacheException;
 import sdk.elastic.stream.apis.exception.RetryableException;
+import sdk.elastic.stream.apis.exception.SealableException;
 import sdk.elastic.stream.apis.manager.ResourceManager;
 import sdk.elastic.stream.client.common.ClientId;
 import sdk.elastic.stream.client.common.PmUtil;
@@ -61,12 +61,11 @@ import sdk.elastic.stream.models.RangeTDecorator;
 import sdk.elastic.stream.models.RecordBatch;
 import sdk.elastic.stream.models.RecordBatchReader;
 
-import static sdk.elastic.stream.flatc.header.ErrorCode.DN_NOT_LEADER_RANGE;
+import static sdk.elastic.stream.flatc.header.ErrorCode.DN_INTERNAL_SERVER_ERROR;
 import static sdk.elastic.stream.flatc.header.ErrorCode.NO_NEW_RECORD;
 import static sdk.elastic.stream.flatc.header.ErrorCode.OFFSET_OUT_OF_RANGE_BOUNDS;
 import static sdk.elastic.stream.flatc.header.ErrorCode.OFFSET_OVERFLOW;
 import static sdk.elastic.stream.flatc.header.ErrorCode.OK;
-import static sdk.elastic.stream.flatc.header.ErrorCode.PM_INTERNAL_SERVER_ERROR;
 import static sdk.elastic.stream.flatc.header.ErrorCode.RANGE_ALREADY_SEALED;
 import static sdk.elastic.stream.flatc.header.ErrorCode.RANGE_NOT_FOUND;
 
@@ -123,27 +122,25 @@ public class OperationClientImpl implements OperationClient {
         Preconditions.checkArgument(recordBatch != null && recordBatch.getRecords().size() > 0, "Invalid recordBatch since no records were found.");
         long streamId = recordBatch.getBatchMeta().getStreamId();
 
-        return appendBatch0(recordBatch, timeout).thenCompose(appendResultT -> {
-            short errorCode = appendResultT.getStatus().getCode();
-            if (errorCode == OK) {
-                return CompletableFuture.completedFuture(appendResultT);
-            } else if (errorCode == RANGE_ALREADY_SEALED || errorCode == DN_NOT_LEADER_RANGE) {
-                log.info("get errorCode {}. refresh cache and try again.", errorCode);
-                // Since the cache is already outdated, we need to invalid the cache and try again.
+        return appendBatch0(recordBatch, timeout).exceptionally(throwable -> {
+            if (throwable instanceof OutdatedCacheException) {
                 this.streamRangeCache.invalidate(streamId);
-                return appendBatch0(recordBatch, timeout);
+                return appendBatch0(recordBatch, timeout).join();
             }
-
-            log.error("Got server error when appending a batch for streamId {}. Try to seal it. Error code: {}, msg: {} ", streamId, errorCode, appendResultT.getStatus().getMessage());
-            RangeIdT rangeIdT = new RangeIdT();
-            rangeIdT.setStreamId(streamId);
-            rangeIdT.setRangeIndex(0);
-            // seal the range and try again.
-            return resourceManager.sealRanges(Collections.singletonList(rangeIdT), timeout)
-                .thenCompose(sealResultList -> {
-                    log.info("sealed for streamId {}, result: {}", streamId, sealResultList.get(0));
-                    return handleSealRangesResultList(sealResultList).thenCompose(v -> appendBatch0(recordBatch, timeout));
-                });
+            if (throwable instanceof SealableException) {
+                log.error("Got server error when appending a batch for streamId {}. Try to seal it", streamId);
+                RangeIdT rangeIdT = new RangeIdT();
+                rangeIdT.setStreamId(streamId);
+                rangeIdT.setRangeIndex(0);
+                // seal the range and try again.
+                return resourceManager.sealRanges(Collections.singletonList(rangeIdT), timeout)
+                    .thenCompose(sealResultList -> {
+                        log.info("sealed for streamId {}, result: {}", streamId, sealResultList.get(0));
+                        return handleSealRangesResultList(sealResultList).thenCompose(v -> appendBatch0(recordBatch, timeout));
+                    }).join();
+            }
+            log.error("Failed to append batch for streamId {}. Error: {}", recordBatch.getBatchMeta().getStreamId(), throwable.getMessage());
+            return null;
         });
     }
 
@@ -232,7 +229,11 @@ public class OperationClientImpl implements OperationClient {
     private CompletableFuture<AppendResultT> appendBatch0(RecordBatch recordBatch, Duration timeout) {
         long streamId = recordBatch.getBatchMeta().getStreamId();
 
-        return this.streamRangeCache.getLastRange(streamId).thenCompose(rangeT -> {
+        AtomicReference<Address> dataNodeAddress = new AtomicReference<>();
+        CompletableFuture<SbpFrame> frameFuture = this.streamRangeCache.getLastRange(streamId).thenApply(rangeT -> {
+            RangeTDecorator rangeTDecorator = new RangeTDecorator(rangeT);
+            dataNodeAddress.set(Address.fromAddress(rangeTDecorator.getPrimaryNode().getAdvertiseAddr()));
+
             ByteBuffer encodedBuffer = recordBatch.encode();
 
             AppendInfoT appendInfoT = new AppendInfoT();
@@ -246,27 +247,46 @@ public class OperationClientImpl implements OperationClient {
             int appendRequestOffset = AppendRequest.pack(builder, appendRequestT);
             builder.finish(appendRequestOffset);
 
-            SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.APPEND, builder.dataBuffer(), new ByteBuffer[] {encodedBuffer});
+            return ProtocolUtil.constructRequestSbpFrame(OperationCode.APPEND, builder.dataBuffer(), new ByteBuffer[] {encodedBuffer});
+        });
 
-            RangeTDecorator rangeTDecorator = new RangeTDecorator(rangeT);
-            Address targetDataNode = Address.fromAddress(rangeTDecorator.getPrimaryNode().getAdvertiseAddr());
-            log.debug("trying to append a batch for streamId {} to datanode {}", streamId, targetDataNode.getAddress());
+        return frameFuture.thenCompose(sbpFrame -> {
+            log.debug("trying to append a batch for streamId {} to datanode {}", streamId, dataNodeAddress.get().getAddress());
+            return nettyClient.invokeAsync(dataNodeAddress.get(), sbpFrame, timeout);
+        }).thenCompose(responseFrame -> {
+            AppendResponse response = AppendResponse.getRootAsAppendResponse(responseFrame.getHeader());
 
-            return nettyClient.invokeAsync(targetDataNode, sbpFrame, timeout)
-                .thenCompose(responseFrame -> {
-                    AppendResponse response = AppendResponse.getRootAsAppendResponse(responseFrame.getHeader());
-                    return extractResponse(response);
-                }).thenCompose(appendResultList -> {
-                    CompletableFuture<AppendResultT> future = new CompletableFuture<>();
-                    short errorCode = appendResultList.get(0).getStatus().getCode();
-                    // get client error code.
-                    if (errorCode > OK && errorCode < PM_INTERNAL_SERVER_ERROR) {
-                        future.completeExceptionally(new ClientException("Append batch failed with code " + errorCode + ", msg: " + appendResultList.get(0).getStatus().getMessage()));
-                    } else {
-                        future.complete(appendResultList.get(0));
-                    }
-                    return future;
-                });
+            CompletableFuture<AppendResultT> future = new CompletableFuture<>();
+            short errorCode = response.status().code();
+            if (errorCode != OK) {
+                future.completeExceptionally(new ClientException("Wrapped response of Append batches failed with code " + errorCode + ", msg: " + response.status().message()));
+                return future;
+            }
+            future.complete(response.unpack().getAppendResponses()[0]);
+            return future;
+        }).thenCompose(appendResult -> {
+            CompletableFuture<AppendResultT> future = new CompletableFuture<>();
+            short errorCode = appendResult.getStatus().getCode();
+
+            if (errorCode == OK) {
+                future.complete(appendResult);
+                return future;
+            }
+
+            String thrownMsg = "Append batch failed with code " + errorCode + ", msg: " + appendResult.getStatus().getMessage();
+            // cache needs to be updated.
+            if (errorCode == RANGE_ALREADY_SEALED) {
+                future.completeExceptionally(new OutdatedCacheException(thrownMsg));
+                return future;
+            }
+            // For errors that are related to the data nodes, seal the range.
+            if (errorCode >= DN_INTERNAL_SERVER_ERROR) {
+                future.completeExceptionally(new SealableException(thrownMsg));
+                return future;
+            }
+            // for other errors, just return the error.
+            future.completeExceptionally(new ClientException(thrownMsg));
+            return future;
         });
     }
 
@@ -373,24 +393,6 @@ public class OperationClientImpl implements OperationClient {
 
             return future;
         });
-    }
-
-    private CompletableFuture<List<AppendResultT>> extractResponse(AppendResponse response) {
-        CompletableFuture<List<AppendResultT>> future = new CompletableFuture<>();
-        if (response.status().code() != OK) {
-            future.completeExceptionally(new ClientException("Append batch failed with code " + response.status().code() + ", msg: " + response.status().message()));
-            return future;
-        }
-        List<AppendResultT> appendResultList = Arrays.asList(response.unpack().getAppendResponses());
-
-        // invalidate the cache if the append request is successful.
-        appendResultList.forEach(appendResultT -> {
-            if (appendResultT.getStatus().getCode() == OK) {
-                this.streamRangeCache.invalidate(appendResultT.getStreamId());
-            }
-        });
-        future.complete(appendResultList);
-        return future;
     }
 
     /**

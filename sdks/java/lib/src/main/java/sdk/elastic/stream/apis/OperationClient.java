@@ -22,7 +22,7 @@ public interface OperationClient extends Closeable {
     CompletableFuture<List<CreateStreamResultT>> createStreams(List<StreamT> streams, Duration timeout);
 
     /**
-     * Append a batch to data nodes.
+     * Append a batch to data nodes. Null will be returned if the request failed.
      *
      * @param recordBatch record batch to be appended.
      * @param timeout     request timeout.
