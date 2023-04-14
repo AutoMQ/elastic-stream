@@ -905,7 +905,7 @@ impl IO {
                             if error.kind() == io::ErrorKind::Interrupted
                                 || error.kind() == io::ErrorKind::WouldBlock
                             {
-                                if (self.blocked.contains_key(&context.wal_offset)) {
+                                if self.blocked.contains_key(&context.wal_offset) {
                                     // There is a pending write task for this block, skip this task.
                                     trace!(
                                         self.log,
@@ -917,6 +917,11 @@ impl IO {
 
                                 let wal_offset = context.wal_offset;
                                 let buf = context.buf.clone();
+
+                                if buf.partial() {
+                                    // Partial write, set the barrier.
+                                    self.barrier.insert(buf.wal_offset);
+                                }
 
                                 let sg = match self.wal.segment_file_of(wal_offset) {
                                     Some(sg) => sg,
@@ -953,7 +958,7 @@ impl IO {
                                         )
                                         .offset(file_offset as libc::off_t)
                                         .build()
-                                        .user_data(Box::into_raw(Box::new(context)) as u64);
+                                        .user_data(context.as_ptr() as u64);
 
                                         self.resubmit_sqes.push_back(sqe);
                                     }
@@ -965,7 +970,7 @@ impl IO {
                                         )
                                         .offset64(file_offset as libc::off_t)
                                         .build()
-                                        .user_data(Box::into_raw(Box::new(context)) as u64);
+                                        .user_data(context.as_ptr() as u64);
 
                                         self.resubmit_sqes.push_back(sqe);
                                     }
