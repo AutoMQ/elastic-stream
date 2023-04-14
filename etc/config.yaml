@@ -1,4 +1,20 @@
 ---
+# Unit of interval in milliseconds
+tick: 100
+# Client configuration
+client:
+  # Connect timeout duration in ticks
+  connect-timeout: 10
+  # IO timeout duration in ticks
+  io-timeout: 10
+  # Client ID
+  client-id: ""
+  # Max attempts in case of transparent retry
+  max-attempt: 3
+  # Heartbeat interval in ticks
+  heartbeat-interval: 30
+  # Refresh placement manager cluster interval in ticks
+  refresh-pm-cluster-interval: 300
 # Server configuration
 server:
   # Advertise host address
@@ -12,12 +28,6 @@ server:
     queue-depth: 128
   # Placement manager address
   placement-manager: "127.0.0.1:2378"
-  # Unit of interval in milliseconds
-  tick: 100
-  # Refresh placement manager cluster interval in ticks
-  refresh-pm-cluster-interval: 300
-  # Heartbeat interval in ticks
-  heartbeat-interval: 30
   # Connection idle duration in ticks
   connection-idle-duration: 60
 # Store configuration

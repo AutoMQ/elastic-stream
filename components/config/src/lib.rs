@@ -6,6 +6,44 @@ use serde::{Deserialize, Serialize};
 pub mod error;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Client {
+    /// Establish connection timeout in ticks
+    #[serde(rename = "connect-timeout")]
+    pub connect_timeout: u64,
+
+    /// IO timeout in ticks
+    #[serde(rename = "io-timeout")]
+    pub io_timeout: u64,
+
+    /// Client ID
+    #[serde(rename = "client-id")]
+    pub client_id: String,
+
+    /// Max transparent client retries
+    #[serde(rename = "max-attempt")]
+    pub max_attempt: usize,
+
+    #[serde(rename = "heartbeat-interval")]
+    pub heartbeat_interval: u64,
+
+    #[serde(rename = "refresh-pm-cluster-interval")]
+    pub refresh_pm_cluster_interval: u64,
+}
+
+impl Default for Client {
+    fn default() -> Self {
+        Self {
+            connect_timeout: 20,
+            io_timeout: 10,
+            client_id: "".to_owned(),
+            max_attempt: 3,
+            heartbeat_interval: 30,
+            refresh_pm_cluster_interval: 300,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Server {
     pub host: String,
     pub port: u16,
@@ -15,14 +53,6 @@ pub struct Server {
 
     #[serde(rename = "placement-manager")]
     pub placement_manager: String,
-
-    pub tick: u64,
-
-    #[serde(rename = "refresh-pm-cluster-interval")]
-    pub refresh_pm_cluster_interval: u64,
-
-    #[serde(rename = "heartbeat-interval")]
-    pub heartbeat_interval: u64,
 
     #[serde(rename = "connection-idle-duration")]
     pub connection_idle_duration: u64,
@@ -35,26 +65,9 @@ impl Default for Server {
             port: 10911,
             concurrency: 1,
             uring: Uring::default(),
-            placement_manager: "localhost:2378".to_owned(),
-            tick: 100,
-            refresh_pm_cluster_interval: 300,
-            heartbeat_interval: 30,
+            placement_manager: "127.0.0.1:2378".to_owned(),
             connection_idle_duration: 60,
         }
-    }
-}
-
-impl Server {
-    pub fn refresh_placement_manager_cluster_interval(&self) -> Duration {
-        Duration::from_millis(self.tick * self.refresh_pm_cluster_interval)
-    }
-
-    pub fn heartbeat_interval(&self) -> Duration {
-        Duration::from_millis(self.tick * self.heartbeat_interval)
-    }
-
-    pub fn connection_idle_duration(&self) -> Duration {
-        Duration::from_millis(self.tick * self.connection_idle_duration)
     }
 }
 
@@ -196,10 +209,27 @@ impl Default for RocksDB {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
+    /// Unit of time in milliseconds.
+    pub tick: u64,
+
+    pub client: Client,
+
     pub server: Server,
+
     pub store: Store,
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Self {
+            tick: 100,
+            client: Default::default(),
+            server: Default::default(),
+            store: Default::default(),
+        }
+    }
 }
 
 impl Configuration {
@@ -249,6 +279,26 @@ impl Configuration {
             }
         }
         Ok(())
+    }
+
+    pub fn connection_idle_duration(&self) -> Duration {
+        Duration::from_millis(self.tick * self.server.connection_idle_duration)
+    }
+
+    pub fn client_io_timeout(&self) -> Duration {
+        Duration::from_millis(self.tick * self.client.io_timeout)
+    }
+
+    pub fn client_connect_timeout(&self) -> Duration {
+        Duration::from_millis(self.tick * self.client.connect_timeout)
+    }
+
+    pub fn client_heartbeat_interval(&self) -> Duration {
+        Duration::from_millis(self.tick * self.client.heartbeat_interval)
+    }
+
+    pub fn client_refresh_placement_manager_cluster_interval(&self) -> Duration {
+        Duration::from_millis(self.tick * self.client.refresh_pm_cluster_interval)
     }
 }
 
