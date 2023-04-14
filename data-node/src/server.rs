@@ -6,10 +6,18 @@ use crate::{
 use client::{ClientBuilder, ClientConfig};
 use config::Configuration;
 use model::data_node::DataNode;
-use slog::{error, o, warn, Drain, Logger};
-use slog_async::Async;
-use slog_term::{FullFormat, TermDecorator};
-use std::{cell::RefCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
+use slog::{error, o, warn, Drain, Duplicate};
+use slog_async::{Async, OverflowStrategy};
+use slog_term::{FullFormat, PlainDecorator, TermDecorator};
+use std::{
+    cell::RefCell,
+    error::Error,
+    fs::OpenOptions,
+    os::fd::AsRawFd,
+    rc::Rc,
+    sync::{Arc, Mutex},
+    thread,
+};
 use store::{ElasticStore, Store};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -22,8 +30,24 @@ pub fn launch(
         .use_file_location()
         .build()
         .fuse();
-    let drain = Async::new(drain).build().fuse();
-    let log = Logger::root(drain, o!());
+    let tmp_dir = std::env::temp_dir();
+    let log_path = tmp_dir.join("elastic-stream.log");
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(log_path)
+        .unwrap();
+    let decorator = PlainDecorator::new(file);
+    let file_drain = FullFormat::new(decorator).build().fuse();
+    let both = Mutex::new(Duplicate::new(drain, file_drain)).fuse();
+    let drain = Async::new(both)
+        .thread_name(String::from("log"))
+        .chan_size(512)
+        .overflow_strategy(OverflowStrategy::DropAndReport)
+        .build()
+        .fuse();
+    let log = slog::Logger::root(drain, o!());
 
     let core_ids = core_affinity::get_core_ids().ok_or_else(|| {
         warn!(log, "No cores are available to set affinity");
