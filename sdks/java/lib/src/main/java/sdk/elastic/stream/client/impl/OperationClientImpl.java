@@ -29,11 +29,11 @@ import sdk.elastic.stream.apis.exception.RetryableException;
 import sdk.elastic.stream.apis.exception.SealableException;
 import sdk.elastic.stream.apis.manager.ResourceManager;
 import sdk.elastic.stream.client.common.ClientId;
-import sdk.elastic.stream.client.common.PmUtil;
 import sdk.elastic.stream.client.common.ProtocolUtil;
 import sdk.elastic.stream.client.common.RemotingUtil;
 import sdk.elastic.stream.client.netty.NettyClient;
 import sdk.elastic.stream.client.protocol.SbpFrame;
+import sdk.elastic.stream.client.protocol.StatusTDecorator;
 import sdk.elastic.stream.client.route.Address;
 import sdk.elastic.stream.flatc.header.AppendInfoT;
 import sdk.elastic.stream.flatc.header.AppendRequest;
@@ -43,6 +43,7 @@ import sdk.elastic.stream.flatc.header.AppendResultT;
 import sdk.elastic.stream.flatc.header.ClientRole;
 import sdk.elastic.stream.flatc.header.CreateStreamResultT;
 import sdk.elastic.stream.flatc.header.DataNodeT;
+import sdk.elastic.stream.flatc.header.DescribeRangeResultT;
 import sdk.elastic.stream.flatc.header.FetchInfoT;
 import sdk.elastic.stream.flatc.header.FetchRequest;
 import sdk.elastic.stream.flatc.header.FetchRequestT;
@@ -150,10 +151,10 @@ public class OperationClientImpl implements OperationClient {
             // The requested range has been sealed, so we have to invalidate the cache and try again.
             if (rangeT.getEndOffset() > 0) {
                 this.streamRangeCache.invalidate(streamId);
-                return getLastWritableOffset0(streamId, timeout).thenApply(RangeT::getNextOffset);
+                return getLastWritableOffset0(streamId, timeout);
             }
-            return CompletableFuture.completedFuture(rangeT.getNextOffset());
-        });
+            return CompletableFuture.completedFuture(rangeT);
+        }).thenApply(RangeT::getNextOffset);
     }
 
     @Override
@@ -180,26 +181,12 @@ public class OperationClientImpl implements OperationClient {
 
     @Override
     public CompletableFuture<Boolean> heartbeat(Address address, Duration timeout) {
-        HeartbeatRequestT heartbeatRequestT = new HeartbeatRequestT();
-        heartbeatRequestT.setClientId(getClientId().toString());
-        heartbeatRequestT.setClientRole(ClientRole.CLIENT_ROLE_CUSTOMER);
-        FlatBufferBuilder builder = new FlatBufferBuilder();
-        int heartbeatRequestOffset = HeartbeatRequest.pack(builder, heartbeatRequestT);
-        builder.finish(heartbeatRequestOffset);
-
-        SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.HEARTBEAT, builder.dataBuffer());
-        return nettyClient.invokeAsync(address, sbpFrame, timeout)
-            .thenCompose(responseFrame -> {
-                HeartbeatResponse response = HeartbeatResponse.getRootAsHeartbeatResponse(responseFrame.getHeader());
-                Address updatePmAddress = PmUtil.extractNewPmAddress(response.status());
-                // need to connect to new Pm primary node.
-                if (updatePmAddress != null) {
-                    nettyClient.updatePmAddress(updatePmAddress);
-                    return nettyClient.invokeAsync(address, sbpFrame, timeout).thenCompose(responseFrame2 -> extractResponse(HeartbeatResponse.getRootAsHeartbeatResponse(responseFrame2.getHeader())));
-                }
-
-                return extractResponse(response);
-            });
+        return heartbeat0(address, timeout).exceptionally(ex -> {
+            if (ex instanceof RetryableException) {
+                return heartbeat0(address, timeout).join();
+            }
+            return false;
+        });
     }
 
     @Override
@@ -224,6 +211,38 @@ public class OperationClientImpl implements OperationClient {
             }
         };
         this.timer.newTimeout(timerTaskHeartBeat, this.heartbeatInterval.getSeconds(), TimeUnit.SECONDS);
+    }
+
+    private CompletableFuture<Boolean> heartbeat0(Address address, Duration timeout) {
+        HeartbeatRequestT heartbeatRequestT = new HeartbeatRequestT();
+        heartbeatRequestT.setClientId(getClientId().toString());
+        heartbeatRequestT.setClientRole(ClientRole.CLIENT_ROLE_CUSTOMER);
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int heartbeatRequestOffset = HeartbeatRequest.pack(builder, heartbeatRequestT);
+        builder.finish(heartbeatRequestOffset);
+
+        SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.HEARTBEAT, builder.dataBuffer());
+        return nettyClient.invokeAsync(address, sbpFrame, timeout)
+            .thenCompose(responseFrame -> {
+                CompletableFuture<Boolean> future = new CompletableFuture<>();
+
+                HeartbeatResponse response = HeartbeatResponse.getRootAsHeartbeatResponse(responseFrame.getHeader());
+                Address updatePmAddress = new StatusTDecorator(response.status()).maybeGetNewPmAddress();
+                // need to connect to new Pm primary node.
+                if (updatePmAddress != null) {
+                    nettyClient.updatePmAddress(updatePmAddress);
+                    future.completeExceptionally(new RetryableException("Pm address changed"));
+                    return future;
+                }
+
+                if (response.status().code() != OK) {
+                    future.completeExceptionally(new ClientException("Heartbeat failed with code " + response.status().code() + ", msg: " + response.status().message() + ", clientId: " + response.clientId()));
+                    return future;
+                }
+                log.debug("Heartbeat success, clientId: {}", response.clientId());
+                future.complete(true);
+                return future;
+            });
     }
 
     private CompletableFuture<AppendResultT> appendBatch0(RecordBatch recordBatch, Duration timeout) {
@@ -299,16 +318,16 @@ public class OperationClientImpl implements OperationClient {
             // Any data node is ok.
             Address dataNodeAddress = Address.fromAddress(rangeT.getReplicaNodes()[0].getDataNode().getAdvertiseAddr());
             // The nextOffset in the cache may be out of date, so we need to fetch the latest range info from the PM.
-            return this.resourceManager.describeRanges(dataNodeAddress, Collections.singletonList(rangeIdT), timeout)
-                .thenCompose(list -> {
-                    CompletableFuture<RangeT> future = new CompletableFuture<>();
-                    if (list.get(0).getStatus().getCode() != OK) {
-                        future.completeExceptionally(new ClientException("Get last writableOffset failed with code " + list.get(0).getStatus().getCode() + ", msg: " + list.get(0).getStatus().getMessage()));
-                        return future;
-                    }
-                    future.complete(list.get(0).getRange());
-                    return future;
-                });
+            return this.resourceManager.describeRanges(dataNodeAddress, Collections.singletonList(rangeIdT), timeout);
+        }).thenCompose(list -> {
+            CompletableFuture<RangeT> future = new CompletableFuture<>();
+            DescribeRangeResultT describeRangeResultT = list.get(0);
+            if (describeRangeResultT.getStatus().getCode() != OK) {
+                future.completeExceptionally(new ClientException("Get last writableOffset failed with code " + describeRangeResultT.getStatus().getCode() + ", msg: " + describeRangeResultT.getStatus().getMessage()));
+                return future;
+            }
+            future.complete(describeRangeResultT.getRange());
+            return future;
         });
     }
 
@@ -426,17 +445,6 @@ public class OperationClientImpl implements OperationClient {
                     streamRangeCache.invalidate(streamId);
                 });
         }).toArray(CompletableFuture[]::new));
-    }
-
-    private CompletableFuture<Boolean> extractResponse(HeartbeatResponse response) {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-        if (response.status().code() != OK) {
-            future.completeExceptionally(new ClientException("Heartbeat failed with code " + response.status().code() + ", msg: " + response.status().message() + ", clientId: " + response.clientId()));
-            return future;
-        }
-        log.debug("Heartbeat success, clientId: {}", response.clientId());
-        future.complete(true);
-        return future;
     }
 
     private CompletableFuture<RangeT[]> fetchRangeArrayBasedOnStreamId(long streamId) {
