@@ -112,7 +112,7 @@ public class ReadWrite {
 
     @SneakyThrows
     private void fetch(OperationClient client, long streamId, long offset) {
-        List<RecordBatch> batches = client.fetchBatches(streamId, offset, 1, Integer.MAX_VALUE, DEFAULT_REQUEST_TIMEOUT).get();
+        List<RecordBatch> batches = client.fetchBatches(streamId, offset, 1, 1, DEFAULT_REQUEST_TIMEOUT).get();
         if (batches.isEmpty()) {
             throw new RuntimeException("failed to fetch a batch from stream " + streamId + " at offset " + offset + ": empty batches");
         }
