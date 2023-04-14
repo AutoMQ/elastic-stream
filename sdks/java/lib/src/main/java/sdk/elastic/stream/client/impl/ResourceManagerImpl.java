@@ -9,11 +9,12 @@ import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sdk.elastic.stream.apis.exception.ClientException;
+import sdk.elastic.stream.apis.exception.RetryableException;
 import sdk.elastic.stream.apis.manager.ResourceManager;
-import sdk.elastic.stream.client.common.PmUtil;
 import sdk.elastic.stream.client.common.ProtocolUtil;
 import sdk.elastic.stream.client.netty.NettyClient;
 import sdk.elastic.stream.client.protocol.SbpFrame;
+import sdk.elastic.stream.client.protocol.StatusTDecorator;
 import sdk.elastic.stream.client.route.Address;
 import sdk.elastic.stream.flatc.header.CreateStreamResultT;
 import sdk.elastic.stream.flatc.header.CreateStreamsRequest;
@@ -37,6 +38,7 @@ import sdk.elastic.stream.flatc.header.SealRangesRequest;
 import sdk.elastic.stream.flatc.header.SealRangesRequestT;
 import sdk.elastic.stream.flatc.header.SealRangesResponse;
 import sdk.elastic.stream.flatc.header.SealRangesResultT;
+import sdk.elastic.stream.flatc.header.Status;
 import sdk.elastic.stream.flatc.header.StreamT;
 import sdk.elastic.stream.models.OperationCode;
 
@@ -64,16 +66,35 @@ public class ResourceManagerImpl implements ResourceManager {
         builder.finish(listRangesRequestOffset);
 
         SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.LIST_RANGES, builder.dataBuffer());
+        return listRanges0(sbpFrame, timeout).exceptionally(throwable -> {
+            if (throwable instanceof RetryableException) {
+                return listRanges0(sbpFrame, timeout).join();
+            }
+            return null;
+        });
+    }
+
+    private CompletableFuture<List<ListRangesResultT>> listRanges0(SbpFrame sbpFrame,
+        Duration timeout) {
         return nettyClient.invokeAsync(sbpFrame, timeout)
             .thenCompose(responseFrame -> {
                 ListRangesResponse response = ListRangesResponse.getRootAsListRangesResponse(responseFrame.getHeader());
-                Address updatePmAddress = PmUtil.extractNewPmAddress(response.status());
+
+                CompletableFuture<List<ListRangesResultT>> completableFuture = new CompletableFuture<>();
+
                 // need to connect to new Pm primary node.
-                if (updatePmAddress != null) {
-                    nettyClient.updatePmAddress(updatePmAddress);
-                    return nettyClient.invokeAsync(sbpFrame, timeout).thenCompose(responseFrame2 -> extractResponse(ListRangesResponse.getRootAsListRangesResponse(responseFrame2.getHeader())));
+                if (maybeUpdatePmAddress(response.status())) {
+                    completableFuture.completeExceptionally(new RetryableException("Pm address changed"));
+                    return completableFuture;
                 }
-                return extractResponse(response);
+
+                if (response.status().code() != OK) {
+                    completableFuture.completeExceptionally(new ClientException("List ranges failed with code " + response.status().code() + ", msg: " + response.status().message()));
+                    return completableFuture;
+                }
+
+                completableFuture.complete(Arrays.asList(response.unpack().getListResponses()));
+                return completableFuture;
             });
     }
 
@@ -81,7 +102,7 @@ public class ResourceManagerImpl implements ResourceManager {
     public CompletableFuture<Byte> pingPong(Duration timeout) {
         SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.PING, null);
         return nettyClient.invokeAsync(sbpFrame, timeout)
-            .thenCompose(responseFrame -> CompletableFuture.completedFuture(responseFrame.getFlag()));
+            .thenApply(SbpFrame::getFlag);
     }
 
     @Override
@@ -96,16 +117,31 @@ public class ResourceManagerImpl implements ResourceManager {
         builder.finish(sealRangesRequestOffset);
 
         SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.SEAL_RANGES, builder.dataBuffer());
+        return sealRanges0(sbpFrame, timeout).exceptionally(throwable -> {
+            if (throwable instanceof RetryableException) {
+                return sealRanges0(sbpFrame, timeout).join();
+            }
+            return null;
+        });
+    }
+
+    private CompletableFuture<List<SealRangesResultT>> sealRanges0(SbpFrame sbpFrame, Duration timeout) {
         return nettyClient.invokeAsync(sbpFrame, timeout)
             .thenCompose(responseFrame -> {
                 SealRangesResponse response = SealRangesResponse.getRootAsSealRangesResponse(responseFrame.getHeader());
-                Address updatePmAddress = PmUtil.extractNewPmAddress(response.status());
+                CompletableFuture<List<SealRangesResultT>> completableFuture = new CompletableFuture<>();
+
                 // need to connect to new Pm primary node.
-                if (updatePmAddress != null) {
-                    nettyClient.updatePmAddress(updatePmAddress);
-                    return nettyClient.invokeAsync(sbpFrame, timeout).thenCompose(responseFrame2 -> extractResponse(SealRangesResponse.getRootAsSealRangesResponse(responseFrame2.getHeader())));
+                if (maybeUpdatePmAddress(response.status())) {
+                    completableFuture.completeExceptionally(new RetryableException("Pm address changed"));
+                    return completableFuture;
                 }
-                return extractResponse(response);
+                if (response.status().code() != OK) {
+                    completableFuture.completeExceptionally(new ClientException("Seal ranges failed with code " + response.status().code() + ", msg: " + response.status().message()));
+                    return completableFuture;
+                }
+                completableFuture.complete(Arrays.asList(response.unpack().getSealResponses()));
+                return completableFuture;
             });
     }
 
@@ -125,7 +161,13 @@ public class ResourceManagerImpl implements ResourceManager {
         return nettyClient.invokeAsync(dataNodeAddress, sbpFrame, timeout)
             .thenCompose(responseFrame -> {
                 DescribeRangesResponse response = DescribeRangesResponse.getRootAsDescribeRangesResponse(responseFrame.getHeader());
-                return extractResponse(response);
+                CompletableFuture<List<DescribeRangeResultT>> completableFuture = new CompletableFuture<>();
+                if (response.status().code() != OK) {
+                    completableFuture.completeExceptionally(new ClientException("Describe ranges failed with code " + response.status().code() + ", msg: " + response.status().message()));
+                    return completableFuture;
+                }
+                completableFuture.complete(Arrays.asList(response.unpack().getDescribeResponses()));
+                return completableFuture;
             });
     }
 
@@ -141,16 +183,30 @@ public class ResourceManagerImpl implements ResourceManager {
         builder.finish(describeStreamsRequestOffset);
 
         SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.DESCRIBE_STREAMS, builder.dataBuffer());
+        return describeStreams0(sbpFrame, timeout).exceptionally(throwable -> {
+            if (throwable instanceof RetryableException) {
+                return describeStreams0(sbpFrame, timeout).join();
+            }
+            return null;
+        });
+    }
+
+    private CompletableFuture<List<DescribeStreamResultT>> describeStreams0(SbpFrame sbpFrame, Duration timeout) {
         return nettyClient.invokeAsync(sbpFrame, timeout)
             .thenCompose(responseFrame -> {
                 DescribeStreamsResponse response = DescribeStreamsResponse.getRootAsDescribeStreamsResponse(responseFrame.getHeader());
-                Address updatePmAddress = PmUtil.extractNewPmAddress(response.status());
+                CompletableFuture<List<DescribeStreamResultT>> completableFuture = new CompletableFuture<>();
                 // need to connect to new Pm primary node.
-                if (updatePmAddress != null) {
-                    nettyClient.updatePmAddress(updatePmAddress);
-                    return nettyClient.invokeAsync(sbpFrame, timeout).thenCompose(responseFrame2 -> extractResponse(DescribeStreamsResponse.getRootAsDescribeStreamsResponse(responseFrame2.getHeader())));
+                if (maybeUpdatePmAddress(response.status())) {
+                    completableFuture.completeExceptionally(new RetryableException("Pm address changed"));
+                    return completableFuture;
                 }
-                return extractResponse(response);
+                if (response.status().code() != OK) {
+                    completableFuture.completeExceptionally(new ClientException("Describe streams failed with code " + response.status().code() + ", msg: " + response.status().message()));
+                    return completableFuture;
+                }
+                completableFuture.complete(Arrays.asList(response.unpack().getDescribeResponses()));
+                return completableFuture;
             });
     }
 
@@ -166,96 +222,47 @@ public class ResourceManagerImpl implements ResourceManager {
         builder.finish(createStreamsRequestOffset);
 
         SbpFrame sbpFrame = ProtocolUtil.constructRequestSbpFrame(OperationCode.CREATE_STREAMS, builder.dataBuffer());
+        return createStreams0(sbpFrame, timeout).exceptionally(throwable -> {
+            if (throwable instanceof RetryableException) {
+                return createStreams0(sbpFrame, timeout).join();
+            }
+            return null;
+        });
+    }
+
+    private CompletableFuture<List<CreateStreamResultT>> createStreams0(SbpFrame sbpFrame, Duration timeout) {
         return nettyClient.invokeAsync(sbpFrame, timeout)
             .thenCompose(responseFrame -> {
                 CreateStreamsResponse response = CreateStreamsResponse.getRootAsCreateStreamsResponse(responseFrame.getHeader());
-                Address updatePmAddress = PmUtil.extractNewPmAddress(response.status());
+                CompletableFuture<List<CreateStreamResultT>> completableFuture = new CompletableFuture<>();
+
                 // need to connect to new Pm primary node.
-                if (updatePmAddress != null) {
-                    nettyClient.updatePmAddress(updatePmAddress);
-                    return nettyClient.invokeAsync(sbpFrame, timeout).thenCompose(responseFrame2 -> extractResponse(CreateStreamsResponse.getRootAsCreateStreamsResponse(responseFrame2.getHeader())));
+                if (maybeUpdatePmAddress(response.status())) {
+                    completableFuture.completeExceptionally(new RetryableException("Pm address changed"));
+                    return completableFuture;
                 }
-                return extractResponse(response);
+                if (response.status().code() != OK) {
+                    completableFuture.completeExceptionally(new ClientException("Create streams failed with code " + response.status().code() + ", msg: " + response.status().message()));
+                    return completableFuture;
+                }
+                completableFuture.complete(Arrays.asList(response.unpack().getCreateResponses()));
+                return completableFuture;
             });
     }
 
     /**
-     * Extract response from ListRangesResponse.
+     * Update pm address if needed.
      *
-     * @param response ListRangesResponse
-     * @return CompletableFuture<List < ListRangesResultT>>
+     * @param status status
+     * @return true if pm address is updated, false otherwise.
      */
-    private CompletableFuture<List<ListRangesResultT>> extractResponse(ListRangesResponse response) {
-        CompletableFuture<List<ListRangesResultT>> completableFuture = new CompletableFuture<>();
-        if (response.status().code() != OK) {
-            completableFuture.completeExceptionally(new ClientException("List ranges failed with code " + response.status().code() + ", msg: " + response.status().message()));
-            return completableFuture;
+    public boolean maybeUpdatePmAddress(Status status) {
+        Address updatePmAddress = new StatusTDecorator(status).maybeGetNewPmAddress();
+        // need to connect to new Pm primary node.
+        if (updatePmAddress != null) {
+            nettyClient.updatePmAddress(updatePmAddress);
+            return true;
         }
-        completableFuture.complete(Arrays.asList(response.unpack().getListResponses()));
-        return completableFuture;
-    }
-
-    /**
-     * Extract response from SealRangesResponse.
-     *
-     * @param response SealRangesResponse
-     * @return CompletableFuture<List < SealRangesResultT>>
-     */
-    private CompletableFuture<List<SealRangesResultT>> extractResponse(SealRangesResponse response) {
-        CompletableFuture<List<SealRangesResultT>> completableFuture = new CompletableFuture<>();
-        if (response.status().code() != OK) {
-            completableFuture.completeExceptionally(new ClientException("Seal ranges failed with code " + response.status().code() + ", msg: " + response.status().message()));
-            return completableFuture;
-        }
-        completableFuture.complete(Arrays.asList(response.unpack().getSealResponses()));
-        return completableFuture;
-    }
-
-    /**
-     * Extract response from DescribeRangesResponse.
-     *
-     * @param response DescribeRangesResponse
-     * @return CompletableFuture<List < DescribeRangeResultT>>
-     */
-    private CompletableFuture<List<DescribeRangeResultT>> extractResponse(DescribeRangesResponse response) {
-        CompletableFuture<List<DescribeRangeResultT>> completableFuture = new CompletableFuture<>();
-        if (response.status().code() != OK) {
-            completableFuture.completeExceptionally(new ClientException("Describe ranges failed with code " + response.status().code() + ", msg: " + response.status().message()));
-            return completableFuture;
-        }
-        completableFuture.complete(Arrays.asList(response.unpack().getDescribeResponses()));
-        return completableFuture;
-    }
-
-    /**
-     * Extract response from CreateStreamsResponse.
-     *
-     * @param response CreateStreamsResponse
-     * @return CompletableFuture<List < CreateStreamResultT>>
-     */
-    private CompletableFuture<List<CreateStreamResultT>> extractResponse(CreateStreamsResponse response) {
-        CompletableFuture<List<CreateStreamResultT>> completableFuture = new CompletableFuture<>();
-        if (response.status().code() != OK) {
-            completableFuture.completeExceptionally(new ClientException("Create streams failed with code " + response.status().code() + ", msg: " + response.status().message()));
-            return completableFuture;
-        }
-        completableFuture.complete(Arrays.asList(response.unpack().getCreateResponses()));
-        return completableFuture;
-    }
-
-    /**
-     * Extract response from DescribeStreamsResponse.
-     *
-     * @param response DescribeStreamsResponse
-     * @return CompletableFuture<List < DescribeStreamResultT>>
-     */
-    private CompletableFuture<List<DescribeStreamResultT>> extractResponse(DescribeStreamsResponse response) {
-        CompletableFuture<List<DescribeStreamResultT>> completableFuture = new CompletableFuture<>();
-        if (response.status().code() != OK) {
-            completableFuture.completeExceptionally(new ClientException("Describe streams failed with code " + response.status().code() + ", msg: " + response.status().message()));
-            return completableFuture;
-        }
-        completableFuture.complete(Arrays.asList(response.unpack().getDescribeResponses()));
-        return completableFuture;
+        return false;
     }
 }

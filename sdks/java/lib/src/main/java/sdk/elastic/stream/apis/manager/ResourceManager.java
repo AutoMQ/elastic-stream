@@ -16,6 +16,7 @@ import sdk.elastic.stream.flatc.header.StreamT;
 public interface ResourceManager {
     /**
      * List the ranges of a batch of streams or the ranges of all the streams in a specific data node.
+     * Null will be returned if the request failed.
      *
      * @param rangeCriteriaList This could be a data node or a list of streams.
      * @param timeout           request timeout.
