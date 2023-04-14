@@ -349,13 +349,6 @@ public class OperationClientImpl implements OperationClient {
             return future;
         }
         List<AppendResultT> appendResultList = Arrays.asList(response.unpack().getAppendResponses());
-
-        // invalidate the cache if the append request is successful.
-        appendResultList.forEach(appendResultT -> {
-            if (appendResultT.getStatus().getCode() == OK) {
-                this.streamRangeCache.invalidate(appendResultT.getStreamId());
-            }
-        });
         future.complete(appendResultList);
         return future;
     }
