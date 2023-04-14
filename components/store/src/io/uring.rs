@@ -910,8 +910,15 @@ impl IO {
                     // is allocated by Box itself, hence, there will no alignment issue at all.
                     let mut context = unsafe { Box::from_raw(ptr) };
 
-                    // Remove barrier
-                    self.barrier.remove(&context.buf.wal_offset);
+                    // Remove write barrier
+                    if context.opcode == opcode::Write::CODE
+                        || context.opcode == opcode::Writev::CODE
+                        || context.opcode == opcode::WriteFixed::CODE
+                    {
+                        if self.barrier.remove(&context.buf.wal_offset) {
+                            trace!(self.log, "WAL barrier {} is removed", context.wal_offset);
+                        }
+                    }
 
                     if let Err(e) = on_complete(
                         &mut self.write_window,
@@ -1218,6 +1225,7 @@ impl IO {
             && self.pending_data_tasks.is_empty()
             && self.inflight_write_tasks.is_empty()
             && self.inflight_read_tasks.is_empty()
+            && self.blocked.is_empty()
             && self.wal.control_task_num() == 0
             && self.channel_disconnected
     }
