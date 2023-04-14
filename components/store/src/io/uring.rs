@@ -455,7 +455,6 @@ impl IO {
             while let Some(n) = requirement.front() {
                 debug_assert!(pos + FOOTER_LENGTH as usize <= file_size);
                 if pos + *n + FOOTER_LENGTH as usize > file_size {
-                    println!("Reach end-of-segment: pos={}, n={}", pos, n);
                     debug_assert!(file_size - pos < *n + FOOTER_LENGTH as usize);
                     to_allocate += file_size - pos;
                     let to = max_allocated_wal_offset + to_allocate as u64;
