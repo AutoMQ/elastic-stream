@@ -718,6 +718,7 @@ dependencies = [
  "flatbuffers",
  "futures",
  "io-uring",
+ "minstant",
  "mockall",
  "model",
  "num_cpus",

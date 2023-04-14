@@ -24,6 +24,7 @@ flatbuffers = { workspace = true }
 io-uring = { workspace = true }
 model = { path = "../components/model" }
 num_enum =  { workspace = true }
+minstant = { workspace = true }
 pprof = { workspace = true }
 protocol = {path = "../components/protocol" }
 serde = { workspace = true, features = ["derive"] }
