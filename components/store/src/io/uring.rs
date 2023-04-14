@@ -557,6 +557,7 @@ impl IO {
     /// submit to io_uring/block-layer until the prior one is completed.
     ///
     /// In this example, this method tells whether
+    #[inline(always)]
     fn has_write_sqe_unblocked(&self) -> bool {
         self.blocked
             .iter()
@@ -568,6 +569,20 @@ impl IO {
         self.blocked
             .drain_filter(|offset, _entry| !self.barrier.contains(offset))
             .for_each(|(_, entry)| {
+                // Trace log submit of previously blocked write to WAL.
+                {
+                    // Safety:
+                    // Lifecycle of context is the same with squeue::Entry, since we have NOT yet
+                    // submit the entry, its associated context is valid.
+                    let ctx = unsafe { Box::from_raw(entry.0) };
+                    trace!(
+                        self.log,
+                        "Submit previously blocked write to WAL[{}, {})",
+                        ctx.wal_offset,
+                        ctx.wal_offset + ctx.len as u64
+                    );
+                    Box::into_raw(ctx);
+                }
                 entries.push(entry.1);
             });
 
@@ -616,12 +631,23 @@ impl IO {
                             .user_data(context as u64);
 
                         if io_blocked {
+                            trace!(self.log, "Write to WAL[{}, {}) is blocked", buf_wal_offset, buf_wal_offset + buf_limit as u64);
                             if let Some((ctx, _entry)) =
                                 self.blocked.insert(buf_wal_offset, (context, sqe))
                             {
                                 // Release context of the dropped squeue::Entry
                                 // See https://github.com/tokio-rs/io-uring/issues/230
-                                unsafe { Box::from_raw(ctx) };
+                                let ctx = unsafe { Box::from_raw(ctx) };
+                                if ctx.len < buf_limit {
+                                    debug!(self.log, "Blocked write to WAL[{}, {}) is superseded by [{}, {})",
+                                        ctx.wal_offset, ctx.wal_offset + ctx.len as u64,
+                                        buf_wal_offset, buf_wal_offset + buf_limit as u64);
+                                } else {
+                                    error!(self.log, "Blocked write to WAL[{}, {}) is superseded by [{}, {})",
+                                        ctx.wal_offset, ctx.wal_offset + ctx.len as u64,
+                                        buf_wal_offset, buf_wal_offset + buf_limit as u64);
+                                    unreachable!("An extended write is superseded by a previous small one");
+                                }
                             }
                         } else {
                             entries.push(sqe);
