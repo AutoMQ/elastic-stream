@@ -586,6 +586,11 @@ impl IO {
                         ctx.wal_offset,
                         ctx.wal_offset + ctx.len as u64
                     );
+
+                    if ctx.buf.partial() || ctx.len < ctx.buf.limit() as u32 {
+                        self.barrier.insert(ctx.wal_offset);
+                    }
+
                     Box::into_raw(ctx);
                 }
                 entries.push(entry.1);
