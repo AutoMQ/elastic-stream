@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use io_uring::opcode;
+
 use super::buf::AlignedBuf;
 
 /// IO context for `Read` and `Write`.
@@ -33,6 +35,16 @@ impl Context {
             wal_offset,
             len,
         }))
+    }
+
+    #[inline(always)]
+    pub(crate) fn is_partial_write(&self) -> bool {
+        if self.opcode != opcode::Write::CODE && self.opcode != opcode::Writev::CODE {
+            return false;
+        }
+
+        // Note the underlying buf may expand to a larger size, so we need to check the len of the context.
+        self.buf.partial() || self.len < self.buf.limit() as u32
     }
 
     /// Converts to a raw pointer.
