@@ -105,7 +105,7 @@ pub(crate) struct IO {
     inflight_read_tasks: BTreeMap<u64, VecDeque<ReadTask>>,
 
     /// Offsets of blocks that are partially filled with data and are still inflight.
-    barrier: HashSet<u64>,
+    barrier: RefCell<HashSet<u64>>,
 
     /// Block the concurrent write IOs to the same page.
     /// The uring instance doesn't provide the ordering guarantee for the IOs,
@@ -201,7 +201,7 @@ impl IO {
             pending_data_tasks: VecDeque::new(),
             inflight_write_tasks: BTreeMap::new(),
             inflight_read_tasks: BTreeMap::new(),
-            barrier: HashSet::new(),
+            barrier: RefCell::new(HashSet::new()),
             blocked: HashMap::new(),
             resubmit_sqes: VecDeque::new(),
             indexer,
@@ -566,17 +566,14 @@ impl IO {
     fn has_write_sqe_unblocked(&self) -> bool {
         self.blocked
             .iter()
-            .any(|(offset, _entry)| !self.barrier.contains(offset))
+            .any(|(offset, _entry)| !self.barrier.borrow().contains(offset))
     }
 
     fn build_write_sqe(&mut self, entries: &mut Vec<squeue::Entry>) {
         // Add previously blocked entries.
 
-        // Wrap the barrier to a refcell to avoid borrow check error.
-        let barrier = RefCell::new(&mut self.barrier);
-
         self.blocked
-            .drain_filter(|offset, _entry| !barrier.borrow().contains(offset))
+            .drain_filter(|offset, _entry| !self.barrier.borrow().contains(offset))
             .for_each(|(_, entry)| {
                 // Trace log submit of previously blocked write to WAL.
                 {
@@ -591,10 +588,9 @@ impl IO {
                         ctx.wal_offset + ctx.len as u64
                     );
 
-                    // We need to re-insert the barrier if the IO is a partial write.
-                    // Note the underlying buf may expand to a larger size, so we need to check the len of the context.
-                    if ctx.buf.partial() || ctx.len < ctx.buf.limit() as u32 {
-                        barrier.borrow_mut().insert(ctx.wal_offset);
+                    // Need to insert a barrier if the blocked IO itself is ALSO a partial write.
+                    if ctx.is_partial_write() {
+                        self.barrier.borrow_mut().insert(ctx.wal_offset);
                     }
 
                     Box::into_raw(ctx);
@@ -621,13 +617,13 @@ impl IO {
 
                         let mut io_blocked = false;
                         // Check barrier
-                        if self.barrier.contains(&buf.wal_offset) {
+                        if self.barrier.borrow().contains(&buf.wal_offset) {
                             // Submit SQE to io_uring when the blocking IO task completed.
                             io_blocked = true;
                         } else {
                             // Insert barrier, blocking future write to this aligned block issued to `io_uring` until `sqe` is reaped.
                             if buf.partial() {
-                                self.barrier.insert(buf.wal_offset);
+                                self.barrier.borrow_mut().insert(buf.wal_offset);
                             }
                         }
 
@@ -926,7 +922,7 @@ impl IO {
                         || context.opcode == opcode::Writev::CODE
                         || context.opcode == opcode::WriteFixed::CODE
                     {
-                        if self.barrier.remove(&context.buf.wal_offset) {
+                        if self.barrier.borrow_mut().remove(&context.buf.wal_offset) {
                             trace!(self.log, "WAL barrier {} is removed", context.wal_offset);
                         }
                     }
@@ -965,10 +961,10 @@ impl IO {
                                     let wal_offset = context.wal_offset;
                                     let buf = context.buf.clone();
 
-                                    if buf.partial() {
-                                        // Partial write, set the barrier.
-                                        self.barrier.insert(buf.wal_offset);
-                                    }
+                                if buf.partial() {
+                                    // Partial write, set the barrier.
+                                    self.barrier.borrow_mut().insert(buf.wal_offset);
+                                }
 
                                     let sg = match self.wal.segment_file_of(wal_offset) {
                                         Some(sg) => sg,
