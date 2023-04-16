@@ -9,7 +9,7 @@ use crate::io::wal::Wal;
 use crate::io::write_window::WriteWindow;
 use crate::AppendResult;
 use crate::BufSlice;
-use std::io::{self, Error, ErrorKind};
+use std::io;
 
 use crossbeam::channel::{Receiver, Sender, TryRecvError};
 use io_uring::register;
@@ -607,6 +607,10 @@ impl IO {
         writer
             .take()
             .into_iter()
+            .filter(|buf| {
+                // Accept the last partial buffer only if it contains uncommited data.
+                buf.wal_offset + buf.limit() as u64 > self.write_window.committed
+            })
             .flat_map(|buf| {
                 let ptr = buf.as_ptr();
                 if let Some(segment) = self.wal.segment_file_of(buf.wal_offset) {
