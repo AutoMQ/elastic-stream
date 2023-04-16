@@ -23,6 +23,8 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * @author ningyu
@@ -38,17 +40,20 @@ public class ReadWrite {
     @Param({"1024"})
     private int bodySize;
 
+    @Param({"64"})
+    private int streamCount;
+
     private OperationClient client;
     private byte[] payload;
-    private long streamId;
+    private List<Long> streamIds;
     private List<Long> baseOffsets;
 
     @Setup
     public void setup() {
         this.client = buildClient(pmAddress);
-        this.streamId = createStream(client);
+        this.streamIds = createStreams(client, streamCount);
         this.payload = randomPayload(bodySize);
-        this.baseOffsets = prepareRecords(client, streamId, payload);
+        this.baseOffsets = prepareRecords(client, streamIds.get(0), payload);
     }
 
     @TearDown
@@ -69,6 +74,10 @@ public class ReadWrite {
         OperationClient client = new OperationClientBuilderImpl().setClientConfiguration(builder.build()).build();
         client.start();
         return client;
+    }
+
+    private List<Long> createStreams(OperationClient client, int streamCount) {
+        return IntStream.range(0, streamCount).mapToObj(i -> createStream(client)).collect(Collectors.toList());
     }
 
     @SneakyThrows
@@ -101,13 +110,13 @@ public class ReadWrite {
     @Benchmark
     @Group("readWrite")
     public void read() {
-        fetch(client, streamId, baseOffsets.get(new SecureRandom().nextInt(PRE_APPEND_RECORD_COUNT)));
+        fetch(client, streamIds.get(0), baseOffsets.get(new SecureRandom().nextInt(PRE_APPEND_RECORD_COUNT)));
     }
 
     @Benchmark
     @Group("readWrite")
     public void write() {
-        append(client, streamId, payload);
+        append(client, streamIds.get(new SecureRandom().nextInt(streamCount)), randomPayload(bodySize));
     }
 
     @SneakyThrows
