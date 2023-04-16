@@ -643,7 +643,7 @@ impl IO {
                                 // Release context of the dropped squeue::Entry
                                 // See https://github.com/tokio-rs/io-uring/issues/230
                                 let ctx = unsafe { Box::from_raw(ctx) };
-                                if ctx.len < buf_limit {
+                                if ctx.len <= buf_limit {
                                     debug!(self.log, "Blocked write to WAL[{}, {}) is superseded by [{}, {})",
                                         ctx.wal_offset, ctx.wal_offset + ctx.len as u64,
                                         buf_wal_offset, buf_wal_offset + buf_limit as u64);
@@ -926,94 +926,106 @@ impl IO {
                         cqe.result(),
                         &self.log,
                     ) {
-                        if let StoreError::System(errno) = e {
-                            error!(
-                                self.log,
-                                "io_uring opcode `{}` failed. errno: `{}`", context.opcode, errno
-                            );
+                        match e {
+                            StoreError::System(errno) => {
+                                error!(
+                                    self.log,
+                                    "io_uring opcode `{}` failed. errno: `{}`",
+                                    context.opcode,
+                                    errno
+                                );
 
-                            let error = io::Error::from_raw_os_error(errno);
-                            // Some errors are not fatal, we should retry the task.
-                            // TODO: Add more error kinds to retry.
-                            if error.kind() == io::ErrorKind::Interrupted
-                                || error.kind() == io::ErrorKind::WouldBlock
-                            {
-                                if self.blocked.contains_key(&context.wal_offset) {
-                                    // There is a pending write task for this block, skip this task.
-                                    trace!(
-                                        self.log,
-                                        "Skip retrying the failed write task for wal offset {} as there is a pending write task for this block",
-                                        context.wal_offset
-                                    );
+                                let error = io::Error::from_raw_os_error(errno);
+                                // Some errors are not fatal, we should retry the task.
+                                // TODO: Add more error kinds to retry.
+                                if error.kind() == io::ErrorKind::Interrupted
+                                    || error.kind() == io::ErrorKind::WouldBlock
+                                {
+                                    if self.blocked.contains_key(&context.wal_offset) {
+                                        // There is a pending write task for this block, skip this task.
+                                        trace!(
+                                            self.log,
+                                            "Skip retrying the failed write task for wal offset {} as there is a pending write task for this block",
+                                            context.wal_offset
+                                        );
+                                        continue;
+                                    }
+
+                                    let wal_offset = context.wal_offset;
+                                    let buf = context.buf.clone();
+
+                                    if buf.partial() {
+                                        // Partial write, set the barrier.
+                                        self.barrier.insert(buf.wal_offset);
+                                    }
+
+                                    let sg = match self.wal.segment_file_of(wal_offset) {
+                                        Some(sg) => sg,
+                                        None => {
+                                            error!(
+                                                self.log,
+                                                "Log segment not found for wal offset {}",
+                                                wal_offset
+                                            );
+                                            continue;
+                                        }
+                                    };
+
+                                    let sd = match &sg.sd {
+                                        Some(sd) => sd,
+                                        None => {
+                                            error!(
+                                                self.log,
+                                                "Log segment {} does not have a valid descriptor",
+                                                sg.wal_offset
+                                            );
+                                            continue;
+                                        }
+                                    };
+
+                                    let file_offset = wal_offset - sg.wal_offset;
+                                    let buf_ptr = buf.as_ptr() as *mut u8;
+
+                                    match context.opcode {
+                                        opcode::Read::CODE => {
+                                            let sqe = opcode::Read::new(
+                                                types::Fd(sd.fd),
+                                                buf_ptr,
+                                                context.len,
+                                            )
+                                            .offset(file_offset as libc::off_t)
+                                            .build()
+                                            .user_data(context.as_ptr() as u64);
+
+                                            self.resubmit_sqes.push_back(sqe);
+                                        }
+                                        opcode::Write::CODE => {
+                                            let sqe = opcode::Write::new(
+                                                types::Fd(sd.fd),
+                                                buf_ptr,
+                                                buf.capacity as u32,
+                                            )
+                                            .offset64(file_offset as libc::off_t)
+                                            .build()
+                                            .user_data(context.as_ptr() as u64);
+
+                                            self.resubmit_sqes.push_back(sqe);
+                                        }
+                                        _ => (),
+                                    };
+
                                     continue;
                                 }
-
-                                let wal_offset = context.wal_offset;
-                                let buf = context.buf.clone();
-
-                                if buf.partial() {
-                                    // Partial write, set the barrier.
-                                    self.barrier.insert(buf.wal_offset);
-                                }
-
-                                let sg = match self.wal.segment_file_of(wal_offset) {
-                                    Some(sg) => sg,
-                                    None => {
-                                        error!(
-                                            self.log,
-                                            "Log segment not found for wal offset {}", wal_offset
-                                        );
-                                        continue;
-                                    }
-                                };
-
-                                let sd = match &sg.sd {
-                                    Some(sd) => sd,
-                                    None => {
-                                        error!(
-                                            self.log,
-                                            "Log segment {} does not have a valid descriptor",
-                                            sg.wal_offset
-                                        );
-                                        continue;
-                                    }
-                                };
-
-                                let file_offset = wal_offset - sg.wal_offset;
-                                let buf_ptr = buf.as_ptr() as *mut u8;
-
-                                match context.opcode {
-                                    opcode::Read::CODE => {
-                                        let sqe = opcode::Read::new(
-                                            types::Fd(sd.fd),
-                                            buf_ptr,
-                                            context.len,
-                                        )
-                                        .offset(file_offset as libc::off_t)
-                                        .build()
-                                        .user_data(context.as_ptr() as u64);
-
-                                        self.resubmit_sqes.push_back(sqe);
-                                    }
-                                    opcode::Write::CODE => {
-                                        let sqe = opcode::Write::new(
-                                            types::Fd(sd.fd),
-                                            buf_ptr,
-                                            buf.capacity as u32,
-                                        )
-                                        .offset64(file_offset as libc::off_t)
-                                        .build()
-                                        .user_data(context.as_ptr() as u64);
-
-                                        self.resubmit_sqes.push_back(sqe);
-                                    }
-                                    _ => (),
-                                };
-
-                                continue;
+                                // TODO: handle the error that can't be recovered.
                             }
 
-                            // TODO: handle the error that can't be recovered.
+                            StoreError::WriteWindow => {
+                                panic!("Invalid write is found. Write ordering is compromised");
+                            }
+
+                            _ => {
+                                panic!("Unrecoverable error found when reaping CQEs");
+                            }
                         }
                     } else {
                         // Add block cache
@@ -1764,7 +1776,7 @@ mod tests {
 
         // Will cost at least 4K * 1024 = 4M bytes, which means at least 4 segments will be allocated
         // And the cache reclaim will be triggered since a small io only has 1M cache
-        let records: Vec<_> = (0..1024)
+        let records: Vec<_> = (0..4096)
             .into_iter()
             .map(|_| {
                 let mut rng = rand::thread_rng();
