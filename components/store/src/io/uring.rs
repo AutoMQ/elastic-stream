@@ -571,8 +571,12 @@ impl IO {
 
     fn build_write_sqe(&mut self, entries: &mut Vec<squeue::Entry>) {
         // Add previously blocked entries.
+
+        // Wrap the barrier to a refcell to avoid borrow check error.
+        let barrier = RefCell::new(&mut self.barrier);
+
         self.blocked
-            .drain_filter(|offset, _entry| !self.barrier.contains(offset))
+            .drain_filter(|offset, _entry| !barrier.borrow().contains(offset))
             .for_each(|(_, entry)| {
                 // Trace log submit of previously blocked write to WAL.
                 {
@@ -587,8 +591,10 @@ impl IO {
                         ctx.wal_offset + ctx.len as u64
                     );
 
+                    // We need to re-insert the barrier if the IO is a partial write.
+                    // Note the underlying buf may expand to a larger size, so we need to check the len of the context.
                     if ctx.buf.partial() || ctx.len < ctx.buf.limit() as u32 {
-                        self.barrier.insert(ctx.wal_offset);
+                        barrier.borrow_mut().insert(ctx.wal_offset);
                     }
 
                     Box::into_raw(ctx);
