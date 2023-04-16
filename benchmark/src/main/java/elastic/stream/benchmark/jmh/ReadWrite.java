@@ -116,7 +116,7 @@ public class ReadWrite {
     @Benchmark
     @Group("readWrite")
     public void write() {
-        append(client, streamIds.get(new SecureRandom().nextInt(streamCount)), randomPayload(bodySize));
+        append(client, streamIds.get(new SecureRandom().nextInt(streamCount)), payload);
     }
 
     @SneakyThrows
