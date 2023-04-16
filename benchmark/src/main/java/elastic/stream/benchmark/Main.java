@@ -18,6 +18,7 @@ public class Main {
         Options options = new OptionsBuilder()
                 .param("pmAddress", "192.168.123.128:2378")
                 .param("bodySize", "1024")
+                .param("streamCount", "64")
                 .shouldFailOnError(true)
                 .threadGroups(3, 1)
                 .include(".*" + ReadWrite.class.getSimpleName() + ".*")
