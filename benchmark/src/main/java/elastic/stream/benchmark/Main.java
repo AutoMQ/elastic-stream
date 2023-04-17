@@ -28,6 +28,7 @@ public class Main {
                 .measurementIterations(1)
                 .measurementTime(new TimeValue(60, TimeUnit.SECONDS))
                 .mode(Mode.SampleTime)
+                .timeUnit(TimeUnit.MILLISECONDS)
                 .build();
         new Runner(options).run();
     }

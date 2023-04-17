@@ -76,20 +76,20 @@ public class ReadWrite {
         return client;
     }
 
-    private List<Long> createStreams(OperationClient client, int streamCount) {
-        return IntStream.range(0, streamCount).mapToObj(i -> createStream(client)).collect(Collectors.toList());
-    }
-
     @SneakyThrows
-    private long createStream(OperationClient client) {
-        StreamT streamT = new StreamT();
-        streamT.setStreamId(0L);
-        streamT.setReplicaNums((byte) 1);
-        streamT.setRetentionPeriodMs(Duration.ofDays(3).toMillis());
-        List<StreamT> streamList = new ArrayList<>(1);
-        streamList.add(streamT);
-        List<CreateStreamResultT> resultList = client.createStreams(streamList, DEFAULT_REQUEST_TIMEOUT).get();
-        return resultList.get(0).getStream().getStreamId();
+    private List<Long> createStreams(OperationClient client, int streamCount) {
+        List<StreamT> streams = IntStream.range(0, streamCount).mapToObj(i -> {
+            StreamT streamT = new StreamT();
+            streamT.setStreamId(0L);
+            streamT.setReplicaNums((byte) 1);
+            streamT.setRetentionPeriodMs(Duration.ofDays(3).toMillis());
+            return streamT;
+        }).collect(Collectors.toList());
+        List<CreateStreamResultT> resultList = client.createStreams(streams, DEFAULT_REQUEST_TIMEOUT).get();
+        return resultList.stream()
+                .map(CreateStreamResultT::getStream)
+                .map(StreamT::getStreamId)
+                .collect(Collectors.toList());
     }
 
     @SneakyThrows
