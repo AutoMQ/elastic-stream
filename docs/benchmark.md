@@ -1,10 +1,10 @@
 # Benchmark
 
-## Write
+## **Write**
 
 Benchmark on `Append` operations.
 
-### Platform
+### **Platform**
 
 [i4i.2xlarge](https://aws.amazon.com/ec2/instance-types/i4i/#Product_Details)
 - 8 vCPUs
@@ -12,14 +12,15 @@ Benchmark on `Append` operations.
 - 1250.00 MB/s [EBS Maximum throughput](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-optimized.html#current-storage-optimized)
 - Ubuntu Server 22.04 LTS
 
-### Approach
+### **Approach**
 
 1. Launch the Placement Manager and a Data Node.
 2. Use the SDK to send Append requests to the Data Node, with a record batch size of 64 MB (65536 Bytes) per request, and randomly send each request to 1, 100, or 2000 streams.
 3. Adjust the number of concurrently running clients and the concurrency level of each client to achieve write rates of 500 MB/s or 1 GB/s on the Data Node. Run the test until the Data Node's resource utilization stabilizes and continue to run for some time.
 4. Record the CPU and memory usage of the Data Node, the SDK request latency, and the write latency on the Data Node side during the process.
 
-### Result
+### **Result**
+#### **Elastic Stream**
 
 | Batch size (KB) | Throughput (MB/s) | Stream | CPU Usage | Memory Usage (MB) | Average* (ms) | P95* (ms) | P99* (ms) | P99.9* (ms) | Average** (us) | P95** (us) | P99** (us) | P99.9** (us) |
 | :--: | :--: | :--: | :--: | :--: | :---: | :---: | :---: | :---: | :--: | :--: | :--: | :--: |
@@ -34,13 +35,13 @@ Benchmark on `Append` operations.
 
 \**: Server Side Latency
 
-### Compared with [Kafka](https://github.com/apache/kafka)
+#### **Kafka**
+| Batch size (KB) | Throughput (MB/s) | Partition | CPU Usage | Average* (ms) | P95* (ms) | P99* (ms) | P99.9* (ms) |
+| :--: | :--: | :--: | :--:| :---: | :---: | :---: | :---: |
+| 64   | 384  | 1    | 115% | 4.61 | 15 | 19 | 37 |
+| 64   | 310  | 100  | 84% | 2.41 | 11 | 27 | 78 |
+| 64   | 250  | 2000 | 73% | 1.63 | 2| 16 | 53 |
 
-| Workload  | Stream / Partition | Target P99.9 Latency | Elastic Stream<br />CPU Usage | Elastic Stream<br />Latency | Kafka<br />CPU Usage | Kafka<br />Latency |
-| :-------: | :--: | :-----: | :--: | :------: | :--: | :-------: |
-| 500 MB/s  | 1    | < 20 ms | 185% | 2.075 ms |      |           |
-| 500 MB/s  | 100  | < 20 ms | 180% | 1.976 ms |      |           |
-| 500 MB/s  | 2000 | < 20 ms | 182% | 1.927 ms |      |           |
-| 1000 MB/s | 1    | < 20 ms | 275% | 4.051 ms |      |           |
-| 1000 MB/s | 100  | < 20 ms | 286% | 3.949 ms |      |           |
-| 1000 MB/s | 2000 | < 20 ms | 282% | 3.654 ms |      |           |
+\*: E2E Latency
+
+Note that for comparison, Kafka is tested with only one single broker. In that case, Kafka can not offer enough throughput with P99 latency as low as about 20 ms. Threrefore, more brokers are needed to achieve the same throughput.
