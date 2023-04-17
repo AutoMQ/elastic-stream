@@ -13,6 +13,7 @@
         "IOPOLL",
         "libc",
         "memtable",
+        "minstant",
         "mkdirs",
         "monoio",
         "MPMC",

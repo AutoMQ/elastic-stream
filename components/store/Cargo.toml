@@ -31,6 +31,8 @@ protocol = { path = "../protocol" }
 num_enum = { workspace = true }
 derivative = { workspace = true }
 rocksdb = { workspace = true }
+lazy_static = {version = "1.4.0"}
+minstant = { workspace = true }
 
 [dev-dependencies]
 slog-async =  { workspace = true }
