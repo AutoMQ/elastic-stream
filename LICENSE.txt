@@ -1,0 +1,1 @@
+Source code in this repository is under the Server Side Public License, v 1, unless the header specifies another license. Access https://spdx.org/licenses/SSPL-1.0.html for a full copy of the license file.

@@ -36,7 +36,7 @@ pub fn dump_to(w: &mut impl Write, should_simplify: bool) {
         return;
     }
 
-    // filter out mertics that has no sample values
+    // filter out metrics that has no sample values
     for mut mf in metric_families {
         let mut metrics = mf.take_metric().into_vec();
         match mf.get_field_type() {
