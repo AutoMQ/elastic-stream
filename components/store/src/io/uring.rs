@@ -4,9 +4,8 @@ use crate::index::record_handle::RecordHandle;
 use crate::io::buf::{AlignedBufReader, AlignedBufWriter};
 use crate::io::context::Context;
 use crate::io::metrics::{
-    URING_INFLIGHT_TASK_GAUGE, URING_IO_DEPTH, URING_PENDING_TASK_GAUGE, URING_READ_BYTES_COUNT,
-    URING_READ_TASK_COUNT, URING_READ_TASK_LATENCY_HISTOGRAM, URING_WRITE_BYTES_COUNT,
-    URING_WRITE_TASK_COUNT, URING_WRITE_TASK_LATENCY_HISTOGRAM,
+    COMPLETED_READ_IO, COMPLETED_WRITE_IO, INFLIGHT_IO, IO_DEPTH, PENDING_TASK, READ_BYTES_TOTAL,
+    READ_IO_LATENCY, WRITE_BYTES_TOTAL, WRITE_IO_LATENCY,
 };
 use crate::io::task::IoTask;
 use crate::io::task::WriteTask;
@@ -299,14 +298,14 @@ impl IO {
         }
 
         self.pending_data_tasks.push_back(io_task);
-        URING_PENDING_TASK_GAUGE.set(self.pending_data_tasks.len() as i64);
+        PENDING_TASK.set(self.pending_data_tasks.len() as i64);
         *received += 1;
     }
 
     fn receive_io_tasks(&mut self) -> usize {
         let mut received = 0;
         let io_depth = self.data_ring.params().sq_entries() as usize;
-        URING_IO_DEPTH.set(io_depth as i64);
+        IO_DEPTH.set(io_depth as i64);
         loop {
             // TODO: Find a better estimation.
             //
@@ -535,7 +534,7 @@ impl IO {
                             Arc::new(buf),
                             read_offset,
                             read_len,
-                            std::time::Instant::now(),
+                            minstant::Instant::now(),
                         );
 
                         let sqe = opcode::Read::new(types::Fd(sd.fd), ptr, read_len)
@@ -656,7 +655,7 @@ impl IO {
                         // The pointer will be set into user_data of uring.
                         // When the uring io completes, the pointer will be used to retrieve the `Context`.
                         let context =
-                            Context::write_ctx(opcode::Write::CODE, buf, buf_wal_offset, buf_limit, std::time::Instant::now());
+                            Context::write_ctx(opcode::Write::CODE, buf, buf_wal_offset, buf_limit, minstant::Instant::now());
 
                         // Note we have to write the whole page even if the page is partially filled.
                         let sqe = opcode::Write::new(types::Fd(sd.fd), ptr, buf_capacity)
@@ -848,7 +847,7 @@ impl IO {
                 }
             }
         }
-        URING_PENDING_TASK_GAUGE.set(self.pending_data_tasks.len() as i64);
+        PENDING_TASK.set(self.pending_data_tasks.len() as i64);
         self.build_read_sqe(entries, missed_entries);
 
         // Increase the strong reference count of the entries.
@@ -941,32 +940,16 @@ impl IO {
 
                     match context.opcode {
                         opcode::Read::CODE => {
-                            URING_READ_TASK_LATENCY_HISTOGRAM
+                            READ_IO_LATENCY
                                 .observe(context.start_time.elapsed().as_micros() as f64);
-                            URING_READ_BYTES_COUNT.inc_by(context.buf.capacity as u64);
-                            URING_READ_TASK_COUNT.inc();
+                            READ_BYTES_TOTAL.inc_by(context.buf.capacity as u64);
+                            COMPLETED_READ_IO.inc();
                         }
                         opcode::Write::CODE => {
-                            URING_WRITE_TASK_LATENCY_HISTOGRAM
+                            WRITE_IO_LATENCY
                                 .observe(context.start_time.elapsed().as_micros() as f64);
-                            URING_WRITE_BYTES_COUNT.inc_by(context.buf.capacity as u64);
-                            URING_WRITE_TASK_COUNT.inc();
-                        }
-                        _ => {}
-                    }
-
-                    match context.opcode {
-                        opcode::Read::CODE => {
-                            URING_READ_TASK_LATENCY_HISTOGRAM
-                                .observe(context.start_time.elapsed().as_micros() as f64);
-                            URING_READ_BYTES_COUNT.inc_by(context.buf.capacity as u64);
-                            URING_READ_TASK_COUNT.inc();
-                        }
-                        opcode::Write::CODE => {
-                            URING_WRITE_TASK_LATENCY_HISTOGRAM
-                                .observe(context.start_time.elapsed().as_micros() as f64);
-                            URING_WRITE_BYTES_COUNT.inc_by(context.buf.capacity as u64);
-                            URING_WRITE_TASK_COUNT.inc();
+                            WRITE_BYTES_TOTAL.inc_by(context.buf.capacity as u64);
+                            COMPLETED_WRITE_IO.inc();
                         }
                         _ => {}
                     }
@@ -1117,7 +1100,7 @@ impl IO {
             }
             debug_assert!(self.inflight >= count);
             self.inflight -= count;
-            URING_INFLIGHT_TASK_GAUGE.sub(count as i64);
+            INFLIGHT_IO.sub(count as i64);
             trace!(self.log, "Reaped {} data CQE(s)", count);
         }
 
@@ -1336,7 +1319,7 @@ impl IO {
                     })?
             };
             self.inflight += cnt;
-            URING_INFLIGHT_TASK_GAUGE.add(cnt as i64);
+            INFLIGHT_IO.add(cnt as i64);
             trace!(self.log, "Pushed {} SQEs into submission queue", cnt);
         }
         Ok(())

@@ -2,58 +2,58 @@ use lazy_static::*;
 use prometheus::*;
 
 lazy_static! {
-    pub static ref URING_READ_TASK_COUNT : IntCounter = register_int_counter!(
-        "uring_read_task_count",
-        "the count of completed read task",
+    pub static ref COMPLETED_READ_IO : IntCounter = register_int_counter!(
+        "completed_read_io",
+        "Number of completed read IO",
     )
     .unwrap();
 
-    pub static ref URING_WRITE_TASK_COUNT : IntCounter = register_int_counter!(
-        "uring_write_task_count",
-        "the count of completed write task",
+    pub static ref COMPLETED_WRITE_IO : IntCounter = register_int_counter!(
+        "completed_write_io",
+        "Number of completed write IO",
     )
     .unwrap();
 
-    pub static ref URING_INFLIGHT_TASK_GAUGE: IntGauge = register_int_gauge!(
-        "uring_inflight_task_gauge",
-        "count of inflight io-task, same as the value of io.inflight"
+    pub static ref INFLIGHT_IO: IntGauge = register_int_gauge!(
+        "inflight_io",
+        "Number of inflight io tasks"
     ).unwrap();
 
-    pub static ref URING_PENDING_TASK_GAUGE: IntGauge = register_int_gauge!(
-        "uring_pending_task_gauge",
-        "count of pending io-task, same as the lenght of io.pending_data_tasks"
+    pub static ref PENDING_TASK: IntGauge = register_int_gauge!(
+        "pending_task",
+        "Number of pending io-task"
     ).unwrap();
 
-    pub static ref URING_READ_TASK_LATENCY_HISTOGRAM: Histogram = register_histogram!(
-        "uring_read_task_latency_histogram",
-        "bucketed histogram of read duration, the unit is us",
-        linear_buckets(0.0, 500.0, 100).unwrap()
+    pub static ref READ_IO_LATENCY: Histogram = register_histogram!(
+        "read_io_latency",
+        "Histogram of read IO latency in microseconds",
+        linear_buckets(0.0, 100.0, 100).unwrap()
     )
     .unwrap();
 
-    pub static ref URING_WRITE_TASK_LATENCY_HISTOGRAM: Histogram = register_histogram!(
-        "uring_write_task_latency_histogram",
-        "bucketed histogram of write duration, the unit is us",
-        linear_buckets(0.0, 500.0, 100).unwrap()
+    pub static ref WRITE_IO_LATENCY: Histogram = register_histogram!(
+        "write_io_latency",
+        "Histogram of write IO latency in microseconds",
+        linear_buckets(0.0, 100.0, 100).unwrap()
     )
     .unwrap();
 
-    pub static ref URING_READ_BYTES_COUNT : IntCounter = register_int_counter!(
-        "uring_read_bytes_count",
-        "total number of bytes read by uring",
+    pub static ref READ_BYTES_TOTAL : IntCounter = register_int_counter!(
+        "read_bytes_total",
+        "Total number of bytes read",
     )
     .unwrap();
 
-    pub static ref URING_WRITE_BYTES_COUNT : IntCounter = register_int_counter!(
-        "uring_write_bytes_count",
-        "total number of bytes written by uring",
+    pub static ref WRITE_BYTES_TOTAL : IntCounter = register_int_counter!(
+        "write_bytes_total",
+        "Total number of bytes written by uring",
     )
     .unwrap();
 
     // dimensions for io_uring
-    pub static ref URING_IO_DEPTH: IntGauge = register_int_gauge!(
-        "uring_io_depth",
-        "the io-depth of uring"
+    pub static ref IO_DEPTH: IntGauge = register_int_gauge!(
+        "io_depth",
+        "the io-depth of io_uring"
     ).unwrap();
 
 }

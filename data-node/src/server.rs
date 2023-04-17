@@ -20,7 +20,6 @@ use std::{
 };
 use store::{ElasticStore, Store};
 use tokio::sync::{broadcast, mpsc, oneshot};
-use util::metrics::initial_metric;
 
 pub fn launch(
     cfg: Arc<Configuration>,

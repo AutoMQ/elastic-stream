@@ -13,7 +13,7 @@ mod seal_range;
 mod util;
 use self::cmd::Command;
 use crate::{
-    metrics::{DATA_NODE_APPEND_LATENCY_HISTOGRAM, DATA_NODE_FETCH_LATENCY_HISTOGRAM},
+    metrics::{APPEND_LATENCY, FETCH_LATENCY},
     stream_manager::StreamManager,
 };
 use codec::frame::Frame;
@@ -89,10 +89,10 @@ impl ServerCall {
         .await;
         match cmd {
             Command::Append(_) => {
-                DATA_NODE_APPEND_LATENCY_HISTOGRAM.observe(now.elapsed().as_micros() as f64);
+                APPEND_LATENCY.observe(now.elapsed().as_micros() as f64);
             }
             Command::Fetch(_) => {
-                DATA_NODE_FETCH_LATENCY_HISTOGRAM.observe(now.elapsed().as_micros() as f64);
+                FETCH_LATENCY.observe(now.elapsed().as_micros() as f64);
             }
             _ => {}
         }

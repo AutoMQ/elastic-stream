@@ -22,7 +22,7 @@ pub(crate) struct Context {
 
     /// The start time of this context
     /// This field is used to calculate the duration from creation to completion of this operation
-    pub(crate) start_time: time::Instant,
+    pub(crate) start_time: minstant::Instant,
 }
 
 impl Context {
@@ -32,7 +32,7 @@ impl Context {
         buf: Arc<AlignedBuf>,
         wal_offset: u64,
         len: u32,
-        start_time: time::Instant,
+        start_time: minstant::Instant,
     ) -> *mut Self {
         Box::into_raw(Box::new(Self {
             opcode,
@@ -64,7 +64,7 @@ impl Context {
         buf: Arc<AlignedBuf>,
         wal_offset: u64,
         len: u32,
-        start_time: time::Instant,
+        start_time: minstant::Instant,
     ) -> *mut Self {
         Box::into_raw(Box::new(Self {
             opcode,

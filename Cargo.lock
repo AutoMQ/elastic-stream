@@ -2470,6 +2470,7 @@ dependencies = [
  "io-uring",
  "lazy_static",
  "libc",
+ "minstant",
  "model",
  "nix 0.26.2",
  "num_enum",
