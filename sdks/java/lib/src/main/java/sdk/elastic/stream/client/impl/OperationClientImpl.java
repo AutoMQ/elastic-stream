@@ -92,7 +92,7 @@ public class OperationClientImpl implements OperationClient {
         this.heartbeatInterval = clientConfiguration.getHeartbeatInterval();
         this.nettyClient = new NettyClient(clientConfiguration, timer);
         this.resourceManager = new ResourceManagerImpl(this.nettyClient);
-        this.streamRangeCache = new StreamRangeCache(
+        this.streamRangeCache = new StreamRangeCache(clientConfiguration.getStreamCacheSize(),
             new CacheLoader<Long, TreeMap<Long, RangeT>>() {
                 @Override
                 public TreeMap<Long, RangeT> load(Long streamId) {
