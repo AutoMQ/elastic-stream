@@ -15,13 +15,19 @@ public class ClientConfiguration {
      */
     private final Duration heartbeatInterval;
     private final int clientAsyncSemaphoreValue;
+    /**
+     * The size of the stream cache. Default is 1000.
+     */
+    private final int streamCacheSize;
 
-    ClientConfiguration(String endpoint, Duration connectionTimeout, Duration channelMaxIdleTime, int clientAsyncSemaphoreValue, Duration heartbeatInterval) {
+    ClientConfiguration(String endpoint, Duration connectionTimeout, Duration channelMaxIdleTime,
+        int clientAsyncSemaphoreValue, Duration heartbeatInterval, int streamCacheSize) {
         this.placementManagerEndpoint = endpoint;
         this.connectionTimeout = connectionTimeout;
         this.channelMaxIdleTime = channelMaxIdleTime;
         this.clientAsyncSemaphoreValue = clientAsyncSemaphoreValue;
         this.heartbeatInterval = heartbeatInterval;
+        this.streamCacheSize = streamCacheSize;
     }
 
     public static ClientConfigurationBuilder newBuilder() {
@@ -46,5 +52,9 @@ public class ClientConfiguration {
 
     public int getClientAsyncSemaphoreValue() {
         return clientAsyncSemaphoreValue;
+    }
+
+    public int getStreamCacheSize() {
+        return streamCacheSize;
     }
 }

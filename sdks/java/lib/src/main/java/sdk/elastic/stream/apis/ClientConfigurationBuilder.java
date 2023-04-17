@@ -13,6 +13,7 @@ public class ClientConfigurationBuilder {
      * Heartbeat interval to keep the client. Default is 10 seconds.
      */
     private Duration heartbeatInterval = Duration.ofSeconds(10);
+    private int streamCacheSize = 1000;
 
     /**
      * Set the endpoint of the placement manager.
@@ -55,6 +56,7 @@ public class ClientConfigurationBuilder {
 
     /**
      * Set the client async semaphore value.
+     *
      * @param clientAsyncSemaphoreValue semaphore value.
      * @return the client configuration builder instance.
      */
@@ -64,11 +66,23 @@ public class ClientConfigurationBuilder {
     }
 
     /**
+     * Set the stream cache size.
+     *
+     * @param streamCacheSize cache size.
+     * @return the client configuration builder instance.
+     */
+    public ClientConfigurationBuilder setStreamCacheSize(int streamCacheSize) {
+        this.streamCacheSize = streamCacheSize;
+        return this;
+    }
+
+    /**
      * Build the client configuration.
+     *
      * @return the client configuration.
      */
     public ClientConfiguration build() {
         checkNotNull(placementManagerEndpoint, "endpoints should not be null");
-        return new ClientConfiguration(placementManagerEndpoint, connectionTimeout, channelMaxIdleTime, clientAsyncSemaphoreValue, heartbeatInterval);
+        return new ClientConfiguration(placementManagerEndpoint, connectionTimeout, channelMaxIdleTime, clientAsyncSemaphoreValue, heartbeatInterval, streamCacheSize);
     }
 }

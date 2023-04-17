@@ -15,7 +15,7 @@ import sdk.elastic.stream.flatc.header.RangeT;
  */
 public class StreamRangeCache extends CommonCache<Long, TreeMap<Long, RangeT>> {
     private static final Logger log = LoggerFactory.getLogger(StreamRangeCache.class);
-    private static final int DEFAULT_CACHE_SIZE = 100;
+    private static final int DEFAULT_CACHE_SIZE = 1000;
 
     /**
      * Create a new StreamRangeCache with the specified size and CacheLoader.
