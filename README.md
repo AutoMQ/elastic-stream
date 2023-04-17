@@ -2,10 +2,11 @@
 ElasticStream is an open-source, elastic streaming platform. ElasticStream is designed to stand on shoulders of cloud infra-structure,
 excelling itself in scalability, fault-tolerance, cost-effectiveness and security.
 
-ElasticStream has three components: placement-manager, data-node and frontend.
 
 
 ## Architecture Overview
+ElasticStream has three components: placement-manager, data-node and clients.
+![Arch](docs/images/elastic-stream-arc.png)
 
 ## Data Node Threading Model
 Primary design goal of data-node is to scale linearly with addition of hardware: including CPU and SSD. To achieve this, threads of it must be as independent from one another as possible, to avoid software locks and even atomic instructions. With that said, instead of centralizing shared data in a global location that all threads access after acquiring a lock, each thread of data-node has its own data. When other threads want to access the data, they pass a message to the owning thread to perform the operation on their behalf through lockless ring-buffers. 
