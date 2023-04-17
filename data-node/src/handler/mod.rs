@@ -12,7 +12,10 @@ mod ping;
 mod seal_range;
 mod util;
 use self::cmd::Command;
-use crate::stream_manager::StreamManager;
+use crate::{
+    metrics::{APPEND_LATENCY, FETCH_LATENCY},
+    stream_manager::StreamManager,
+};
 use codec::frame::Frame;
 use slog::{trace, warn, Logger};
 use std::{cell::RefCell, rc::Rc};
@@ -53,6 +56,7 @@ impl ServerCall {
             self.request.stream_id,
             self.request.operation_code
         );
+        let now = std::time::Instant::now();
         let mut response = Frame::new(self.request.operation_code);
         response.stream_id = self.request.stream_id;
 
@@ -83,6 +87,15 @@ impl ServerCall {
             &mut response,
         )
         .await;
+        match cmd {
+            Command::Append(_) => {
+                APPEND_LATENCY.observe(now.elapsed().as_micros() as f64);
+            }
+            Command::Fetch(_) => {
+                FETCH_LATENCY.observe(now.elapsed().as_micros() as f64);
+            }
+            _ => {}
+        }
         trace!(
             self.logger,
             "Response frame generated. stream-id={}",

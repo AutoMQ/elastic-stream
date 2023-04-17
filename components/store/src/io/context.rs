@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time};
 
 use io_uring::opcode;
 
@@ -19,6 +19,10 @@ pub(crate) struct Context {
     /// Original read length. This field makes sense iff opcode is `Read`.
     /// This field represents the real read length of a read operation.
     pub(crate) len: u32,
+
+    /// The start time of this context
+    /// This field is used to calculate the duration from creation to completion of this operation
+    pub(crate) start_time: minstant::Instant,
 }
 
 impl Context {
@@ -28,12 +32,14 @@ impl Context {
         buf: Arc<AlignedBuf>,
         wal_offset: u64,
         len: u32,
+        start_time: minstant::Instant,
     ) -> *mut Self {
         Box::into_raw(Box::new(Self {
             opcode,
             buf,
             wal_offset,
             len,
+            start_time,
         }))
     }
 
@@ -58,12 +64,14 @@ impl Context {
         buf: Arc<AlignedBuf>,
         wal_offset: u64,
         len: u32,
+        start_time: minstant::Instant,
     ) -> *mut Self {
         Box::into_raw(Box::new(Self {
             opcode,
             buf,
             wal_offset,
             len,
+            start_time,
         }))
     }
 }

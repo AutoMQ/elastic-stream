@@ -10,6 +10,7 @@ pub(crate) mod stream_manager;
 mod worker;
 mod worker_config;
 pub use crate::cli::Cli;
+mod metrics;
 
 #[cfg(test)]
 mod tests {

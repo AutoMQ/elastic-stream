@@ -2,9 +2,13 @@ use std::{cell::RefCell, error::Error, net::SocketAddr, rc::Rc, time::Duration};
 
 use slog::{debug, error, info, o, trace, warn, Logger};
 use store::ElasticStore;
-use tokio::sync::{broadcast, mpsc};
+use tokio::{
+    sync::{broadcast, mpsc},
+    time,
+};
 use tokio_uring::net::{TcpListener, TcpStream};
 use transport::connection::Connection;
+use util::metrics::{dump, http_serve};
 
 use crate::{
     connection_tracker::ConnectionTracker,
@@ -90,6 +94,20 @@ impl Worker {
                     .start()
                     .await
                     .expect("Failed to bootstrap stream ranges from placement managers");
+
+                let metrics_logger = self.logger.clone();
+                if self.config.primary {
+                    // tokio_uring::spawn(async {
+                    //     http_serve().await;
+                    // });
+                    tokio_uring::spawn(async move {
+                        loop {
+                            time::sleep(time::Duration::from_millis(1000)).await;
+                            let metrics_str = dump(false);
+                            info!(metrics_logger, "metrics:\n{}", metrics_str);
+                        }
+                    });
+                }
 
                 match self.run(listener, self.logger.clone(), shutdown_rx).await {
                     Ok(_) => {}

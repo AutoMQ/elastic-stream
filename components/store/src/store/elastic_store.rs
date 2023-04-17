@@ -6,7 +6,14 @@ use std::{
     thread::{Builder, JoinHandle},
 };
 
-use super::lock::Lock;
+use super::{
+    lock::Lock,
+    metrics::{
+        STORE_APPEND_BYTES_COUNT, STORE_APPEND_COUNT, STORE_APPEND_LATENCY_HISTOGRAM,
+        STORE_FAILED_APPEND_COUNT, STORE_FAILED_FETCH_COUNT, STORE_FETCH_BYTES_COUNT,
+        STORE_FETCH_COUNT, STORE_FETCH_LATENCY_HISTOGRAM,
+    },
+};
 use crate::{
     error::{AppendError, FetchError, StoreError},
     index::{driver::IndexDriver, MinOffset},
@@ -213,15 +220,26 @@ impl Store for ElasticStore {
         options: WriteOptions,
         request: AppendRecordRequest,
     ) -> Result<AppendResult, AppendError> {
+        let now = std::time::Instant::now();
         let (sender, receiver) = oneshot::channel();
+        let len = request.buffer.len();
         self.do_append(request, sender);
         match receiver.await.map_err(|_e| AppendError::ChannelRecv) {
-            Ok(res) => res,
-            Err(e) => Err(e),
+            Ok(res) => {
+                STORE_APPEND_LATENCY_HISTOGRAM.observe(now.elapsed().as_micros() as f64);
+                STORE_APPEND_COUNT.inc();
+                STORE_APPEND_BYTES_COUNT.inc_by(len as u64);
+                res
+            }
+            Err(e) => {
+                STORE_FAILED_APPEND_COUNT.inc();
+                Err(e)
+            }
         }
     }
 
     async fn fetch(&self, options: ReadOptions) -> Result<FetchResult, FetchError> {
+        let now = std::time::Instant::now();
         let (index_tx, index_rx) = oneshot::channel();
         self.indexer.scan_record_handles(
             options.stream_id,
@@ -286,14 +304,16 @@ impl Store for ElasticStore {
 
             // Extract the payload from the result, and assemble the final result.
             let final_result: Vec<_> = result.into_iter().flat_map(|res| res.payload).collect();
-
+            STORE_FETCH_COUNT.inc();
+            STORE_FETCH_LATENCY_HISTOGRAM.observe(now.elapsed().as_micros() as f64);
+            STORE_FETCH_BYTES_COUNT.inc_by(final_result.len() as u64);
             return Ok(FetchResult {
                 stream_id: options.stream_id,
                 offset: options.offset,
                 payload: final_result,
             });
         }
-
+        STORE_FAILED_FETCH_COUNT.inc();
         Err(FetchError::NoRecord)
     }
 

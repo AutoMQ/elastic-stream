@@ -73,6 +73,7 @@ gethostname = "0.4"
 ordinal = "0.3"
 
 criterion = "0.4"
+
 minstant = "0.1"
 minitrace = "0.4"
 prometheus = "0.13"

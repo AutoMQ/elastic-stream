@@ -37,6 +37,9 @@ transport = { path = "../components/transport" }
 thiserror =  { workspace = true }
 tokio-uring = { workspace = true }
 tokio = { workspace = true }
+util = {path = "../components/util"}
+lazy_static = {version = "1.4.0"}
+prometheus = {workspace = true}
 
 [dev-dependencies]
 mockall = { workspace = true }

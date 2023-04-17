@@ -3,6 +3,10 @@ use crate::index::driver::IndexDriver;
 use crate::index::record_handle::RecordHandle;
 use crate::io::buf::{AlignedBufReader, AlignedBufWriter};
 use crate::io::context::Context;
+use crate::io::metrics::{
+    COMPLETED_READ_IO, COMPLETED_WRITE_IO, INFLIGHT_IO, IO_DEPTH, PENDING_TASK, READ_BYTES_TOTAL,
+    READ_IO_LATENCY, WRITE_BYTES_TOTAL, WRITE_IO_LATENCY,
+};
 use crate::io::task::IoTask;
 use crate::io::task::WriteTask;
 use crate::io::wal::Wal;
@@ -294,12 +298,14 @@ impl IO {
         }
 
         self.pending_data_tasks.push_back(io_task);
+        PENDING_TASK.set(self.pending_data_tasks.len() as i64);
         *received += 1;
     }
 
     fn receive_io_tasks(&mut self) -> usize {
         let mut received = 0;
         let io_depth = self.data_ring.params().sq_entries() as usize;
+        IO_DEPTH.set(io_depth as i64);
         loop {
             // TODO: Find a better estimation.
             //
@@ -528,6 +534,7 @@ impl IO {
                             Arc::new(buf),
                             read_offset,
                             read_len,
+                            minstant::Instant::now(),
                         );
 
                         let sqe = opcode::Read::new(types::Fd(sd.fd), ptr, read_len)
@@ -648,7 +655,7 @@ impl IO {
                         // The pointer will be set into user_data of uring.
                         // When the uring io completes, the pointer will be used to retrieve the `Context`.
                         let context =
-                            Context::write_ctx(opcode::Write::CODE, buf, buf_wal_offset, buf_limit);
+                            Context::write_ctx(opcode::Write::CODE, buf, buf_wal_offset, buf_limit, minstant::Instant::now());
 
                         // Note we have to write the whole page even if the page is partially filled.
                         let sqe = opcode::Write::new(types::Fd(sd.fd), ptr, buf_capacity)
@@ -840,7 +847,7 @@ impl IO {
                 }
             }
         }
-
+        PENDING_TASK.set(self.pending_data_tasks.len() as i64);
         self.build_read_sqe(entries, missed_entries);
 
         // Increase the strong reference count of the entries.
@@ -930,6 +937,22 @@ impl IO {
                     // It's safe to convert tag ptr back to Box<Context> as the memory pointed by ptr
                     // is allocated by Box itself, hence, there will no alignment issue at all.
                     let mut context = unsafe { Box::from_raw(ptr) };
+
+                    match context.opcode {
+                        opcode::Read::CODE => {
+                            READ_IO_LATENCY
+                                .observe(context.start_time.elapsed().as_micros() as f64);
+                            READ_BYTES_TOTAL.inc_by(context.buf.capacity as u64);
+                            COMPLETED_READ_IO.inc();
+                        }
+                        opcode::Write::CODE => {
+                            WRITE_IO_LATENCY
+                                .observe(context.start_time.elapsed().as_micros() as f64);
+                            WRITE_BYTES_TOTAL.inc_by(context.buf.capacity as u64);
+                            COMPLETED_WRITE_IO.inc();
+                        }
+                        _ => {}
+                    }
 
                     // Remove write barrier
                     if context.opcode == opcode::Write::CODE
@@ -1077,6 +1100,7 @@ impl IO {
             }
             debug_assert!(self.inflight >= count);
             self.inflight -= count;
+            INFLIGHT_IO.sub(count as i64);
             trace!(self.log, "Reaped {} data CQE(s)", count);
         }
 
@@ -1295,6 +1319,7 @@ impl IO {
                     })?
             };
             self.inflight += cnt;
+            INFLIGHT_IO.add(cnt as i64);
             trace!(self.log, "Pushed {} SQEs into submission queue", cnt);
         }
         Ok(())
