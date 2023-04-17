@@ -17,10 +17,11 @@ public class Main {
     public static void main(String[] args) throws RunnerException {
         Options options = new OptionsBuilder()
                 .param("pmAddress", "192.168.123.128:2378")
-                .param("bodySize", "1024")
+                .param("bodySize", "4096")
                 .param("streamCount", "64")
                 .shouldFailOnError(true)
                 .threadGroups(3, 1)
+                .threads(1)
                 .include(".*" + ReadWrite.class.getSimpleName() + ".*")
                 .forks(1)
                 .warmupIterations(1)

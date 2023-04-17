@@ -1,5 +1,6 @@
 package elastic.stream.benchmark.jmh;
 
+import lombok.Getter;
 import lombok.SneakyThrows;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Group;
@@ -8,142 +9,98 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
-import sdk.elastic.stream.apis.ClientConfigurationBuilder;
 import sdk.elastic.stream.apis.OperationClient;
-import sdk.elastic.stream.client.impl.OperationClientBuilderImpl;
-import sdk.elastic.stream.flatc.header.AppendResultT;
-import sdk.elastic.stream.flatc.header.CreateStreamResultT;
-import sdk.elastic.stream.flatc.header.ErrorCode;
-import sdk.elastic.stream.flatc.header.StreamT;
-import sdk.elastic.stream.models.Record;
-import sdk.elastic.stream.models.RecordBatch;
 
-import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Random;
 import java.util.stream.IntStream;
+
+import static elastic.stream.benchmark.tool.ClientTool.append;
+import static elastic.stream.benchmark.tool.ClientTool.buildClient;
+import static elastic.stream.benchmark.tool.ClientTool.createStreams;
+import static elastic.stream.benchmark.tool.ClientTool.fetch;
 
 /**
  * @author ningyu
  */
-@State(Scope.Group)
+@State(Scope.Thread)
 public class ReadWrite {
 
-    private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(60);
     private static final int PRE_APPEND_RECORD_COUNT = 10;
 
-    @Param({"localhost:2378"})
-    private String pmAddress;
-    @Param({"1024"})
-    private int bodySize;
-    @Param({"64"})
-    private int streamCount;
+    private final Random random = new SecureRandom();
 
-    private OperationClient client;
-    private byte[] payload;
-    private List<Long> streamIds;
-    private List<Long> baseOffsets;
+    @State(Scope.Benchmark)
+    @Getter
+    public static class BenchmarkState {
+        @Param({"localhost:2378"})
+        private String pmAddress;
+        @Param({"1024"})
+        private int bodySize;
+        @Param({"64"})
+        private int streamCount;
 
-    @Setup
-    public void setup() {
-        this.client = buildClient(pmAddress, streamCount);
-        this.streamIds = createStreams(client, streamCount);
-        this.payload = randomPayload(bodySize);
-        this.baseOffsets = prepareRecords(client, streamIds.get(0), payload);
-    }
+        private byte[] payload;
+        private List<Long> streamIds;
+        private List<Long> baseOffsets;
 
-    @TearDown
-    @SneakyThrows
-    public void tearDown() {
-        client.close();
-    }
-
-    @SneakyThrows
-    private OperationClient buildClient(String pmAddress, int streamCount) {
-        ClientConfigurationBuilder builder = new ClientConfigurationBuilder()
-                .setPmEndpoint(pmAddress)
-                .setStreamCacheSize(streamCount)
-                // TODO make these options configurable
-                .setClientAsyncSemaphoreValue(1024)
-                .setConnectionTimeout(Duration.ofSeconds(3))
-                .setChannelMaxIdleTime(Duration.ofSeconds(10))
-                .setHeartBeatInterval(Duration.ofSeconds(5));
-        OperationClient client = new OperationClientBuilderImpl().setClientConfiguration(builder.build()).build();
-        client.start();
-        return client;
-    }
-
-    @SneakyThrows
-    private List<Long> createStreams(OperationClient client, int streamCount) {
-        List<StreamT> streams = IntStream.range(0, streamCount).mapToObj(i -> {
-            StreamT streamT = new StreamT();
-            streamT.setStreamId(0L);
-            streamT.setReplicaNums((byte) 1);
-            streamT.setRetentionPeriodMs(Duration.ofDays(3).toMillis());
-            return streamT;
-        }).collect(Collectors.toList());
-        List<CreateStreamResultT> resultList = client.createStreams(streams, DEFAULT_REQUEST_TIMEOUT).get();
-        return resultList.stream()
-                .map(CreateStreamResultT::getStream)
-                .map(StreamT::getStreamId)
-                .collect(Collectors.toList());
-    }
-
-    @SneakyThrows
-    private byte[] randomPayload(int size) {
-        byte[] payload = new byte[size];
-        SecureRandom.getInstanceStrong().nextBytes(payload);
-        return payload;
-    }
-
-    private List<Long> prepareRecords(OperationClient client, long streamId, byte[] payload) {
-        List<Long> baseOffsets = new ArrayList<>();
-        for (int i = 0; i < PRE_APPEND_RECORD_COUNT; i++) {
-            baseOffsets.add(append(client, streamId, payload));
+        @Setup
+        public void setup() throws Exception {
+            OperationClient client = buildClient(pmAddress, streamCount * 2);
+            this.streamIds = createStreams(client, streamCount);
+            this.payload = randomPayload(bodySize);
+            this.baseOffsets = prepareRecords(client, streamIds.get(0), payload);
+            client.close();
         }
-        return baseOffsets;
+
+        @SneakyThrows
+        private byte[] randomPayload(int size) {
+            byte[] payload = new byte[size];
+            SecureRandom.getInstanceStrong().nextBytes(payload);
+            return payload;
+        }
+
+        private List<Long> prepareRecords(OperationClient client, long streamId, byte[] payload) {
+            return IntStream.range(0, PRE_APPEND_RECORD_COUNT).mapToObj(i -> append(client, streamId, payload)).toList();
+        }
+    }
+
+    @State(Scope.Group)
+    @Getter
+    public static class ClientState {
+        private OperationClient client;
+
+        @Setup
+        public void setup(BenchmarkState benchmarkState) {
+            client = buildClient(benchmarkState.getPmAddress(), benchmarkState.getStreamCount() * 2);
+        }
+
+        @TearDown
+        @SneakyThrows
+        public void tearDown() {
+            client.close();
+        }
     }
 
     @Benchmark
     @Group("readWrite")
-    public void read() {
-        fetch(client, streamIds.get(0), baseOffsets.get(new SecureRandom().nextInt(PRE_APPEND_RECORD_COUNT)));
+    public boolean read(BenchmarkState benchmarkState, ClientState clientState) {
+        OperationClient client = clientState.getClient();
+        // TODO random read
+        Long streamId = benchmarkState.getStreamIds().get(0);
+        Long baseOffset = benchmarkState.getBaseOffsets().get(random.nextInt(PRE_APPEND_RECORD_COUNT));
+
+        return fetch(client, streamId, baseOffset, benchmarkState.getBodySize());
     }
 
     @Benchmark
     @Group("readWrite")
-    public void write() {
-        append(client, streamIds.get(new SecureRandom().nextInt(streamCount)), payload);
-    }
+    public long write(BenchmarkState benchmarkState, ClientState clientState) {
+        OperationClient client = clientState.getClient();
+        Long streamId = benchmarkState.getStreamIds().get(random.nextInt(benchmarkState.getStreamCount()));
+        byte[] payload = benchmarkState.getPayload();
 
-    @SneakyThrows
-    private void fetch(OperationClient client, long streamId, long offset) {
-        List<RecordBatch> batches = client.fetchBatches(streamId, offset, 1, 1, DEFAULT_REQUEST_TIMEOUT).get();
-        if (batches.isEmpty()) {
-            throw new RuntimeException("failed to fetch a batch from stream " + streamId + " at offset " + offset + ": empty batches");
-        }
-        batches.forEach(batch -> {
-            if (batch.getRecords().isEmpty()) {
-                throw new RuntimeException("failed to fetch a batch from stream " + streamId + " at offset " + offset + ": empty records");
-            }
-            batch.getRecords().forEach(record -> {
-                if (record.getBody() == null || record.getBody().remaining() != bodySize) {
-                    throw new RuntimeException("failed to fetch a batch from stream " + streamId + " at offset " + offset + ": body size mismatch, expected: " + bodySize + ", actual: " + record.getBody().remaining());
-                }
-            });
-        });
-    }
-
-    @SneakyThrows
-    private long append(OperationClient client, long streamId, byte[] payload) {
-        List<Record> recordList = List.of(new Record(streamId, 0L, 42L, null, null, ByteBuffer.wrap(payload)));
-        AppendResultT resultT = client.appendBatch(new RecordBatch(streamId, null, recordList), DEFAULT_REQUEST_TIMEOUT).get();
-        if (resultT.getStatus().getCode() != ErrorCode.OK) {
-            throw new RuntimeException("failed to append a batch to stream " + streamId + ", code: " + resultT.getStatus().getCode() + ", message: " + resultT.getStatus().getMessage());
-        }
-        return resultT.getBaseOffset();
+        return append(client, streamId, payload);
     }
 }
