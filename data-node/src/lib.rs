@@ -10,6 +10,7 @@ mod node_config;
 pub mod server;
 pub(crate) mod stream_manager;
 pub use crate::cli::Cli;
+mod metrics;
 
 #[cfg(test)]
 mod tests {
