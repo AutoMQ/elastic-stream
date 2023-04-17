@@ -39,7 +39,6 @@ public class ReadWrite {
     private String pmAddress;
     @Param({"1024"})
     private int bodySize;
-
     @Param({"64"})
     private int streamCount;
 
@@ -50,7 +49,7 @@ public class ReadWrite {
 
     @Setup
     public void setup() {
-        this.client = buildClient(pmAddress);
+        this.client = buildClient(pmAddress, streamCount);
         this.streamIds = createStreams(client, streamCount);
         this.payload = randomPayload(bodySize);
         this.baseOffsets = prepareRecords(client, streamIds.get(0), payload);
@@ -63,9 +62,10 @@ public class ReadWrite {
     }
 
     @SneakyThrows
-    private OperationClient buildClient(String pmAddress) {
+    private OperationClient buildClient(String pmAddress, int streamCount) {
         ClientConfigurationBuilder builder = new ClientConfigurationBuilder()
                 .setPmEndpoint(pmAddress)
+                .setStreamCacheSize(streamCount)
                 // TODO make these options configurable
                 .setClientAsyncSemaphoreValue(1024)
                 .setConnectionTimeout(Duration.ofSeconds(3))
