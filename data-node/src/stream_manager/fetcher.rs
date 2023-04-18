@@ -29,12 +29,6 @@ pub(crate) enum Fetcher {
 }
 
 impl Fetcher {
-    pub(crate) fn start(&mut self) {
-        if let Fetcher::PlacementClient { ref mut client, .. } = self {
-            client.start();
-        }
-    }
-
     pub(crate) async fn bootstrap(
         &mut self,
         log: &Logger,

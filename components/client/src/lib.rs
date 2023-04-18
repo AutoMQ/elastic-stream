@@ -8,6 +8,8 @@
 
 #![feature(try_find)]
 #![feature(iterator_try_collect)]
+#![feature(hash_drain_filter)]
+#![feature(drain_filter)]
 
 pub mod client;
 pub mod error;

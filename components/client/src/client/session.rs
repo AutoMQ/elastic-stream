@@ -25,7 +25,7 @@ use tokio_uring::net::TcpStream;
 use transport::connection::Connection;
 
 pub(crate) struct Session {
-    target: SocketAddr,
+    pub(crate) target: SocketAddr,
 
     config: Arc<config::Configuration>,
 

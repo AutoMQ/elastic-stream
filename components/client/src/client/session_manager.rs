@@ -1,8 +1,7 @@
 use super::composite_session::CompositeSession;
 use crate::error::ClientError;
-use slog::{info, trace, Logger};
+use slog::Logger;
 use std::{cell::UnsafeCell, collections::HashMap, rc::Rc, sync::Arc};
-use tokio::time::{timeout, Instant};
 
 pub struct SessionManager {
     /// Configuration for the transport layer.
@@ -31,65 +30,7 @@ impl SessionManager {
         }
     }
 
-    fn start_heartbeat_loop(
-        logger: Logger,
-        config: Arc<config::Configuration>,
-        stop_rx: async_channel::Receiver<()>,
-        sessions: Rc<UnsafeCell<HashMap<String, Rc<CompositeSession>>>>,
-    ) {
-        let heartbeat_interval = config.client_heartbeat_interval();
-        let io_timeout = config.client_io_timeout();
-
-        tokio_uring::spawn(async move {
-            tokio::pin! {
-                let stop_fut = stop_rx.recv();
-
-                // Interval to check if a session needs to send a heartbeat request.
-                let sleep = tokio::time::sleep(heartbeat_interval);
-            }
-
-            loop {
-                tokio::select! {
-                    _ = &mut stop_fut => {
-                        info!(logger, "Got notified to stop");
-                        break;
-                    }
-
-                    _hb = &mut sleep => {
-                        sleep.as_mut().reset(Instant::now() + heartbeat_interval);
-                        let sessions_ = unsafe {&*sessions.get()};
-                        let mut futures = Vec::with_capacity(sessions_.len());
-                        for (_addr, session) in sessions_.iter() {
-                            if session.need_heartbeat() {
-                                trace!(logger, "Heartbeat to {:?}", _addr);
-                                futures.push(timeout(io_timeout, session.heartbeat()));
-                            }
-                        }
-                         futures::future::join_all(futures).await;
-                    }
-                }
-            }
-        });
-    }
-
-    pub(super) async fn start(&self) -> Result<(), ClientError> {
-        trace!(self.log, "Start session manager");
-
-        if let Some(ref stop_rx) = self.stop_rx {
-            Self::start_heartbeat_loop(
-                self.log.clone(),
-                Arc::clone(&self.config),
-                stop_rx.clone(),
-                Rc::clone(&self.sessions),
-            );
-
-            // Start other task loops
-        }
-
-        Ok(())
-    }
-
-    pub(crate) async fn get_session(
+    pub(crate) async fn get_composite_session(
         &mut self,
         target: &str,
     ) -> Result<Rc<CompositeSession>, ClientError> {

@@ -33,7 +33,6 @@ impl IdGenerator for PlacementManagerIdGenerator {
         tokio_uring::start(async {
             let config = Arc::new(config::Configuration::default());
             let client = Client::new(config, &self.log);
-            client.start();
 
             match client
                 .allocate_id(

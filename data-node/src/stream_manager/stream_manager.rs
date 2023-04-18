@@ -37,7 +37,6 @@ impl StreamManager {
     }
 
     pub(crate) async fn start(&mut self) -> Result<(), ServiceError> {
-        self.fetcher.start();
         let mut bootstrap = false;
         if let Fetcher::PlacementClient { .. } = &self.fetcher {
             bootstrap = true;

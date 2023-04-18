@@ -4,7 +4,6 @@ use crate::{
     worker_config::WorkerConfig,
 };
 use config::Configuration;
-use model::data_node::DataNode;
 use slog::{error, o, warn, Drain, Duplicate};
 use slog_async::{Async, OverflowStrategy};
 use slog_term::{FullFormat, PlainDecorator, TermDecorator};
@@ -17,10 +16,13 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use store::{ElasticStore, Store};
+use store::ElasticStore;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
-pub fn launch(config: Configuration, shutdown: broadcast::Sender<()>) -> Result<(), Box<dyn Error>> {
+pub fn launch(
+    config: Configuration,
+    shutdown: broadcast::Sender<()>,
+) -> Result<(), Box<dyn Error>> {
     let decorator = TermDecorator::new().build();
     let drain = FullFormat::new(decorator)
         .use_file_location()

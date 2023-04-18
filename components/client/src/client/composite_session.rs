@@ -44,21 +44,25 @@ impl CompositeSession {
             .to_socket_addrs()
             .map_err(|_e| ClientError::BadAddress)?
         {
-            let session = Self::connect(
+            let res = Self::connect(
                 socket_addr.clone(),
                 config.client_connect_timeout(),
                 &config,
                 &log,
             )
-            .await?;
-            sessions.borrow_mut().insert(socket_addr, session);
+            .await;
+            match res {
+                Ok(session) => {
+                    sessions.borrow_mut().insert(socket_addr, session);
+                    info!(log, "Connection to {} established", target.to_string());
+                    break;
+                }
+                Err(_e) => {
+                    info!(log, "Failed to connect to {}", socket_addr);
+                }
+            }
         }
-        info!(
-            log,
-            "CompositeSession to {} has {} internal session(s)",
-            target.to_string(),
-            sessions.borrow().len()
-        );
+
         Ok(Self {
             target: target.to_string(),
             config,
@@ -78,58 +82,119 @@ impl CompositeSession {
 
     fn need_refresh_cluster(&self) -> bool {
         let now = Instant::now();
-        todo!()
+        self.refresh_cluster_instant.borrow().clone()
+            + self
+                .config
+                .client_refresh_placement_manager_cluster_interval()
+            > now
     }
 
     /// Broadcast heartbeat requests to all nested sessions.
-    ///
-    ///
     pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
         if !self.need_heartbeat() {
             trace!(self.log, "No need to broadcast heartbeat yet");
             return Ok(());
         }
 
-        let now = Instant::now();
-        *self.heartbeat_instant.borrow_mut() = now;
+        if self.need_refresh_cluster() {
+            if let Ok(Some(nodes)) = self.describe_placement_manager_cluster().await {
+                if !nodes.is_empty() {
+                    *self.refresh_cluster_instant.borrow_mut() = Instant::now();
 
-        if let Some((_, session)) = self.sessions.borrow().iter().next() {
-            let request = Request::Heartbeat {
-                client_id: self.config.client.client_id.clone(),
-                role: ClientRole::DataNode,
-                data_node: Some(self.config.server.data_node()),
-            };
-            let (tx, rx) = oneshot::channel();
-            if let Err(e) = session.write(&request, tx).await {
-                error!(
-                    self.log,
-                    "Failed to send heartbeat-request to {}. Cause: {:?}", self.target, e
-                );
-                return Err(ClientError::ClientInternal);
-            }
+                    let mut addrs = nodes
+                        .into_iter()
+                        .map(|node| node.advertise_addr.to_socket_addrs().into_iter())
+                        .flatten()
+                        .flatten()
+                        .collect::<Vec<_>>();
 
-            if let Response::Heartbeat { status } = rx.await.map_err(|e| {
-                error!(
-                    self.log,
-                    "Internal error while allocating ID from {}. Cause: {:?}", self.target, e
-                );
-                ClientError::ClientInternal
-            })? {
-                if status.code != ErrorCode::OK {
-                    error!(
-                        self.log,
-                        "Failed to maintain heartbeat to {}. Status-Message: `{}`",
-                        self.target,
-                        status.message
-                    );
-                    // TODO: refine error handling
-                    return Err(ClientError::ServerInternal);
+                    // Remove sessions that are no longer valid
+                    self.sessions
+                        .borrow_mut()
+                        .drain_filter(|k, _v| !addrs.contains(k));
+
+                    addrs.drain_filter(|addr| self.sessions.borrow().contains_key(addr));
+
+                    let futures = addrs.into_iter().map(|addr| {
+                        Self::connect(
+                            addr,
+                            self.config.client_connect_timeout(),
+                            &self.config,
+                            &self.log,
+                        )
+                    });
+
+                    let res: Vec<Result<Session, ClientError>> =
+                        futures::future::join_all(futures).await;
+                    for item in res {
+                        match item {
+                            Ok(session) => {
+                                info!(
+                                    self.log,
+                                    "Insert a session to composite-session {} using socket: {}",
+                                    self.target,
+                                    session.target
+                                );
+                                self.sessions
+                                    .borrow_mut()
+                                    .insert(session.target.clone(), session);
+                            }
+                            Err(e) => {
+                                error!(self.log, "Failed to connect. {:?}", e);
+                            }
+                        }
+                    }
                 }
-                return Ok(());
             }
         }
 
-        Err(ClientError::ClientInternal)
+        let now = Instant::now();
+        *self.heartbeat_instant.borrow_mut() = now;
+
+        let request = Request::Heartbeat {
+            client_id: self.config.client.client_id.clone(),
+            role: ClientRole::DataNode,
+            data_node: Some(self.config.server.data_node()),
+        };
+
+        let mut receivers = vec![];
+        {
+            let sessions = self.sessions.borrow();
+            let futures = sessions
+                .iter()
+                .map(|(_addr, session)| {
+                    let (tx, rx) = oneshot::channel();
+                    receivers.push(rx);
+                    session.write(&request, tx)
+                })
+                .collect::<Vec<_>>();
+            let _res: Vec<Result<(), oneshot::Sender<Response>>> =
+                futures::future::join_all(futures).await;
+        }
+
+        let res: Vec<Result<Response, oneshot::error::RecvError>> =
+            futures::future::join_all(receivers).await;
+
+        for item in res {
+            match item {
+                Ok(response) => {
+                    if let Response::Heartbeat { status } = response {
+                        if status.code != ErrorCode::OK {
+                            error!(
+                                self.log,
+                                "Failed to maintain heartbeat to {}. Status-Message: `{}`",
+                                self.target,
+                                status.message
+                            );
+                            // TODO: refine error handling
+                            return Err(ClientError::ServerInternal);
+                        }
+                    }
+                }
+                Err(_e) => {}
+            }
+        }
+        Ok(())
     }
 
     pub(crate) async fn allocate_id(

@@ -24,12 +24,6 @@ impl Client {
         }
     }
 
-    pub fn start(&self) {
-        let session_manager = Rc::clone(&self.session_manager);
-        let session_manager = unsafe { &*session_manager.get() };
-        tokio_uring::spawn(async move { session_manager.start().await });
-    }
-
     pub async fn allocate_id(
         &self,
         target: &str,
@@ -37,7 +31,7 @@ impl Client {
         timeout: Duration,
     ) -> Result<i32, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
-        let session = session_manager.get_session(target).await?;
+        let session = session_manager.get_composite_session(target).await?;
         let future = session.allocate_id(host, timeout);
         time::timeout(timeout, future).await.map_err(|e|{
             warn!(self.log, "Timeout when allocate ID. {}", e);
@@ -71,7 +65,7 @@ impl Client {
         };
 
         let session_manager = unsafe { &mut *self.session_manager.get() };
-        let session = session_manager.get_session(target).await?;
+        let session = session_manager.get_composite_session(target).await?;
         let future = session.list_range(criteria);
         time::timeout(timeout, future).await.map_err(|elapsed| {
             warn!(self.log, "Timeout when list range. {}", elapsed);
@@ -94,22 +88,25 @@ impl Client {
     ///
     pub async fn broadcast_heartbeat(&self, target: &str) -> Result<(), ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
-        let session = session_manager.get_session(target).await?;
-        time::timeout(self.config.client_io_timeout(), session.heartbeat())
-            .await
-            .map_err(|_elapsed| {
-                error!(
-                    self.log,
-                    "Timeout when broadcasting heartbeat to {}", target
-                );
-                ClientError::RpcTimeout {
-                    timeout: self.config.client_io_timeout(),
-                }
-            })
-            .and_then(|_res| {
-                trace!(self.log, "Heartbeat to {} OK", target);
-                Ok(())
-            })
+        let composite_session = session_manager.get_composite_session(target).await?;
+        time::timeout(
+            self.config.client_io_timeout(),
+            composite_session.heartbeat(),
+        )
+        .await
+        .map_err(|_elapsed| {
+            error!(
+                self.log,
+                "Timeout when broadcasting heartbeat to {}", target
+            );
+            ClientError::RpcTimeout {
+                timeout: self.config.client_io_timeout(),
+            }
+        })
+        .and_then(|_res| {
+            trace!(self.log, "Heartbeat to {} OK", target);
+            Ok(())
+        })
     }
 }
 
@@ -134,7 +131,6 @@ mod tests {
             config.server.port = 10911;
             let config = Arc::new(config);
             let client = Client::new(config, &log);
-            client.start();
             let timeout = Duration::from_secs(3);
             let id = client.allocate_id(&addr, "localhost", timeout).await?;
             assert_eq!(1, id);
@@ -157,8 +153,6 @@ mod tests {
             config.server.port = 10911;
             let config = Arc::new(config);
             let client = Client::new(config, &log);
-
-            client.start();
 
             let timeout = Duration::from_secs(10);
 
@@ -197,7 +191,6 @@ mod tests {
             config.server.port = 10911;
             let config = Arc::new(config);
             let client = Client::new(config, &log);
-            client.start();
 
             let timeout = Duration::from_secs(10);
 
