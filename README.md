@@ -58,7 +58,7 @@ Read [more](https://crates.io/crates/cargo-llvm-cov)
 Sample [integration](https://github.com/taiki-e/cargo-llvm-cov) with github action.
 
 ## How to Contribute
-We welcome contribution
+We welcome contribution of various types: documentation, bug reporting, feature request, and pull requests. Before proposing a major large-scale change, it is advised to discuss your proposal first.
 
 ## Notes
 
