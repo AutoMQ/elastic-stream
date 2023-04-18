@@ -313,7 +313,6 @@ impl CompositeSession {
                 );
                 ClientError::BadAddress
             })?
-            .into_iter()
             .collect::<Vec<_>>();
 
         let (mut tx, rx) = oneshot::channel();

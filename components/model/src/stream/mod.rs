@@ -58,8 +58,8 @@ impl Stream {
     pub fn is_mut(&self) -> bool {
         self.ranges
             .last()
-            .and_then(|range| Some(!range.is_sealed()))
-            .unwrap_or(false)
+            .map(|range| !range.is_sealed())
+            .unwrap_or_default()
     }
 
     pub fn last(&self) -> Option<&StreamRange> {
@@ -92,12 +92,7 @@ impl Stream {
     pub fn refresh(&mut self, ranges: Vec<StreamRange>) {
         let to_append = ranges
             .into_iter()
-            .filter(|range| {
-                self.ranges
-                    .iter()
-                    .find(|r| range.index() == r.index())
-                    .is_none()
-            })
+            .filter(|range| !self.ranges.iter().any(|r| range.index() == r.index()))
             .collect::<Vec<_>>();
         self.ranges.extend(to_append);
     }

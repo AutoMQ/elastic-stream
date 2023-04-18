@@ -83,18 +83,19 @@ pub fn launch(
             let (tx, rx) = mpsc::unbounded_channel();
             channels.push(rx);
 
-            let shutdown_rx = shutdown.subscribe();
+            let shutdown_tx = shutdown.clone();
             thread::Builder::new()
                 .name("DataNode".to_owned())
                 .spawn(move || {
                     let worker_config = WorkerConfig {
                         core_id,
-                        server_config,
+                        server_config: Arc::clone(&server_config),
                         sharing_uring: store.as_raw_fd(),
                         primary: false,
                     };
 
                     let store = Rc::new(store);
+                    let client = Rc::new(client::Client::new(Arc::clone(&server_config), &logger));
 
                     let fetcher = Fetcher::Channel { sender: tx };
                     let stream_manager = Rc::new(RefCell::new(StreamManager::new(
@@ -103,8 +104,8 @@ pub fn launch(
                         Rc::clone(&store),
                     )));
                     let mut worker =
-                        Worker::new(worker_config, store, stream_manager, None, &logger);
-                    worker.serve(shutdown_rx)
+                        Worker::new(worker_config, store, stream_manager, client, None, &logger);
+                    worker.serve(shutdown_tx)
                 })
         })
         .collect::<Vec<_>>();
@@ -116,7 +117,7 @@ pub fn launch(
             .expect("At least one core should be reserved for primary node")
             .clone();
         let server_config = config.clone();
-        let shutdown_rx = shutdown.subscribe();
+        let shutdown_tx = shutdown.clone();
         let handle = thread::Builder::new()
             .name("DataNode[Primary]".to_owned())
             .spawn(move || {
@@ -127,10 +128,9 @@ pub fn launch(
                     primary: true,
                 };
 
-                let placement_client = client::Client::new(Arc::clone(&server_config), &log);
-
+                let client = Rc::new(client::Client::new(Arc::clone(&server_config), &log));
                 let fetcher = Fetcher::PlacementClient {
-                    client: placement_client,
+                    client: Rc::clone(&client),
                     target: worker_config.server_config.server.placement_manager.clone(),
                 };
                 let store = Rc::new(store);
@@ -141,9 +141,15 @@ pub fn launch(
                     Rc::clone(&store),
                 )));
 
-                let mut worker =
-                    Worker::new(worker_config, store, stream_manager, Some(channels), &log);
-                worker.serve(shutdown_rx)
+                let mut worker = Worker::new(
+                    worker_config,
+                    store,
+                    stream_manager,
+                    client,
+                    Some(channels),
+                    &log,
+                );
+                worker.serve(shutdown_tx)
             });
         handles.push(handle);
     }

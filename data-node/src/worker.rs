@@ -1,5 +1,6 @@
-use std::{cell::RefCell, error::Error, net::SocketAddr, rc::Rc, time::Duration};
+use std::{cell::RefCell, error::Error, net::SocketAddr, rc::Rc, sync::Arc, time::Duration};
 
+use client::Client;
 use slog::{debug, error, info, o, trace, warn, Logger};
 use store::ElasticStore;
 use tokio::{
@@ -29,6 +30,7 @@ pub(crate) struct Worker {
     config: WorkerConfig,
     store: Rc<ElasticStore>,
     stream_manager: Rc<RefCell<StreamManager>>,
+    client: Rc<Client>,
     channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
 }
 
@@ -37,6 +39,7 @@ impl Worker {
         config: WorkerConfig,
         store: Rc<ElasticStore>,
         stream_manager: Rc<RefCell<StreamManager>>,
+        client: Rc<Client>,
         channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
         logger: &Logger,
     ) -> Self {
@@ -44,12 +47,13 @@ impl Worker {
             config,
             store,
             stream_manager,
+            client,
             channels,
             logger: logger.clone(),
         }
     }
 
-    pub fn serve(&mut self, shutdown_rx: broadcast::Receiver<()>) {
+    pub fn serve(&mut self, shutdown: broadcast::Sender<()>) {
         core_affinity::set_for_current(self.config.core_id);
         if self.config.primary {
             info!(
@@ -109,13 +113,41 @@ impl Worker {
                     });
                 }
 
-                match self.run(listener, self.logger.clone(), shutdown_rx).await {
+                self.heartbeat(shutdown.subscribe());
+
+                match self
+                    .run(listener, self.logger.clone(), shutdown.subscribe())
+                    .await
+                {
                     Ok(_) => {}
                     Err(e) => {
                         error!(self.logger, "Runtime failed. Cause: {}", e.to_string());
                     }
                 }
             });
+    }
+
+    fn heartbeat(&self, mut shutdown_rx: broadcast::Receiver<()>) {
+        let client = Rc::clone(&self.client);
+        let config = Arc::clone(&self.config.server_config);
+        let logger = self.logger.clone();
+        tokio_uring::spawn(async move {
+            let mut interval = tokio::time::interval(config.client_heartbeat_interval());
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        info!(logger, "Received shutdown signal. Stop accepting new connections.");
+                        break;
+                    }
+                    _ = interval.tick() => {
+                        let _ = client
+                        .broadcast_heartbeat(&config.server.placement_manager)
+                        .await;
+                    }
+
+                }
+            }
+        });
     }
 
     async fn run(

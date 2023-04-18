@@ -417,7 +417,7 @@ impl AsRawFd for ElasticStore {
 /// Some tests for ElasticStore.
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, path::Path, sync::Arc};
+    use std::{error::Error, path::Path};
 
     use bytes::{Bytes, BytesMut};
     use futures::future::join_all;
