@@ -11,7 +11,7 @@ ElasticStream has three components: placement-manager, data-node and clients.
 ## Data Node Threading Model
 Primary design goal of data-node is to scale linearly with addition of hardware: including CPU and SSD. To achieve this, threads of it must be as independent from one another as possible, to avoid software locks and even atomic instructions. With that said, instead of centralizing shared data in a global location that all threads access after acquiring a lock, each thread of data-node has its own data. When other threads want to access the data, they pass a message to the owning thread to perform the operation on their behalf through lockless ring-buffers. 
 
-Data-node has 3 categories of threads: worker threads, IO thread and miscellaneous auxillary threads. The former two kinds follows [Thread-per-Core](https://www.datadoghq.com/blog/engineering/introducing-glommio/) architecture while auxillary threads use traditional multi-threads parallelism, with CPU affinity set.
+Data-node has 3 categories of threads: worker threads, IO thread and miscellaneous auxiliary threads. The former two kinds follows [Thread-per-Core](https://www.datadoghq.com/blog/engineering/introducing-glommio/) architecture while auxiliary threads use traditional multi-threads parallelism, with CPU affinity set.
 
 ![Threading Model](assets/threading_model.png)
 
