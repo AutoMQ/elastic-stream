@@ -15,12 +15,22 @@ Data-node has 3 categories of threads: worker threads, IO thread and miscellaneo
 
 ![Threading Model](assets/threading_model.png)
 
-Each data-node, by default, has one IO thread, taking up a dedicated core, running an io_uring instance with SQ_POLLING and IO_POLLING. This configuration offers best latency performance and makes most the [modern storage capabilities](https://atlarge-research.com/pdfs/2022-systor-apis.pdf).
+Each data-node, by default, has one IO thread, taking up a dedicated core, running an io_uring instance with SQ_POLLING and IO_POLLING. This configuration offers best [latency performance](docs/benchmark.md) and makes most the [modern storage capabilities](https://atlarge-research.com/pdfs/2022-systor-apis.pdf).
 
-Multiple independent workers runs in parallel within a data-node. All of them are backed by an io_uring instance with FAST_POLL feature set. A worker also takes up a dedicated core and is in charge of a group of streams. Workers communicate by way of message passing, aka, lockless ring buffer. 
+Multiple independent workers runs in parallel within a data-node. Each of them are backed by an io_uring instance with FAST_POLL feature set. A worker also takes up a dedicated core and is in charge of a group of streams. Inter-worker communication is fulfilled by way of message passing, aka, lockless ring buffer. 
 
 ## How to Build
+Rust crates are managed by cargo. To build data node,
 
+### Debug Mode
+```
+cargo build
+```
+
+### Release Mode
+```
+cargo build --release
+```
 
 ## Collect and Report Unit Test Coverage
 
@@ -48,6 +58,7 @@ Read [more](https://crates.io/crates/cargo-llvm-cov)
 Sample [integration](https://github.com/taiki-e/cargo-llvm-cov) with github action.
 
 ## How to Contribute
+We welcome contribution
 
 ## Notes
 
