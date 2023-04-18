@@ -297,20 +297,19 @@ impl Store for ElasticStore {
             }
 
             // Collect all successful IO results, and sort it by the wal offset
-            let mut result: Vec<_> = flattened_result.into_iter().flatten().collect();
+            let mut final_result: Vec<_> = flattened_result.into_iter().flatten().collect();
 
             // Sort the result
-            result.sort_by(|a, b| a.wal_offset.cmp(&b.wal_offset));
+            final_result.sort_by(|a, b| a.wal_offset.cmp(&b.wal_offset));
 
-            // Extract the payload from the result, and assemble the final result.
-            let final_result: Vec<_> = result.into_iter().flat_map(|res| res.payload).collect();
             STORE_FETCH_COUNT.inc();
             STORE_FETCH_LATENCY_HISTOGRAM.observe(now.elapsed().as_micros() as f64);
-            STORE_FETCH_BYTES_COUNT.inc_by(final_result.len() as u64);
+            STORE_FETCH_BYTES_COUNT
+                .inc_by(final_result.iter().map(|re| re.total_len()).sum::<usize>() as u64);
             return Ok(FetchResult {
                 stream_id: options.stream_id,
                 offset: options.offset,
-                payload: final_result,
+                results: final_result,
             });
         }
         STORE_FAILED_FETCH_COUNT.inc();
@@ -419,16 +418,17 @@ impl AsRawFd for ElasticStore {
 mod tests {
     use std::{error::Error, path::Path, sync::Arc};
 
-    use bytes::{Bytes, BytesMut};
+    use bytes::{BufMut, Bytes, BytesMut};
     use futures::future::join_all;
     use slog::trace;
     use tokio::sync::oneshot;
 
     use crate::{
         error::{AppendError, FetchError},
+        io::task::SingleFetchResult,
         option::{ReadOptions, WriteOptions},
-        store::{append_result::AppendResult, fetch_result::FetchResult},
-        AppendRecordRequest, ElasticStore, Store,
+        store::{self, append_result::AppendResult, fetch_result::FetchResult},
+        AppendRecordRequest, ElasticStore, Store, RECORD_PREFIX_LENGTH,
     };
 
     fn build_store(pm_address: &str, store_path: &str) -> ElasticStore {
@@ -485,7 +485,7 @@ mod tests {
         let store = rx.await.unwrap();
 
         let mut append_fs = vec![];
-        (0..2)
+        (0..1024)
             .into_iter()
             .map(|i| AppendRecordRequest {
                 stream_id: 1,
@@ -500,56 +500,82 @@ mod tests {
 
         let append_rs: Vec<Result<AppendResult, AppendError>> = join_all(append_fs).await;
 
-        let mut fetch_fs = vec![];
-
-        append_rs.iter().for_each(|res| {
-            // Log the append result
-            match res {
-                Ok(res) => {
-                    trace!(store.log, "Append result: {:?}", res);
-                    let options = ReadOptions {
-                        stream_id: 1,
-                        offset: res.offset,
-                        max_offset: None,
-                        max_bytes: 1,
-                        max_wait_ms: 1000,
-                    };
-                    let fetch_f = store.fetch(options);
-                    fetch_fs.push(fetch_f);
+        // Case One: Fetch all records one by one.
+        {
+            let mut fetch_fs = vec![];
+            append_rs.iter().for_each(|res| {
+                // Log the append result
+                match res {
+                    Ok(res) => {
+                        trace!(store.log, "Append result: {:?}", res);
+                        let options = ReadOptions {
+                            stream_id: 1,
+                            offset: 0,
+                            max_offset: None,
+                            max_bytes: 1,
+                            max_wait_ms: 1000,
+                        };
+                        let fetch_f = store.fetch(options);
+                        fetch_fs.push(fetch_f);
+                    }
+                    Err(e) => {
+                        panic!("Append error: {:?}", e);
+                    }
                 }
-                Err(e) => {
-                    panic!("Append error: {:?}", e);
-                }
-            }
-        });
+            });
 
-        let fetch_rs: Vec<Result<FetchResult, FetchError>> = join_all(fetch_fs).await;
-        fetch_rs.iter().for_each(|res| {
-            // Assert the fetch result with the append result.
-            match res {
-                Ok(res) => {
-                    trace!(store.log, "Fetch result: {:?}", res);
+            let fetch_rs: Vec<Result<FetchResult, FetchError>> = join_all(fetch_fs).await;
+            assert!(fetch_rs.len() == append_rs.len());
+            fetch_rs.iter().flatten().for_each(|res| {
+                let mut res_payload = BytesMut::new();
+                res.results.iter().for_each(|r| {
+                    res_payload.extend_from_slice(&copy_single_fetch_result(r));
+                });
 
-                    let mut res_payload = BytesMut::new();
-                    res.payload.iter().for_each(|r| {
-                        res_payload.extend_from_slice(&r[..]);
-                    });
+                assert_eq!(
+                    Bytes::copy_from_slice(&res_payload[(crate::RECORD_PREFIX_LENGTH as usize)..]),
+                    Bytes::from(format!("{}-{}", "hello, world", res.offset))
+                );
+            });
+        }
 
-                    assert_eq!(
-                        Bytes::copy_from_slice(
-                            &res_payload[(crate::RECORD_PREFIX_LENGTH as usize)..]
-                        ),
-                        Bytes::from(format!("{}-{}", "hello, world", res.offset))
-                    );
-                }
-                Err(e) => {
-                    panic!("Fetch error: {:?}", e);
-                }
-            }
-        });
+        // Case Two: Fetch all records through a single call
+        {
+            let mut fetch_fs = vec![];
+            let options = ReadOptions {
+                stream_id: 1,
+                offset: 0,
+                max_offset: None,
+                max_bytes: 1024 * 1024 * 1024,
+                max_wait_ms: 1000,
+            };
+            let fetch_f = store.fetch(options);
+            fetch_fs.push(fetch_f);
+            let fetch_rs: Vec<Result<FetchResult, FetchError>> = join_all(fetch_fs).await;
+            assert_eq!(1, fetch_rs.len());
+            let fetch_res = fetch_rs[0].as_ref().unwrap();
+            fetch_res.results.iter().enumerate().for_each(|(i, r)| {
+                let mut res_payload = BytesMut::new();
+                res_payload.extend_from_slice(&copy_single_fetch_result(r));
+                assert_eq!(
+                    Bytes::copy_from_slice(&res_payload[(crate::RECORD_PREFIX_LENGTH as usize)..]),
+                    Bytes::from(format!("{}-{}", "hello, world", i))
+                );
+            });
+        }
+
         let _ = stop_tx.send(());
         let _ = handle.join();
         drop(store);
         Ok(())
+    }
+
+    /// Copy all buffers from a SingleFetchResult.
+    fn copy_single_fetch_result(res: &SingleFetchResult) -> Bytes {
+        let mut res_payload = BytesMut::new();
+        res.iter().for_each(|r| {
+            res_payload.extend_from_slice(&r[..]);
+        });
+        res_payload.freeze()
     }
 }

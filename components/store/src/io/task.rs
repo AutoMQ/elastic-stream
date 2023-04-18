@@ -25,10 +25,24 @@ pub(crate) struct ReadTask {
 // Each fetch operation may split into multiple `ReadTask`s.
 // Each `ReadTask` returns a single fetch result.
 #[derive(Debug)]
-pub(crate) struct SingleFetchResult {
+pub struct SingleFetchResult {
     pub(crate) stream_id: i64,
     pub(crate) wal_offset: i64,
+    /// The payload of a SingleFetchResult may be splitted into multiple `BufSlice`s.
     pub(crate) payload: Vec<BufSlice>,
+}
+
+impl SingleFetchResult {
+    /// The total length of the payload.
+    pub fn total_len(&self) -> usize {
+        self.payload.iter().map(|buf| buf.len()).sum()
+    }
+
+    /// The iterator of the payload.
+    /// It's a convenience method to iterate over the payload.
+    pub fn iter(&self) -> impl Iterator<Item = &BufSlice> {
+        self.payload.iter()
+    }
 }
 
 #[derive(Derivative)]

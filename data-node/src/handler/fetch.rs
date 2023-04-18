@@ -1,4 +1,4 @@
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use codec::frame::Frame;
 
 use flatbuffers::FlatBufferBuilder;
@@ -96,12 +96,12 @@ impl<'a> Fetch<'a> {
                     Ok(fetch_result) => {
                         let fetch_result_args = FetchResultArgs {
                             stream_id: fetch_result.stream_id,
-                            batch_count: fetch_result.payload.len() as i32,
+                            batch_count: fetch_result.results.len() as i32,
                             // TODO: Fill the request index
                             request_index: 0,
                             status: Some(ok_status),
                         };
-                        payloads.push(fetch_result.payload);
+                        payloads.push(fetch_result.results);
                         protocol::rpc::header::FetchResult::create(&mut builder, &fetch_result_args)
                     }
                     Err(e) => {
@@ -146,10 +146,26 @@ impl<'a> Fetch<'a> {
         let payloads: Vec<_> = payloads
             .into_iter()
             .flatten()
-            // Strip the first `RECORD_PREFIX_LENGTH` bytes of the storage prefix
-            // TODO: Find a efficient way to avoid copying the payload
             .map(|payload| {
-                Bytes::copy_from_slice(&payload[(store::RECORD_PREFIX_LENGTH as usize)..])
+                // Copy all the buffer from the SingleFetchResult.
+                // TODO: Find a efficient way to avoid copying the payload
+                let mut bytes = BytesMut::with_capacity(
+                    payload.total_len() - store::RECORD_PREFIX_LENGTH as usize,
+                );
+
+                // Strip the first `RECORD_PREFIX_LENGTH` bytes of the storage prefix
+                let mut prefix = store::RECORD_PREFIX_LENGTH as usize;
+
+                payload.iter().for_each(|buf| {
+                    if prefix < buf.len() {
+                        bytes.put_slice(&buf[prefix..]);
+                        prefix = 0;
+                    } else {
+                        prefix -= buf.len();
+                    }
+                });
+
+                bytes.freeze()
             })
             .collect();
         response.payload = Some(payloads);
