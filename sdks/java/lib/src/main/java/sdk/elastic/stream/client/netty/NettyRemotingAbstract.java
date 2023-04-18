@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sdk.elastic.stream.apis.exception.ClientException;
 import sdk.elastic.stream.client.common.RemotingUtil;
+import sdk.elastic.stream.client.common.RequestIdGenerator;
 import sdk.elastic.stream.client.common.SemaphoreReleaseOnlyOnce;
 import sdk.elastic.stream.client.protocol.SbpFrame;
 
@@ -41,6 +42,10 @@ public abstract class NettyRemotingAbstract {
      * Remoting logger instance.
      */
     private static final Logger log = LoggerFactory.getLogger(NettyRemotingAbstract.class);
+    /**
+     * Generate stream id for each request.
+     */
+    private final RequestIdGenerator requestIdGenerator;
 
     /**
      * Semaphore to limit maximum number of on-going asynchronous requests, which protects system memory footprint.
@@ -65,6 +70,7 @@ public abstract class NettyRemotingAbstract {
      */
     public NettyRemotingAbstract(final int permitsAsync) {
         this.semaphoreAsync = new Semaphore(permitsAsync, true);
+        this.requestIdGenerator = new RequestIdGenerator();
     }
 
     /**
@@ -151,11 +157,11 @@ public abstract class NettyRemotingAbstract {
     public CompletableFuture<SbpFrame> invokeAsyncImpl(final Channel channel, final SbpFrame request,
         final long timeoutMillis,
         final CompletableFuture<SbpFrame> future) {
-        final int opaque = request.getId();
-
         try {
             boolean acquired = this.semaphoreAsync.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS);
             if (acquired) {
+                final int opaque = this.requestIdGenerator.getId();
+                request.setStreamId(opaque);
                 final SemaphoreReleaseOnlyOnce once = new SemaphoreReleaseOnlyOnce(this.semaphoreAsync);
                 final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis, future, once);
 

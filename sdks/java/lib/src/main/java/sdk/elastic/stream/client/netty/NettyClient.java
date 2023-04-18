@@ -37,7 +37,6 @@ import sdk.elastic.stream.apis.exception.ClientException;
 import sdk.elastic.stream.client.RemotingClient;
 import sdk.elastic.stream.client.common.ClientId;
 import sdk.elastic.stream.client.common.RemotingUtil;
-import sdk.elastic.stream.client.common.RequestIdGenerator;
 import sdk.elastic.stream.client.misc.ThreadFactoryImpl;
 import sdk.elastic.stream.client.protocol.RemotingItem;
 import sdk.elastic.stream.client.protocol.SbpFrame;
@@ -57,10 +56,6 @@ public class NettyClient extends NettyRemotingAbstract implements RemotingClient
     private final Lock pmAddressUpdateLock = new ReentrantLock();
     private final ConcurrentMap<Address, ChannelWrapper> channelTables = new ConcurrentHashMap<>();
     private final HashedWheelTimer timer;
-    /**
-     * Since a netty client has separate input channels and output channels, one RequestIdGenerator is created for one client rather than one channel.
-     */
-    private final RequestIdGenerator requestIdGenerator;
 
     public NettyClient(final ClientConfiguration clientConfiguration, HashedWheelTimer timer) {
         this(clientConfiguration, timer, null);
@@ -70,7 +65,6 @@ public class NettyClient extends NettyRemotingAbstract implements RemotingClient
         HashedWheelTimer timer, final EventLoopGroup eventLoopGroup) {
         super(clientConfiguration.getClientAsyncSemaphoreValue());
         this.clientConfiguration = clientConfiguration;
-        this.requestIdGenerator = new RequestIdGenerator();
         this.timer = timer;
 
         this.pmAddress = new Endpoints(clientConfiguration.getPlacementManagerEndpoint()).getAddresses().get(0);
@@ -155,7 +149,6 @@ public class NettyClient extends NettyRemotingAbstract implements RemotingClient
             CompletableFuture<SbpFrame> responseFuture = new CompletableFuture<>();
             if (channel != null && channel.isActive()) {
                 SbpFrame requestFrame = (SbpFrame) request;
-                requestFrame.setStreamId(this.requestIdGenerator.getId());
                 super.invokeAsyncImpl(channel, requestFrame, timeout.toMillis(), responseFuture);
             } else {
                 this.closeChannel(address, channel);
