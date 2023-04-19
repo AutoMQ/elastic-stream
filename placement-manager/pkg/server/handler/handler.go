@@ -44,7 +44,7 @@ func (h *Handler) Check(req protocol.InRequest, resp protocol.OutResponse) (pass
 }
 
 func (h *Handler) pmInfo() []byte {
-	pm := &rpcfb.PlacementManagerT{Nodes: make([]*rpcfb.PlacementManagerNodeT, 0, 1)}
+	pm := &rpcfb.PlacementManagerClusterT{Nodes: make([]*rpcfb.PlacementManagerNodeT, 0, 1)}
 	leader := h.c.Leader()
 	if leader != nil {
 		pm.Nodes = append(pm.Nodes, &rpcfb.PlacementManagerNodeT{
