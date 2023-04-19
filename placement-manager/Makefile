@@ -57,8 +57,9 @@ MAKEFLAGS += --warn-undefined-variables
 # It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /usr/bin/env bash -o errexit -o pipefail -o nounset
 
-HOST_OS ?= $(shell if which go > /dev/null; then go env GOOS; fi)
-HOST_ARCH ?= $(shell if which go > /dev/null; then go env GOARCH; fi)
+LOCAL_GO := $(shell command -v go 2> /dev/null)
+HOST_OS ?= $(shell if [ -n "$(LOCAL_GO)" ]; then $(LOCAL_GO) env GOOS; fi)
+HOST_ARCH ?= $(shell if [ -n "$(LOCAL_GO)" ]; then $(LOCAL_GO) env GOARCH; fi)
 ifeq (,$(HOST_OS))
   ifeq ($(OS),Windows_NT)
     HOST_OS := windows
@@ -93,7 +94,7 @@ BUILDX_NAME := $(shell basename $$(pwd))
 
 # Satisfy --warn-undefined-variables.
 GOFLAGS ?=
-GOPROXY ?= $(shell if which go > /dev/null; then go env GOPROXY; fi)
+GOPROXY ?= $(shell if [ -n "$(LOCAL_GO)" ]; then $(LOCAL_GO) env GOPROXY; fi)
 HTTP_PROXY ?=
 HTTPS_PROXY ?=
 
@@ -101,6 +102,8 @@ HTTPS_PROXY ?=
 GOFLAGS := $(GOFLAGS) -modcacherw
 
 GO_TEST_FLAGS ?=
+
+FLATC := $(shell command -v flatc 2> /dev/null)
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
@@ -454,6 +457,24 @@ fmt: | $(BUILD_DIRS)
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"                      \
 	    $(BUILD_IMAGE)                                          \
 	    ./build/fmt.sh
+
+flatc: # @HELP runs flatc to generate go code from flatbuffers schema
+flatc:
+	if [ -z "$(FLATC)" ]; then \
+	    echo "flatc not found"; \
+	    exit 1; \
+	fi
+	if [ "$$($(FLATC) --version | cut -d' ' -f3)" != "23.3.3" ]; then \
+	    echo "flatc version must be 23.3.3"; \
+	    exit 1; \
+	fi
+	rm -rf $$(pwd)/api/rpcfb/rpcfb && $(FLATC) \
+	    --go \
+	    --go-namespace rpcfb \
+	    --gen-object-api \
+	    --gen-compare \
+	    -o $$(pwd)/api/rpcfb \
+	    $$(pwd)/../components/protocol/fbs/rpc.fbs
 
 $(BUILD_DIRS):
 	mkdir -p $@
