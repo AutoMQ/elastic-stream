@@ -1,0 +1,70 @@
+name: Placement Manager - CI
+
+on:
+  workflow_call:
+permissions: read-all
+
+jobs:
+  lint:
+    name: Lint
+    strategy:
+      matrix:
+        go-version: [ "1.20" ]
+        platform: [ "ubuntu-latest" ]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Go Cache
+        uses: actions/cache@v3
+        with:
+          path: .go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-lint-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{matrix.platform}}-${{matrix.go-version}}-pm-lint-
+            ${{matrix.platform}}-${{matrix.go-version}}-pm-
+      - name: Lint
+        run: make lint GO_VERSION=${{ matrix.go-version }}
+  crossbuild:
+    name: Cross Build
+    strategy:
+      matrix:
+        go-version: [ "1.19", "1.20" ]
+        platform: [ "ubuntu-latest" ]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Go Cache
+        uses: actions/cache@v3
+        with:
+          path: .go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-build-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{matrix.platform}}-${{matrix.go-version}}-pm-build-
+            ${{matrix.platform}}-${{matrix.go-version}}-pm-
+      - name: Build containers
+        run: make all-container GO_VERSION=${{ matrix.go-version }}
+  test:
+    name: Test
+    strategy:
+      matrix:
+        go-version: [ "1.19", "1.20" ]
+        platform: [ "ubuntu-latest" ]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Go Cache
+        uses: actions/cache@v3
+        with:
+          path: .go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-test-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{matrix.platform}}-${{matrix.go-version}}-pm-test-
+            ${{matrix.platform}}-${{matrix.go-version}}-pm-
+      - name: Test
+        run: make test GOFLAGS="-v" GO_VERSION=${{ matrix.go-version }} GO_TEST_FLAGS="-coverprofile=covprofile -covermode=atomic -coverpkg=./..."
