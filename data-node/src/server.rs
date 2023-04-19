@@ -17,7 +17,10 @@ use std::{
     thread,
 };
 use store::ElasticStore;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{
+    broadcast::{self, error::TryRecvError},
+    mpsc, oneshot,
+};
 
 pub fn launch(
     config: Configuration,
@@ -46,6 +49,8 @@ pub fn launch(
         .build()
         .fuse();
     let log = slog::Logger::root(drain, o!());
+
+    generate_flame_graph(shutdown.subscribe());
 
     let core_ids = core_affinity::get_core_ids().ok_or_else(|| {
         warn!(log, "No cores are available to set affinity");
@@ -159,6 +164,41 @@ pub fn launch(
     }
 
     Ok(())
+}
+
+fn generate_flame_graph(mut shutdown: broadcast::Receiver<()>) {
+    std::thread::Builder::new()
+        .name("flamegraph".to_owned())
+        .spawn(move || {
+            let guard = pprof::ProfilerGuardBuilder::default()
+                .frequency(1000)
+                .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+                .build()
+                .unwrap();
+
+            let tmp = std::env::temp_dir();
+
+            loop {
+                match shutdown.try_recv() {
+                    Ok(_) => {
+                        break;
+                    }
+                    Err(TryRecvError::Closed) => {
+                        break;
+                    }
+                    Err(_e) => {}
+                }
+                std::thread::sleep(std::time::Duration::from_secs(300));
+                if let Ok(report) = guard.report().build() {
+                    let time = chrono::Utc::now();
+                    let time = time.format("%Y-%m-%d-%H-%M-%S").to_string();
+                    let file_path = tmp.join(format!("{}.svg", time));
+                    let file = std::fs::File::create(file_path.as_path()).unwrap();
+                    report.flamegraph(file).unwrap();
+                }
+            }
+        })
+        .unwrap();
 }
 
 #[cfg(test)]
