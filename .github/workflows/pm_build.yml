@@ -9,6 +9,27 @@ defaults:
     working-directory: ./placement-manager
 
 jobs:
+  flatc:
+    name: Verify Flatbuffers
+    strategy:
+      matrix:
+        platform: [ "ubuntu-latest" ]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Flatbuffers
+        run: |
+          wget -O flatc.zip https://github.com/google/flatbuffers/releases/download/v23.3.3/Linux.flatc.binary.g++-10.zip
+          unzip flatc.zip
+          sudo mv flatc /usr/local/bin
+          rm flatc.zip
+          flatc --version
+      - name: Verify Flatbuffers
+        run: |
+          make flatc
+          git diff --exit-code
   lint:
     name: Lint
     strategy:
