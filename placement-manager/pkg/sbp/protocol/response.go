@@ -303,3 +303,27 @@ func (ds *DescribeStreamsResponse) Error(status *rpcfb.StatusT) {
 func (ds *DescribeStreamsResponse) OK() {
 	ds.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
 }
+
+// DescribePMClusterResponse is a response to operation.OpDescribePMCluster
+type DescribePMClusterResponse struct {
+	baseMarshaller
+	singleResponse
+
+	rpcfb.DescribePlacementManagerClusterResponseT
+}
+
+func (dpm *DescribePMClusterResponse) marshalFlatBuffer() ([]byte, error) {
+	return fbutil.Marshal(&dpm.DescribePlacementManagerClusterResponseT), nil
+}
+
+func (dpm *DescribePMClusterResponse) Marshal(fmt format.Format) ([]byte, error) {
+	return marshal(dpm, fmt)
+}
+
+func (dpm *DescribePMClusterResponse) Error(status *rpcfb.StatusT) {
+	dpm.Status = status
+}
+
+func (dpm *DescribePMClusterResponse) OK() {
+	dpm.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
+}

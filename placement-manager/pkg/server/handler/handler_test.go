@@ -54,14 +54,14 @@ func (m *mockServer) IsLeader() bool {
 	return true
 }
 
-func (m *mockServer) Leader() *member.Info {
-	return &member.Info{
+func (m *mockServer) ClusterInfo() []*member.Info {
+	return []*member.Info{{
 		Name:       "test-member-name",
 		MemberID:   1,
 		PeerUrls:   []string{"test-member-peer-urls"},
 		ClientUrls: []string{"test-member-client-urls"},
 		SbpAddr:    "test-member-sbp-addr",
-	}
+	}}
 }
 
 func (m *mockServer) SbpClient() sbpClient.Client {

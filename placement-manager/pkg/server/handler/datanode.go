@@ -22,7 +22,7 @@ func (h *Handler) Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.Heart
 		if err != nil {
 			switch {
 			case errors.Is(err, cluster.ErrNotLeader):
-				resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: h.pmInfo()})
+				resp.Error(h.notLeaderError())
 			default:
 				resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 			}
@@ -40,7 +40,7 @@ func (h *Handler) AllocateID(req *protocol.IDAllocationRequest, resp *protocol.I
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: h.pmInfo()})
+			resp.Error(h.notLeaderError())
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}

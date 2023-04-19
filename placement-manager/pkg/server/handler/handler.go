@@ -39,19 +39,25 @@ func (h *Handler) Check(req protocol.InRequest, resp protocol.OutResponse) (pass
 	}
 	h.lg.Warn("not leader", traceutil.TraceLogField(req.Context()))
 
-	resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: h.pmInfo()})
+	resp.Error(h.notLeaderError())
 	return false
 }
 
-func (h *Handler) pmInfo() []byte {
-	pm := &rpcfb.PlacementManagerClusterT{Nodes: make([]*rpcfb.PlacementManagerNodeT, 0, 1)}
-	leader := h.c.Leader()
-	if leader != nil {
+func (h *Handler) notLeaderError() *rpcfb.StatusT {
+	pmCluster := h.pmCluster()
+	return &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: fbutil.Marshal(pmCluster)}
+}
+
+func (h *Handler) pmCluster() *rpcfb.PlacementManagerClusterT {
+	pm := &rpcfb.PlacementManagerClusterT{Nodes: make([]*rpcfb.PlacementManagerNodeT, 0)}
+	for _, member := range h.c.ClusterInfo() {
 		pm.Nodes = append(pm.Nodes, &rpcfb.PlacementManagerNodeT{
-			Name:          leader.Name,
-			AdvertiseAddr: leader.SbpAddr,
-			IsLeader:      true,
+			Name:          member.Name,
+			AdvertiseAddr: member.SbpAddr,
 		})
 	}
-	return fbutil.Marshal(pm)
+	if len(pm.Nodes) > 0 {
+		pm.Nodes[0].IsLeader = true
+	}
+	return pm
 }

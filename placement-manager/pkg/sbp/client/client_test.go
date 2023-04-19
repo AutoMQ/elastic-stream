@@ -157,3 +157,7 @@ func (b *baseHandler) UpdateStreams(_ *protocol.UpdateStreamsRequest, resp *prot
 func (b *baseHandler) DescribeStreams(_ *protocol.DescribeStreamsRequest, resp *protocol.DescribeStreamsResponse) {
 	resp.OK()
 }
+
+func (b *baseHandler) DescribePMCluster(_ *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
+	resp.OK()
+}

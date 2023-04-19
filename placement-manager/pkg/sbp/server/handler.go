@@ -25,6 +25,8 @@ type Handler interface {
 	UpdateStreams(req *protocol.UpdateStreamsRequest, resp *protocol.UpdateStreamsResponse)
 	// DescribeStreams describes a batch of streams.
 	DescribeStreams(req *protocol.DescribeStreamsRequest, resp *protocol.DescribeStreamsResponse)
+	// DescribePMCluster describes placement manager cluster membership.
+	DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse)
 }
 
 var (
@@ -83,6 +85,13 @@ var (
 			newResp: func() protocol.OutResponse { return &protocol.DescribeStreamsResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
 				handler.DescribeStreams(req.(*protocol.DescribeStreamsRequest), resp.(*protocol.DescribeStreamsResponse))
+			},
+		},
+		{Code: operation.OpDescribePMCluster}: {
+			newReq:  func() protocol.InRequest { return &protocol.DescribePMClusterRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.DescribePMClusterResponse{} },
+			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
+				handler.DescribePMCluster(req.(*protocol.DescribePMClusterRequest), resp.(*protocol.DescribePMClusterResponse))
 			},
 		},
 	}

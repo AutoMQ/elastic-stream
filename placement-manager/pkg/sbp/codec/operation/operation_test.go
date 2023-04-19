@@ -153,6 +153,14 @@ func TestNewOperation(t *testing.T) {
 			},
 		},
 		{
+			name:   "DescribePMCluster",
+			fields: fields{code: OpDescribePMCluster},
+			wants: wants{
+				s:    "DescribePMCluster",
+				code: OpDescribePMCluster,
+			},
+		},
+		{
 			name:   "Unknown",
 			fields: fields{code: OpUnknown},
 			wants: wants{

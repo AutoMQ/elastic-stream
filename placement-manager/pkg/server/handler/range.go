@@ -25,7 +25,8 @@ func (h *Handler) ListRanges(req *protocol.ListRangesRequest, resp *protocol.Lis
 		if err != nil {
 			switch {
 			case errors.Is(err, cluster.ErrNotLeader):
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: h.pmInfo()}
+				resp.Error(h.notLeaderError())
+				return
 			default:
 				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
 			}

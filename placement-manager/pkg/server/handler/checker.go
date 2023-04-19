@@ -71,3 +71,10 @@ func (c Checker) DescribeStreams(req *protocol.DescribeStreamsRequest, resp *pro
 	}
 	c.Handler.DescribeStreams(req, resp)
 }
+
+func (c Checker) DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
+	if !c.Handler.Check(req, resp) {
+		return
+	}
+	c.Handler.DescribePMCluster(req, resp)
+}

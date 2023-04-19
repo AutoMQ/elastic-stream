@@ -274,6 +274,18 @@ func (m *Member) Leader() *Info {
 	return leader
 }
 
+// ClusterInfo returns all members in the cluster. The first member is the leader.
+func (m *Member) ClusterInfo() []*Info {
+	leader := m.Leader()
+	if leader == nil {
+		return nil
+	}
+	members := make([]*Info, 0)
+	members = append(members, leader)
+	// TODO add other members
+	return members
+}
+
 // Etcd returns etcd related information.
 func (m *Member) Etcd() *embed.Etcd {
 	return m.etcd

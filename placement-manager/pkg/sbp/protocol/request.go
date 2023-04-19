@@ -258,3 +258,24 @@ func (ds *DescribeStreamsRequest) Unmarshal(fmt format.Format, data []byte) erro
 func (ds *DescribeStreamsRequest) Timeout() int32 {
 	return ds.TimeoutMs
 }
+
+// DescribePMClusterRequest is a request to operation.OpDescribePMCluster
+type DescribePMClusterRequest struct {
+	baseRequest
+	baseUnmarshaler
+
+	rpcfb.DescribePlacementManagerClusterRequestT
+}
+
+func (dpm *DescribePMClusterRequest) unmarshalFlatBuffer(data []byte) error {
+	dpm.DescribePlacementManagerClusterRequestT = *rpcfb.GetRootAsDescribePlacementManagerClusterRequest(data, 0).UnPack()
+	return nil
+}
+
+func (dpm *DescribePMClusterRequest) Unmarshal(fmt format.Format, data []byte) error {
+	return unmarshal(dpm, fmt, data)
+}
+
+func (dpm *DescribePMClusterRequest) Timeout() int32 {
+	return dpm.TimeoutMs
+}

@@ -19,7 +19,7 @@ func (h *Handler) CreateStreams(req *protocol.CreateStreamsRequest, resp *protoc
 		case errors.Is(err, cluster.ErrNotEnoughDataNodes):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()})
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: h.pmInfo()})
+			resp.Error(h.notLeaderError())
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
@@ -47,7 +47,7 @@ func (h *Handler) DeleteStreams(req *protocol.DeleteStreamsRequest, resp *protoc
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: h.pmInfo()})
+			resp.Error(h.notLeaderError())
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
@@ -72,7 +72,7 @@ func (h *Handler) UpdateStreams(req *protocol.UpdateStreamsRequest, resp *protoc
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: h.pmInfo()})
+			resp.Error(h.notLeaderError())
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
@@ -96,7 +96,7 @@ func (h *Handler) DescribeStreams(req *protocol.DescribeStreamsRequest, resp *pr
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: h.pmInfo()})
+			resp.Error(h.notLeaderError())
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}

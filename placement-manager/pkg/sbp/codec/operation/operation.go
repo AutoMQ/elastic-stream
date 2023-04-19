@@ -39,6 +39,8 @@ const (
 
 	// OpReportMetrics report metrics to the PM.
 	OpReportMetrics uint16 = 0x4001
+	// OpDescribePMCluster describe placement manager cluster membership
+	OpDescribePMCluster uint16 = 0x4002
 )
 
 var (
@@ -62,7 +64,8 @@ var (
 		OpDescribeStreams: {OpDescribeStreams},
 		OpTrimStreams:     {OpTrimStreams},
 
-		OpReportMetrics: {OpReportMetrics},
+		OpReportMetrics:     {OpReportMetrics},
+		OpDescribePMCluster: {OpDescribePMCluster},
 	}
 )
 
@@ -124,6 +127,8 @@ func (o Operation) String() string {
 		return "TrimStreams"
 	case OpReportMetrics:
 		return "ReportMetrics"
+	case OpDescribePMCluster:
+		return "DescribePMCluster"
 	default:
 		return "Unknown"
 	}
