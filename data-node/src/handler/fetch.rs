@@ -1,4 +1,4 @@
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use codec::frame::Frame;
 
 use flatbuffers::FlatBufferBuilder;

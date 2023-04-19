@@ -32,6 +32,16 @@ server:
   placement-manager: "127.0.0.1:2378"
   # Connection idle duration in ticks
   connection-idle-duration: 60
+  profiling:
+    enable: true
+    # profiler sampling frequency
+    sampling-frequency: 1000
+    # Generate flamegraph interval in seconds
+    report-interval: 300
+    # store report path
+    report-path: "/tmp"
+    # max backup reports
+    max-report-backup: 3
 # Store configuration
 store:
   # Whether mkdirs if missing

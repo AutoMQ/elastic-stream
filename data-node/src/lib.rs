@@ -11,6 +11,7 @@ mod worker;
 mod worker_config;
 pub use crate::cli::Cli;
 mod metrics;
+pub(crate) mod profiling;
 
 #[cfg(test)]
 mod tests {

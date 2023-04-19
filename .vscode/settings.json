@@ -8,6 +8,7 @@
         "errno",
         "fallocate",
         "fcntl",
+        "flamegraph",
         "flatbuffers",
         "Hasher",
         "IOPOLL",

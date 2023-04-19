@@ -1,4 +1,4 @@
-use crate::{io::task::SingleFetchResult, BufSlice};
+use crate::io::task::SingleFetchResult;
 
 #[derive(Debug)]
 pub struct FetchResult {
