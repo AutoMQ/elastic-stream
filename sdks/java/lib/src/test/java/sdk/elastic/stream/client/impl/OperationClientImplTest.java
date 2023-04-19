@@ -95,7 +95,7 @@ class OperationClientImplTest {
         rangeT.setNextOffset(0);
         StreamT streamT = new StreamT();
         streamT.setStreamId(streamId);
-        streamT.setReplicaNums(replicaNum);
+        streamT.setReplicaNum(replicaNum);
         streamT.setRetentionPeriodMs(retentionPeriodMs);
 
         CreateStreamResultT createStreamResultT = new CreateStreamResultT();
@@ -105,7 +105,7 @@ class OperationClientImplTest {
         doReturn(CompletableFuture.completedFuture(Collections.singletonList(createStreamResultT))).when(resourceManager).createStreams(any(), any(Duration.class));
 
         StreamT toCreatestreamT = new StreamT();
-        toCreatestreamT.setReplicaNums(replicaNum);
+        toCreatestreamT.setReplicaNum(replicaNum);
         toCreatestreamT.setRetentionPeriodMs(retentionPeriodMs);
         operationClient.createStreams(Collections.singletonList(toCreatestreamT), DEFAULT_REQUEST_TIMEOUT).thenAccept(
             resultTList -> {

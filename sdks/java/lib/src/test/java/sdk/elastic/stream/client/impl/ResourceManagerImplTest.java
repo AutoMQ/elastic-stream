@@ -263,7 +263,7 @@ class ResourceManagerImplTest {
         long streamId = 4;
         StreamT streamT = new StreamT();
         streamT.setStreamId(streamId);
-        streamT.setReplicaNums((byte) 1);
+        streamT.setReplicaNum((byte) 1);
         streamT.setRetentionPeriodMs(Duration.ofDays(21).toMillis());
         DescribeStreamResultT describeStreamResultT = new DescribeStreamResultT();
         describeStreamResultT.setStatus(okStatus);
@@ -288,7 +288,7 @@ class ResourceManagerImplTest {
 
         StreamT describedStream = describeStreamResultTList.get(0).getStream();
         assertEquals(streamId, describedStream.getStreamId());
-        assertEquals(streamT.getReplicaNums(), describedStream.getReplicaNums());
+        assertEquals(streamT.getReplicaNum(), describedStream.getReplicaNum());
         assertEquals(streamT.getRetentionPeriodMs(), describedStream.getRetentionPeriodMs());
     }
 
@@ -307,7 +307,7 @@ class ResourceManagerImplTest {
         rangeT.setNextOffset(0);
         StreamT streamT = new StreamT();
         streamT.setStreamId(streamId);
-        streamT.setReplicaNums(replicaNum);
+        streamT.setReplicaNum(replicaNum);
         streamT.setRetentionPeriodMs(retentionPeriodMs);
 
         CreateStreamResultT createStreamResultT = new CreateStreamResultT();
@@ -335,7 +335,7 @@ class ResourceManagerImplTest {
         CreateStreamResultT result = resultList.get(0);
         assertEquals(okStatus.getCode(), result.getStatus().getCode());
         assertEquals(streamId, result.getStream().getStreamId());
-        assertEquals(replicaNum, result.getStream().getReplicaNums());
+        assertEquals(replicaNum, result.getStream().getReplicaNum());
         assertEquals(retentionPeriodMs, result.getStream().getRetentionPeriodMs());
         assertEquals(streamId, result.getRange().getStreamId());
         assertEquals(0, result.getRange().getRangeIndex());

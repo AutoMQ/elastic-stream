@@ -40,7 +40,7 @@ public class BatchExample {
     public static StreamT createOneStream() throws ExecutionException, InterruptedException {
         StreamT streamT = new StreamT();
         streamT.setStreamId(0L);
-        streamT.setReplicaNums((byte) 1);
+        streamT.setReplicaNum((byte) 1);
         streamT.setRetentionPeriodMs(Duration.ofDays(3).toMillis());
         List<StreamT> streamTList = new ArrayList<>(1);
         streamTList.add(streamT);

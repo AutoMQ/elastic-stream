@@ -68,7 +68,7 @@ class ResourceManagerImplTest {
     public void createStreams() throws ExecutionException, InterruptedException {
         StreamT streamT = new StreamT();
         streamT.setStreamId(0L);
-        streamT.setReplicaNums((byte) 1);
+        streamT.setReplicaNum((byte) 1);
         streamT.setRetentionPeriodMs(Duration.ofDays(3).toMillis());
         List<StreamT> streamTList = new ArrayList<>(1);
         streamTList.add(streamT);
@@ -77,11 +77,11 @@ class ResourceManagerImplTest {
 
         StreamT resultStream = resultList.get(0).getStream();
         assertTrue(resultStream.getStreamId() > 0);
-        assertEquals(1, resultStream.getReplicaNums());
+        assertEquals(1, resultStream.getReplicaNum());
         assertEquals(Duration.ofDays(3).toMillis(), resultStream.getRetentionPeriodMs());
 
         System.out.println(resultStream.getStreamId());
-        System.out.println(resultStream.getReplicaNums());
+        System.out.println(resultStream.getReplicaNum());
     }
 
     @Test
@@ -158,14 +158,14 @@ class ResourceManagerImplTest {
 
         StreamT describedStream = describeStreamResultTList.get(0).getStream();
         assertEquals(describedStream.getStreamId(), resultStream.getStreamId());
-        assertEquals(describedStream.getReplicaNums(), resultStream.getReplicaNums());
+        assertEquals(describedStream.getReplicaNum(), resultStream.getReplicaNum());
         assertEquals(describedStream.getRetentionPeriodMs(), resultStream.getRetentionPeriodMs());
     }
 
     private CreateStreamResultT createOneStream() throws ExecutionException, InterruptedException {
         StreamT streamT = new StreamT();
         streamT.setStreamId(0L);
-        streamT.setReplicaNums((byte) 1);
+        streamT.setReplicaNum((byte) 1);
         streamT.setRetentionPeriodMs(Duration.ofDays(3).toMillis());
         List<StreamT> streamTList = new ArrayList<>(1);
         streamTList.add(streamT);
