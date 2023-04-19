@@ -25,7 +25,6 @@ func NewCache() *Cache {
 // Reset resets the cache.
 func (c *Cache) Reset() {
 	c.writableRanges.Clear()
-	c.dataNodes.Clear()
 }
 
 type Range struct {

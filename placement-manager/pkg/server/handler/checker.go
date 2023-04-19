@@ -17,9 +17,7 @@ type Checker struct {
 }
 
 func (c Checker) Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.HeartbeatResponse) {
-	if !c.Handler.Check(req, resp) {
-		return
-	}
+	// all pm nodes will handle heartbeat request, so we don't need to check leader here.
 	c.Handler.Heartbeat(req, resp)
 }
 
