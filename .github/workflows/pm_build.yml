@@ -4,10 +4,11 @@ on:
   workflow_call:
 permissions: read-all
 
+defaults:
+  run:
+    working-directory: ./placement-manager
+
 jobs:
-  defaults:
-    run:
-      working-directory: ./placement-manager
   lint:
     name: Lint
     strategy:
