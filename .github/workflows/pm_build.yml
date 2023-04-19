@@ -23,7 +23,7 @@ jobs:
       - name: Go Cache
         uses: actions/cache@v3
         with:
-          path: .go/cache
+          path: ./placement-manager/.go/cache
           key: ${{matrix.platform}}-${{matrix.go-version}}-pm-lint-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{matrix.platform}}-${{matrix.go-version}}-pm-lint-
@@ -44,7 +44,7 @@ jobs:
       - name: Go Cache
         uses: actions/cache@v3
         with:
-          path: .go/cache
+          path: ./placement-manager/.go/cache
           key: ${{matrix.platform}}-${{matrix.go-version}}-pm-build-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{matrix.platform}}-${{matrix.go-version}}-pm-build-
@@ -65,7 +65,7 @@ jobs:
       - name: Go Cache
         uses: actions/cache@v3
         with:
-          path: .go/cache
+          path: ./placement-manager/.go/cache
           key: ${{matrix.platform}}-${{matrix.go-version}}-pm-test-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{matrix.platform}}-${{matrix.go-version}}-pm-test-
