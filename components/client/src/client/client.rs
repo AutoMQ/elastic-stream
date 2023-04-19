@@ -116,7 +116,30 @@ mod tests {
     use std::{error::Error, sync::Arc, time::Duration};
     use test_util::{run_listener, terminal_logger};
 
-    use crate::{error::ListRangeError, Client};
+    use crate::{
+        error::{ClientError, ListRangeError},
+        Client,
+    };
+
+    #[test]
+    fn test_broadcast() -> Result<(), ClientError> {
+        tokio_uring::start(async {
+            let log = terminal_logger();
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener(log.clone()).await;
+            let mut config = config::Configuration::default();
+            config.server.placement_manager = format!("localhost:{}", port);
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.check_and_apply().unwrap();
+            let config = Arc::new(config);
+            let client = Client::new(Arc::clone(&config), &log);
+            client
+                .broadcast_heartbeat(&config.server.placement_manager)
+                .await
+        })
+    }
 
     #[test]
     fn test_allocate_id() -> Result<(), Box<dyn Error>> {

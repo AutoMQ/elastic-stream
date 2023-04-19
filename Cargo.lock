@@ -419,6 +419,7 @@ dependencies = [
  "flatbuffers",
  "futures",
  "gethostname",
+ "itertools",
  "mockall",
  "model",
  "ordinal",

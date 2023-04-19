@@ -9,6 +9,7 @@ edition = "2021"
 async-channel = { workspace = true }
 codec = { path = "../codec" }
 config = { path = "../config" }
+itertools = { workspace = true }
 model = { path = "../model" }
 protocol = { path = "../protocol" }
 transport = { path = "../transport" }

@@ -1,11 +1,12 @@
 use super::{lb_policy::LbPolicy, response, session::Session};
 use crate::{error::ClientError, Response};
+use itertools::Itertools;
 use model::{
     client_role::ClientRole, range::StreamRange, range_criteria::RangeCriteria, request::Request,
     PlacementManagerNode,
 };
 use protocol::rpc::header::ErrorCode;
-use slog::{error, info, trace, warn, Logger};
+use slog::{debug, error, info, trace, warn, Logger};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -81,12 +82,18 @@ impl CompositeSession {
     }
 
     fn need_refresh_cluster(&self) -> bool {
+        let cluster_size = self.sessions.borrow().len();
+        if cluster_size <= 1 {
+            debug!(self.log, "Placement Manager Cluster size is {} which is rare in production, flag refresh-cluster true", cluster_size);
+            return true;
+        }
+
         let now = Instant::now();
         self.refresh_cluster_instant.borrow().clone()
             + self
                 .config
                 .client_refresh_placement_manager_cluster_interval()
-            > now
+            <= now
     }
 
     /// Broadcast heartbeat requests to all nested sessions.
@@ -106,14 +113,27 @@ impl CompositeSession {
                         .map(|node| node.advertise_addr.to_socket_addrs().into_iter())
                         .flatten()
                         .flatten()
+                        .filter(|socket_addr| socket_addr.is_ipv4())
+                        .dedup()
                         .collect::<Vec<_>>();
 
                     // Remove sessions that are no longer valid
                     self.sessions
                         .borrow_mut()
-                        .drain_filter(|k, _v| !addrs.contains(k));
+                        .drain_filter(|k, _v| !addrs.contains(k))
+                        .for_each(|(k, _v)| {
+                            info!(self.log, "Session to {} will be disconnected because latest Placement Manager Cluster does not contain it any more", k);
+                        });
 
                     addrs.drain_filter(|addr| self.sessions.borrow().contains_key(addr));
+
+                    addrs.iter().for_each(|addr| {
+                        trace!(
+                            self.log,
+                            "Create a new session for new Placement Manager Cluster member: {}",
+                            addr
+                        );
+                    });
 
                     let futures = addrs.into_iter().map(|addr| {
                         Self::connect(

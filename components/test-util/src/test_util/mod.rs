@@ -77,6 +77,7 @@ fn serve_describe_placement_manager_cluster(
     log: &Logger,
     request: &DescribePlacementManagerClusterRequest,
     frame: &mut Frame,
+    port: u16,
 ) {
     trace!(log, "Received a list-ranges request: {:?}", request);
     let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
@@ -91,7 +92,7 @@ fn serve_describe_placement_manager_cluster(
                 let mut node = PlacementManagerNodeT::default();
                 node.is_leader = i == 0;
                 node.name = format!("node-{}", i);
-                node.advertise_addr = format!("localhost:{}", 1080 + i);
+                node.advertise_addr = format!("localhost:{}", port);
                 node
             })
             .collect();
@@ -208,6 +209,7 @@ pub async fn run_listener(logger: Logger) -> u16 {
                                                     &log,
                                                     &request,
                                                     &mut response_frame,
+                                                    port,
                                                 )
                                             }
                                             Err(e) => {
