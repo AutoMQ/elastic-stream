@@ -7,7 +7,7 @@ import (
 )
 
 type FetchInfoT struct {
-	StreamId int64 `json:"stream_id"`
+	Range *RangeT `json:"range"`
 	RequestIndex int32 `json:"request_index"`
 	FetchOffset int64 `json:"fetch_offset"`
 	BatchMaxBytes int32 `json:"batch_max_bytes"`
@@ -15,8 +15,9 @@ type FetchInfoT struct {
 
 func (t *FetchInfoT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
+	range_Offset := t.Range.Pack(builder)
 	FetchInfoStart(builder)
-	FetchInfoAddStreamId(builder, t.StreamId)
+	FetchInfoAddRange(builder, range_Offset)
 	FetchInfoAddRequestIndex(builder, t.RequestIndex)
 	FetchInfoAddFetchOffset(builder, t.FetchOffset)
 	FetchInfoAddBatchMaxBytes(builder, t.BatchMaxBytes)
@@ -24,7 +25,7 @@ func (t *FetchInfoT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 }
 
 func (rcv *FetchInfo) UnPackTo(t *FetchInfoT) {
-	t.StreamId = rcv.StreamId()
+	t.Range = rcv.Range(nil).UnPack()
 	t.RequestIndex = rcv.RequestIndex()
 	t.FetchOffset = rcv.FetchOffset()
 	t.BatchMaxBytes = rcv.BatchMaxBytes()
@@ -64,16 +65,17 @@ func (rcv *FetchInfo) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *FetchInfo) StreamId() int64 {
+func (rcv *FetchInfo) Range(obj *Range) *Range {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
-		return rcv._tab.GetInt64(o + rcv._tab.Pos)
+		x := rcv._tab.Indirect(o + rcv._tab.Pos)
+		if obj == nil {
+			obj = new(Range)
+		}
+		obj.Init(rcv._tab.Bytes, x)
+		return obj
 	}
-	return -1
-}
-
-func (rcv *FetchInfo) MutateStreamId(n int64) bool {
-	return rcv._tab.MutateInt64Slot(4, n)
+	return nil
 }
 
 func (rcv *FetchInfo) RequestIndex() int32 {
@@ -115,8 +117,8 @@ func (rcv *FetchInfo) MutateBatchMaxBytes(n int32) bool {
 func FetchInfoStart(builder *flatbuffers.Builder) {
 	builder.StartObject(4)
 }
-func FetchInfoAddStreamId(builder *flatbuffers.Builder, streamId int64) {
-	builder.PrependInt64Slot(0, streamId, -1)
+func FetchInfoAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(range_), 0)
 }
 func FetchInfoAddRequestIndex(builder *flatbuffers.Builder, requestIndex int32) {
 	builder.PrependInt32Slot(1, requestIndex, 0)

@@ -6,11 +6,11 @@ import (
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-type PlacementManagerT struct {
+type PlacementManagerClusterT struct {
 	Nodes []*PlacementManagerNodeT `json:"nodes"`
 }
 
-func (t *PlacementManagerT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+func (t *PlacementManagerClusterT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	nodesOffset := flatbuffers.UOffsetT(0)
 	if t.Nodes != nil {
@@ -19,18 +19,18 @@ func (t *PlacementManagerT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffs
 		for j := 0; j < nodesLength; j++ {
 			nodesOffsets[j] = t.Nodes[j].Pack(builder)
 		}
-		PlacementManagerStartNodesVector(builder, nodesLength)
+		PlacementManagerClusterStartNodesVector(builder, nodesLength)
 		for j := nodesLength - 1; j >= 0; j-- {
 			builder.PrependUOffsetT(nodesOffsets[j])
 		}
 		nodesOffset = builder.EndVector(nodesLength)
 	}
-	PlacementManagerStart(builder)
-	PlacementManagerAddNodes(builder, nodesOffset)
-	return PlacementManagerEnd(builder)
+	PlacementManagerClusterStart(builder)
+	PlacementManagerClusterAddNodes(builder, nodesOffset)
+	return PlacementManagerClusterEnd(builder)
 }
 
-func (rcv *PlacementManager) UnPackTo(t *PlacementManagerT) {
+func (rcv *PlacementManagerCluster) UnPackTo(t *PlacementManagerClusterT) {
 	nodesLength := rcv.NodesLength()
 	t.Nodes = make([]*PlacementManagerNodeT, nodesLength)
 	for j := 0; j < nodesLength; j++ {
@@ -40,41 +40,41 @@ func (rcv *PlacementManager) UnPackTo(t *PlacementManagerT) {
 	}
 }
 
-func (rcv *PlacementManager) UnPack() *PlacementManagerT {
+func (rcv *PlacementManagerCluster) UnPack() *PlacementManagerClusterT {
 	if rcv == nil { return nil }
-	t := &PlacementManagerT{}
+	t := &PlacementManagerClusterT{}
 	rcv.UnPackTo(t)
 	return t
 }
 
-type PlacementManager struct {
+type PlacementManagerCluster struct {
 	_tab flatbuffers.Table
 }
 
-func GetRootAsPlacementManager(buf []byte, offset flatbuffers.UOffsetT) *PlacementManager {
+func GetRootAsPlacementManagerCluster(buf []byte, offset flatbuffers.UOffsetT) *PlacementManagerCluster {
 	n := flatbuffers.GetUOffsetT(buf[offset:])
-	x := &PlacementManager{}
+	x := &PlacementManagerCluster{}
 	x.Init(buf, n+offset)
 	return x
 }
 
-func GetSizePrefixedRootAsPlacementManager(buf []byte, offset flatbuffers.UOffsetT) *PlacementManager {
+func GetSizePrefixedRootAsPlacementManagerCluster(buf []byte, offset flatbuffers.UOffsetT) *PlacementManagerCluster {
 	n := flatbuffers.GetUOffsetT(buf[offset+flatbuffers.SizeUint32:])
-	x := &PlacementManager{}
+	x := &PlacementManagerCluster{}
 	x.Init(buf, n+offset+flatbuffers.SizeUint32)
 	return x
 }
 
-func (rcv *PlacementManager) Init(buf []byte, i flatbuffers.UOffsetT) {
+func (rcv *PlacementManagerCluster) Init(buf []byte, i flatbuffers.UOffsetT) {
 	rcv._tab.Bytes = buf
 	rcv._tab.Pos = i
 }
 
-func (rcv *PlacementManager) Table() flatbuffers.Table {
+func (rcv *PlacementManagerCluster) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *PlacementManager) Nodes(obj *PlacementManagerNode, j int) bool {
+func (rcv *PlacementManagerCluster) Nodes(obj *PlacementManagerNode, j int) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Vector(o)
@@ -86,7 +86,7 @@ func (rcv *PlacementManager) Nodes(obj *PlacementManagerNode, j int) bool {
 	return false
 }
 
-func (rcv *PlacementManager) NodesLength() int {
+func (rcv *PlacementManagerCluster) NodesLength() int {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
@@ -94,15 +94,15 @@ func (rcv *PlacementManager) NodesLength() int {
 	return 0
 }
 
-func PlacementManagerStart(builder *flatbuffers.Builder) {
+func PlacementManagerClusterStart(builder *flatbuffers.Builder) {
 	builder.StartObject(1)
 }
-func PlacementManagerAddNodes(builder *flatbuffers.Builder, nodes flatbuffers.UOffsetT) {
+func PlacementManagerClusterAddNodes(builder *flatbuffers.Builder, nodes flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(nodes), 0)
 }
-func PlacementManagerStartNodesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func PlacementManagerClusterStartNodesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
-func PlacementManagerEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+func PlacementManagerClusterEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }

@@ -11,6 +11,7 @@ const (
 	ErrorCodeENCODE                        ErrorCode = 1
 	ErrorCodeDECODE                        ErrorCode = 2
 	ErrorCodeOK                            ErrorCode = 1200
+	ErrorCodeNO_NEW_RECORD                 ErrorCode = 1204
 	ErrorCodeBAD_REQUEST                   ErrorCode = 1400
 	ErrorCodeUNAUTHORIZED                  ErrorCode = 1401
 	ErrorCodePAYMENT_REQUIRED              ErrorCode = 1402
@@ -21,6 +22,11 @@ const (
 	ErrorCodePAYLOAD_TOO_LARGE             ErrorCode = 1413
 	ErrorCodeTOO_MANY_REQUESTS             ErrorCode = 1429
 	ErrorCodeHEADER_FIELDS_TOO_LARGE       ErrorCode = 1431
+	ErrorCodeUNAVAILABLE_FOR_LEGAL_REASONS ErrorCode = 1451
+	ErrorCodeRANGE_ALREADY_SEALED          ErrorCode = 1460
+	ErrorCodeOFFSET_OVERFLOW               ErrorCode = 1461
+	ErrorCodeRANGE_NOT_FOUND               ErrorCode = 1462
+	ErrorCodeOFFSET_OUT_OF_RANGE_BOUNDS    ErrorCode = 1463
 	ErrorCodePM_INTERNAL_SERVER_ERROR      ErrorCode = 1500
 	ErrorCodePM_NOT_IMPLEMENTED            ErrorCode = 1501
 	ErrorCodePM_NO_AVAILABLE_DN            ErrorCode = 1502
@@ -37,6 +43,7 @@ var EnumNamesErrorCode = map[ErrorCode]string{
 	ErrorCodeENCODE:                        "ENCODE",
 	ErrorCodeDECODE:                        "DECODE",
 	ErrorCodeOK:                            "OK",
+	ErrorCodeNO_NEW_RECORD:                 "NO_NEW_RECORD",
 	ErrorCodeBAD_REQUEST:                   "BAD_REQUEST",
 	ErrorCodeUNAUTHORIZED:                  "UNAUTHORIZED",
 	ErrorCodePAYMENT_REQUIRED:              "PAYMENT_REQUIRED",
@@ -47,6 +54,11 @@ var EnumNamesErrorCode = map[ErrorCode]string{
 	ErrorCodePAYLOAD_TOO_LARGE:             "PAYLOAD_TOO_LARGE",
 	ErrorCodeTOO_MANY_REQUESTS:             "TOO_MANY_REQUESTS",
 	ErrorCodeHEADER_FIELDS_TOO_LARGE:       "HEADER_FIELDS_TOO_LARGE",
+	ErrorCodeUNAVAILABLE_FOR_LEGAL_REASONS: "UNAVAILABLE_FOR_LEGAL_REASONS",
+	ErrorCodeRANGE_ALREADY_SEALED:          "RANGE_ALREADY_SEALED",
+	ErrorCodeOFFSET_OVERFLOW:               "OFFSET_OVERFLOW",
+	ErrorCodeRANGE_NOT_FOUND:               "RANGE_NOT_FOUND",
+	ErrorCodeOFFSET_OUT_OF_RANGE_BOUNDS:    "OFFSET_OUT_OF_RANGE_BOUNDS",
 	ErrorCodePM_INTERNAL_SERVER_ERROR:      "PM_INTERNAL_SERVER_ERROR",
 	ErrorCodePM_NOT_IMPLEMENTED:            "PM_NOT_IMPLEMENTED",
 	ErrorCodePM_NO_AVAILABLE_DN:            "PM_NO_AVAILABLE_DN",
@@ -63,6 +75,7 @@ var EnumValuesErrorCode = map[string]ErrorCode{
 	"ENCODE":                        ErrorCodeENCODE,
 	"DECODE":                        ErrorCodeDECODE,
 	"OK":                            ErrorCodeOK,
+	"NO_NEW_RECORD":                 ErrorCodeNO_NEW_RECORD,
 	"BAD_REQUEST":                   ErrorCodeBAD_REQUEST,
 	"UNAUTHORIZED":                  ErrorCodeUNAUTHORIZED,
 	"PAYMENT_REQUIRED":              ErrorCodePAYMENT_REQUIRED,
@@ -73,6 +86,11 @@ var EnumValuesErrorCode = map[string]ErrorCode{
 	"PAYLOAD_TOO_LARGE":             ErrorCodePAYLOAD_TOO_LARGE,
 	"TOO_MANY_REQUESTS":             ErrorCodeTOO_MANY_REQUESTS,
 	"HEADER_FIELDS_TOO_LARGE":       ErrorCodeHEADER_FIELDS_TOO_LARGE,
+	"UNAVAILABLE_FOR_LEGAL_REASONS": ErrorCodeUNAVAILABLE_FOR_LEGAL_REASONS,
+	"RANGE_ALREADY_SEALED":          ErrorCodeRANGE_ALREADY_SEALED,
+	"OFFSET_OVERFLOW":               ErrorCodeOFFSET_OVERFLOW,
+	"RANGE_NOT_FOUND":               ErrorCodeRANGE_NOT_FOUND,
+	"OFFSET_OUT_OF_RANGE_BOUNDS":    ErrorCodeOFFSET_OUT_OF_RANGE_BOUNDS,
 	"PM_INTERNAL_SERVER_ERROR":      ErrorCodePM_INTERNAL_SERVER_ERROR,
 	"PM_NOT_IMPLEMENTED":            ErrorCodePM_NOT_IMPLEMENTED,
 	"PM_NO_AVAILABLE_DN":            ErrorCodePM_NO_AVAILABLE_DN,

@@ -9,7 +9,7 @@ import (
 type FetchResultT struct {
 	StreamId int64 `json:"stream_id"`
 	RequestIndex int32 `json:"request_index"`
-	BatchLength int32 `json:"batch_length"`
+	BatchCount int32 `json:"batch_count"`
 	Status *StatusT `json:"status"`
 }
 
@@ -19,7 +19,7 @@ func (t *FetchResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	FetchResultStart(builder)
 	FetchResultAddStreamId(builder, t.StreamId)
 	FetchResultAddRequestIndex(builder, t.RequestIndex)
-	FetchResultAddBatchLength(builder, t.BatchLength)
+	FetchResultAddBatchCount(builder, t.BatchCount)
 	FetchResultAddStatus(builder, statusOffset)
 	return FetchResultEnd(builder)
 }
@@ -27,7 +27,7 @@ func (t *FetchResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 func (rcv *FetchResult) UnPackTo(t *FetchResultT) {
 	t.StreamId = rcv.StreamId()
 	t.RequestIndex = rcv.RequestIndex()
-	t.BatchLength = rcv.BatchLength()
+	t.BatchCount = rcv.BatchCount()
 	t.Status = rcv.Status(nil).UnPack()
 }
 
@@ -89,7 +89,7 @@ func (rcv *FetchResult) MutateRequestIndex(n int32) bool {
 	return rcv._tab.MutateInt32Slot(6, n)
 }
 
-func (rcv *FetchResult) BatchLength() int32 {
+func (rcv *FetchResult) BatchCount() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
@@ -97,7 +97,7 @@ func (rcv *FetchResult) BatchLength() int32 {
 	return 0
 }
 
-func (rcv *FetchResult) MutateBatchLength(n int32) bool {
+func (rcv *FetchResult) MutateBatchCount(n int32) bool {
 	return rcv._tab.MutateInt32Slot(8, n)
 }
 
@@ -123,8 +123,8 @@ func FetchResultAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 func FetchResultAddRequestIndex(builder *flatbuffers.Builder, requestIndex int32) {
 	builder.PrependInt32Slot(1, requestIndex, 0)
 }
-func FetchResultAddBatchLength(builder *flatbuffers.Builder, batchLength int32) {
-	builder.PrependInt32Slot(2, batchLength, 0)
+func FetchResultAddBatchCount(builder *flatbuffers.Builder, batchCount int32) {
+	builder.PrependInt32Slot(2, batchCount, 0)
 }
 func FetchResultAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(3, flatbuffers.UOffsetT(status), 0)
