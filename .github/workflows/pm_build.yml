@@ -5,6 +5,9 @@ on:
 permissions: read-all
 
 jobs:
+  defaults:
+    run:
+      working-directory: ./placement-manager
   lint:
     name: Lint
     strategy:
