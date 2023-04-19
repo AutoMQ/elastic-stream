@@ -8,7 +8,7 @@ import (
 
 type StreamT struct {
 	StreamId int64 `json:"stream_id"`
-	ReplicaNums int8 `json:"replica_nums"`
+	ReplicaNum int8 `json:"replica_num"`
 	RetentionPeriodMs int64 `json:"retention_period_ms"`
 }
 
@@ -16,14 +16,14 @@ func (t *StreamT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	StreamStart(builder)
 	StreamAddStreamId(builder, t.StreamId)
-	StreamAddReplicaNums(builder, t.ReplicaNums)
+	StreamAddReplicaNum(builder, t.ReplicaNum)
 	StreamAddRetentionPeriodMs(builder, t.RetentionPeriodMs)
 	return StreamEnd(builder)
 }
 
 func (rcv *Stream) UnPackTo(t *StreamT) {
 	t.StreamId = rcv.StreamId()
-	t.ReplicaNums = rcv.ReplicaNums()
+	t.ReplicaNum = rcv.ReplicaNum()
 	t.RetentionPeriodMs = rcv.RetentionPeriodMs()
 }
 
@@ -73,7 +73,7 @@ func (rcv *Stream) MutateStreamId(n int64) bool {
 	return rcv._tab.MutateInt64Slot(4, n)
 }
 
-func (rcv *Stream) ReplicaNums() int8 {
+func (rcv *Stream) ReplicaNum() int8 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		return rcv._tab.GetInt8(o + rcv._tab.Pos)
@@ -81,7 +81,7 @@ func (rcv *Stream) ReplicaNums() int8 {
 	return 0
 }
 
-func (rcv *Stream) MutateReplicaNums(n int8) bool {
+func (rcv *Stream) MutateReplicaNum(n int8) bool {
 	return rcv._tab.MutateInt8Slot(6, n)
 }
 
@@ -103,8 +103,8 @@ func StreamStart(builder *flatbuffers.Builder) {
 func StreamAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(0, streamId, -1)
 }
-func StreamAddReplicaNums(builder *flatbuffers.Builder, replicaNums int8) {
-	builder.PrependInt8Slot(1, replicaNums, 0)
+func StreamAddReplicaNum(builder *flatbuffers.Builder, replicaNum int8) {
+	builder.PrependInt8Slot(1, replicaNum, 0)
 }
 func StreamAddRetentionPeriodMs(builder *flatbuffers.Builder, retentionPeriodMs int64) {
 	builder.PrependInt64Slot(2, retentionPeriodMs, 0)
