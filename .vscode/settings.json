@@ -22,8 +22,10 @@
         "SQPOLL",
         "squeue",
         "struct",
+        "structs",
         "syscall",
         "thiserror",
+        "ubyte",
         "Uring",
         "writev"
     ],

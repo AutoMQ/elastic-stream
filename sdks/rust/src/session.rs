@@ -119,7 +119,7 @@ impl Session {
 
         let mut create_stream_request = CreateStreamsRequestT::default();
         let mut stream = StreamT::default();
-        stream.replica_nums = replica;
+        stream.replica_num = replica;
         stream.retention_period_ms = retention_period.as_millis() as i64;
         create_stream_request.streams = Some(vec![stream]);
 
