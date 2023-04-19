@@ -43,7 +43,7 @@ func (c *RaftCluster) CreateStreams(ctx context.Context, streams []*rpcfb.Stream
 	params := make([]*endpoint.CreateStreamParam, 0, len(streams))
 	for i, stream := range streams {
 		stream.StreamId = int64(ids[i])
-		nodes, err := c.chooseDataNodes(stream.ReplicaNums)
+		nodes, err := c.chooseDataNodes(stream.ReplicaNum)
 		if err != nil {
 			logger.Error("failed to choose data nodes", zap.Int64("stream-id", stream.StreamId), zap.Error(err))
 			return nil, err

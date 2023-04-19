@@ -209,7 +209,7 @@ func preCreateStreams(tb testing.TB, h *Handler, num int, replicaNum int8) {
 		Streams: make([]*rpcfb.StreamT, num),
 	}}
 	for i := 0; i < num; i++ {
-		req.Streams[i] = &rpcfb.StreamT{ReplicaNums: replicaNum}
+		req.Streams[i] = &rpcfb.StreamT{ReplicaNum: replicaNum}
 	}
 	resp := &protocol.CreateStreamsResponse{}
 	h.CreateStreams(req, resp)
