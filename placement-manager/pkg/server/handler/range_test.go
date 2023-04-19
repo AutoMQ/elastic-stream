@@ -14,7 +14,7 @@ import (
 func TestListRanges(t *testing.T) {
 	re := require.New(t)
 
-	h, closeFunc := startSbpHandler(t, nil)
+	h, closeFunc := startSbpHandler(t, nil, true)
 	defer closeFunc()
 
 	preHeartbeat(t, h, 0)
@@ -137,7 +137,7 @@ func TestSealRanges(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
 
-			h, closeFunc := startSbpHandler(t, mockSbpClient{tt.endOffsetF})
+			h, closeFunc := startSbpHandler(t, mockSbpClient{tt.endOffsetF}, true)
 			defer closeFunc()
 
 			preHeartbeat(t, h, 0)

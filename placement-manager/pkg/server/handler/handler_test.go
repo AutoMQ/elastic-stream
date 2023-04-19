@@ -68,6 +68,14 @@ func (m *mockServer) SbpClient() sbpClient.Client {
 	return m.sbpClient
 }
 
+type mockServerNotLeader struct {
+	cluster.Server
+}
+
+func (m *mockServerNotLeader) IsLeader() bool {
+	return false
+}
+
 type mockSbpClient struct {
 	endOffsetF func(rangeIndex int32, addr sbpClient.Address) int64
 }
@@ -117,7 +125,7 @@ func (m mockSbpClient) SealRanges(req *protocol.SealRangesRequest, addr sbpClien
 	return resp, nil
 }
 
-func startSbpHandler(tb testing.TB, sbpClient sbpClient.Client) (*Handler, func()) {
+func startSbpHandler(tb testing.TB, sbpClient sbpClient.Client, isLeader bool) (*Handler, func()) {
 	re := require.New(tb)
 
 	if sbpClient == nil {
@@ -126,8 +134,14 @@ func startSbpHandler(tb testing.TB, sbpClient sbpClient.Client) (*Handler, func(
 
 	_, client, closeFunc := testutil.StartEtcd(tb)
 
+	var server cluster.Server
+	server = &mockServer{c: client, sbpClient: sbpClient}
+	if !isLeader {
+		server = &mockServerNotLeader{server}
+	}
+
 	c := cluster.NewRaftCluster(context.Background(), &config.Cluster{SealReqTimeoutMs: 1000, DataNodeTimeout: time.Minute}, zap.NewNop())
-	err := c.Start(&mockServer{c: client, sbpClient: sbpClient})
+	err := c.Start(server)
 	re.NoError(err)
 
 	h := NewHandler(c, zap.NewNop())
