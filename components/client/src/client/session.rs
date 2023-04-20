@@ -1,5 +1,6 @@
 use super::response;
 use super::session_state::SessionState;
+use codec::error::FrameError;
 use codec::frame::{Frame, OperationCode};
 use model::data_node::DataNode;
 use model::range::StreamRange;
@@ -10,9 +11,10 @@ use protocol::rpc::header::{
     DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse, IdAllocationResponse,
     ListRangesResponse, SystemErrorResponse,
 };
-use slog::{error, trace, warn, Logger};
+use slog::{error, info, trace, warn, Logger};
 use std::cell::RefCell;
 use std::net::SocketAddr;
+use std::rc::Weak;
 use std::sync::Arc;
 use std::{
     cell::UnsafeCell,
@@ -48,14 +50,28 @@ impl Session {
     fn spawn_read_loop(
         connection: Rc<Connection>,
         inflight_requests: Rc<UnsafeCell<HashMap<u32, oneshot::Sender<response::Response>>>>,
+        sessions: Weak<RefCell<HashMap<SocketAddr, Session>>>,
+        target: SocketAddr,
         log: Logger,
     ) {
         tokio_uring::spawn(async move {
             loop {
                 match connection.read_frame().await {
                     Err(e) => {
-                        // Handle connection reset
-                        todo!()
+                        warn!(log, "Error reading frame from channel"; "error" => ?e);
+                        match e {
+                            FrameError::ConnectionReset => {
+                                error!(log, "Connection to {} reset by peer", target);
+                                if let Some(sessions) = sessions.upgrade() {
+                                    let mut sessions = sessions.borrow_mut();
+                                    if let Some(mut session) = sessions.remove(&target) {
+                                        warn!(log, "Closing session to {}", target);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                        break;
                     }
                     Ok(Some(frame)) => {
                         trace!(log, "Read a frame from channel");
@@ -67,7 +83,13 @@ impl Session {
                         }
                     }
                     Ok(None) => {
-                        // TODO: Handle normal connection close
+                        info!(log, "Connection to {} closed", target);
+                        if let Some(sessions) = sessions.upgrade() {
+                            let mut sessions = sessions.borrow_mut();
+                            if let Some(mut session) = sessions.remove(&target) {
+                                info!(log, "Closing session to {}", target);
+                            }
+                        }
                         break;
                     }
                 }
@@ -80,12 +102,19 @@ impl Session {
         stream: TcpStream,
         endpoint: &str,
         config: &Arc<config::Configuration>,
+        sessions: Weak<RefCell<HashMap<SocketAddr, Session>>>,
         log: &Logger,
     ) -> Self {
         let connection = Rc::new(Connection::new(stream, endpoint, log.clone()));
         let inflight = Rc::new(UnsafeCell::new(HashMap::new()));
 
-        Self::spawn_read_loop(Rc::clone(&connection), Rc::clone(&inflight), log.clone());
+        Self::spawn_read_loop(
+            Rc::clone(&connection),
+            Rc::clone(&inflight),
+            sessions,
+            target.clone(),
+            log.clone(),
+        );
 
         Self {
             config: Arc::clone(config),
@@ -573,7 +602,15 @@ mod tests {
             let target = format!("127.0.0.1:{}", port);
             let stream = TcpStream::connect(target.parse()?).await?;
             let config = Arc::new(config::Configuration::default());
-            let session = Session::new(target.parse()?, stream, &target, &config, &logger);
+            let sessions = Rc::new(RefCell::new(HashMap::new()));
+            let session = Session::new(
+                target.parse()?,
+                stream,
+                &target,
+                &config,
+                Rc::downgrade(&sessions),
+                &logger,
+            );
 
             assert_eq!(SessionState::Active, session.state());
 
@@ -599,7 +636,15 @@ mod tests {
             config.server.host = "localhost".to_owned();
             config.server.port = 1234;
             let config = Arc::new(config);
-            let mut session = Session::new(target.parse()?, stream, &target, &config, &logger);
+            let sessions = Rc::new(RefCell::new(HashMap::new()));
+            let mut session = Session::new(
+                target.parse()?,
+                stream,
+                &target,
+                &config,
+                Rc::downgrade(&sessions),
+                &logger,
+            );
 
             let result = session.heartbeat().await;
             let response = result.unwrap().await?;
@@ -624,7 +669,15 @@ mod tests {
             let mut config = config::Configuration::default();
             config.server.node_id = 1;
             let config = Arc::new(config);
-            let mut session = Session::new(target.parse()?, stream, &target, &config, &logger);
+            let sessions = Rc::new(RefCell::new(HashMap::new()));
+            let mut session = Session::new(
+                target.parse()?,
+                stream,
+                &target,
+                &config,
+                Rc::downgrade(&sessions),
+                &logger,
+            );
 
             if let Some(rx) = session.heartbeat().await {
                 let start = Instant::now();

@@ -12,6 +12,7 @@ use std::{
     collections::HashMap,
     io::ErrorKind,
     net::{SocketAddr, ToSocketAddrs},
+    rc::Rc,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -22,7 +23,7 @@ pub(crate) struct CompositeSession {
     target: String,
     config: Arc<config::Configuration>,
     lb_policy: LbPolicy,
-    sessions: RefCell<HashMap<SocketAddr, Session>>,
+    sessions: Rc<RefCell<HashMap<SocketAddr, Session>>>,
     log: Logger,
     refresh_cluster_instant: RefCell<Instant>,
     heartbeat_instant: RefCell<Instant>,
@@ -38,7 +39,7 @@ impl CompositeSession {
     where
         T: ToSocketAddrs + ToString,
     {
-        let sessions = RefCell::new(HashMap::new());
+        let sessions = Rc::new(RefCell::new(HashMap::new()));
         // For now, we just resolve one session out of the target.
         // In the future, we would support multiple internal connection and load balancing among them.
         for socket_addr in target
@@ -49,6 +50,7 @@ impl CompositeSession {
                 socket_addr.clone(),
                 config.client_connect_timeout(),
                 &config,
+                &sessions,
                 &log,
             )
             .await;
@@ -140,6 +142,7 @@ impl CompositeSession {
                             addr,
                             self.config.client_connect_timeout(),
                             &self.config,
+                            &self.sessions,
                             &self.log,
                         )
                     });
@@ -359,6 +362,7 @@ impl CompositeSession {
                         addr.clone(),
                         self.config.client_connect_timeout(),
                         &self.config,
+                        &self.sessions,
                         &self.log,
                     )
                     .await?;
@@ -398,6 +402,7 @@ impl CompositeSession {
         addr: SocketAddr,
         duration: Duration,
         config: &Arc<config::Configuration>,
+        sessions: &Rc<RefCell<HashMap<SocketAddr, Session>>>,
         log: &Logger,
     ) -> Result<Session, ClientError> {
         trace!(log, "Establishing connection to {:?}", addr);
@@ -429,7 +434,14 @@ impl CompositeSession {
                 return Err(ClientError::ConnectTimeout(description));
             }
         };
-        Ok(Session::new(addr, stream, &endpoint, config, log))
+        Ok(Session::new(
+            addr,
+            stream,
+            &endpoint,
+            config,
+            Rc::downgrade(sessions),
+            log,
+        ))
     }
 }
 
