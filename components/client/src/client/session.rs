@@ -4,9 +4,9 @@ use codec::error::FrameError;
 use codec::frame::{Frame, OperationCode};
 use model::data_node::DataNode;
 use model::range::StreamRange;
+use model::request::Request;
 use model::PlacementManagerNode;
 use model::Status;
-use model::{client_role::ClientRole, request::Request};
 use protocol::rpc::header::{
     DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse, IdAllocationResponse,
     ListRangesResponse, SystemErrorResponse,
@@ -16,12 +16,7 @@ use std::cell::RefCell;
 use std::net::SocketAddr;
 use std::rc::Weak;
 use std::sync::Arc;
-use std::{
-    cell::UnsafeCell,
-    collections::HashMap,
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::{cell::UnsafeCell, collections::HashMap, rc::Rc, time::Instant};
 use tokio::sync::oneshot;
 use tokio_uring::net::TcpStream;
 use transport::connection::Connection;
@@ -64,7 +59,7 @@ impl Session {
                                 error!(log, "Connection to {} reset by peer", target);
                                 if let Some(sessions) = sessions.upgrade() {
                                     let mut sessions = sessions.borrow_mut();
-                                    if let Some(mut session) = sessions.remove(&target) {
+                                    if let Some(_session) = sessions.remove(&target) {
                                         warn!(log, "Closing session to {}", target);
                                     }
                                 }
@@ -86,13 +81,25 @@ impl Session {
                         info!(log, "Connection to {} closed", target);
                         if let Some(sessions) = sessions.upgrade() {
                             let mut sessions = sessions.borrow_mut();
-                            if let Some(mut session) = sessions.remove(&target) {
+                            if let Some(_session) = sessions.remove(&target) {
                                 info!(log, "Closing session to {}", target);
                             }
                         }
                         break;
                     }
                 }
+
+                let inflight = unsafe { &mut *inflight_requests.get() };
+                inflight.drain_filter(|stream_id, tx| {
+                    if tx.is_closed() {
+                        info!(
+                            log,
+                            "Caller has cancelled request[stream-id={}], potentially due to timeout",
+                            stream_id
+                        );
+                    }
+                    tx.is_closed()
+                });
             }
         });
     }
@@ -149,7 +156,7 @@ impl Session {
                     Ok(_) => {
                         trace!(
                             self.log,
-                            "Write `Heartbeat` request to {}, stream-id={}",
+                            "Write `Heartbeat` request bounded for {} using stream-id={} to socket buffer",
                             self.connection.peer_address(),
                             frame.stream_id,
                         );
@@ -157,7 +164,8 @@ impl Session {
                     Err(e) => {
                         error!(
                             self.log,
-                            "Failed to write request to network. Cause: {:?}", e
+                            "Failed to write `Heartbeat` request bounded for {} to socket buffer. Cause: {:?}", 
+                            self.connection.peer_address(), e
                         );
                         if let Some(observer) = inflight_requests.remove(&frame.stream_id) {
                             return Err(observer);
@@ -248,53 +256,25 @@ impl Session {
         Ok(())
     }
 
-    pub(crate) fn state(&self) -> SessionState {
-        self.state
-    }
-
-    fn active(&self) -> bool {
-        SessionState::Active == self.state
-    }
-
-    pub(crate) fn need_heartbeat(&self, duration: &Duration) -> bool {
-        self.active() && (Instant::now() - *self.idle_since.borrow() >= *duration)
-    }
-
-    pub(crate) async fn heartbeat(&mut self) -> Option<oneshot::Receiver<response::Response>> {
-        // If the current session is being closed, heartbeat will be no-op.
-        if self.state == SessionState::Closing {
-            return None;
-        }
-
-        let request = Request::Heartbeat {
-            client_id: self.config.client.client_id.clone(),
-            role: ClientRole::DataNode,
-            data_node: Some(self.config.server.data_node()),
-        };
-        let (response_observer, rx) = oneshot::channel();
-        if self.write(&request, response_observer).await.is_ok() {
-            trace!(
-                self.log,
-                "Heartbeat sent to {}",
-                self.connection.peer_address()
-            );
-        }
-        Some(rx)
-    }
-
     fn handle_heartbeat_response(log: &Logger, frame: &Frame) -> response::Response {
         let mut resp = response::Response::Heartbeat {
             status: Status::ok(),
         };
         if let Some(ref buf) = frame.header {
-            if let Ok(heartbeat) = flatbuffers::root::<HeartbeatResponse>(&buf) {
-                trace!(log, "Heartbeat response: {:?}", heartbeat);
-                let hb = heartbeat.unpack();
-                let _client_id = hb.client_id;
-                let _client_role = hb.client_role;
-                let _status = hb.status;
-                if let response::Response::Heartbeat { ref mut status } = resp {
-                    *status = _status.as_ref().into();
+            match flatbuffers::root::<HeartbeatResponse>(&buf) {
+                Ok(heartbeat) => {
+                    trace!(log, "Received Heartbeat response: {:?}", heartbeat);
+                    let hb = heartbeat.unpack();
+                    let _client_id = hb.client_id;
+                    let _client_role = hb.client_role;
+                    let _status = hb.status;
+                    if let response::Response::Heartbeat { ref mut status } = resp {
+                        *status = _status.as_ref().into();
+                    }
+                }
+
+                Err(e) => {
+                    error!(log, "Failed to parse Heartbeat response header: {:?}", e);
                 }
             }
         }
@@ -482,7 +462,10 @@ impl Session {
                     } else {
                     }
                 }
-                Err(e) => {}
+                Err(_e) => {
+                    // Deserialize error
+                    warn!(log, "Failed to decode `DescribePlacementManagerClusterResponse` response header using FlatBuffers. Cause: {}", _e);
+                }
             }
         }
         resp
@@ -588,10 +571,8 @@ impl Drop for Session {
 mod tests {
 
     use super::*;
-    use protocol::rpc::header::ErrorCode;
-    use std::{error::Error, time::Duration};
+    use std::error::Error;
     use test_util::{run_listener, terminal_logger};
-    use tokio::time::timeout;
 
     /// Verify it's OK to create a new session.
     #[test]
@@ -603,7 +584,7 @@ mod tests {
             let stream = TcpStream::connect(target.parse()?).await?;
             let config = Arc::new(config::Configuration::default());
             let sessions = Rc::new(RefCell::new(HashMap::new()));
-            let session = Session::new(
+            let _session = Session::new(
                 target.parse()?,
                 stream,
                 &target,
@@ -612,83 +593,6 @@ mod tests {
                 &logger,
             );
 
-            assert_eq!(SessionState::Active, session.state());
-
-            assert_eq!(false, session.need_heartbeat(&Duration::from_secs(1)));
-
-            Ok(())
-        })
-    }
-
-    #[test]
-    fn test_heartbeat() -> Result<(), Box<dyn Error>> {
-        tokio_uring::start(async {
-            let logger = terminal_logger();
-
-            #[allow(unused_variables)]
-            let port = 2378;
-
-            let port = run_listener(logger.clone()).await;
-            let target = format!("127.0.0.1:{}", port);
-            let stream = TcpStream::connect(target.parse()?).await?;
-            let mut config = config::Configuration::default();
-            config.server.node_id = 1;
-            config.server.host = "localhost".to_owned();
-            config.server.port = 1234;
-            let config = Arc::new(config);
-            let sessions = Rc::new(RefCell::new(HashMap::new()));
-            let mut session = Session::new(
-                target.parse()?,
-                stream,
-                &target,
-                &config,
-                Rc::downgrade(&sessions),
-                &logger,
-            );
-
-            let result = session.heartbeat().await;
-            let response = result.unwrap().await?;
-            trace!(logger, "Heartbeat response: {:?}", response);
-            if let response::Response::Heartbeat { ref status } = response {
-                assert_eq!(ErrorCode::OK, status.code);
-            } else {
-                panic!("Unexpected response type");
-            }
-            Ok(())
-        })
-    }
-
-    #[test]
-    #[ignore]
-    fn test_heartbeat_timeout() -> Result<(), Box<dyn Error>> {
-        tokio_uring::start(async {
-            let logger = terminal_logger();
-            let port = run_listener(logger.clone()).await;
-            let target = format!("127.0.0.1:{}", port);
-            let stream = TcpStream::connect(target.parse()?).await?;
-            let mut config = config::Configuration::default();
-            config.server.node_id = 1;
-            let config = Arc::new(config);
-            let sessions = Rc::new(RefCell::new(HashMap::new()));
-            let mut session = Session::new(
-                target.parse()?,
-                stream,
-                &target,
-                &config,
-                Rc::downgrade(&sessions),
-                &logger,
-            );
-
-            if let Some(rx) = session.heartbeat().await {
-                let start = Instant::now();
-                let result = timeout(Duration::from_millis(200), rx).await;
-                let duration = start.elapsed();
-                assert!(duration.as_millis() >= 200, "Timeout should work");
-                if let Err(ref _elapsed) = result {
-                } else {
-                    panic!("Should get timeout");
-                }
-            }
             Ok(())
         })
     }

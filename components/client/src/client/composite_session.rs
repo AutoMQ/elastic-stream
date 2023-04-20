@@ -16,7 +16,10 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{sync::oneshot, time::timeout};
+use tokio::{
+    sync::oneshot,
+    time::{self, timeout},
+};
 use tokio_uring::net::TcpStream;
 
 pub(crate) struct CompositeSession {
@@ -81,12 +84,6 @@ impl CompositeSession {
         })
     }
 
-    pub(crate) fn need_heartbeat(&self) -> bool {
-        let now = Instant::now();
-        let last = self.heartbeat_instant.borrow();
-        last.clone() + self.config.client_heartbeat_interval() >= now
-    }
-
     fn need_refresh_cluster(&self) -> bool {
         let cluster_size = self.sessions.borrow().len();
         if cluster_size <= 1 {
@@ -104,11 +101,6 @@ impl CompositeSession {
 
     /// Broadcast heartbeat requests to all nested sessions.
     pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
-        if !self.need_heartbeat() {
-            trace!(self.log, "No need to broadcast heartbeat yet");
-            return Ok(());
-        }
-
         self.try_reconnect().await;
 
         if self.need_refresh_cluster() {
@@ -364,12 +356,17 @@ impl CompositeSession {
                         error!(self.log, "Failed to send request to {}", addr);
                         continue;
                     }
+                    trace!(self.log, "Describe placement manager cluster via {}", addr);
                     request_sent = true;
                     break 'outer;
                 }
             }
 
             if !request_sent {
+                warn!(
+                    self.log,
+                    "Failed to describe placement manager cluster via existing sessions. Try to re-connect..."
+                );
                 if let Some(addr) = addrs.first() {
                     let session = Self::connect(
                         addr.clone(),
@@ -390,24 +387,30 @@ impl CompositeSession {
             return Err(ClientError::ClientInternal);
         }
 
-        match rx.await {
-            Ok(response) => {
-                if let response::Response::DescribePlacementManager { status, nodes } = response {
-                    if ErrorCode::OK == status.code {
-                        trace!(self.log, "Received placement manager cluster {:?}", nodes);
-                        Ok(nodes)
+        match time::timeout(self.config.client_connect_timeout(), rx).await {
+            Ok(response) => match response {
+                Ok(response) => {
+                    if let response::Response::DescribePlacementManager { status, nodes } = response
+                    {
+                        if ErrorCode::OK == status.code {
+                            trace!(self.log, "Received placement manager cluster {:?}", nodes);
+                            Ok(nodes)
+                        } else {
+                            warn!(
+                                self.log,
+                                "Failed to describe placement manager cluster: {:?}", status
+                            );
+                            Err(ClientError::ServerInternal)
+                        }
                     } else {
-                        warn!(
-                            self.log,
-                            "Failed to describe placement manager cluster: {:?}", status
-                        );
-                        Err(ClientError::ServerInternal)
+                        Err(ClientError::ClientInternal)
                     }
-                } else {
-                    Err(ClientError::ClientInternal)
                 }
-            }
-            Err(e) => Err(ClientError::ClientInternal),
+                Err(_e) => Err(ClientError::ClientInternal),
+            },
+            Err(_e) => Err(ClientError::RpcTimeout {
+                timeout: self.config.client_connect_timeout(),
+            }),
         }
     }
 
@@ -438,6 +441,11 @@ impl CompositeSession {
                     )
                 })
                 .collect::<Vec<_>>();
+
+            if futures.is_empty() {
+                return;
+            }
+            trace!(self.log, "Reconnecting {} sessions", futures.len());
 
             futures::future::join_all(futures)
                 .await

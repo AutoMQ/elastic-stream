@@ -8,7 +8,7 @@
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/target/debug/data-node",
             "args": [
-                "-c", "/data/elastic-stream/etc/config.yaml",
+                "-c", "/root/elastic-stream/etc/config.yaml",
             ]
         }
     ]

@@ -89,24 +89,13 @@ impl Client {
     pub async fn broadcast_heartbeat(&self, target: &str) -> Result<(), ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager.get_composite_session(target).await?;
-        time::timeout(
-            self.config.client_io_timeout(),
-            composite_session.heartbeat(),
-        )
-        .await
-        .map_err(|_elapsed| {
-            error!(
-                self.log,
-                "Timeout when broadcasting heartbeat to {}", target
-            );
-            ClientError::RpcTimeout {
-                timeout: self.config.client_io_timeout(),
-            }
-        })
-        .and_then(|_res| {
-            trace!(self.log, "Heartbeat to {} OK", target);
-            Ok(())
-        })
+        trace!(
+            self.log,
+            "Broadcast heartbeat to composite-channel={}",
+            target
+        );
+
+        composite_session.heartbeat().await
     }
 }
 
@@ -122,7 +111,7 @@ mod tests {
     };
 
     #[test]
-    fn test_broadcast() -> Result<(), ClientError> {
+    fn test_broadcast_heartbeat() -> Result<(), ClientError> {
         tokio_uring::start(async {
             let log = terminal_logger();
             #[allow(unused_variables)]

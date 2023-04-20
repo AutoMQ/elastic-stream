@@ -99,17 +99,9 @@ impl Worker {
                     .await
                     .expect("Failed to bootstrap stream ranges from placement managers");
 
-                let metrics_logger = self.logger.clone();
                 if self.config.primary {
-                    // tokio_uring::spawn(async {
-                    //     http_serve().await;
-                    // });
-                    tokio_uring::spawn(async move {
-                        loop {
-                            time::sleep(time::Duration::from_millis(1000)).await;
-                            let metrics_str = dump(false);
-                            info!(metrics_logger, "metrics:\n{}", metrics_str);
-                        }
+                    tokio_uring::spawn(async {
+                        http_serve().await;
                     });
                 }
 

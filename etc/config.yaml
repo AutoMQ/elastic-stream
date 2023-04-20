@@ -29,7 +29,7 @@ server:
     # Network io_uring queue depth
     queue-depth: 128
   # Placement manager address
-  placement-manager: "127.0.0.1:2378"
+  placement-manager: "192.168.123.128:2378"
   # Connection idle duration in ticks
   connection-idle-duration: 60
   profiling:
