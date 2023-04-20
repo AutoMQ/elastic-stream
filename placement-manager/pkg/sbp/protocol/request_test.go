@@ -35,6 +35,15 @@ func TestListRangesRequest_Unmarshal(t *testing.T) {
 			want: mockListRangesRequest,
 		},
 		{
+			name: "FlatBuffer in wrong format",
+			args: args{
+				fmt:  format.FlatBuffer(),
+				data: []byte{'a', 'b', 'c'},
+			},
+			wantErr: true,
+			errMsg:  "unmarshal FlatBuffer:",
+		},
+		{
 			name: "ProtoBuffer",
 			args: args{
 				fmt:  format.ProtoBuffer(),

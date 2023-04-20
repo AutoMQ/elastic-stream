@@ -96,9 +96,19 @@ func (u *baseUnmarshaler) unmarshalJSON(_ []byte) error {
 	return errors.Errorf(_unsupportedFmtErrMsg, format.JSON())
 }
 
-func unmarshal(m unmarshaler, fmt format.Format, data []byte) error {
+func unmarshal(m unmarshaler, fmt format.Format, data []byte) (err error) {
 	switch fmt {
 	case format.FlatBuffer():
+		defer func() {
+			if r := recover(); r != nil {
+				switch r.(type) {
+				case error:
+					err = errors.Wrap(r.(error), "unmarshal FlatBuffer")
+				default:
+					err = errors.Errorf("unmarshal FlatBuffer: %v", r)
+				}
+			}
+		}()
 		return m.unmarshalFlatBuffer(data)
 	case format.ProtoBuffer():
 		return m.unmarshalProtoBuffer(data)
