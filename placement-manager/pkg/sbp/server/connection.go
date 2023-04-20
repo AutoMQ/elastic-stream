@@ -403,7 +403,7 @@ func (c *conn) generateAct(f *codec.DataFrame, action *Action) (ctx context.Cont
 	err := req.Unmarshal(f.HeaderFmt, f.Header)
 	if err != nil {
 		resp.Error(&rpcfb.StatusT{
-			Code:    rpcfb.ErrorCodeBAD_REQUEST,
+			Code:    rpcfb.ErrorCodeDECODE,
 			Message: "failed to unmarshal frame header",
 		})
 		act = func(_ protocol.OutResponse) {}
