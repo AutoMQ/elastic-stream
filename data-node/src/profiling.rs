@@ -48,19 +48,10 @@ pub(crate) fn generate_flame_graph(
 
             loop {
                 match shutdown.try_recv() {
-                    Ok(_) => {
-                        info!(log, "Received TERM/STOP signal, quit profiler");
+                    Err(TryRecvError::Empty) => {}
+                    _ => {
+                        info!(log, "Continuous Profiling stopped");
                         break;
-                    }
-                    Err(TryRecvError::Closed) => {
-                        info!(log, "Received TERM/STOP signal, quit profiler");
-                        break;
-                    }
-                    Err(e) => {
-                        error!(
-                            log,
-                            "Unexpected error while try_recv from shutdown channel: {}", e
-                        );
                     }
                 }
 
