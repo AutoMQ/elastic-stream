@@ -101,9 +101,9 @@ func unmarshal(m unmarshaler, fmt format.Format, data []byte) (err error) {
 	case format.FlatBuffer():
 		defer func() {
 			if r := recover(); r != nil {
-				switch r.(type) {
+				switch r := r.(type) {
 				case error:
-					err = errors.Wrap(r.(error), "unmarshal FlatBuffer")
+					err = errors.Wrap(r, "unmarshal FlatBuffer")
 				default:
 					err = errors.Errorf("unmarshal FlatBuffer: %v", r)
 				}
