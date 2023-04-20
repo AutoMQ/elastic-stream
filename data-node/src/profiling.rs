@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, os::unix::prelude::OsStrExt, sync::Arc};
+use std::{cmp::Ordering, os::unix::prelude::OsStrExt, path::Path, sync::Arc};
 
 use config::Configuration;
 use slog::{error, info, Logger};
@@ -28,6 +28,24 @@ pub(crate) fn generate_flame_graph(
             };
 
             let mut last_generation_instant = std::time::Instant::now();
+            let cwd = match std::env::current_dir() {
+                Ok(path) => path,
+                Err(e) => {
+                    error!(log, "Failed to acquire current working directory: {}", e);
+                    return;
+                }
+            };
+
+            let base_path = cwd.join(&config.server.profiling.report_path);
+            if !base_path.exists() {
+                if let Err(e) = std::fs::create_dir_all(base_path.as_path()) {
+                    error!(
+                        log,
+                        "Failed to create directory[{:?}] to save flamegraph files", base_path
+                    )
+                }
+            }
+
             loop {
                 match shutdown.try_recv() {
                     Ok(_) => {
@@ -66,12 +84,7 @@ pub(crate) fn generate_flame_graph(
 
                 let time = chrono::Utc::now();
                 let time = time.format("%Y-%m-%d-%H-%M-%S").to_string();
-                let file_path = config
-                    .server
-                    .profiling
-                    .report_path
-                    .join(format!("{}.svg", time));
-
+                let file_path = base_path.join(format!("{}.svg", time));
                 let file = match std::fs::File::create(file_path.as_path()) {
                     Ok(file) => file,
                     Err(e) => {
@@ -85,7 +98,7 @@ pub(crate) fn generate_flame_graph(
                 }
 
                 // Sweep expired flamegraph files
-                if let Err(e) = sweep_expired(&config, &log) {
+                if let Err(e) = sweep_expired(base_path.as_path(), &config, &log) {
                     error!(log, "Failed to clean expired flamegraph file: {}", e);
                 }
             }
@@ -93,8 +106,11 @@ pub(crate) fn generate_flame_graph(
         .unwrap();
 }
 
-fn sweep_expired(config: &Arc<Configuration>, log: &Logger) -> std::io::Result<()> {
-    let report_path = config.server.profiling.report_path.as_path();
+fn sweep_expired(
+    report_path: &Path,
+    config: &Arc<Configuration>,
+    log: &Logger,
+) -> std::io::Result<()> {
     let mut entries = std::fs::read_dir(report_path)?
         .into_iter()
         .flatten()

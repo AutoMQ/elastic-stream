@@ -75,8 +75,10 @@ pub struct Profiling {
     #[serde(rename = "report-interval")]
     pub report_interval: u64,
 
+    ///  Path to save flamegraph files: if a relative path is configured, it will be relative to current working directory;
+    ///  If an absolute path is configured, the absolute path is used.
     #[serde(rename = "report-path")]
-    pub report_path: PathBuf,
+    pub report_path: String,
 
     #[serde(rename = "max-report-backup")]
     pub max_report_backup: usize,
@@ -88,7 +90,7 @@ impl Default for Profiling {
             enable: true,
             sampling_frequency: 1000,
             report_interval: 300,
-            report_path: std::env::temp_dir(),
+            report_path: "flamegraph".to_owned(),
             max_report_backup: 3,
         }
     }

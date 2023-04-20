@@ -38,7 +38,8 @@ server:
     sampling-frequency: 1000
     # Generate flamegraph interval in seconds
     report-interval: 300
-    # store report path
+    # Path to save flamegraph files: if a relative path is configured, it will be relative to current working directory; 
+    # If an absolute path is configured, the absolute path is used.
     report-path: "/tmp"
     # max backup reports
     max-report-backup: 3
