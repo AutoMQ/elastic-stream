@@ -1,6 +1,7 @@
 package elastic.stream.benchmark.tool;
 
 import lombok.SneakyThrows;
+import sdk.elastic.stream.apis.ClientConfiguration;
 import sdk.elastic.stream.apis.ClientConfigurationBuilder;
 import sdk.elastic.stream.apis.OperationClient;
 import sdk.elastic.stream.client.impl.OperationClientBuilderImpl;
@@ -22,21 +23,18 @@ import java.util.stream.IntStream;
  */
 public class ClientTool {
 
-    private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(60);
+    private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
     private static final int CREATE_STREAM_BATCH_SIZE = 10;
 
     @SneakyThrows
-    public static OperationClient buildClient(String pmAddress, int streamCacheSize) {
-        ClientConfigurationBuilder builder = new ClientConfigurationBuilder()
+    public static OperationClient buildClient(String pmAddress, int streamCacheSize, int semaphore) {
+        ClientConfiguration configuration = new ClientConfigurationBuilder()
                 .setPmEndpoint(pmAddress)
                 .setStreamCacheSize(streamCacheSize)
-                // TODO make these options configurable
-                .setClientAsyncSemaphoreValue(1024)
-                .setConnectionTimeout(Duration.ofSeconds(3))
-                .setChannelMaxIdleTime(Duration.ofSeconds(10))
-                .setHeartBeatInterval(Duration.ofSeconds(5));
-        OperationClient client = new OperationClientBuilderImpl().setClientConfiguration(builder.build()).build();
+                .setClientAsyncSemaphoreValue(semaphore)
+                .build();
+        OperationClient client = new OperationClientBuilderImpl().setClientConfiguration(configuration).build();
         client.start();
         return client;
     }
@@ -62,23 +60,40 @@ public class ClientTool {
         }
         return streamIds;
     }
-    
+
     @SneakyThrows
-    public static boolean fetch(OperationClient client, long streamId, long offset, int expectedBodySize) {
+    public static boolean fetchOne(OperationClient client, long streamId, long offset, int expectedBodySize) {
         List<RecordBatch> batches = client.fetchBatches(streamId, offset, 1, 1, DEFAULT_REQUEST_TIMEOUT).get();
-        if (batches.isEmpty()) {
-            throw new RuntimeException("failed to fetch a batch from stream " + streamId + " at offset " + offset + ": empty batches");
+        return checkBatches(batches, expectedBodySize);
+    }
+
+    @SneakyThrows
+    public static Long fetchFrom(OperationClient client, long streamId, long offset, int expectedBodySize) {
+        List<RecordBatch> batches = client.fetchBatches(streamId, offset, 1, Integer.MAX_VALUE, DEFAULT_REQUEST_TIMEOUT).get();
+        if (!checkBatches(batches, expectedBodySize)) {
+            return null;
         }
-        batches.forEach(batch -> {
+        return batches.stream()
+                .flatMap(batch -> batch.getRecords().stream())
+                .map(Record::getOffset)
+                .max(Long::compareTo)
+                .orElse(null);
+    }
+
+    private static boolean checkBatches(List<RecordBatch> batches, int expectedBodySize) {
+        if (batches.isEmpty()) {
+            return false;
+        }
+        for (RecordBatch batch : batches) {
             if (batch.getRecords().isEmpty()) {
-                throw new RuntimeException("failed to fetch a batch from stream " + streamId + " at offset " + offset + ": empty records");
+                return false;
             }
-            batch.getRecords().forEach(record -> {
+            for (Record record : batch.getRecords()) {
                 if (record.getBody() == null || record.getBody().remaining() != expectedBodySize) {
-                    throw new RuntimeException("failed to fetch a batch from stream " + streamId + " at offset " + offset + ": body size mismatch, expected: " + expectedBodySize + ", actual: " + record.getBody().remaining());
+                    return false;
                 }
-            });
-        });
+            }
+        }
         return true;
     }
 

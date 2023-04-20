@@ -23,20 +23,23 @@ import java.util.concurrent.TimeUnit;
  */
 public class Main {
     public static void main(String[] args) throws RunnerException {
-        ReadWriteOptions readWriteOptions = parseOptions(args);
+        ReadWriteOptions rwOptions = parseOptions(args);
+        if (rwOptions.getReadTailThreadPerClient() > 0 && rwOptions.getWriteThreadPerClient() == 0) {
+            throw new IllegalArgumentException("read tail thread per client must be 0 when write thread per client is 0");
+        }
         Options options = new OptionsBuilder()
-                .param("pmAddress", readWriteOptions.getPmAddress())
-                .param("bodySize", String.valueOf(readWriteOptions.getBodySize()))
-                .param("streamCount", String.valueOf(readWriteOptions.getStreamCount()))
+                .param("pmAddress", rwOptions.getPmAddress())
+                .param("bodySize", String.valueOf(rwOptions.getBodySize()))
+                .param("streamCount", String.valueOf(rwOptions.getStreamCount()))
                 .shouldFailOnError(true)
-                .threadGroups(readWriteOptions.getReadThreadPerClient(), readWriteOptions.getWriteThreadPerClient())
-                .threads(readWriteOptions.getClientCount() * (readWriteOptions.getReadThreadPerClient() + readWriteOptions.getWriteThreadPerClient()))
+                .threadGroups(rwOptions.getReadRandomThreadPerClient(), rwOptions.getReadTailThreadPerClient(), rwOptions.getWriteThreadPerClient())
+                .threads(rwOptions.getClientCount() * (rwOptions.getReadRandomThreadPerClient() + rwOptions.getReadTailThreadPerClient() + rwOptions.getWriteThreadPerClient()))
                 .include(".*" + ReadWrite.class.getSimpleName() + ".*")
                 .forks(1)
-                .warmupIterations(readWriteOptions.getWarmupIterations())
-                .warmupTime(new TimeValue(readWriteOptions.getWarmupTimeSeconds(), TimeUnit.SECONDS))
-                .measurementIterations(readWriteOptions.getMeasurementIterations())
-                .measurementTime(new TimeValue(readWriteOptions.getMeasurementTimeSeconds(), TimeUnit.SECONDS))
+                .warmupIterations(rwOptions.getWarmupIterations())
+                .warmupTime(new TimeValue(rwOptions.getWarmupTimeSeconds(), TimeUnit.SECONDS))
+                .measurementIterations(rwOptions.getMeasurementIterations())
+                .measurementTime(new TimeValue(rwOptions.getMeasurementTimeSeconds(), TimeUnit.SECONDS))
                 .mode(Mode.SampleTime)
                 .timeUnit(TimeUnit.MILLISECONDS)
                 .build();
@@ -46,10 +49,11 @@ public class Main {
     @Builder
     @Getter
     public static class ReadWriteOptions {
-        public static final int DEFAULT_BODY_SIZE = 1024 * 1024;
+        public static final int DEFAULT_BODY_SIZE = 16 * 1024;
         public static final int DEFAULT_STREAM_COUNT = 64;
         public static final int DEFAULT_CLIENT_COUNT = 2;
-        public static final int DEFAULT_READ_THREAD_PER_CLIENT = 1;
+        public static final int DEFAULT_READ_RANDOM_THREAD_PER_CLIENT = 1;
+        public static final int DEFAULT_READ_TAIL_THREAD_PER_CLIENT = 1;
         public static final int DEFAULT_WRITE_THREAD_PER_CLIENT = 1;
 
         public static final int DEFAULT_WARMUP_ITERATIONS = 1;
@@ -61,7 +65,8 @@ public class Main {
         private int bodySize;
         private int streamCount;
         private int clientCount;
-        private int readThreadPerClient;
+        private int readRandomThreadPerClient;
+        private int readTailThreadPerClient;
         private int writeThreadPerClient;
 
         private int warmupIterations;
@@ -98,13 +103,19 @@ public class Main {
                 .hasArg()
                 .desc("client count, default " + ReadWriteOptions.DEFAULT_CLIENT_COUNT)
                 .build());
-        options.addOption(Option.builder("r")
-                .longOpt("read-thread-per-client")
+        options.addOption(Option.builder("rrt")
+                .longOpt("read-random-thread-per-client")
                 .type(Integer.class)
                 .hasArg()
-                .desc("read thread per client, default " + ReadWriteOptions.DEFAULT_READ_THREAD_PER_CLIENT)
+                .desc("random read thread per client, default " + ReadWriteOptions.DEFAULT_READ_RANDOM_THREAD_PER_CLIENT)
                 .build());
-        options.addOption(Option.builder("w")
+        options.addOption(Option.builder("rtt")
+                .longOpt("read-tail-thread-per-client")
+                .type(Integer.class)
+                .hasArg()
+                .desc("tail read thread per client, default " + ReadWriteOptions.DEFAULT_READ_TAIL_THREAD_PER_CLIENT)
+                .build());
+        options.addOption(Option.builder("wrt")
                 .longOpt("write-thread-per-client")
                 .type(Integer.class)
                 .hasArg()
@@ -144,7 +155,8 @@ public class Main {
                     .bodySize(Integer.parseInt(cmd.getOptionValue("body-size", String.valueOf(ReadWriteOptions.DEFAULT_BODY_SIZE))))
                     .streamCount(Integer.parseInt(cmd.getOptionValue("stream-count", String.valueOf(ReadWriteOptions.DEFAULT_STREAM_COUNT))))
                     .clientCount(Integer.parseInt(cmd.getOptionValue("client-count", String.valueOf(ReadWriteOptions.DEFAULT_CLIENT_COUNT))))
-                    .readThreadPerClient(Integer.parseInt(cmd.getOptionValue("read-thread-per-client", String.valueOf(ReadWriteOptions.DEFAULT_READ_THREAD_PER_CLIENT))))
+                    .readRandomThreadPerClient(Integer.parseInt(cmd.getOptionValue("read-random-thread-per-client", String.valueOf(ReadWriteOptions.DEFAULT_READ_RANDOM_THREAD_PER_CLIENT))))
+                    .readTailThreadPerClient(Integer.parseInt(cmd.getOptionValue("read-tail-thread-per-client", String.valueOf(ReadWriteOptions.DEFAULT_READ_TAIL_THREAD_PER_CLIENT))))
                     .writeThreadPerClient(Integer.parseInt(cmd.getOptionValue("write-thread-per-client", String.valueOf(ReadWriteOptions.DEFAULT_WRITE_THREAD_PER_CLIENT))))
                     .warmupIterations(Integer.parseInt(cmd.getOptionValue("warmup-iterations", String.valueOf(ReadWriteOptions.DEFAULT_WARMUP_ITERATIONS))))
                     .warmupTimeSeconds(Integer.parseInt(cmd.getOptionValue("warmup-time", String.valueOf(ReadWriteOptions.DEFAULT_WARMUP_TIME_SECONDS))))
