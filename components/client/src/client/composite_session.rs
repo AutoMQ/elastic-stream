@@ -17,7 +17,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{
-    sync::oneshot,
+    sync::{broadcast, oneshot},
     time::{self, timeout},
 };
 use tokio_uring::net::TcpStream;
@@ -28,6 +28,7 @@ pub(crate) struct CompositeSession {
     lb_policy: LbPolicy,
     endpoints: RefCell<Vec<SocketAddr>>,
     sessions: Rc<RefCell<HashMap<SocketAddr, Session>>>,
+    shutdown: broadcast::Sender<()>,
     log: Logger,
     refresh_cluster_instant: RefCell<Instant>,
     heartbeat_instant: RefCell<Instant>,
@@ -38,6 +39,7 @@ impl CompositeSession {
         target: T,
         config: Arc<config::Configuration>,
         lb_policy: LbPolicy,
+        shutdown: broadcast::Sender<()>,
         log: Logger,
     ) -> Result<Self, ClientError>
     where
@@ -56,6 +58,7 @@ impl CompositeSession {
                 config.client_connect_timeout(),
                 &config,
                 &sessions,
+                shutdown.subscribe(),
                 &log,
             )
             .await;
@@ -78,6 +81,7 @@ impl CompositeSession {
             lb_policy,
             endpoints,
             sessions,
+            shutdown,
             log,
             refresh_cluster_instant: RefCell::new(Instant::now()),
             heartbeat_instant: RefCell::new(Instant::now()),
@@ -144,6 +148,7 @@ impl CompositeSession {
                             self.config.client_connect_timeout(),
                             &self.config,
                             &self.sessions,
+                            self.shutdown.subscribe(),
                             &self.log,
                         )
                     });
@@ -373,6 +378,7 @@ impl CompositeSession {
                         self.config.client_connect_timeout(),
                         &self.config,
                         &self.sessions,
+                        self.shutdown.subscribe(),
                         &self.log,
                     )
                     .await?;
@@ -437,6 +443,7 @@ impl CompositeSession {
                         self.config.client_connect_timeout(),
                         &self.config,
                         &self.sessions,
+                        self.shutdown.subscribe(),
                         &self.log,
                     )
                 })
@@ -467,6 +474,7 @@ impl CompositeSession {
         duration: Duration,
         config: &Arc<config::Configuration>,
         sessions: &Rc<RefCell<HashMap<SocketAddr, Session>>>,
+        shutdown: broadcast::Receiver<()>,
         log: &Logger,
     ) -> Result<Session, ClientError> {
         trace!(log, "Establishing connection to {:?}", addr);
@@ -504,6 +512,7 @@ impl CompositeSession {
             &endpoint,
             config,
             Rc::downgrade(sessions),
+            shutdown,
             log,
         ))
     }
@@ -511,6 +520,8 @@ impl CompositeSession {
 
 #[cfg(test)]
 mod tests {
+    use tokio::sync::broadcast;
+
     use super::CompositeSession;
     use crate::client::lb_policy::LbPolicy;
     use std::{error::Error, sync::Arc};
@@ -522,8 +533,15 @@ mod tests {
         tokio_uring::start(async {
             let port = test_util::run_listener(log.clone()).await;
             let target = format!("{}:{}", "localhost", port);
-            let _session =
-                CompositeSession::new(&target, config, LbPolicy::PickFirst, log.clone()).await?;
+            let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
+            let _session = CompositeSession::new(
+                &target,
+                config,
+                LbPolicy::PickFirst,
+                shutdown_tx,
+                log.clone(),
+            )
+            .await?;
 
             Ok(())
         })
@@ -538,8 +556,15 @@ mod tests {
         tokio_uring::start(async {
             let port = test_util::run_listener(log.clone()).await;
             let target = format!("{}:{}", "localhost", port);
-            let composite_session =
-                CompositeSession::new(&target, config, LbPolicy::PickFirst, log.clone()).await?;
+            let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+            let composite_session = CompositeSession::new(
+                &target,
+                config,
+                LbPolicy::PickFirst,
+                shutdown_tx,
+                log.clone(),
+            )
+            .await?;
             let nodes = composite_session
                 .describe_placement_manager_cluster()
                 .await

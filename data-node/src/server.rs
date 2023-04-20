@@ -104,7 +104,11 @@ pub fn launch(
                     };
 
                     let store = Rc::new(store);
-                    let client = Rc::new(client::Client::new(Arc::clone(&server_config), &logger));
+                    let client = Rc::new(client::Client::new(
+                        Arc::clone(&server_config),
+                        shutdown_tx.clone(),
+                        &logger,
+                    ));
 
                     let fetcher = Fetcher::Channel { sender: tx };
                     let stream_manager = Rc::new(RefCell::new(StreamManager::new(
@@ -137,7 +141,11 @@ pub fn launch(
                     primary: true,
                 };
 
-                let client = Rc::new(client::Client::new(Arc::clone(&server_config), &log));
+                let client = Rc::new(client::Client::new(
+                    Arc::clone(&server_config),
+                    shutdown_tx.clone(),
+                    &log,
+                ));
                 let fetcher = Fetcher::PlacementClient {
                     client: Rc::clone(&client),
                     target: worker_config.server_config.server.placement_manager.clone(),

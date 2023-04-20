@@ -2,7 +2,7 @@
 
 use slog::{error, trace, Logger};
 use std::{sync::Arc, time::Duration};
-use tokio::sync::oneshot;
+use tokio::sync::{broadcast, oneshot};
 
 use crate::{error::ClientError, Client};
 
@@ -32,7 +32,8 @@ impl IdGenerator for PlacementManagerIdGenerator {
         let (tx, rx) = oneshot::channel();
         tokio_uring::start(async {
             let config = Arc::new(config::Configuration::default());
-            let client = Client::new(config, &self.log);
+            let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+            let client = Client::new(config, shutdown_tx, &self.log);
 
             match client
                 .allocate_id(

@@ -17,7 +17,8 @@ use std::net::SocketAddr;
 use std::rc::Weak;
 use std::sync::Arc;
 use std::{cell::UnsafeCell, collections::HashMap, rc::Rc, time::Instant};
-use tokio::sync::oneshot;
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::{broadcast, oneshot};
 use tokio_uring::net::TcpStream;
 use transport::connection::Connection;
 
@@ -47,45 +48,67 @@ impl Session {
         inflight_requests: Rc<UnsafeCell<HashMap<u32, oneshot::Sender<response::Response>>>>,
         sessions: Weak<RefCell<HashMap<SocketAddr, Session>>>,
         target: SocketAddr,
+        mut shutdown: broadcast::Receiver<()>,
         log: Logger,
     ) {
         tokio_uring::spawn(async move {
             loop {
-                match connection.read_frame().await {
-                    Err(e) => {
-                        warn!(log, "Error reading frame from channel"; "error" => ?e);
-                        match e {
-                            FrameError::ConnectionReset => {
-                                error!(log, "Connection to {} reset by peer", target);
+                tokio::select! {
+                    stop = shutdown.recv() => {
+                        match stop {
+                            Ok(_) => {
+                                info!(log, "Received a shutdown signal. Stop session read loop");
+                            },
+                            Err(RecvError::Closed) => {
+                                // should NOT reach here.
+                                info!(log, "Shutdown broadcast channel is closed. Stop session read loop");
+                            },
+                            Err(RecvError::Lagged(_)) => {
+                                // should not reach here.
+                                info!(log, "Shutdown broadcast channel is lagged behind. Stop session read loop");
+                            }
+                        }
+                        break;
+                    },
+                    read = connection.read_frame() => {
+                        match read {
+                            Err(e) => {
+                                warn!(log, "Error reading frame from channel"; "error" => ?e);
+                                match e {
+                                    FrameError::ConnectionReset => {
+                                        error!(log, "Connection to {} reset by peer", target);
+                                        if let Some(sessions) = sessions.upgrade() {
+                                            let mut sessions = sessions.borrow_mut();
+                                            if let Some(_session) = sessions.remove(&target) {
+                                                warn!(log, "Closing session to {}", target);
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                                break;
+                            }
+                            Ok(Some(frame)) => {
+                                trace!(log, "Read a frame from channel");
+                                let inflight = unsafe { &mut *inflight_requests.get() };
+                                if frame.is_response() {
+                                    Session::handle_response(inflight, frame, &log);
+                                } else {
+                                    warn!(log, "Received an unexpected request frame");
+                                }
+                            }
+                            Ok(None) => {
+                                info!(log, "Connection to {} closed", target);
                                 if let Some(sessions) = sessions.upgrade() {
                                     let mut sessions = sessions.borrow_mut();
                                     if let Some(_session) = sessions.remove(&target) {
-                                        warn!(log, "Closing session to {}", target);
+                                        info!(log, "Closing session to {}", target);
                                     }
                                 }
+                                break;
                             }
-                            _ => {}
+
                         }
-                        break;
-                    }
-                    Ok(Some(frame)) => {
-                        trace!(log, "Read a frame from channel");
-                        let inflight = unsafe { &mut *inflight_requests.get() };
-                        if frame.is_response() {
-                            Session::handle_response(inflight, frame, &log);
-                        } else {
-                            warn!(log, "Received an unexpected request frame");
-                        }
-                    }
-                    Ok(None) => {
-                        info!(log, "Connection to {} closed", target);
-                        if let Some(sessions) = sessions.upgrade() {
-                            let mut sessions = sessions.borrow_mut();
-                            if let Some(_session) = sessions.remove(&target) {
-                                info!(log, "Closing session to {}", target);
-                            }
-                        }
-                        break;
                     }
                 }
 
@@ -110,6 +133,7 @@ impl Session {
         endpoint: &str,
         config: &Arc<config::Configuration>,
         sessions: Weak<RefCell<HashMap<SocketAddr, Session>>>,
+        shutdown: broadcast::Receiver<()>,
         log: &Logger,
     ) -> Self {
         let connection = Rc::new(Connection::new(stream, endpoint, log.clone()));
@@ -120,6 +144,7 @@ impl Session {
             Rc::clone(&inflight),
             sessions,
             target.clone(),
+            shutdown,
             log.clone(),
         );
 
@@ -584,12 +609,14 @@ mod tests {
             let stream = TcpStream::connect(target.parse()?).await?;
             let config = Arc::new(config::Configuration::default());
             let sessions = Rc::new(RefCell::new(HashMap::new()));
+            let (tx, _rx) = broadcast::channel(1);
             let _session = Session::new(
                 target.parse()?,
                 stream,
                 &target,
                 &config,
                 Rc::downgrade(&sessions),
+                _rx,
                 &logger,
             );
 

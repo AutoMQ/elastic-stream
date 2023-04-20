@@ -3,7 +3,7 @@ use crate::error::ClientError;
 use model::{range::StreamRange, range_criteria::RangeCriteria};
 use slog::{error, trace, warn, Logger};
 use std::{cell::UnsafeCell, rc::Rc, sync::Arc, time::Duration};
-use tokio::time;
+use tokio::{sync::broadcast, time};
 
 /// `Client` is used to send
 pub struct Client {
@@ -13,9 +13,12 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(config: Arc<config::Configuration>, log: &Logger) -> Self {
-        let (stop_tx, stop_rx) = async_channel::unbounded();
-        let session_manager = Rc::new(UnsafeCell::new(SessionManager::new(&config, stop_rx, log)));
+    pub fn new(
+        config: Arc<config::Configuration>,
+        shutdown: broadcast::Sender<()>,
+        log: &Logger,
+    ) -> Self {
+        let session_manager = Rc::new(UnsafeCell::new(SessionManager::new(&config, shutdown, log)));
 
         Self {
             session_manager,
@@ -104,6 +107,7 @@ mod tests {
     use slog::trace;
     use std::{error::Error, sync::Arc, time::Duration};
     use test_util::{run_listener, terminal_logger};
+    use tokio::sync::broadcast;
 
     use crate::{
         error::{ClientError, ListRangeError},
@@ -123,7 +127,8 @@ mod tests {
             config.server.port = 10911;
             config.check_and_apply().unwrap();
             let config = Arc::new(config);
-            let client = Client::new(Arc::clone(&config), &log);
+            let (tx, rx) = broadcast::channel(1);
+            let client = Client::new(Arc::clone(&config), tx, &log);
             client
                 .broadcast_heartbeat(&config.server.placement_manager)
                 .await
@@ -142,7 +147,8 @@ mod tests {
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             let config = Arc::new(config);
-            let client = Client::new(config, &log);
+            let (tx, rx) = broadcast::channel(1);
+            let client = Client::new(config, tx, &log);
             let timeout = Duration::from_secs(3);
             let id = client.allocate_id(&addr, "localhost", timeout).await?;
             assert_eq!(1, id);
@@ -164,7 +170,8 @@ mod tests {
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             let config = Arc::new(config);
-            let client = Client::new(config, &log);
+            let (tx, rx) = broadcast::channel(1);
+            let client = Client::new(config, tx, &log);
 
             let timeout = Duration::from_secs(10);
 
@@ -202,7 +209,8 @@ mod tests {
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             let config = Arc::new(config);
-            let client = Client::new(config, &log);
+            let (tx, rx) = broadcast::channel(1);
+            let client = Client::new(config, tx, &log);
 
             let timeout = Duration::from_secs(10);
 
