@@ -147,7 +147,7 @@ impl Frame {
             );
             return Err(FrameError::MagicCodeMismatch {
                 found: magic_code,
-                expect: MAGIC_CODE,
+                expected: MAGIC_CODE,
             });
         }
 
@@ -528,7 +528,7 @@ mod tests {
                 assert_eq!(
                     FrameError::MagicCodeMismatch {
                         found: 16u8,
-                        expect: MAGIC_CODE
+                        expected: MAGIC_CODE
                     },
                     e
                 );
