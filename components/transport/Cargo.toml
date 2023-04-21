@@ -12,4 +12,5 @@ slog = { workspace = true }
 tokio-uring = { workspace = true }
 
 [dev-dependencies]
+tokio = { workspace = true}
 cargo-llvm-cov = { workspace = true }

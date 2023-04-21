@@ -193,14 +193,30 @@ impl Connection {
             buffers = _buffers;
             match res {
                 Ok(mut n) => {
-                    if n >= remaining {
-                        trace!(
-                            self.logger,
-                            "Wrote {}/{} bytes to {}",
-                            n,
-                            total,
-                            self.peer_address
-                        );
+                    debug_assert!(n <= remaining, "Data written to socket buffer should be less than or equal to remaining bytes to write");
+                    if n == remaining {
+                        if remaining == total {
+                            // First time to write
+                            trace!(
+                                self.logger,
+                                "Wrote {}/{} bytes to {}",
+                                n,
+                                total,
+                                self.peer_address
+                            );    
+                        } else {
+                            // Last time of writing: the remaining are all written.
+                            remaining -= n;
+                            trace!(
+                                self.logger,
+                                "Wrote {}/{} bytes to {}. Overall, {}/{} is written.",
+                                n,
+                                total,
+                                self.peer_address,
+                                total - remaining,
+                                total
+                            );    
+                        }
                         break;
                     } else {
                         remaining -= n;
@@ -245,7 +261,7 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use std::{error::Error, sync::atomic::AtomicUsize};
 
     use bytes::{Buf, BufMut, BytesMut};
 
@@ -282,6 +298,19 @@ mod tests {
         assert_eq!(0, buf.len());
         assert_eq!(0, buf.remaining());
         assert_eq!(122, buf.spare_capacity_mut().len());
+    }
+
+    fn run_server(
+        counter: &AtomicUsize,
+        shutdown: tokio::sync::oneshot::Receiver<()>,
+    ) -> Result<(), Box<dyn Error>> {
+        std::thread::Builder::new().name("Test-Server")
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?;
+
+
+        Ok(())
     }
 
     #[test]

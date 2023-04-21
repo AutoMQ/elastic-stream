@@ -2870,6 +2870,7 @@ dependencies = [
  "cargo-llvm-cov",
  "codec",
  "slog",
+ "tokio",
  "tokio-uring",
 ]
 
