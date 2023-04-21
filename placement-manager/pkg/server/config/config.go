@@ -26,8 +26,8 @@ const (
 
 	_envPrefix = "PM"
 
-	_defaultPeerUrls                          = "http://127.0.0.1:2380"
-	_defaultClientUrls                        = "http://127.0.0.1:2379"
+	_defaultPeerUrls                          = "http://127.0.0.1:12380"
+	_defaultClientUrls                        = "http://127.0.0.1:12379"
 	_defaultEtcdLogLevel                      = "warn"
 	_defaultCompactionMode                    = "periodic"
 	_defaultAutoCompactionRetention           = "1h"
@@ -35,7 +35,7 @@ const (
 	_defaultDataDirFormat                     = "default.%s"
 	_defaultInitialClusterFormat              = "%s=%s"
 	_defaultInitialClusterToken               = "pm-cluster"
-	_defaultSbpAddr                           = "127.0.0.1:2378"
+	_defaultSbpAddr                           = "127.0.0.1:12378"
 	_defaultLeaderLease                 int64 = 3
 	_defaultLeaderPriorityCheckInterval       = time.Minute
 
@@ -150,8 +150,8 @@ func (c *Config) Adjust() error {
 		c.DataDir = fmt.Sprintf(_defaultDataDirFormat, c.Name)
 	}
 	if c.InitialCluster == "" {
-		// For example, when Name is set "my-pm" and AdvertisePeerUrls is set to "http://127.0.0.1:2380,http://127.0.0.1:2381",
-		// the InitialCluster is "my-pm=http://127.0.0.1:2380,my-pm=http://127.0.0.1:2381".
+		// For example, when Name is set "my-pm" and AdvertisePeerUrls is set to "http://127.0.0.1:12380,http://127.0.0.1:12381",
+		// the InitialCluster is "my-pm=http://127.0.0.1:12380,my-pm=http://127.0.0.1:12381".
 		urls := strings.Split(c.AdvertisePeerUrls, URLSeparator)
 		nodes := make([]string, 0, len(urls))
 		for _, u := range urls {
@@ -267,7 +267,7 @@ func configure(v *viper.Viper, fs *pflag.FlagSet) {
 	// PM members settings
 	fs.String("name", "", "human-readable name for this PM member (default 'pm-${hostname}')")
 	fs.String("data-dir", "", "path to the data directory (default 'default.${name}')")
-	fs.String("initial-cluster", "", "initial cluster configuration for bootstrapping, e.g. pm=http://127.0.0.1:2380. (default '${name}=${advertise-peer-urls}')")
+	fs.String("initial-cluster", "", "initial cluster configuration for bootstrapping, e.g. pm=http://127.0.0.1:12380. (default '${name}=${advertise-peer-urls}')")
 	fs.Int64("leader-lease", _defaultLeaderLease, "expiration time of the leader, in seconds")
 	fs.Duration("leader-priority-check-interval", _defaultLeaderPriorityCheckInterval, "time interval for checking the leader's priority")
 	fs.String("etcd-initial-cluster-token", _defaultInitialClusterToken, "set different tokens to prevent communication between PMs in different clusters")

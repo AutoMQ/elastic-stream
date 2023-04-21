@@ -6,9 +6,9 @@ spec:
   type: LoadBalancer
   ports:
     - name: pm-client
-      port: 2379
+      port: 12379
       protocol: TCP
-      targetPort: 2379
+      targetPort: 12379
   selector:
     app: placement-manager
 ---
@@ -22,9 +22,9 @@ metadata:
 spec:
   clusterIP: None
   ports:
-    - port: 2379
+    - port: 12379
       name: client
-    - port: 2380
+    - port: 12380
       name: peer
   selector:
     app: placement-manager
@@ -55,9 +55,9 @@ spec:
           image: 716469478206.dkr.ecr.ap-northeast-1.amazonaws.com/placement-manager:latest
           imagePullPolicy: "Always"
           ports:
-            - containerPort: 2379
+            - containerPort: 12379
               name: client
-            - containerPort: 2380
+            - containerPort: 12380
               name: peer
           volumeMounts:
             - name: pm-data
@@ -68,23 +68,23 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: PM_PEERURLS
-              value: "http://0.0.0.0:2380"
+              value: "http://0.0.0.0:12380"
             - name: PM_CLIENTURLS
-              value: "http://0.0.0.0:2379"
+              value: "http://0.0.0.0:12379"
             - name: PM_ADVERTISEPEERURLS
-              value: "http://$(NAME).pm:2380"
+              value: "http://$(NAME).pm:12380"
             - name: PM_ADVERTISECLIENTURLS
-              value: "http://$(NAME).pm:2379"
+              value: "http://$(NAME).pm:12379"
             - name: PM_NAME
               value: "$(NAME)"
             - name: PM_DATADIR
               value: "/data/placement-manager/default.$(NAME)"
             - name: PM_INITIALCLUSTER
-              value: "pm-0=http://pm-0.pm:2380,pm-1=http://pm-1.pm:2380,pm-2=http://pm-2.pm:2380"
+              value: "pm-0=http://pm-0.pm:12380,pm-1=http://pm-1.pm:12380,pm-2=http://pm-2.pm:12380"
             - name: PM_SBPADDR
-              value: "0.0.0.0:2378"
+              value: "0.0.0.0:12378"
             - name: PM_ADVERTISESBPADDR
-              value: "$(NAME).pm:2378"
+              value: "$(NAME).pm:12378"
             - name: PM_ETCD_INITIALCLUSTERTOKEN
               value: "pm-cluster"
   volumeClaimTemplates:

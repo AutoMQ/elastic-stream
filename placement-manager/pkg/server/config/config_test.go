@@ -51,15 +51,15 @@ var (
 			Log:                         _testDefaultLog(),
 			Cluster:                     _testDefaultCluster(),
 			Sbp:                         _testDefaultSbp(),
-			PeerUrls:                    "http://127.0.0.1:2380",
-			ClientUrls:                  "http://127.0.0.1:2379",
-			AdvertisePeerUrls:           "http://127.0.0.1:2380",
-			AdvertiseClientUrls:         "http://127.0.0.1:2379",
+			PeerUrls:                    "http://127.0.0.1:12380",
+			ClientUrls:                  "http://127.0.0.1:12379",
+			AdvertisePeerUrls:           "http://127.0.0.1:12380",
+			AdvertiseClientUrls:         "http://127.0.0.1:12379",
 			Name:                        "pm-hostname",
 			DataDir:                     "default.pm-hostname",
-			InitialCluster:              "pm=http://127.0.0.1:2380",
-			SbpAddr:                     "127.0.0.1:2378",
-			AdvertiseSbpAddr:            "127.0.0.1:2378",
+			InitialCluster:              "pm=http://127.0.0.1:12380",
+			SbpAddr:                     "127.0.0.1:12378",
+			AdvertiseSbpAddr:            "127.0.0.1:12378",
 			LeaderLease:                 3,
 			LeaderPriorityCheckInterval: time.Minute,
 		}
@@ -153,14 +153,14 @@ func TestNewConfig(t *testing.T) {
 				Log:                         _testDefaultLog(),
 				Cluster:                     _testDefaultCluster(),
 				Sbp:                         _testDefaultSbp(),
-				PeerUrls:                    "http://127.0.0.1:2380",
-				ClientUrls:                  "http://127.0.0.1:2379",
+				PeerUrls:                    "http://127.0.0.1:12380",
+				ClientUrls:                  "http://127.0.0.1:12379",
 				AdvertisePeerUrls:           "",
 				AdvertiseClientUrls:         "",
 				Name:                        "",
 				DataDir:                     "",
 				InitialCluster:              "",
-				SbpAddr:                     "127.0.0.1:2378",
+				SbpAddr:                     "127.0.0.1:12378",
 				AdvertiseSbpAddr:            "",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
@@ -394,11 +394,11 @@ func TestConfig_Adjust(t *testing.T) {
 					config := embed.NewConfig()
 					config.Name = fmt.Sprintf("pm-%s", hostname)
 					config.Dir = fmt.Sprintf("default.pm-%s", hostname)
-					config.InitialCluster = fmt.Sprintf("pm-%s=http://127.0.0.1:2380", hostname)
-					config.LPUrls, _ = parseUrls("http://127.0.0.1:2380")
-					config.LCUrls, _ = parseUrls("http://127.0.0.1:2379")
-					config.APUrls, _ = parseUrls("http://127.0.0.1:2380")
-					config.ACUrls, _ = parseUrls("http://127.0.0.1:2379")
+					config.InitialCluster = fmt.Sprintf("pm-%s=http://127.0.0.1:12380", hostname)
+					config.LPUrls, _ = parseUrls("http://127.0.0.1:12380")
+					config.LCUrls, _ = parseUrls("http://127.0.0.1:12379")
+					config.APUrls, _ = parseUrls("http://127.0.0.1:12380")
+					config.ACUrls, _ = parseUrls("http://127.0.0.1:12379")
 					config.InitialClusterToken = "pm-cluster"
 					config.LogLevel = "warn"
 					config.AutoCompactionMode = "periodic"
@@ -408,15 +408,15 @@ func TestConfig_Adjust(t *testing.T) {
 				Log:                         _testDefaultLog(),
 				Cluster:                     _testDefaultCluster(),
 				Sbp:                         _testDefaultSbp(),
-				PeerUrls:                    "http://127.0.0.1:2380",
-				ClientUrls:                  "http://127.0.0.1:2379",
-				AdvertisePeerUrls:           "http://127.0.0.1:2380",
-				AdvertiseClientUrls:         "http://127.0.0.1:2379",
+				PeerUrls:                    "http://127.0.0.1:12380",
+				ClientUrls:                  "http://127.0.0.1:12379",
+				AdvertisePeerUrls:           "http://127.0.0.1:12380",
+				AdvertiseClientUrls:         "http://127.0.0.1:12379",
 				Name:                        fmt.Sprintf("pm-%s", hostname),
 				DataDir:                     fmt.Sprintf("default.pm-%s", hostname),
-				InitialCluster:              fmt.Sprintf("pm-%s=http://127.0.0.1:2380", hostname),
-				SbpAddr:                     "127.0.0.1:2378",
-				AdvertiseSbpAddr:            "127.0.0.1:2378",
+				InitialCluster:              fmt.Sprintf("pm-%s=http://127.0.0.1:12380", hostname),
+				SbpAddr:                     "127.0.0.1:12378",
+				AdvertiseSbpAddr:            "127.0.0.1:12378",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
 			},
@@ -425,9 +425,9 @@ func TestConfig_Adjust(t *testing.T) {
 			name: "normal adjust config",
 			in: func() *Config {
 				config, _ := NewConfig([]string{}, io.Discard)
-				config.PeerUrls = "http://example.com:2380,http://10.0.0.1:2380"
-				config.ClientUrls = "http://example.com:2379,http://10.0.0.1:2379"
-				config.SbpAddr = "example.com:2378"
+				config.PeerUrls = "http://example.com:12380,http://10.0.0.1:12380"
+				config.ClientUrls = "http://example.com:12379,http://10.0.0.1:12379"
+				config.SbpAddr = "example.com:12378"
 				config.Name = "test-name"
 				return config
 			}(),
@@ -436,11 +436,11 @@ func TestConfig_Adjust(t *testing.T) {
 					config := embed.NewConfig()
 					config.Name = "test-name"
 					config.Dir = "default.test-name"
-					config.InitialCluster = "test-name=http://example.com:2380,test-name=http://10.0.0.1:2380"
-					config.LPUrls, _ = parseUrls("http://example.com:2380,http://10.0.0.1:2380")
-					config.LCUrls, _ = parseUrls("http://example.com:2379,http://10.0.0.1:2379")
-					config.APUrls, _ = parseUrls("http://example.com:2380,http://10.0.0.1:2380")
-					config.ACUrls, _ = parseUrls("http://example.com:2379,http://10.0.0.1:2379")
+					config.InitialCluster = "test-name=http://example.com:12380,test-name=http://10.0.0.1:12380"
+					config.LPUrls, _ = parseUrls("http://example.com:12380,http://10.0.0.1:12380")
+					config.LCUrls, _ = parseUrls("http://example.com:12379,http://10.0.0.1:12379")
+					config.APUrls, _ = parseUrls("http://example.com:12380,http://10.0.0.1:12380")
+					config.ACUrls, _ = parseUrls("http://example.com:12379,http://10.0.0.1:12379")
 					config.InitialClusterToken = "pm-cluster"
 					config.LogLevel = "warn"
 					config.AutoCompactionMode = "periodic"
@@ -450,15 +450,15 @@ func TestConfig_Adjust(t *testing.T) {
 				Log:                         _testDefaultLog(),
 				Cluster:                     _testDefaultCluster(),
 				Sbp:                         _testDefaultSbp(),
-				PeerUrls:                    "http://example.com:2380,http://10.0.0.1:2380",
-				ClientUrls:                  "http://example.com:2379,http://10.0.0.1:2379",
-				AdvertisePeerUrls:           "http://example.com:2380,http://10.0.0.1:2380",
-				AdvertiseClientUrls:         "http://example.com:2379,http://10.0.0.1:2379",
+				PeerUrls:                    "http://example.com:12380,http://10.0.0.1:12380",
+				ClientUrls:                  "http://example.com:12379,http://10.0.0.1:12379",
+				AdvertisePeerUrls:           "http://example.com:12380,http://10.0.0.1:12380",
+				AdvertiseClientUrls:         "http://example.com:12379,http://10.0.0.1:12379",
 				Name:                        "test-name",
 				DataDir:                     "default.test-name",
-				InitialCluster:              "test-name=http://example.com:2380,test-name=http://10.0.0.1:2380",
-				SbpAddr:                     "example.com:2378",
-				AdvertiseSbpAddr:            "example.com:2378",
+				InitialCluster:              "test-name=http://example.com:12380,test-name=http://10.0.0.1:12380",
+				SbpAddr:                     "example.com:12378",
+				AdvertiseSbpAddr:            "example.com:12378",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
 			},
@@ -467,7 +467,7 @@ func TestConfig_Adjust(t *testing.T) {
 			name: "invalid peer url",
 			in: func() *Config {
 				config, _ := NewConfig([]string{}, io.Discard)
-				config.PeerUrls = "http://example.com:2380,://10.0.0.1:2380"
+				config.PeerUrls = "http://example.com:12380,://10.0.0.1:12380"
 				return config
 			}(),
 			wantErr: true,
@@ -477,7 +477,7 @@ func TestConfig_Adjust(t *testing.T) {
 			name: "invalid client url",
 			in: func() *Config {
 				config, _ := NewConfig([]string{}, io.Discard)
-				config.ClientUrls = "http://example.com:2379,://10.0.0.1:2379"
+				config.ClientUrls = "http://example.com:12379,://10.0.0.1:12379"
 				return config
 			}(),
 			wantErr: true,
@@ -487,7 +487,7 @@ func TestConfig_Adjust(t *testing.T) {
 			name: "invalid advertise peer url",
 			in: func() *Config {
 				config, _ := NewConfig([]string{}, io.Discard)
-				config.AdvertisePeerUrls = "http://example.com:2380,://10.0.0.1:2380"
+				config.AdvertisePeerUrls = "http://example.com:12380,://10.0.0.1:12380"
 				return config
 			}(),
 			wantErr: true,
@@ -497,7 +497,7 @@ func TestConfig_Adjust(t *testing.T) {
 			name: "invalid advertise client url",
 			in: func() *Config {
 				config, _ := NewConfig([]string{}, io.Discard)
-				config.AdvertiseClientUrls = "http://example.com:2379,://10.0.0.1:2379"
+				config.AdvertiseClientUrls = "http://example.com:12379,://10.0.0.1:12379"
 				return config
 			}(),
 			wantErr: true,
@@ -655,11 +655,11 @@ func TestParseUrls(t *testing.T) {
 	}{
 		{
 			name: "normal case",
-			args: args{s: "http://localhost:2380,https://example.com,ftp://10.0.0.1:2380"},
+			args: args{s: "http://localhost:12380,https://example.com,ftp://10.0.0.1:12380"},
 			want: []url.URL{
 				{
 					Scheme: "http",
-					Host:   "localhost:2380",
+					Host:   "localhost:12380",
 				},
 				{
 					Scheme: "https",
@@ -667,13 +667,13 @@ func TestParseUrls(t *testing.T) {
 				},
 				{
 					Scheme: "ftp",
-					Host:   "10.0.0.1:2380",
+					Host:   "10.0.0.1:12380",
 				},
 			},
 		},
 		{
 			name:    "bad case",
-			args:    args{s: "://localhost:2380,https://example.com,ftp://10.0.0.1:2380"},
+			args:    args{s: "://localhost:12380,https://example.com,ftp://10.0.0.1:12380"},
 			wantErr: true,
 		},
 	}

@@ -1,24 +1,24 @@
 # PM Configuration.
 
 # urls for peer traffic
-peerUrls: http://127.0.0.1:2380
+peerUrls: http://127.0.0.1:12380
 # urls for client traffic
-clientUrls: http://127.0.0.1:2379
+clientUrls: http://127.0.0.1:12379
 # advertise urls for peer traffic
-advertisePeerUrls: http://127.0.0.1:2380
+advertisePeerUrls: http://127.0.0.1:12380
 # advertise urls for client traffic
-advertiseClientUrls: http://127.0.0.1:2379
+advertiseClientUrls: http://127.0.0.1:12379
 
 # human-readable name for this PM member
 name: pm-hostname
 # path to the data directory
 dataDir: default.pm-hostname
 # the initial cluster configuration for bootstrapping
-initialCluster: pm=http://127.0.0.1:2380
+initialCluster: pm=http://127.0.0.1:12380
 # the address of sbp server
-sbpAddr: 127.0.0.1:2378
+sbpAddr: 127.0.0.1:12378
 # advertise address of sbp server
-advertiseSbpAddr: 127.0.0.1:2378
+advertiseSbpAddr: 127.0.0.1:12378
 # expiration time of the leader, in seconds
 leaderLease: 3
 # time interval for checking the leader's priority
