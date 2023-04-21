@@ -1,4 +1,11 @@
-use std::{cell::RefCell, error::Error, net::SocketAddr, rc::Rc, sync::Arc, time::Duration};
+use std::{
+    cell::RefCell,
+    error::Error,
+    net::SocketAddr,
+    rc::Rc,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use client::Client;
 use slog::{debug, error, info, o, trace, warn, Logger};
@@ -192,6 +199,7 @@ impl Worker {
         connection_tracker.borrow_mut().go_away();
 
         // Await till all existing connections disconnect
+        let start = Instant::now();
         loop {
             let remaining = connection_tracker.borrow().len();
             if 0 == remaining {
@@ -200,9 +208,15 @@ impl Worker {
 
             info!(
                 logger,
-                "There are {} connections left. Sleep 1 second...", remaining
+                "There are {} connections left. Waited for {}/{} seconds",
+                remaining,
+                start.elapsed().as_secs(),
+                self.config.server_config.server_grace_period().as_secs()
             );
             tokio::time::sleep(Duration::from_secs(1)).await;
+            if Instant::now() >= start + self.config.server_config.server_grace_period() {
+                break;
+            }
         }
 
         info!(logger, "Node#run completed");

@@ -114,6 +114,9 @@ pub struct Server {
     #[serde(rename = "connection-idle-duration")]
     pub connection_idle_duration: u64,
 
+    #[serde(rename = "grace-period")]
+    pub grace_period: u64,
+
     pub profiling: Profiling,
 }
 
@@ -136,6 +139,7 @@ impl Default for Server {
             uring: Uring::default(),
             placement_manager: "127.0.0.1:2378".to_owned(),
             connection_idle_duration: 60,
+            grace_period: 120,
             profiling: Profiling::default(),
         }
     }
@@ -379,6 +383,10 @@ impl Configuration {
 
     pub fn client_refresh_placement_manager_cluster_interval(&self) -> Duration {
         Duration::from_millis(self.tick * self.client.refresh_pm_cluster_interval)
+    }
+
+    pub fn server_grace_period(&self) -> Duration {
+        Duration::from_millis(self.tick * self.server.grace_period)
     }
 }
 

@@ -29,9 +29,11 @@ server:
     # Network io_uring queue depth
     queue-depth: 128
   # Placement manager address
-  placement-manager: "192.168.123.128:2378"
+  placement-manager: "192.168.123.128:12378"
   # Connection idle duration in ticks
   connection-idle-duration: 60
+  # grace period in ticks, after this period of time, disconnect lingering client connections
+  grace-period: 120
   profiling:
     enable: true
     # profiler sampling frequency
