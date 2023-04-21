@@ -80,36 +80,54 @@ impl Session {
                     read = connection.read_frame() => {
                         match read {
                             Err(e) => {
-                                warn!(log, "Error reading frame from channel"; "error" => ?e);
                                 match e {
+                                    FrameError::Incomplete => {
+                                        // More data needed
+                                        continue;
+                                    }
                                     FrameError::ConnectionReset => {
                                         error!(log, "Connection to {} reset by peer", target);
-                                        if let Some(sessions) = sessions.upgrade() {
-                                            let mut sessions = sessions.borrow_mut();
-                                            if let Some(_session) = sessions.remove(&target) {
-                                                warn!(log, "Closing session to {}", target);
-                                            }
-                                        }
                                     }
-                                    _ => {}
+                                    FrameError::BadFrame(message) => {
+                                        error!(log, "Read a bad frame from target={}. Cause: {}", target, message);
+                                    }
+                                    FrameError::TooLongFrame{found, max} => {
+                                        error!(log, "Read a frame with excessive length={}, max={}, target={}", found, max, target);
+                                    }
+                                    FrameError::MagicCodeMismatch{found, expected} => {
+                                        error!(log, "Read a frame with incorrect magic code. Expected={}, actual={}, target={}", expected, found, target);
+                                    }
+                                    FrameError::TooLongFrameHeader{found, expected} => {
+                                        error!(log, "Read a frame with excessive header length={}, max={}, target={}", found, expected, target);
+                                    }
+                                    FrameError::PayloadChecksumMismatch{expected, actual} => {
+                                        error!(log, "Read a frame with incorrect payload checksum. Expected={}, actual={}, target={}", expected, actual, target);
+                                    }
+                                }
+                                // Close the session
+                                if let Some(sessions) = sessions.upgrade() {
+                                    let mut sessions = sessions.borrow_mut();
+                                    if let Some(_session) = sessions.remove(&target) {
+                                        warn!(log, "Closing session to {}", target);
+                                    }
                                 }
                                 break;
                             }
                             Ok(Some(frame)) => {
-                                trace!(log, "Read a frame from channel");
+                                trace!(log, "Read a frame from channel={}", target);
                                 let inflight = unsafe { &mut *inflight_requests.get() };
                                 if frame.is_response() {
                                     Session::handle_response(inflight, frame, &log);
                                 } else {
-                                    warn!(log, "Received an unexpected request frame");
+                                    warn!(log, "Received an unexpected request frame from target={}", target);
                                 }
                             }
                             Ok(None) => {
-                                info!(log, "Connection to {} closed", target);
+                                info!(log, "Connection to {} is closed", target);
                                 if let Some(sessions) = sessions.upgrade() {
                                     let mut sessions = sessions.borrow_mut();
                                     if let Some(_session) = sessions.remove(&target) {
-                                        info!(log, "Closing session to {}", target);
+                                        info!(log, "Remove session to {} from composite-session", target);
                                     }
                                 }
                                 break;

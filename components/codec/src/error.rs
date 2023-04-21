@@ -12,11 +12,11 @@ pub enum FrameError {
     #[error("Invalid frame length(max: {max:?}, found: {found:?})")]
     TooLongFrame { found: u32, max: u32 },
 
-    #[error("Frame magic code mismatch(expect: {expect:?}, found: {found:?})")]
-    MagicCodeMismatch { found: u8, expect: u8 },
+    #[error("Frame magic code mismatch(expect: {expected:?}, found: {found:?})")]
+    MagicCodeMismatch { found: u8, expected: u8 },
 
-    #[error("Invalid frame header length(expect: {expect:?}, found: {found:?})")]
-    TooLongFrameHeader { found: u32, expect: u32 },
+    #[error("Invalid frame header length(expect: {expected:?}, found: {found:?})")]
+    TooLongFrameHeader { found: u32, expected: u32 },
 
     #[error("Payload checksum mismatch detected(expect: {expected:?}, actual: {actual:?})")]
     PayloadChecksumMismatch { expected: u32, actual: u32 },

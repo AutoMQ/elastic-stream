@@ -32,7 +32,7 @@ impl IdGenerator for PlacementManagerIdGenerator {
         let (tx, rx) = oneshot::channel();
         tokio_uring::start(async {
             let config = Arc::new(config::Configuration::default());
-            let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+            let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
             let client = Client::new(config, shutdown_tx, &self.log);
 
             match client
