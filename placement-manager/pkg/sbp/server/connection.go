@@ -493,11 +493,19 @@ func (c *conn) runHandlerAndWrite(ctx context.Context, frameCtx *codec.DataFrame
 
 	header, err := resp.Marshal(frameCtx.HeaderFmt)
 	if err != nil {
+		logger.Error("failed to marshal response header", zap.Error(err))
+
+		resp := &protocol.SystemErrorResponse{}
 		resp.Error(&rpcfb.StatusT{
-			Code:    rpcfb.ErrorCodeBAD_REQUEST,
+			Code:    rpcfb.ErrorCodeENCODE,
 			Message: "failed to marshal response header",
 		})
-		logger.Error("failed to marshal response header", zap.Error(err))
+
+		header, err = resp.Marshal(frameCtx.HeaderFmt)
+		if err != nil {
+			logger.Error("failed to marshal system error response header", zap.Error(err))
+			return
+		}
 	}
 
 	errCh := errChanPool.Get().(chan error)
