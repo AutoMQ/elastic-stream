@@ -37,6 +37,8 @@ enum ErrorCode : int16 {
     RANGE_NOT_FOUND = 1462,
     // For a sealed range, the requested offset is out of range bounds. For an open range, the requested offset < start_offset.
     OFFSET_OUT_OF_RANGE_BOUNDS = 1463,
+    // The operation is not supported.
+    UNKNOWN_OPERATION = 1499,
 
     // 15xx is reserved for placement manager errors
     // In case placement manager encounters an internal error, normally, this implies 
