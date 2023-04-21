@@ -1,26 +1,32 @@
 use super::response;
 use super::session_state::SessionState;
-use codec::error::FrameError;
-use codec::frame::{Frame, OperationCode};
-use model::data_node::DataNode;
-use model::range::StreamRange;
-use model::request::Request;
-use model::PlacementManagerNode;
-use model::Status;
+use codec::{
+    error::FrameError,
+    frame::{Frame, OperationCode},
+};
+use model::{
+    data_node::DataNode, range::StreamRange, request::Request, PlacementManagerNode, Status,
+};
 use protocol::rpc::header::{
     DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse, IdAllocationResponse,
     ListRangesResponse, SystemErrorResponse,
 };
-use slog::{error, info, trace, warn, Logger};
-use std::cell::RefCell;
-use std::net::SocketAddr;
-use std::rc::Weak;
-use std::sync::Arc;
-use std::{cell::UnsafeCell, collections::HashMap, rc::Rc, time::Instant};
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::{broadcast, oneshot};
-use tokio_uring::net::TcpStream;
 use transport::connection::Connection;
+
+use slog::{error, info, trace, warn, Logger};
+use std::{
+    cell::{RefCell, UnsafeCell},
+    collections::HashMap,
+    net::SocketAddr,
+    rc::{Rc, Weak},
+    sync::Arc,
+    time::Instant,
+};
+use tokio::sync::{
+    broadcast::{self, error::RecvError},
+    oneshot,
+};
+use tokio_uring::net::TcpStream;
 
 pub(crate) struct Session {
     pub(crate) target: SocketAddr,
@@ -52,6 +58,7 @@ impl Session {
         log: Logger,
     ) {
         tokio_uring::spawn(async move {
+            trace!(log, "Start read loop for session[target={}]", target);
             loop {
                 tokio::select! {
                     stop = shutdown.recv() => {
@@ -124,6 +131,7 @@ impl Session {
                     tx.is_closed()
                 });
             }
+            trace!(log, "Read loop for session[target={}] completed", target);
         });
     }
 

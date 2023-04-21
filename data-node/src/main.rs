@@ -18,6 +18,7 @@ fn main() {
     let (shutdown_tx, _rx) = broadcast::channel(1);
     let tx = shutdown_tx.clone();
     ctrlc::set_handler(move || {
+        println!("Received shutdown signal");
         if let Err(_) = tx.send(()) {
             eprintln!("Could not send shutdown signal to shutdown channel");
         }
