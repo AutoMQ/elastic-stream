@@ -239,7 +239,7 @@ func (fr *Framer) ReadFrame() (frame Frame, free func(), err error) {
 	}
 
 	bFrame := baseFrame{
-		OpCode:    operation.NewOperation(opCode),
+		OpCode:    operation.Operation{Code: opCode},
 		Flag:      Flags(flag),
 		StreamID:  streamID,
 		HeaderFmt: format.NewFormat(headerFmt),
@@ -255,8 +255,6 @@ func (fr *Framer) ReadFrame() (frame Frame, free func(), err error) {
 		frame = &PingFrame{baseFrame: bFrame}
 	case operation.OpGoAway:
 		frame = &GoAwayFrame{baseFrame: bFrame}
-	case operation.OpUnknown:
-		frame = &bFrame
 	default:
 		frame = &DataFrame{baseFrame: bFrame}
 	}

@@ -1,8 +1,10 @@
 package operation
 
+import (
+	"fmt"
+)
+
 const (
-	// OpUnknown is an unknown operation
-	OpUnknown uint16 = 0x0000
 	// OpPing measure a minimal round-trip time from the sender.
 	OpPing uint16 = 0x0001
 	// OpGoAway initiate a shutdown of a connection or signal serious error conditions.
@@ -43,43 +45,9 @@ const (
 	OpDescribePMCluster uint16 = 0x4002
 )
 
-var (
-	_opMap = map[uint16]Operation{
-		OpPing:       {OpPing},
-		OpGoAway:     {OpGoAway},
-		OpHeartbeat:  {OpHeartbeat},
-		OpAllocateID: {OpAllocateID},
-
-		OpAppend: {OpAppend},
-		OpFetch:  {OpFetch},
-
-		OpListRanges:     {OpListRanges},
-		OpSealRanges:     {OpSealRanges},
-		OpSyncRanges:     {OpSyncRanges},
-		OpDescribeRanges: {OpDescribeRanges},
-
-		OpCreateStreams:   {OpCreateStreams},
-		OpDeleteStreams:   {OpDeleteStreams},
-		OpUpdateStreams:   {OpUpdateStreams},
-		OpDescribeStreams: {OpDescribeStreams},
-		OpTrimStreams:     {OpTrimStreams},
-
-		OpReportMetrics:     {OpReportMetrics},
-		OpDescribePMCluster: {OpDescribePMCluster},
-	}
-)
-
 // Operation is enumeration of Frame.OpCode
 type Operation struct {
 	Code uint16
-}
-
-// NewOperation new an operation with code
-func NewOperation(code uint16) Operation {
-	if op, ok := _opMap[code]; ok {
-		return op
-	}
-	return Operation{OpUnknown}
 }
 
 // IsControl returns whether o is a control operation
@@ -130,6 +98,6 @@ func (o Operation) String() string {
 	case OpDescribePMCluster:
 		return "DescribePMCluster"
 	default:
-		return "Unknown"
+		return fmt.Sprintf("Unknown(%#04x)", o.Code)
 	}
 }

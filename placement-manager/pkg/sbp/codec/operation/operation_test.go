@@ -162,18 +162,18 @@ func TestNewOperation(t *testing.T) {
 		},
 		{
 			name:   "Unknown",
-			fields: fields{code: OpUnknown},
+			fields: fields{code: 0},
 			wants: wants{
-				s:    "Unknown",
-				code: OpUnknown,
+				s:    "Unknown(0x0000)",
+				code: 0,
 			},
 		},
 		{
 			name:   "Unknown code",
 			fields: fields{code: 42},
 			wants: wants{
-				s:    "Unknown",
-				code: OpUnknown,
+				s:    "Unknown(0x002a)",
+				code: 42,
 			},
 		},
 	}
@@ -183,7 +183,7 @@ func TestNewOperation(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
 
-			o := NewOperation(tt.fields.code)
+			o := Operation{tt.fields.code}
 
 			re.Equal(tt.wants.s, o.String())
 			re.Equal(tt.wants.code, o.Code)
@@ -198,7 +198,7 @@ func TestIsControl(t *testing.T) {
 	for _, operation := range []Operation{{OpGoAway}} {
 		re.True(operation.IsControl())
 	}
-	for _, operation := range []Operation{{OpPing}, {OpHeartbeat}, {OpUnknown}} {
+	for _, operation := range []Operation{{OpPing}, {OpHeartbeat}, {0}} {
 		re.False(operation.IsControl())
 	}
 }
