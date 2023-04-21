@@ -172,8 +172,7 @@ impl Connection {
     }
 
     pub async fn write_frame(&self, frame: &Frame) -> Result<(), std::io::Error> {
-        let encode_result = frame.encode();
-        let encode_result = encode_result.map_err(|e| {
+        let mut buffers = frame.encode().map_err(|e| {
             // TODO: handle the encode error
             std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -181,32 +180,65 @@ impl Connection {
             )
         })?;
 
-        let bytes_to_write = encode_result.iter().map(|b| b.len()).sum::<usize>();
+        let total = buffers.iter().map(|b| b.len()).sum::<usize>();
         trace!(
             self.logger,
-            "{} bytes to write to: {}",
-            bytes_to_write,
+            "Get {} bytes to write to: {}",
+            total,
             self.peer_address
         );
+        let mut remaining = total;
+        loop {
+            let (res, _buffers) = self.stream.writev(buffers).await;
+            buffers = _buffers;
+            match res {
+                Ok(mut n) => {
+                    if n >= remaining {
+                        trace!(
+                            self.logger,
+                            "Wrote {}/{} bytes to {}",
+                            n,
+                            total,
+                            self.peer_address
+                        );
+                        break;
+                    } else {
+                        remaining -= n;
+                        trace!(
+                            self.logger,
+                            "Wrote {} bytes to {}. Overall, {}/{} is written",
+                            n,
+                            self.peer_address,
+                            total - remaining,
+                            total,
+                        );
+                        // Drain/advance buffers that are already written.
+                        buffers.drain_filter(|buffer| {
+                            if buffer.len() <= n {
+                                n -= buffer.len();
+                                // Remove it
+                                true
+                            } else {
+                                if n > 0 {
+                                    buffer.advance(n);
+                                    n = 0;
+                                }
+                                // Keep the buffer slice
+                                false
+                            }
+                        });
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        self.logger,
+                        "Failed to write Frame[stream-id={}]", frame.stream_id
+                    );
+                    return Err(e);
+                }
+            };
+        }
 
-        let (res, _buf) = self.stream.writev(encode_result).await;
-        match res {
-            Ok(_) => {
-                trace!(
-                    self.logger,
-                    "Wrote {} bytes to {}",
-                    bytes_to_write,
-                    self.peer_address
-                );
-            }
-            Err(e) => {
-                error!(
-                    self.logger,
-                    "Failed to write Frame[stream-id={}]", frame.stream_id
-                );
-                return Err(e);
-            }
-        };
         Ok(())
     }
 }
