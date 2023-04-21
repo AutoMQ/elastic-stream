@@ -245,6 +245,8 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use bytes::{Buf, BufMut, BytesMut};
 
     #[test]
@@ -280,5 +282,10 @@ mod tests {
         assert_eq!(0, buf.len());
         assert_eq!(0, buf.remaining());
         assert_eq!(122, buf.spare_capacity_mut().len());
+    }
+
+    #[test]
+    fn test_write_frame() -> Result<(), Box<dyn Error>> {
+        Ok(())
     }
 }
