@@ -203,7 +203,7 @@ impl Connection {
                                 n,
                                 total,
                                 self.peer_address
-                            );    
+                            );
                         } else {
                             // Last time of writing: the remaining are all written.
                             remaining -= n;
@@ -215,7 +215,7 @@ impl Connection {
                                 self.peer_address,
                                 total - remaining,
                                 total
-                            );    
+                            );
                         }
                         break;
                     } else {
@@ -261,9 +261,11 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, sync::atomic::AtomicUsize};
+    use std::{error::Error, thread::JoinHandle};
 
     use bytes::{Buf, BufMut, BytesMut};
+    use slog::{o, Drain};
+    use tokio::{io::AsyncReadExt, net::TcpListener};
 
     #[test]
     fn test_bytes_concept() {
@@ -301,20 +303,82 @@ mod tests {
     }
 
     fn run_server(
-        counter: &AtomicUsize,
-        shutdown: tokio::sync::oneshot::Receiver<()>,
-    ) -> Result<(), Box<dyn Error>> {
-        std::thread::Builder::new().name("Test-Server")
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()?;
+        counter: tokio::sync::oneshot::Sender<usize>,
+        port: tokio::sync::oneshot::Sender<u16>,
+    ) -> Result<JoinHandle<()>, Box<dyn Error>> {
+        let handle = std::thread::Builder::new()
+            .name("Test-Server".to_owned())
+            .spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap();
+                rt.block_on(async move {
+                    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                    let local_addr = listener.local_addr().unwrap();
+                    port.send(local_addr.port()).unwrap();
+                    let (mut stream, _addr) = listener.accept().await.unwrap();
+                    let mut read = 0;
+                    let mut buf = BytesMut::with_capacity(1024);
+                    loop {
+                        match stream.read_buf(&mut buf).await {
+                            Ok(n) => {
+                                if 0 == n {
+                                    break;
+                                }
+                                read += n;
+                                buf.clear();
+                            }
 
-
-        Ok(())
+                            Err(_e) => {
+                                break;
+                            }
+                        }
+                    }
+                    counter.send(read).unwrap();
+                });
+            })?;
+        Ok(handle)
     }
 
     #[test]
     fn test_write_frame() -> Result<(), Box<dyn Error>> {
+        let (counter_tx, counter_rx) = tokio::sync::oneshot::channel();
+        let (port_tx, port_rx) = tokio::sync::oneshot::channel();
+
+        let handle = run_server(counter_tx, port_tx).unwrap();
+
+        let port = port_rx.blocking_recv()?;
+
+        tokio_uring::start(async {
+            let address = format!("127.0.0.1:{}", port);
+            {
+                let tcp_stream = tokio_uring::net::TcpStream::connect(address.parse().unwrap())
+                    .await
+                    .unwrap();
+                tcp_stream.set_nodelay(true).unwrap();
+                let decorator = slog_term::TermDecorator::new().build();
+                let drain = slog_term::FullFormat::new(decorator).build().fuse();
+                let drain = slog_async::Async::new(drain).build().fuse();
+                let log = slog::Logger::root(drain, o!());
+                let connection = super::Connection::new(tcp_stream, &address, log);
+                let mut frame = codec::frame::Frame::new(codec::frame::OperationCode::AllocateId);
+                let mut payload = vec![];
+                (0..8).into_iter().for_each(|_| {
+                    let mut buf = BytesMut::with_capacity(1024 * 1024);
+                    buf.resize(1024 * 1024, 8u8);
+                    payload.push(buf.freeze());
+                });
+                frame.payload = Some(payload);
+                connection.write_frame(&frame).await.unwrap();
+            }
+
+            let total = counter_rx.await.unwrap();
+            assert_eq!(total, 1024 * 1024 * 8 + 20);
+        });
+
+        let _ = handle.join();
+
         Ok(())
     }
 }

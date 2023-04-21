@@ -12,5 +12,7 @@ slog = { workspace = true }
 tokio-uring = { workspace = true }
 
 [dev-dependencies]
+slog-async = { workspace = true }
+slog-term = { workspace = true }
 tokio = { workspace = true}
 cargo-llvm-cov = { workspace = true }
