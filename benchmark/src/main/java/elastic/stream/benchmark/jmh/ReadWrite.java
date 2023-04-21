@@ -142,7 +142,6 @@ public class ReadWrite {
         }
     }
 
-
     @Benchmark
     @Group("readWrite")
     public void readTail(BenchmarkState benchmarkState, ClientState clientState, ReadTailState readTailState) {

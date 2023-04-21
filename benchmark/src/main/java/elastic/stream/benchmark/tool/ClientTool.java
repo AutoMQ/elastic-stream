@@ -47,7 +47,7 @@ public class ClientTool {
             List<StreamT> streams = IntStream.range(i, toIndex).mapToObj(j -> {
                 StreamT streamT = new StreamT();
                 streamT.setStreamId(0L);
-                streamT.setReplicaNums((byte) 1);
+                streamT.setReplicaNum((byte) 1);
                 streamT.setRetentionPeriodMs(Duration.ofDays(3).toMillis());
                 return streamT;
             }).toList();
