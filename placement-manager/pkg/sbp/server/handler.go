@@ -99,7 +99,7 @@ var (
 		newReq:  func() protocol.InRequest { return &protocol.EmptyRequest{} },
 		newResp: func() protocol.OutResponse { return &protocol.SystemErrorResponse{} },
 		act: func(_ Handler, _ protocol.InRequest, resp protocol.OutResponse) {
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeNOT_FOUND, Message: "unknown operation"})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeUNKNOWN_OPERATION, Message: "unknown operation"})
 		},
 	}
 )

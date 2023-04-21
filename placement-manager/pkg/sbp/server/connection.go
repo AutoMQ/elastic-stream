@@ -16,6 +16,7 @@ import (
 
 	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/placement-manager/pkg/sbp/codec"
+	"github.com/AutoMQ/placement-manager/pkg/sbp/codec/format"
 	"github.com/AutoMQ/placement-manager/pkg/sbp/protocol"
 	"github.com/AutoMQ/placement-manager/pkg/util/logutil"
 	"github.com/AutoMQ/placement-manager/pkg/util/traceutil"
@@ -341,8 +342,8 @@ func (c *conn) processFrame(f codec.Frame) error {
 	case *codec.DataFrame:
 		return c.processDataFrame(f, st)
 	default:
-		logger.Warn("server ignoring unknown type frame", f.Info()...)
-		return nil
+		logger.Warn("server received unknown frame", f.Info()...)
+		return c.processUnknownFrame(f, st)
 	}
 }
 
@@ -392,6 +393,41 @@ func (c *conn) processDataFrame(f *codec.DataFrame, st *stream) error {
 		c.runHandlerAndWrite(ctx, f.Context(), st, act, resp)
 		cancel()
 	}()
+	return nil
+}
+
+func (c *conn) processUnknownFrame(f codec.Frame, st *stream) error {
+	logger := c.lg
+	c.serveG.Check()
+	if f.IsResponse() {
+		logger.Warn("server ignoring unknown response frame", f.Info()...)
+		return nil
+	}
+
+	resp := &protocol.SystemErrorResponse{}
+	resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeUNKNOWN_OPERATION, Message: "unknown operation"})
+
+	headerFmt := format.Default()
+	header, err := resp.Marshal(headerFmt)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal response")
+	}
+
+	outFrame := codec.NewDataFrameResp(&codec.DataFrameContext{
+		OpCode:    f.Base().OpCode,
+		HeaderFmt: headerFmt,
+		StreamID:  st.id,
+	}, header, nil, codec.FlagResponse, codec.FlagResponseEnd, codec.FlagSystemError)
+
+	c.writeFrame(frameWriteRequest{
+		f: outFrame,
+		free: func() {
+			mcache.Free(header)
+		},
+		stream:    st,
+		endStream: true,
+	})
+
 	return nil
 }
 
