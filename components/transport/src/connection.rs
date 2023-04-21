@@ -257,6 +257,10 @@ impl Connection {
 
         Ok(())
     }
+
+    pub fn close(&self) -> std::io::Result<()> {
+        self.stream.shutdown(std::net::Shutdown::Both)
+    }
 }
 
 #[cfg(test)]
