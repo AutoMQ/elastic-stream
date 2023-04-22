@@ -102,3 +102,49 @@ impl IdleHandler {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::RefCell, error::Error, net::SocketAddr, rc::Rc, sync::Arc};
+
+    use config::Configuration;
+    use tokio_uring::net::TcpStream;
+    use transport::connection::Connection;
+
+    use crate::connection_tracker::{self, ConnectionTracker};
+
+    #[test]
+    fn test_read_idle() -> Result<(), Box<dyn Error>> {
+        let mut config = Configuration::default();
+        config.server.connection_idle_duration = 1;
+        let log = test_util::terminal_logger();
+        let config = Arc::new(config);
+        tokio_uring::start(async {
+            let port = test_util::run_listener(log.clone()).await;
+            let target = format!("127.0.0.1:{}", port);
+            let addr = target.parse::<SocketAddr>().unwrap();
+            let stream = TcpStream::connect(addr.clone()).await.unwrap();
+            let connection = Rc::new(Connection::new(stream, &target, log.clone()));
+            let conn_tracker = Rc::new(RefCell::new(ConnectionTracker::new(log.clone())));
+            let handler = super::IdleHandler::new(
+                Rc::downgrade(&connection),
+                addr,
+                Arc::clone(&config),
+                conn_tracker,
+                log,
+            );
+            tokio::time::sleep(config.connection_idle_duration()).await;
+            assert!(handler.read_idle(), "Read should be idle");
+            assert!(handler.write_idle(), "Write should be idle");
+
+            handler.on_read();
+            assert_eq!(false, handler.read_idle(), "Read should NOT be idle");
+            assert!(handler.write_idle(), "Write should be idle");
+
+            handler.on_write();
+            assert_eq!(false, handler.write_idle(), "Read should NOT be idle");
+
+            Ok(())
+        })
+    }
+}
