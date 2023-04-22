@@ -955,17 +955,16 @@ impl IO {
                     }
 
                     // Remove write barrier
-                    if context.opcode == opcode::Write::CODE
+                    if (context.opcode == opcode::Write::CODE
                         || context.opcode == opcode::Writev::CODE
-                        || context.opcode == opcode::WriteFixed::CODE
+                        || context.opcode == opcode::WriteFixed::CODE)
+                        && self.barrier.borrow_mut().remove(&context.buf.wal_offset)
                     {
-                        if self.barrier.borrow_mut().remove(&context.buf.wal_offset) {
-                            trace!(
-                                self.log,
-                                "Remove the barrier with wal_offset={}",
-                                context.wal_offset
-                            );
-                        }
+                        trace!(
+                            self.log,
+                            "Remove the barrier with wal_offset={}",
+                            context.wal_offset
+                        );
                     }
 
                     if let Err(e) = on_complete(

@@ -338,7 +338,7 @@ impl Session {
             ranges: None,
         };
         if let Some(ref buf) = frame.header {
-            if let Ok(list_ranges) = flatbuffers::root::<ListRangesResponse>(&buf) {
+            if let Ok(list_ranges) = flatbuffers::root::<ListRangesResponse>(buf) {
                 let _ranges = list_ranges
                     .unpack()
                     .list_responses
@@ -538,15 +538,15 @@ impl Session {
         match inflight.remove(&stream_id) {
             Some(sender) => {
                 let response = match frame.operation_code {
-                    OperationCode::Heartbeat => Self::handle_heartbeat_response(&log, &frame),
-                    OperationCode::ListRanges => Self::handle_list_ranges_response(&log, &frame),
+                    OperationCode::Heartbeat => Self::handle_heartbeat_response(log, &frame),
+                    OperationCode::ListRanges => Self::handle_list_ranges_response(log, &frame),
                     OperationCode::Unknown => {
                         warn!(log, "Received an unknown operation code");
                         return;
                     }
                     OperationCode::Ping => todo!(),
                     OperationCode::GoAway => todo!(),
-                    OperationCode::AllocateId => Self::handle_allocate_id_response(&log, &frame),
+                    OperationCode::AllocateId => Self::handle_allocate_id_response(log, &frame),
                     OperationCode::Append => {
                         warn!(log, "Received an unexpected `Append` response");
                         return;
@@ -586,7 +586,7 @@ impl Session {
                     OperationCode::TrimStreams => todo!(),
                     OperationCode::ReportMetrics => todo!(),
                     OperationCode::DescribePlacementManager => {
-                        Self::handle_describe_placement_manager_response(&log, &frame)
+                        Self::handle_describe_placement_manager_response(log, &frame)
                     }
                 };
                 sender.send(response).unwrap_or_else(|response| {
@@ -635,14 +635,14 @@ mod tests {
             let stream = TcpStream::connect(target.parse()?).await?;
             let config = Arc::new(config::Configuration::default());
             let sessions = Rc::new(RefCell::new(HashMap::new()));
-            let (tx, _rx) = broadcast::channel(1);
+            let (_tx, rx) = broadcast::channel(1);
             let _session = Session::new(
                 target.parse()?,
                 stream,
                 &target,
                 &config,
                 Rc::downgrade(&sessions),
-                _rx,
+                rx,
                 &logger,
             );
 

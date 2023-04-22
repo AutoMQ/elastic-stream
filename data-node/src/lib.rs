@@ -10,6 +10,7 @@ pub(crate) mod stream_manager;
 mod worker;
 mod worker_config;
 pub use crate::cli::Cli;
+pub(crate) mod channel_handler;
 mod metrics;
 pub(crate) mod profiling;
 

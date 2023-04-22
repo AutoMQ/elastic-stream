@@ -374,7 +374,7 @@ impl CompositeSession {
                 );
                 if let Some(addr) = addrs.first() {
                     let session = Self::connect(
-                        addr.clone(),
+                        *addr,
                         self.config.client_connect_timeout(),
                         &self.config,
                         &self.sessions,

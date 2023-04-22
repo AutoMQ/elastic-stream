@@ -11,15 +11,13 @@ use client::Client;
 use config::Configuration;
 use slog::{debug, error, info, o, trace, warn, Logger};
 use store::ElasticStore;
-use tokio::{
-    sync::{broadcast, mpsc, watch::Ref},
-    time,
-};
+use tokio::sync::{broadcast, mpsc};
 use tokio_uring::net::{TcpListener, TcpStream};
 use transport::connection::Connection;
-use util::metrics::{dump, http_serve};
+use util::metrics::http_serve;
 
 use crate::{
+    channel_handler,
     connection_tracker::ConnectionTracker,
     handler::ServerCall,
     stream_manager::{fetcher::FetchRangeTask, StreamManager},
@@ -249,48 +247,18 @@ impl Worker {
             logger.new(o!()),
         ));
 
-        let read_write_since = Rc::new(RefCell::new(Instant::now()));
-
-        // TODO: Extract and define an idle handler
-        // Check and close idle connection
-        let idle_since = Rc::clone(&read_write_since);
-        let idle_channel = Rc::downgrade(&channel);
-        let idle = Rc::clone(&idle_since);
-        let idle_log = logger.clone();
-        let idle_conn_tracker = Rc::clone(&connection_tracker);
-        let idle_peer_address = peer_address.clone();
-        tokio_uring::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(10));
-            loop {
-                interval.tick().await;
-                match idle_channel.upgrade() {
-                    Some(channel) => {
-                        if idle.borrow().clone() + server_config.connection_idle_duration()
-                            < Instant::now()
-                        {
-                            idle_conn_tracker.borrow_mut().remove(&idle_peer_address);
-                            if let Ok(_) = channel.close() {
-                                info!(
-                                    idle_log,
-                                    "Close connection to {} since it has been idle for {}ms",
-                                    channel.peer_address(),
-                                    idle_since.borrow().elapsed().as_millis()
-                                );
-                            }
-                        }
-                    }
-                    None => {
-                        // If the connection were destructed, stop idle checking automatically.
-                        break;
-                    }
-                }
-            }
-        });
+        let idle_handler = channel_handler::idle::IdleHandler::new(
+            Rc::downgrade(&channel),
+            peer_address.clone(),
+            Arc::clone(&server_config),
+            Rc::clone(&connection_tracker),
+            logger.clone(),
+        );
 
         // Coroutine to read requests from network connection
         let request_logger = logger.clone();
         let _channel = Rc::clone(&channel);
-        let read_since = Rc::clone(&read_write_since);
+        let read_idle_handler = Rc::clone(&idle_handler);
         tokio_uring::spawn(async move {
             let channel = _channel;
             let logger = request_logger;
@@ -298,7 +266,7 @@ impl Worker {
                 match channel.read_frame().await {
                     Ok(Some(frame)) => {
                         // Update last read instant.
-                        *read_since.borrow_mut() = Instant::now();
+                        read_idle_handler.on_read();
                         let log = logger.clone();
                         let sender = tx.clone();
                         let store = Rc::clone(&store);
@@ -332,7 +300,6 @@ impl Worker {
         });
 
         // Coroutine to write responses to network connection
-        let write_since = Rc::clone(&read_write_since);
         tokio_uring::spawn(async move {
             let peer_address = channel.peer_address().to_owned();
             loop {
@@ -340,7 +307,7 @@ impl Worker {
                     Some(frame) => match channel.write_frame(&frame).await {
                         Ok(_) => {
                             // Update last write instant
-                            *write_since.borrow_mut() = Instant::now();
+                            idle_handler.on_write();
                             trace!(
                                 logger,
                                 "Response frame[stream-id={}, opcode={}] written to {}",
