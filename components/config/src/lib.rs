@@ -404,7 +404,7 @@ mod tests {
             .unwrap()
             .parent()
             .unwrap()
-            .join("etc/config.yaml");
+            .join("etc/data-node.yaml");
         let mut file = File::open(path.as_path())?;
         let mut content = String::new();
         file.read_to_string(&mut content)?;
