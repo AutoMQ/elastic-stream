@@ -25,6 +25,7 @@ type DataNode interface {
 }
 
 // Heartbeat updates DataNode's last active time, and save it to storage if its info changed.
+// It returns ErrNotLeader if the transaction failed.
 func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) error {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
@@ -33,7 +34,16 @@ func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) erro
 		LastActiveTime: time.Now(),
 	})
 	if updated {
-		logger.Info("data node updated", zap.Int32("node-id", node.NodeId), zap.String("advertise-addr", node.AdvertiseAddr))
+		logger.Info("data node updated, start to save it", zap.Int32("node-id", node.NodeId), zap.String("advertise-addr", node.AdvertiseAddr))
+		// FIXME: lock it when saving
+		_, err := c.storage.SaveDataNode(ctx, node)
+		logger.Info("finish saving data node", zap.Int32("node-id", node.NodeId), zap.Error(err))
+		if err != nil {
+			if errors.Is(err, kv.ErrTxnFailed) {
+				return ErrNotLeader
+			}
+			return err
+		}
 	}
 	return nil
 }

@@ -15,10 +15,8 @@ import (
 )
 
 const (
-	_rangeIDFormat    = _int32Format
-	_rangeIDLen       = _int32Len
-	_dataNodeIDFormat = _int32Format
-	_dataNodeIDLen    = _int32Len
+	_rangeIDFormat = _int32Format
+	_rangeIDLen    = _int32Len
 
 	// ranges in stream
 	_rangeStreamPath         = "range"

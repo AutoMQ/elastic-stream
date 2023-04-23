@@ -20,7 +20,13 @@ func (h *Handler) Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.Heart
 	if req.ClientRole == rpcfb.ClientRoleCLIENT_ROLE_DATA_NODE && req.DataNode != nil {
 		err := h.c.Heartbeat(ctx, req.DataNode)
 		if err != nil {
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			switch {
+			case errors.Is(err, cluster.ErrNotLeader):
+				// It's ok to ignore this error, as all pm nodes will receive this request.
+				break
+			default:
+				resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			}
 			return
 		}
 	}

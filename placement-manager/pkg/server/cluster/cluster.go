@@ -17,9 +17,12 @@ package cluster
 import (
 	"context"
 	"sync/atomic"
+	"time"
 
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
 	sbpClient "github.com/AutoMQ/placement-manager/pkg/sbp/client"
 	"github.com/AutoMQ/placement-manager/pkg/server/cluster/cache"
 	"github.com/AutoMQ/placement-manager/pkg/server/config"
@@ -103,7 +106,11 @@ func (c *RaftCluster) Start(s Server) error {
 	c.dnAlloc = s.IDAllocator(_dataNodeIDAllocKey, uint64(endpoint.MinDataNodeID), _dataNodeIDStep)
 	c.client = s.SbpClient()
 
-	c.cache.Reset()
+	err := c.loadInfo()
+	if err != nil {
+		logger.Error("load cluster info failed", zap.Error(err))
+		return errors.Wrap(err, "load cluster info")
+	}
 
 	// start other background goroutines
 
@@ -111,6 +118,29 @@ func (c *RaftCluster) Start(s Server) error {
 		logger.Warn("raft cluster is already running")
 		return nil
 	}
+	return nil
+}
+
+// loadInfo loads all info from storage into cache.
+func (c *RaftCluster) loadInfo() error {
+	logger := c.lg
+
+	c.cache.Reset()
+
+	// load data nodes
+	// TODO compare them with data nodes in cache
+	start := time.Now()
+	err := c.storage.ForEachDataNode(c.ctx, func(nodeT *rpcfb.DataNodeT) error {
+		_ = c.cache.SaveDataNode(&cache.DataNode{
+			DataNodeT: *nodeT,
+		})
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "load data nodes")
+	}
+	logger.Info("load data nodes", zap.Int("count", c.cache.DataNodeCount()), zap.Duration("cost", time.Since(start)))
+
 	return nil
 }
 
