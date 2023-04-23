@@ -517,10 +517,14 @@ impl Wal {
                 Err(e) => {
                     match e.kind() {
                         io::ErrorKind::Interrupted => {
-                            // The operation was interrupted by a delivery of a signal before it could complete;
-                            // see signal(7). Can happen while waiting for events with IORING_ENTER_GETEVENTS.
+                            // io_uring_enter just propagates underlying EINTR signal up to application, allowing to handle this signal.
+                            // For our usage, we just ignore this signal and retry.
                             //
-                            // See https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html
+                            // See https://www.spinics.net/lists/io-uring/msg01823.html
+                            // Lots of system calls return -EINTR if interrupted by a signal, don't
+                            // think there's anything worth fixing there. For the wait part, the
+                            // application may want to handle the signal before we can wait again.
+                            // We can't go to sleep with a pending signal.
                             warn!(self.log, "io_uring_enter got an error: {:?}", e);
                             continue;
                         }

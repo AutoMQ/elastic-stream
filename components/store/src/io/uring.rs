@@ -907,6 +907,14 @@ impl IO {
                 Err(e) => {
                     match e.kind() {
                         io::ErrorKind::Interrupted => {
+                            // io_uring_enter just propagates underlying EINTR signal up to application, allowing to handle this signal.
+                            // For our usage, we just ignore this signal and retry.
+                            //
+                            // See https://www.spinics.net/lists/io-uring/msg01823.html
+                            // Lots of system calls return -EINTR if interrupted by a signal, don't
+                            // think there's anything worth fixing there. For the wait part, the
+                            // application may want to handle the signal before we can wait again.
+                            // We can't go to sleep with a pending signal.
                             warn!(self.log, "io_uring_enter got an error: {:?}", e);
                             continue;
                         }
@@ -926,6 +934,7 @@ impl IO {
                         }
                         _ => {
                             // Fatal errors, crash the process and let watchdog to restart.
+                            error!(self.log, "io_uring_enter got an error: {:?}", e);
                             panic!("io_uring_enter returns error {:?}", e);
                         }
                     }
