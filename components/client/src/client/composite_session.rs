@@ -96,7 +96,7 @@ impl CompositeSession {
         }
 
         let now = Instant::now();
-        self.refresh_cluster_instant.borrow().clone()
+        *self.refresh_cluster_instant.borrow()
             + self
                 .config
                 .client_refresh_placement_manager_cluster_interval()
@@ -164,10 +164,8 @@ impl CompositeSession {
                                     self.target,
                                     session.target
                                 );
-                                self.endpoints.borrow_mut().push(session.target.clone());
-                                self.sessions
-                                    .borrow_mut()
-                                    .insert(session.target.clone(), session);
+                                self.endpoints.borrow_mut().push(session.target);
+                                self.sessions.borrow_mut().insert(session.target, session);
                             }
                             Err(e) => {
                                 error!(self.log, "Failed to connect. {:?}", e);
@@ -355,6 +353,7 @@ impl CompositeSession {
         let mut request_sent = false;
         'outer: loop {
             for addr in &addrs {
+                // TODO: RefCell is held across await, which should be avoided. Drop it before await.
                 if let Some(session) = self.sessions.borrow().get(addr) {
                     if let Err(tx_) = session.write(&request, tx).await {
                         tx = tx_;

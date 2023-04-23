@@ -1,6 +1,7 @@
 use std::{
     cmp,
     collections::{HashMap, VecDeque},
+    io,
     sync::Arc,
 };
 
@@ -503,19 +504,44 @@ impl Wal {
 
     pub(crate) fn await_control_task_completion(&self) {
         let now = std::time::Instant::now();
-        match self.control_ring.submit_and_wait(1) {
-            Ok(_) => {
-                info!(
-                    self.log,
-                    "Waiting {}us for control plane file system operation",
-                    now.elapsed().as_micros()
-                );
-            }
-            Err(e) => {
-                error!(self.log, "io_uring_enter got an error: {:?}", e);
+        loop {
+            match self.control_ring.submit_and_wait(1) {
+                Ok(_) => {
+                    info!(
+                        self.log,
+                        "Waiting {}us for control plane file system operation",
+                        now.elapsed().as_micros()
+                    );
+                    break;
+                }
+                Err(e) => {
+                    match e.kind() {
+                        io::ErrorKind::Interrupted => {
+                            // The operation was interrupted by a delivery of a signal before it could complete;
+                            // see signal(7). Can happen while waiting for events with IORING_ENTER_GETEVENTS.
+                            //
+                            // See https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html
+                            warn!(self.log, "io_uring_enter got an error: {:?}", e);
+                            continue;
+                        }
 
-                // Fatal errors, crash the process and let watchdog to restart.
-                panic!("io_uring_enter returns error {:?}", e);
+                        io::ErrorKind::ResourceBusy => {
+                            // If the IORING_FEAT_NODROP feature flag is set, then EBUSY will be returned
+                            // if there were overflow entries, IORING_ENTER_GETEVENTS flag is set and not all of
+                            // the overflow entries were able to be flushed to the CQ ring.
+                            //
+                            // See https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html
+                            warn!(self.log, "io_uring_enter got an error: {:?}", e);
+                            continue;
+                        }
+
+                        _ => {
+                            error!(self.log, "io_uring_enter got an error: {:?}", e);
+                            // Fatal errors, crash the process and let watchdog to restart.
+                            panic!("io_uring_enter returns error {:?}", e);
+                        }
+                    }
+                }
             }
         }
     }

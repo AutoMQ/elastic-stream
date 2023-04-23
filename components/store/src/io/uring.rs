@@ -894,19 +894,42 @@ impl IO {
         }
 
         let now = std::time::Instant::now();
-        match self.data_ring.submit_and_wait(wanted) {
-            Ok(_reaped) => {
-                trace!(
-                    self.log,
-                    "io_uring_enter waited {}us to reap completed data CQE(s)",
-                    now.elapsed().as_micros()
-                );
-            }
-            Err(e) => {
-                error!(self.log, "io_uring_enter got an error: {:?}", e);
-
-                // Fatal errors, crash the process and let watchdog to restart.
-                panic!("io_uring_enter returns error {:?}", e);
+        loop {
+            match self.data_ring.submit_and_wait(wanted) {
+                Ok(_reaped) => {
+                    trace!(
+                        self.log,
+                        "io_uring_enter waited {}us to reap completed data CQE(s)",
+                        now.elapsed().as_micros()
+                    );
+                    break;
+                }
+                Err(e) => {
+                    match e.kind() {
+                        io::ErrorKind::Interrupted => {
+                            warn!(self.log, "io_uring_enter got an error: {:?}", e);
+                            continue;
+                        }
+                        io::ErrorKind::WouldBlock => {
+                            // The kernel was unable to allocate memory for the request, or otherwise ran out of resources to handle it.
+                            // The application should wait for some completions and try again.
+                            warn!(self.log, "io_uring_enter got an error: {:?}", e);
+                            continue;
+                        }
+                        io::ErrorKind::ResourceBusy => {
+                            // If the IORING_FEAT_NODROP feature flag is set, then EBUSY will be returned if there were overflow entries,
+                            // IORING_ENTER_GETEVENTS flag is set and not all of the overflow entries were able to be flushed to the CQ ring.
+                            // Without IORING_FEAT_NODROP the application is attempting to overcommit the number of requests it can have pending.
+                            // The application should wait for some completions and try again. May occur if the application tries to queue more
+                            // requests than we have room for in the CQ ring, or if the application attempts to wait for more events without
+                            // having reaped the ones already present in the CQ ring.
+                        }
+                        _ => {
+                            // Fatal errors, crash the process and let watchdog to restart.
+                            panic!("io_uring_enter returns error {:?}", e);
+                        }
+                    }
+                }
             }
         }
     }

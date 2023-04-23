@@ -22,6 +22,7 @@
 #![feature(async_fn_in_trait)]
 #![feature(result_flattening)]
 #![feature(iterator_try_collect)]
+#![feature(io_error_more)]
 
 pub mod error;
 pub mod util;
