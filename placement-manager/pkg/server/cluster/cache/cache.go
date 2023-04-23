@@ -57,13 +57,15 @@ type DataNode struct {
 }
 
 // SaveDataNode saves a data node to the cache.
-// It returns true if the data node is updated.
-func (c *Cache) SaveDataNode(node *DataNode) (updated bool) {
+// It returns true if the data node is new or its info is updated.
+// If its info is updated, the old value is returned.
+func (c *Cache) SaveDataNode(node *DataNode) (updated bool, old rpcfb.DataNodeT) {
 	_ = c.dataNodes.Upsert(node.NodeId, node, func(exist bool, valueInMap, newValue *DataNode) *DataNode {
 		if exist {
 			if !isDataNodeEqual(valueInMap.DataNodeT, newValue.DataNodeT) {
 				updated = true
 				valueInMap.DataNodeT = newValue.DataNodeT
+				old = valueInMap.DataNodeT
 			}
 			valueInMap.LastActiveTime = newValue.LastActiveTime
 			return valueInMap
@@ -71,7 +73,7 @@ func (c *Cache) SaveDataNode(node *DataNode) (updated bool) {
 		updated = true
 		return newValue
 	})
-	return updated
+	return
 }
 
 // DataNode returns the data node by node ID.

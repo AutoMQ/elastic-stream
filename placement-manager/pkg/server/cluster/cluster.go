@@ -128,12 +128,14 @@ func (c *RaftCluster) loadInfo() error {
 	c.cache.Reset()
 
 	// load data nodes
-	// TODO compare them with data nodes in cache
 	start := time.Now()
 	err := c.storage.ForEachDataNode(c.ctx, func(nodeT *rpcfb.DataNodeT) error {
-		_ = c.cache.SaveDataNode(&cache.DataNode{
+		updated, old := c.cache.SaveDataNode(&cache.DataNode{
 			DataNodeT: *nodeT,
 		})
+		if updated {
+			logger.Warn("different data node in storage and cache", zap.Any("node-in-storage", nodeT), zap.Any("node-in-cache", old))
+		}
 		return nil
 	})
 	if err != nil {

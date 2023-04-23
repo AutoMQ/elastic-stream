@@ -29,12 +29,12 @@ type DataNode interface {
 func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) error {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
-	updated := c.cache.SaveDataNode(&cache.DataNode{
+	updated, old := c.cache.SaveDataNode(&cache.DataNode{
 		DataNodeT:      *node,
 		LastActiveTime: time.Now(),
 	})
 	if updated {
-		logger.Info("data node updated, start to save it", zap.Int32("node-id", node.NodeId), zap.String("advertise-addr", node.AdvertiseAddr))
+		logger.Info("data node updated, start to save it", zap.Any("new", node), zap.Any("old", old))
 		// FIXME: lock it when saving
 		_, err := c.storage.SaveDataNode(ctx, node)
 		logger.Info("finish saving data node", zap.Int32("node-id", node.NodeId), zap.Error(err))
