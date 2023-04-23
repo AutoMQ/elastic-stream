@@ -10,9 +10,10 @@ pub(crate) mod stream_manager;
 mod worker;
 mod worker_config;
 pub use crate::cli::Cli;
-pub(crate) mod channel_handler;
+pub(crate) mod connection_handler;
 mod metrics;
 pub(crate) mod profiling;
+pub(crate) mod session;
 
 #[cfg(test)]
 mod tests {
