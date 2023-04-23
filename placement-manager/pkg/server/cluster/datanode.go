@@ -33,9 +33,8 @@ func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) erro
 		DataNodeT:      *node,
 		LastActiveTime: time.Now(),
 	})
-	if updated {
+	if updated && c.IsLeader() {
 		logger.Info("data node updated, start to save it", zap.Any("new", node), zap.Any("old", old))
-		// FIXME: lock it when saving
 		_, err := c.storage.SaveDataNode(ctx, node)
 		logger.Info("finish saving data node", zap.Int32("node-id", node.NodeId), zap.Error(err))
 		if err != nil {
