@@ -169,7 +169,7 @@ impl Session {
             Rc::clone(&connection),
             Rc::clone(&inflight),
             sessions,
-            target.clone(),
+            target,
             shutdown,
             log.clone(),
         );
@@ -312,7 +312,7 @@ impl Session {
             status: Status::ok(),
         };
         if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<HeartbeatResponse>(&buf) {
+            match flatbuffers::root::<HeartbeatResponse>(buf) {
                 Ok(heartbeat) => {
                     trace!(log, "Received Heartbeat response: {:?}", heartbeat);
                     let hb = heartbeat.unpack();
@@ -437,15 +437,13 @@ impl Session {
                             *id = response.id;
                             *status = Status::ok();
                         }
-                    } else {
-                        if let response::Response::AllocateId {
-                            ref mut id,
-                            ref mut status,
-                        } = resp
-                        {
-                            *id = response.id;
-                            *status = response.status.as_ref().into();
-                        }
+                    } else if let response::Response::AllocateId {
+                        ref mut id,
+                        ref mut status,
+                    } = resp
+                    {
+                        *id = response.id;
+                        *status = response.status.as_ref().into();
                     }
                 }
                 Err(e) => {

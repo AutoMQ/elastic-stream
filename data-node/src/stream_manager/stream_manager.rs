@@ -217,26 +217,6 @@ impl StreamManager {
         Ok(())
     }
 
-    async fn ensure_mutable(&mut self, stream_id: i64) -> Result<(), ServiceError> {
-        if let Some(stream) = self.streams.get_mut(&stream_id) {
-            if stream.is_mut() {
-                return Ok(());
-            }
-        }
-
-        let ranges = self.fetcher.fetch(stream_id, &self.log).await?;
-        if let Some(range) = ranges.last() {
-            if range.is_sealed() {
-                return Err(ServiceError::AlreadySealed);
-            }
-        }
-        if let Some(stream) = self.streams.get_mut(&stream_id) {
-            stream.refresh(ranges);
-        }
-
-        Ok(())
-    }
-
     pub(crate) fn alloc_record_batch_slots(
         &mut self,
         range: protocol::rpc::header::Range,

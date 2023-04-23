@@ -959,6 +959,7 @@ impl IO {
                     break;
                 }
 
+                #[allow(clippy::while_let_on_iterator)]
                 while let Some(cqe) = completion.next() {
                     count += 1;
                     let tag = cqe.user_data();
@@ -1079,7 +1080,7 @@ impl IO {
                                             )
                                             .offset(file_offset as libc::off_t)
                                             .build()
-                                            .user_data(context.as_ptr() as u64);
+                                            .user_data(Box::into_raw(context) as u64);
 
                                             self.resubmit_sqes.push_back(sqe);
                                         }
@@ -1091,7 +1092,7 @@ impl IO {
                                             )
                                             .offset64(file_offset as libc::off_t)
                                             .build()
-                                            .user_data(context.as_ptr() as u64);
+                                            .user_data(Box::into_raw(context) as u64);
 
                                             self.resubmit_sqes.push_back(sqe);
                                         }
@@ -1952,8 +1953,6 @@ mod tests {
 
     #[test]
     fn test_multiple_run_with_random_bytes() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-
         let (handle, sender) = create_and_run_io(create_small_io)?;
 
         let mut records: Vec<_> = vec![];
@@ -1983,9 +1982,7 @@ mod tests {
 
     #[test]
     fn test_run_with_random_bytes() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let (handle, sender) = create_and_run_io(create_small_io)?;
-
         let mut records: Vec<_> = vec![];
         let count = 1000;
         (0..count).into_iter().for_each(|_| {

@@ -60,7 +60,7 @@ mod tests {
     #[test]
     fn test_new() -> Result<(), Box<dyn Error>> {
         let log = test_util::terminal_logger();
-        let session_manager = SessionManager::new(log)?;
+        let _session_manager = SessionManager::new(log)?;
         Ok(())
     }
 }

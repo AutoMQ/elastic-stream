@@ -111,7 +111,7 @@ mod tests {
     use tokio_uring::net::TcpStream;
     use transport::connection::Connection;
 
-    use crate::connection_tracker::{self, ConnectionTracker};
+    use crate::connection_tracker::ConnectionTracker;
 
     #[test]
     fn test_read_idle() -> Result<(), Box<dyn Error>> {

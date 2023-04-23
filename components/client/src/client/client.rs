@@ -127,7 +127,7 @@ mod tests {
             config.server.port = 10911;
             config.check_and_apply().unwrap();
             let config = Arc::new(config);
-            let (tx, rx) = broadcast::channel(1);
+            let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx, &log);
             client
                 .broadcast_heartbeat(&config.server.placement_manager)
@@ -147,7 +147,7 @@ mod tests {
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             let config = Arc::new(config);
-            let (tx, rx) = broadcast::channel(1);
+            let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx, &log);
             let timeout = Duration::from_secs(3);
             let id = client.allocate_id(&addr, "localhost", timeout).await?;
@@ -170,7 +170,7 @@ mod tests {
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             let config = Arc::new(config);
-            let (tx, rx) = broadcast::channel(1);
+            let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx, &log);
 
             let timeout = Duration::from_secs(10);
@@ -209,7 +209,7 @@ mod tests {
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             let config = Arc::new(config);
-            let (tx, rx) = broadcast::channel(1);
+            let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx, &log);
 
             let timeout = Duration::from_secs(10);

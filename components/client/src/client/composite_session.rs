@@ -381,7 +381,7 @@ impl CompositeSession {
                         &self.log,
                     )
                     .await?;
-                    self.sessions.borrow_mut().insert(addr.clone(), session);
+                    self.sessions.borrow_mut().insert(*addr, session);
                 } else {
                     break;
                 }
@@ -438,7 +438,7 @@ impl CompositeSession {
                 .filter(|target| !self.sessions.borrow().contains_key(target))
                 .map(|target| {
                     Self::connect(
-                        target.clone(),
+                        *target,
                         self.config.client_connect_timeout(),
                         &self.config,
                         &self.sessions,
@@ -458,7 +458,7 @@ impl CompositeSession {
                 .into_iter()
                 .for_each(|res| match res {
                     Ok(session) => {
-                        let target = session.target.clone();
+                        let target = session.target;
                         self.sessions.borrow_mut().insert(target, session);
                     }
                     Err(e) => {
@@ -555,7 +555,7 @@ mod tests {
         tokio_uring::start(async {
             let port = test_util::run_listener(log.clone()).await;
             let target = format!("{}:{}", "localhost", port);
-            let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+            let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
             let composite_session = CompositeSession::new(
                 &target,
                 config,

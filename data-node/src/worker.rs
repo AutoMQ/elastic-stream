@@ -7,17 +7,14 @@ use std::{
 };
 
 use client::Client;
-use slog::{debug, error, info, o, trace, warn, Logger};
+use slog::{debug, error, info, warn, Logger};
 use store::ElasticStore;
 use tokio::sync::{broadcast, mpsc};
-use tokio_uring::net::{TcpListener, TcpStream};
-use transport::connection::Connection;
+use tokio_uring::net::{TcpListener};
 use util::metrics::http_serve;
 
 use crate::{
-    connection_handler,
     connection_tracker::ConnectionTracker,
-    handler::ServerCall,
     stream_manager::{fetcher::FetchRangeTask, StreamManager},
     worker_config::WorkerConfig,
 };

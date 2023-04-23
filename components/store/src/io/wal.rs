@@ -559,7 +559,7 @@ impl Wal {
                 if cq.is_empty() {
                     break;
                 }
-
+                #[allow(clippy::while_let_on_iterator)]
                 while let Some(cqe) = cq.next() {
                     m.insert(cqe.user_data(), cqe.result());
                 }

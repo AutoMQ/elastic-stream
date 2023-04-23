@@ -54,6 +54,7 @@ impl Session {
                 self.config,
                 self.log,
             )
+            .await;
         });
     }
 

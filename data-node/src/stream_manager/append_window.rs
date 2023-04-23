@@ -29,13 +29,6 @@ impl AppendWindow {
         }
     }
 
-    pub(crate) fn alloc_slot(&mut self) -> u64 {
-        let offset = self.next;
-        self.inflight.push(Reverse(offset));
-        self.next += 1;
-        offset
-    }
-
     pub(crate) fn alloc_batch_slots(&mut self, batch_size: usize) -> u64 {
         let offset = self.next;
         for i in 0..batch_size {
@@ -75,11 +68,11 @@ mod tests {
     use std::error::Error;
 
     #[test]
-    fn test_alloc_slot() -> Result<(), Box<dyn Error>> {
+    fn test_alloc_batch_slots() -> Result<(), Box<dyn Error>> {
         let mut window = AppendWindow::new(0, 0);
         const TOTAL: u64 = 16;
         for i in 0..TOTAL {
-            let slot = window.alloc_slot();
+            let slot = window.alloc_batch_slots(1);
             assert_eq!(i, slot);
         }
 
@@ -93,7 +86,7 @@ mod tests {
         let mut window = AppendWindow::new(0, 0);
         const TOTAL: u64 = 16;
         for i in 0..TOTAL {
-            let slot = window.alloc_slot();
+            let slot = window.alloc_batch_slots(1);
             assert_eq!(i, slot);
         }
 
@@ -112,7 +105,7 @@ mod tests {
         let mut window = AppendWindow::new(0, 0);
         const TOTAL: u64 = 16;
         for i in 0..TOTAL {
-            let slot = window.alloc_slot();
+            let slot = window.alloc_batch_slots(1);
             assert_eq!(i, slot);
         }
 

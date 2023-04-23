@@ -18,10 +18,7 @@ use slog::{error, info, trace, warn, Logger};
 use tokio::{net::TcpStream, sync::oneshot};
 
 use crate::{
-    channel_reader::ChannelReader,
-    channel_writer::ChannelWriter,
-    client_error::ClientError,
-    node::{Node, Role},
+    channel_reader::ChannelReader, channel_writer::ChannelWriter, client_error::ClientError,
 };
 
 lazy_static::lazy_static! {

@@ -53,11 +53,6 @@ impl Context {
         self.buf.partial() || self.len < self.buf.limit() as u32
     }
 
-    /// Converts to a raw pointer.
-    pub(crate) fn as_ptr(self) -> *mut Self {
-        Box::into_raw(Box::new(self))
-    }
-
     /// Create read context
     pub(crate) fn read_ctx(
         opcode: u8,

@@ -418,7 +418,7 @@ impl AsRawFd for ElasticStore {
 mod tests {
     use std::{error::Error, path::Path};
 
-    use bytes::{BufMut, Bytes, BytesMut};
+    use bytes::{Bytes, BytesMut};
     use futures::future::join_all;
     use slog::trace;
     use tokio::sync::oneshot;
@@ -427,8 +427,8 @@ mod tests {
         error::{AppendError, FetchError},
         io::task::SingleFetchResult,
         option::{ReadOptions, WriteOptions},
-        store::{self, append_result::AppendResult, fetch_result::FetchResult},
-        AppendRecordRequest, ElasticStore, Store, RECORD_PREFIX_LENGTH,
+        store::{append_result::AppendResult, fetch_result::FetchResult},
+        AppendRecordRequest, ElasticStore, Store,
     };
 
     fn build_store(pm_address: &str, store_path: &str) -> ElasticStore {
