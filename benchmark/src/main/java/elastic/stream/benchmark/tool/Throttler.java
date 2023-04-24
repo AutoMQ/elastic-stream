@@ -19,7 +19,7 @@ public class Throttler {
 
     private long tickets = 0;
     private long toSleepNs = 0;
-    private boolean wakeUp = false;
+    private boolean stopped = false;
 
     /**
      * @param ticketPerSecond ticket per second.
@@ -40,7 +40,7 @@ public class Throttler {
      * Stop to throttle, wake up all threads.
      */
     public void stop() {
-        wakeUp = true;
+        stopped = true;
         synchronized (mutex) {
             mutex.notifyAll();
         }
@@ -63,12 +63,11 @@ public class Throttler {
             try {
                 long remainingNs = toSleepNs;
                 synchronized (mutex) {
-                    while (!wakeUp && remainingNs > 0) {
+                    while (!stopped && remainingNs > 0) {
                         TimeUnit.NANOSECONDS.timedWait(mutex, remainingNs);
                         remainingNs = toSleepNs - (System.nanoTime() - sleepStartNs);
                     }
                 }
-                wakeUp = false;
                 toSleepNs = 0;
             } catch (InterruptedException e) {
                 long elapsedNs = System.nanoTime() - sleepStartNs;

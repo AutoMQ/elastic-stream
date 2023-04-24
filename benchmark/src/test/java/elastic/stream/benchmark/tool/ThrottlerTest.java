@@ -55,6 +55,8 @@ class ThrottlerTest {
     @Test
     void testStop() {
         Throttler throttler = new Throttler(1);
+        ExecutorService executor = Executors.newFixedThreadPool(16);
+        CompletableFuture[] futures = new CompletableFuture[100];
 
         // new thread to stop the throttler
         new Thread(() -> {
@@ -68,7 +70,12 @@ class ThrottlerTest {
 
         long start = System.nanoTime();
         throttler.start();
-        throttler.throttle();
+
+        for (int i = 0; i < 100; i++) {
+            futures[i] = CompletableFuture.runAsync(throttler::throttle, executor);
+        }
+        CompletableFuture.allOf(futures).join();
+
         long end = System.nanoTime();
 
         Assertions.assertTrue((end - start) < TimeUnit.SECONDS.toNanos(1));
