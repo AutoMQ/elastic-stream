@@ -1401,7 +1401,6 @@ fn try_reclaim_from_wal(wal: &mut Wal, reclaim_bytes: u32) -> (u64, u64) {
 ///
 /// * `state` - Operation state, including original IO request, buffer and response observer.
 /// * `result` - Result code, exactly same to system call return value.
-/// * `log` - Logger instance.
 fn on_complete(
     write_window: &mut WriteWindow,
     context: &mut Context,
