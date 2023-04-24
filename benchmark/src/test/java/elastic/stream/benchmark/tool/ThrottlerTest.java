@@ -29,7 +29,7 @@ class ThrottlerTest {
     }
 
     @Test
-    void testThrottleThreadSafe() throws InterruptedException {
+    void testThrottleThreadSafe() {
         final int ticketPerSecond = 16384;
 
         Throttler throttler = new Throttler(ticketPerSecond);
