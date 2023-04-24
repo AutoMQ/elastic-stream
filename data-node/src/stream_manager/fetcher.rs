@@ -1,6 +1,6 @@
 use client::Client;
+use log::{error, trace};
 use model::range::StreamRange;
-use slog::{error, trace, Logger};
 use std::{rc::Rc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
@@ -29,24 +29,17 @@ pub(crate) enum Fetcher {
 }
 
 impl Fetcher {
-    pub(crate) async fn bootstrap(
-        &mut self,
-        log: &Logger,
-    ) -> Result<Vec<StreamRange>, ServiceError> {
+    pub(crate) async fn bootstrap(&mut self) -> Result<Vec<StreamRange>, ServiceError> {
         if let Fetcher::PlacementClient { client, target } = self {
             return client
                 .list_range(target, None, Duration::from_secs(3))
                 .await
                 .map_err(|_e| {
-                    error!(
-                        log,
-                        "Failed to list ranges by data node from placement manager"
-                    );
+                    error!("Failed to list ranges by data node from placement manager");
                     ServiceError::AcquireRange
                 })
                 .inspect(|ranges| {
                     trace!(
-                        log,
                         "Received list ranges response for current data node: {:?}",
                         ranges
                     );
@@ -56,15 +49,11 @@ impl Fetcher {
     }
 
     /// TODO: filter out ranges that is not hosted in current data node.
-    pub(crate) async fn fetch(
-        &mut self,
-        stream_id: i64,
-        log: &Logger,
-    ) -> Result<Vec<StreamRange>, ServiceError> {
+    pub(crate) async fn fetch(&mut self, stream_id: i64) -> Result<Vec<StreamRange>, ServiceError> {
         match self {
-            Fetcher::Channel { sender } => Self::fetch_from_peer_node(sender, stream_id, log).await,
+            Fetcher::Channel { sender } => Self::fetch_from_peer_node(sender, stream_id).await,
             Fetcher::PlacementClient { client, target } => {
-                Self::fetch_by_client(client, target, stream_id, log).await
+                Self::fetch_by_client(client, target, stream_id).await
             }
         }
     }
@@ -73,25 +62,23 @@ impl Fetcher {
         client: &Client,
         target: &str,
         stream_id: i64,
-        log: &Logger,
     ) -> Result<Vec<StreamRange>, ServiceError> {
         client
             .list_range(target, Some(stream_id), Duration::from_secs(3))
             .await
             .map_err(|_e| {
                 error!(
-                    log,
-                    "Failed to list ranges for stream={} from placement manager", stream_id
+                    "Failed to list ranges for stream={} from placement manager",
+                    stream_id
                 );
                 ServiceError::AcquireRange
             })
-            .inspect(|ranges| trace!(log, "Ranges for stream={} is: {:?}", stream_id, ranges))
+            .inspect(|ranges| trace!("Ranges for stream={} is: {:?}", stream_id, ranges))
     }
 
     async fn fetch_from_peer_node(
         sender: &mpsc::UnboundedSender<FetchRangeTask>,
         stream_id: i64,
-        log: &Logger,
     ) -> Result<Vec<StreamRange>, ServiceError> {
         let (tx, rx) = oneshot::channel();
         let task = FetchRangeTask { stream_id, tx };
@@ -101,8 +88,8 @@ impl Fetcher {
         }
         rx.await.map_err(|_e| {
             error!(
-                log,
-                "Failed to get ranges from primary node for stream={}", stream_id
+                "Failed to get ranges from primary node for stream={}",
+                stream_id
             );
             ServiceError::Internal("Broken oneshot channel".to_owned())
         })?
@@ -119,7 +106,6 @@ pub(crate) mod tests {
 
     #[test]
     fn test_fetch_from_peer_node() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         tokio_uring::start(async {
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -157,7 +143,7 @@ pub(crate) mod tests {
                 }
             });
 
-            let res = fetcher.fetch(1, &log).await?;
+            let res = fetcher.fetch(1).await?;
             assert_eq!(res.len(), TOTAL as usize);
             drop(fetcher);
             Ok(())

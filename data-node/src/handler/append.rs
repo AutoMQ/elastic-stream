@@ -4,11 +4,11 @@ use codec::frame::Frame;
 use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
+use log::{error, trace, warn};
 use model::flat_record::FlatRecordBatch;
 use protocol::rpc::header::{
     AppendRequest, AppendResponseArgs, AppendResultArgs, ErrorCode, StatusArgs,
 };
-use slog::{error, trace, warn, Logger};
 use std::{cell::RefCell, rc::Rc};
 use store::{
     error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, ElasticStore,
@@ -23,9 +23,6 @@ use super::util::{
 
 #[derive(Debug)]
 pub(crate) struct Append<'a> {
-    /// Logger
-    logger: Logger,
-
     /// The append request already parsed by flatbuffers
     append_request: AppendRequest<'a>,
 
@@ -35,13 +32,13 @@ pub(crate) struct Append<'a> {
 }
 
 impl<'a> Append<'a> {
-    pub(crate) fn parse_frame(logger: Logger, request: &Frame) -> Result<Append, ErrorCode> {
+    pub(crate) fn parse_frame(request: &Frame) -> Result<Append, ErrorCode> {
         let request_buf = match request.header {
             Some(ref buf) => buf,
             None => {
                 warn!(
-                    logger,
-                    "AppendRequest[stream-id={}] received without payload", request.stream_id
+                    "AppendRequest[stream-id={}] received without payload",
+                    request.stream_id
                 );
                 return Err(ErrorCode::BAD_REQUEST);
             }
@@ -51,10 +48,8 @@ impl<'a> Append<'a> {
             Ok(request) => request,
             Err(e) => {
                 warn!(
-                    logger,
                     "AppendRequest[stream-id={}] received with invalid payload. Cause: {:?}",
-                    request.stream_id,
-                    e
+                    request.stream_id, e
                 );
                 return Err(ErrorCode::BAD_REQUEST);
             }
@@ -65,15 +60,14 @@ impl<'a> Append<'a> {
             Some(ref buf) if buf.len() == 1 => buf.first().ok_or(ErrorCode::BAD_REQUEST)?,
             _ => {
                 warn!(
-                    logger,
-                    "AppendRequest[stream-id={}] received without payload", request.stream_id
+                    "AppendRequest[stream-id={}] received without payload",
+                    request.stream_id
                 );
                 return Err(ErrorCode::BAD_REQUEST);
             }
         };
 
         Ok(Append {
-            logger,
             append_request,
             payload: payload.clone(),
         })
@@ -99,10 +93,7 @@ impl<'a> Append<'a> {
         let to_store_requests = match self.build_store_requests(&stream_manager).await {
             Ok(requests) => requests,
             Err(err_code) => {
-                error!(
-                    self.logger,
-                    "Failed to build store requests. ErrorCode: {:?}", err_code
-                );
+                error!("Failed to build store requests. ErrorCode: {:?}", err_code);
                 // The request frame is invalid, return a system error frame directly
                 response.flag_system_err();
                 response.header = Some(system_error_frame_bytes(err_code, "Invalid request"));
@@ -139,7 +130,6 @@ impl<'a> Append<'a> {
                             .ack(result.stream_id, result.offset as u64)
                         {
                             warn!(
-                                self.logger,
                                 "Failed to ack offset on store completion to stream manager: {:?}",
                                 e
                             );
@@ -156,7 +146,7 @@ impl<'a> Append<'a> {
                     }
                     Err(e) => {
                         // TODO: what to do with the offset on failure?
-                        warn!(self.logger, "Append failed: {:?}", e);
+                        warn!("Append failed: {:?}", e);
                         let (err_code, error_message) = self.convert_store_error(e);
 
                         let mut error_message_fb = None;
@@ -195,7 +185,7 @@ impl<'a> Append<'a> {
 
         let response_header =
             protocol::rpc::header::AppendResponse::create(&mut builder, &res_args);
-        trace!(self.logger, "AppendResponseHeader: {:?}", response_header);
+        trace!("AppendResponseHeader: {:?}", response_header);
         let res_header = finish_response_builder(&mut builder, response_header);
         response.header = Some(res_header);
     }
@@ -218,10 +208,7 @@ impl<'a> Append<'a> {
                 let range = match record_batch.range() {
                     Some(range) => range,
                     None => {
-                        error!(
-                            self.logger,
-                            "Required `range` field is missing from `AppendRequest`"
-                        );
+                        error!("Required `range` field is missing from `AppendRequest`");
                         err_code = ErrorCode::BAD_REQUEST;
                         return None;
                     }
@@ -234,7 +221,7 @@ impl<'a> Append<'a> {
 
                 // Split the current batch payload from the whole payload
                 if payload.len() < batch_len as usize {
-                    warn!(self.logger, "Invalid record batch length");
+                    warn!("Invalid record batch length");
                     err_code = ErrorCode::BAD_REQUEST;
                     return None;
                 }
@@ -251,7 +238,7 @@ impl<'a> Append<'a> {
 
                         // Set the error code if the offset allocation failed
                         if let Err(e) = offset_r {
-                            warn!(self.logger, "Failed to allocate offset: {:?}", e);
+                            warn!("Failed to allocate offset: {:?}", e);
                             err_code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
                             return None;
                         }
@@ -294,7 +281,7 @@ impl<'a> Append<'a> {
                         Some(to_store)
                     }
                     Err(e) => {
-                        warn!(self.logger, "Failed to decode record batch: {:?}", e);
+                        warn!("Failed to decode record batch: {:?}", e);
                         err_code = ErrorCode::BAD_REQUEST;
                         return None;
                     }

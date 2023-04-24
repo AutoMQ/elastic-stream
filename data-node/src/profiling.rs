@@ -1,12 +1,11 @@
 use std::{cmp::Ordering, os::unix::prelude::OsStrExt, path::Path, sync::Arc};
 
 use config::Configuration;
-use slog::{error, info, Logger};
+use log::{error, info};
 use tokio::sync::broadcast::{self, error::TryRecvError};
 
 pub(crate) fn generate_flame_graph(
     config: Arc<Configuration>,
-    log: Logger,
     mut shutdown: broadcast::Receiver<()>,
 ) {
     std::thread::Builder::new()
@@ -22,7 +21,7 @@ pub(crate) fn generate_flame_graph(
             {
                 Ok(guard) => guard,
                 Err(e) => {
-                    error!(log, "Failed to build profiler guard: {}", e);
+                    error!("Failed to build profiler guard: {}", e);
                     return;
                 }
             };
@@ -31,7 +30,7 @@ pub(crate) fn generate_flame_graph(
             let cwd = match std::env::current_dir() {
                 Ok(path) => path,
                 Err(e) => {
-                    error!(log, "Failed to acquire current working directory: {}", e);
+                    error!("Failed to acquire current working directory: {}", e);
                     return;
                 }
             };
@@ -40,8 +39,8 @@ pub(crate) fn generate_flame_graph(
             if !base_path.exists() {
                 if let Err(e) = std::fs::create_dir_all(base_path.as_path()) {
                     error!(
-                        log,
-                        "Failed to create directory[{:?}] to save flamegraph files", base_path
+                        "Failed to create directory[{:?}] to save flamegraph files",
+                        base_path
                     )
                 }
             }
@@ -50,7 +49,7 @@ pub(crate) fn generate_flame_graph(
                 match shutdown.try_recv() {
                     Err(TryRecvError::Empty) => {}
                     _ => {
-                        info!(log, "Continuous Profiling stopped");
+                        info!("Continuous Profiling stopped");
                         break;
                     }
                 }
@@ -68,7 +67,7 @@ pub(crate) fn generate_flame_graph(
                 let report = match guard.report().build() {
                     Ok(report) => report,
                     Err(e) => {
-                        error!(log, "Failed to generated report: {}", e);
+                        error!("Failed to generated report: {}", e);
                         break;
                     }
                 };
@@ -79,29 +78,25 @@ pub(crate) fn generate_flame_graph(
                 let file = match std::fs::File::create(file_path.as_path()) {
                     Ok(file) => file,
                     Err(e) => {
-                        error!(log, "Failed to create file to save flamegraph: {}", e);
+                        error!("Failed to create file to save flamegraph: {}", e);
                         break;
                     }
                 };
 
                 if let Err(e) = report.flamegraph(file) {
-                    error!(log, "Failed to write flamegraph to file: {}", e);
+                    error!("Failed to write flamegraph to file: {}", e);
                 }
 
                 // Sweep expired flamegraph files
-                if let Err(e) = sweep_expired(base_path.as_path(), &config, &log) {
-                    error!(log, "Failed to clean expired flamegraph file: {}", e);
+                if let Err(e) = sweep_expired(base_path.as_path(), &config) {
+                    error!("Failed to clean expired flamegraph file: {}", e);
                 }
             }
         })
         .unwrap();
 }
 
-fn sweep_expired(
-    report_path: &Path,
-    config: &Arc<Configuration>,
-    log: &Logger,
-) -> std::io::Result<()> {
+fn sweep_expired(report_path: &Path, config: &Arc<Configuration>) -> std::io::Result<()> {
     let mut entries = std::fs::read_dir(report_path)?
         .into_iter()
         .flatten()
@@ -153,10 +148,10 @@ fn sweep_expired(
         if let Some(entry) = entries.pop() {
             match std::fs::remove_file(entry.path()) {
                 Ok(_) => {
-                    info!(log, "Removed flamegraph file[{:?}]", entry.path());
+                    info!("Removed flamegraph file[{:?}]", entry.path());
                 }
                 Err(e) => {
-                    error!(log, "Failed to remove file[{:?}]: {}", entry.path(), e);
+                    error!("Failed to remove file[{:?}]: {}", entry.path(), e);
                 }
             }
         }

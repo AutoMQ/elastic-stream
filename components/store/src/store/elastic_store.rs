@@ -34,8 +34,8 @@ use client::PlacementManagerIdGenerator;
 use core_affinity::CoreId;
 use crossbeam::channel::Sender;
 use futures::future::join_all;
+use log::{error, trace};
 use model::range::StreamRange;
-use slog::{error, trace, Logger};
 use tokio::sync::{mpsc, oneshot};
 
 #[derive(Clone)]
@@ -59,22 +59,17 @@ pub struct ElasticStore {
     /// server layer I/O Uring instances.
     sharing_uring: RawFd,
 
-    log: Logger,
-
     join_handles: Arc<util::HandleJoiner>,
 }
 
 impl ElasticStore {
     pub fn new(
-        log: Logger,
         mut config: config::Configuration,
         recovery_completion_tx: oneshot::Sender<()>,
     ) -> Result<Self, StoreError> {
-        let logger = log.clone();
+        let id_generator = Box::new(PlacementManagerIdGenerator::new(&config));
 
-        let id_generator = Box::new(PlacementManagerIdGenerator::new(logger.clone(), &config));
-
-        let lock = Arc::new(Lock::new(&config, id_generator, &log)?);
+        let lock = Arc::new(Lock::new(&config, id_generator)?);
 
         // Fill node_id
         config.server.node_id = lock.id();
@@ -84,7 +79,6 @@ impl ElasticStore {
 
         // Build index driver
         let indexer = Arc::new(IndexDriver::new(
-            log.clone(),
             config
                 .store
                 .path
@@ -106,8 +100,7 @@ impl ElasticStore {
         let _io_thread_handle = Self::with_thread(
             "IO",
             move || {
-                let log = log.clone();
-                let mut io = io::IO::new(&cfg, indexer_cp, log.clone())?;
+                let mut io = io::IO::new(&cfg, indexer_cp)?;
                 let sharing_uring = io.as_raw_fd();
                 let tx = io
                     .sender
@@ -116,10 +109,7 @@ impl ElasticStore {
 
                 let io = RefCell::new(io);
                 if let Err(_e) = sender.send((tx, sharing_uring)) {
-                    error!(
-                        log,
-                        "Failed to expose sharing_uring and task channel sender"
-                    );
+                    error!("Failed to expose sharing_uring and task channel sender");
                 }
                 io::IO::run(io, recovery_completion_tx)
             },
@@ -129,7 +119,7 @@ impl ElasticStore {
             .blocking_recv()
             .map_err(|_e| StoreError::Internal("Start".to_owned()))?;
 
-        let mut handle_joiner = util::HandleJoiner::new(logger.clone());
+        let mut handle_joiner = util::HandleJoiner::new();
         handle_joiner.push(_io_thread_handle);
 
         let store = Self {
@@ -139,10 +129,9 @@ impl ElasticStore {
             indexer,
             wal_offset_manager,
             sharing_uring,
-            log: logger,
             join_handles: Arc::new(handle_joiner),
         };
-        trace!(store.log, "ElasticStore launched");
+        trace!("ElasticStore launched");
         Ok(store)
     }
 
@@ -207,7 +196,7 @@ impl ElasticStore {
         if let Err(e) = self.io_tx.send(io_task) {
             if let Write(task) = e.0 {
                 if let Err(e) = task.observer.send(Err(AppendError::SubmissionQueue)) {
-                    error!(self.log, "Failed to propagate error: {:?}", e);
+                    error!("Failed to propagate error: {:?}", e);
                 }
             }
         }
@@ -250,7 +239,6 @@ impl Store for ElasticStore {
         );
 
         let io_tx_cp = self.io_tx.clone();
-        let logger = self.log.clone();
         let scan_res = match index_rx.await.map_err(|_e| FetchError::TranslateIndex) {
             Ok(res) => res.map_err(|_e| FetchError::TranslateIndex),
             Err(e) => Err(e),
@@ -270,7 +258,7 @@ impl Store for ElasticStore {
                 if let Err(e) = io_tx_cp.send(Read(io_task)) {
                     if let Read(io_task) = e.0 {
                         if let Err(e) = io_task.observer.send(Err(FetchError::SubmissionQueue)) {
-                            error!(logger, "Failed to propagate error: {:?}", e);
+                            error!("Failed to propagate error: {:?}", e);
                         }
                     }
                 }
@@ -420,7 +408,7 @@ mod tests {
 
     use bytes::{Bytes, BytesMut};
     use futures::future::join_all;
-    use slog::trace;
+    use log::trace;
     use tokio::sync::oneshot;
 
     use crate::{
@@ -432,13 +420,12 @@ mod tests {
     };
 
     fn build_store(pm_address: &str, store_path: &str) -> ElasticStore {
-        let log = test_util::terminal_logger();
         let mut config = config::Configuration::default();
         config.server.placement_manager = pm_address.to_owned();
         config.store.path.set_base(store_path);
         config.check_and_apply().expect("Configuration is invalid");
         let (tx, rx) = oneshot::channel();
-        let store = match ElasticStore::new(log.clone(), config, tx) {
+        let store = match ElasticStore::new(config, tx) {
             Ok(store) => store,
             Err(e) => {
                 panic!("Failed to launch ElasticStore: {:?}", e);
@@ -451,23 +438,20 @@ mod tests {
     /// Test the basic append and fetch operations.
     #[tokio::test]
     async fn test_run_store() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-
         let store_dir = test_util::create_random_path()?;
         let store_path = store_dir.as_path().to_str().unwrap().to_owned();
 
         let store_path_g = store_path.clone();
-        let _guard = test_util::DirectoryRemovalGuard::new(log.clone(), &Path::new(&store_path_g));
+        let _guard = test_util::DirectoryRemovalGuard::new(&Path::new(&store_path_g));
 
         let (tx, rx) = oneshot::channel();
 
         let (stop_tx, stop_rx) = oneshot::channel();
         let (port_tx, port_rx) = oneshot::channel();
 
-        let logger = log.clone();
         let handle = std::thread::spawn(move || {
             tokio_uring::start(async {
-                let port = test_util::run_listener(logger).await;
+                let port = test_util::run_listener().await;
                 let _ = port_tx.send(port);
                 let _ = stop_rx.await;
             });
@@ -507,7 +491,7 @@ mod tests {
                 // Log the append result
                 match res {
                     Ok(res) => {
-                        trace!(store.log, "Append result: {:?}", res);
+                        trace!("Append result: {:?}", res);
                         let options = ReadOptions {
                             stream_id: 1,
                             offset: 0,

@@ -1,12 +1,12 @@
 use super::{lb_policy::LbPolicy, response, session::Session};
 use crate::{error::ClientError, Response};
 use itertools::Itertools;
+use log::{debug, error, info, trace, warn};
 use model::{
     client_role::ClientRole, range::StreamRange, range_criteria::RangeCriteria, request::Request,
     PlacementManagerNode,
 };
 use protocol::rpc::header::ErrorCode;
-use slog::{debug, error, info, trace, warn, Logger};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -29,7 +29,6 @@ pub(crate) struct CompositeSession {
     endpoints: RefCell<Vec<SocketAddr>>,
     sessions: Rc<RefCell<HashMap<SocketAddr, Session>>>,
     shutdown: broadcast::Sender<()>,
-    log: Logger,
     refresh_cluster_instant: RefCell<Instant>,
     heartbeat_instant: RefCell<Instant>,
 }
@@ -40,7 +39,6 @@ impl CompositeSession {
         config: Arc<config::Configuration>,
         lb_policy: LbPolicy,
         shutdown: broadcast::Sender<()>,
-        log: Logger,
     ) -> Result<Self, ClientError>
     where
         T: ToSocketAddrs + ToString,
@@ -59,18 +57,17 @@ impl CompositeSession {
                 &config,
                 &sessions,
                 shutdown.subscribe(),
-                &log,
             )
             .await;
             match res {
                 Ok(session) => {
                     endpoints.borrow_mut().push(socket_addr.clone());
                     sessions.borrow_mut().insert(socket_addr, session);
-                    info!(log, "Connection to {} established", target.to_string());
+                    info!("Connection to {} established", target.to_string());
                     break;
                 }
                 Err(_e) => {
-                    info!(log, "Failed to connect to {}", socket_addr);
+                    info!("Failed to connect to {}", socket_addr);
                 }
             }
         }
@@ -82,7 +79,6 @@ impl CompositeSession {
             endpoints,
             sessions,
             shutdown,
-            log,
             refresh_cluster_instant: RefCell::new(Instant::now()),
             heartbeat_instant: RefCell::new(Instant::now()),
         })
@@ -91,7 +87,7 @@ impl CompositeSession {
     fn need_refresh_cluster(&self) -> bool {
         let cluster_size = self.sessions.borrow().len();
         if cluster_size <= 1 {
-            debug!(self.log, "Placement Manager Cluster size is {} which is rare in production, flag refresh-cluster true", cluster_size);
+            debug!("Placement Manager Cluster size is {} which is rare in production, flag refresh-cluster true", cluster_size);
             return true;
         }
 
@@ -129,14 +125,13 @@ impl CompositeSession {
                             self.endpoints.borrow_mut().drain_filter(|e| {
                                 e == &k
                             });
-                            info!(self.log, "Session to {} will be disconnected because latest Placement Manager Cluster does not contain it any more", k);
+                            info!("Session to {} will be disconnected because latest Placement Manager Cluster does not contain it any more", k);
                         });
 
                     addrs.drain_filter(|addr| self.sessions.borrow().contains_key(addr));
 
                     addrs.iter().for_each(|addr| {
                         trace!(
-                            self.log,
                             "Create a new session for new Placement Manager Cluster member: {}",
                             addr
                         );
@@ -149,7 +144,6 @@ impl CompositeSession {
                             &self.config,
                             &self.sessions,
                             self.shutdown.subscribe(),
-                            &self.log,
                         )
                     });
 
@@ -159,16 +153,14 @@ impl CompositeSession {
                         match item {
                             Ok(session) => {
                                 info!(
-                                    self.log,
                                     "Insert a session to composite-session {} using socket: {}",
-                                    self.target,
-                                    session.target
+                                    self.target, session.target
                                 );
                                 self.endpoints.borrow_mut().push(session.target);
                                 self.sessions.borrow_mut().insert(session.target, session);
                             }
                             Err(e) => {
-                                error!(self.log, "Failed to connect. {:?}", e);
+                                error!("Failed to connect. {:?}", e);
                             }
                         }
                     }
@@ -209,10 +201,8 @@ impl CompositeSession {
                     if let Response::Heartbeat { status } = response {
                         if status.code != ErrorCode::OK {
                             error!(
-                                self.log,
                                 "Failed to maintain heartbeat to {}. Status-Message: `{}`",
-                                self.target,
-                                status.message
+                                self.target, status.message
                             );
                             // TODO: refine error handling
                             return Err(ClientError::ServerInternal);
@@ -239,25 +229,23 @@ impl CompositeSession {
             let (tx, rx) = oneshot::channel();
             if let Err(e) = session.write(&request, tx).await {
                 error!(
-                    self.log,
-                    "Failed to send ID-allocation-request to {}. Cause: {:?}", self.target, e
+                    "Failed to send ID-allocation-request to {}. Cause: {:?}",
+                    self.target, e
                 );
                 return Err(ClientError::ConnectionRefused(self.target.to_owned()));
             }
 
             if let Response::AllocateId { status, id } = rx.await.map_err(|e| {
                 error!(
-                    self.log,
-                    "Internal error while allocating ID from {}. Cause: {:?}", self.target, e
+                    "Internal error while allocating ID from {}. Cause: {:?}",
+                    self.target, e
                 );
                 ClientError::ClientInternal
             })? {
                 if status.code != ErrorCode::OK {
                     error!(
-                        self.log,
                         "Failed to allocate ID from {}. Status-Message: `{}`",
-                        self.target,
-                        status.message
+                        self.target, status.message
                     );
                     // TODO: refine error handling
                     return Err(ClientError::ServerInternal);
@@ -284,27 +272,23 @@ impl CompositeSession {
             let (tx, rx) = oneshot::channel();
             if let Err(e) = session.write(&request, tx).await {
                 error!(
-                    self.log,
-                    "Failed to send list-range request to {}. Cause: {:?}", self.target, e
+                    "Failed to send list-range request to {}. Cause: {:?}",
+                    self.target, e
                 );
                 return Err(ClientError::ClientInternal);
             }
 
             if let Response::ListRange { status, ranges } = rx.await.map_err(|e| {
                 error!(
-                    self.log,
                     "Internal client error when listing ranges from {}. Cause: {:?}",
-                    self.target,
-                    e
+                    self.target, e
                 );
                 ClientError::ClientInternal
             })? {
                 if status.code != ErrorCode::OK {
                     error!(
-                        self.log,
                         "Failed to list-ranges from {}. Status-Message: `{}`",
-                        self.target,
-                        status.message
+                        self.target, status.message
                     );
                     // TODO: refine error handling
                     return Err(ClientError::ServerInternal);
@@ -338,10 +322,7 @@ impl CompositeSession {
             .target
             .to_socket_addrs()
             .map_err(|e| {
-                error!(
-                    self.log,
-                    "Failed to parse {} into SocketAddr: {:?}", self.target, e
-                );
+                error!("Failed to parse {} into SocketAddr: {:?}", self.target, e);
                 ClientError::BadAddress
             })?
             .collect::<Vec<_>>();
@@ -357,10 +338,10 @@ impl CompositeSession {
                 if let Some(session) = self.sessions.borrow().get(addr) {
                     if let Err(tx_) = session.write(&request, tx).await {
                         tx = tx_;
-                        error!(self.log, "Failed to send request to {}", addr);
+                        error!("Failed to send request to {}", addr);
                         continue;
                     }
-                    trace!(self.log, "Describe placement manager cluster via {}", addr);
+                    trace!("Describe placement manager cluster via {}", addr);
                     request_sent = true;
                     break 'outer;
                 }
@@ -368,7 +349,6 @@ impl CompositeSession {
 
             if !request_sent {
                 warn!(
-                    self.log,
                     "Failed to describe placement manager cluster via existing sessions. Try to re-connect..."
                 );
                 if let Some(addr) = addrs.first() {
@@ -378,7 +358,6 @@ impl CompositeSession {
                         &self.config,
                         &self.sessions,
                         self.shutdown.subscribe(),
-                        &self.log,
                     )
                     .await?;
                     self.sessions.borrow_mut().insert(*addr, session);
@@ -398,13 +377,10 @@ impl CompositeSession {
                     if let response::Response::DescribePlacementManager { status, nodes } = response
                     {
                         if ErrorCode::OK == status.code {
-                            trace!(self.log, "Received placement manager cluster {:?}", nodes);
+                            trace!("Received placement manager cluster {:?}", nodes);
                             Ok(nodes)
                         } else {
-                            warn!(
-                                self.log,
-                                "Failed to describe placement manager cluster: {:?}", status
-                            );
+                            warn!("Failed to describe placement manager cluster: {:?}", status);
                             Err(ClientError::ServerInternal)
                         }
                     } else {
@@ -443,7 +419,6 @@ impl CompositeSession {
                         &self.config,
                         &self.sessions,
                         self.shutdown.subscribe(),
-                        &self.log,
                     )
                 })
                 .collect::<Vec<_>>();
@@ -451,7 +426,7 @@ impl CompositeSession {
             if futures.is_empty() {
                 return;
             }
-            trace!(self.log, "Reconnecting {} sessions", futures.len());
+            trace!("Reconnecting {} sessions", futures.len());
 
             futures::future::join_all(futures)
                 .await
@@ -462,7 +437,7 @@ impl CompositeSession {
                         self.sessions.borrow_mut().insert(target, session);
                     }
                     Err(e) => {
-                        error!(self.log, "Failed to connect. Cause: {:?}", e);
+                        error!("Failed to connect. Cause: {:?}", e);
                     }
                 });
         }
@@ -474,24 +449,23 @@ impl CompositeSession {
         config: &Arc<config::Configuration>,
         sessions: &Rc<RefCell<HashMap<SocketAddr, Session>>>,
         shutdown: broadcast::Receiver<()>,
-        log: &Logger,
     ) -> Result<Session, ClientError> {
-        trace!(log, "Establishing connection to {:?}", addr);
+        trace!("Establishing connection to {:?}", addr);
         let endpoint = addr.to_string();
         let connect = TcpStream::connect(addr);
         let stream = match timeout(duration, connect).await {
             Ok(res) => match res {
                 Ok(connection) => {
-                    trace!(log, "Connection to {:?} established", addr);
+                    trace!("Connection to {:?} established", addr);
                     connection.set_nodelay(true).map_err(|e| {
-                        error!(log, "Failed to disable Nagle's algorithm. Cause: {:?}", e);
+                        error!("Failed to disable Nagle's algorithm. Cause: {:?}", e);
                         ClientError::DisableNagleAlgorithm
                     })?;
                     connection
                 }
                 Err(e) => match e.kind() {
                     ErrorKind::ConnectionRefused => {
-                        error!(log, "Connection to {} is refused", endpoint);
+                        error!("Connection to {} is refused", endpoint);
                         return Err(ClientError::ConnectionRefused(format!("{:?}", endpoint)));
                     }
                     _ => {
@@ -501,7 +475,7 @@ impl CompositeSession {
             },
             Err(e) => {
                 let description = format!("Timeout when connecting {}, elapsed: {}", endpoint, e);
-                error!(log, "{}", description);
+                error!("{}", description);
                 return Err(ClientError::ConnectTimeout(description));
             }
         };
@@ -512,7 +486,6 @@ impl CompositeSession {
             config,
             Rc::downgrade(sessions),
             shutdown,
-            log,
         ))
     }
 }
@@ -527,20 +500,13 @@ mod tests {
 
     #[test]
     fn test_new() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let config = Arc::new(config::Configuration::default());
         tokio_uring::start(async {
-            let port = test_util::run_listener(log.clone()).await;
+            let port = test_util::run_listener().await;
             let target = format!("{}:{}", "localhost", port);
             let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
-            let _session = CompositeSession::new(
-                &target,
-                config,
-                LbPolicy::PickFirst,
-                shutdown_tx,
-                log.clone(),
-            )
-            .await?;
+            let _session =
+                CompositeSession::new(&target, config, LbPolicy::PickFirst, shutdown_tx).await?;
 
             Ok(())
         })
@@ -548,22 +514,15 @@ mod tests {
 
     #[test]
     fn test_describe_placement_manager_cluster() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let mut config = config::Configuration::default();
         config.server.node_id = 1;
         let config = Arc::new(config);
         tokio_uring::start(async {
-            let port = test_util::run_listener(log.clone()).await;
+            let port = test_util::run_listener().await;
             let target = format!("{}:{}", "localhost", port);
             let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
-            let composite_session = CompositeSession::new(
-                &target,
-                config,
-                LbPolicy::PickFirst,
-                shutdown_tx,
-                log.clone(),
-            )
-            .await?;
+            let composite_session =
+                CompositeSession::new(&target, config, LbPolicy::PickFirst, shutdown_tx).await?;
             let nodes = composite_session
                 .describe_placement_manager_cluster()
                 .await

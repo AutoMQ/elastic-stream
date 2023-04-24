@@ -7,11 +7,10 @@ use std::{
 use crate::error::StoreError;
 use byteorder::{BigEndian, ReadBytesExt};
 use client::IdGenerator;
+use log::{error, info};
 use nix::fcntl::{flock, FlockArg};
-use slog::{error, info, Logger};
 
 pub(crate) struct Lock {
-    log: Logger,
     fd: RawFd,
     id: i32,
 }
@@ -20,7 +19,6 @@ impl Lock {
     pub(crate) fn new(
         config: &config::Configuration,
         id_generator: Box<dyn IdGenerator>,
-        log: &Logger,
     ) -> Result<Self, StoreError> {
         let store_base_path = config.store.path.base_path();
         let lock_file_path = store_base_path.join("LOCK");
@@ -51,24 +49,19 @@ impl Lock {
         };
 
         info!(
-            log,
             "Acquiring store lock: {:?}, id={}",
             lock_file_path.as_path(),
             id
         );
 
         flock(fd, FlockArg::LockExclusive).map_err(|e| {
-            error!(log, "Failed to acquire store lock. errno={}", e);
+            error!("Failed to acquire store lock. errno={}", e);
             StoreError::AcquireLock
         })?;
 
-        info!(log, "Store lock acquired. ID={}", id);
+        info!("Store lock acquired. ID={}", id);
 
-        Ok(Self {
-            log: log.clone(),
-            fd,
-            id,
-        })
+        Ok(Self { fd, id })
     }
 
     pub(crate) fn id(&self) -> i32 {
@@ -79,7 +72,7 @@ impl Lock {
 impl Drop for Lock {
     fn drop(&mut self) {
         if let Err(e) = flock(self.fd, FlockArg::Unlock) {
-            error!(self.log, "Failed to release store lock. errno={}", e);
+            error!("Failed to release store lock. errno={}", e);
         }
         let _file = unsafe { File::from_raw_fd(self.fd) };
     }
@@ -95,17 +88,15 @@ mod tests {
 
     #[test]
     fn test_lock_normal() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let store_base = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(log.clone(), store_base.as_path());
+        let _guard = test_util::DirectoryRemovalGuard::new(store_base.as_path());
 
         let (stop_tx, stop_rx) = oneshot::channel();
         let (port_tx, port_rx) = oneshot::channel();
 
-        let logger = log.clone();
         let handle = std::thread::spawn(move || {
             tokio_uring::start(async {
-                let port = test_util::run_listener(logger).await;
+                let port = test_util::run_listener().await;
                 let _ = port_tx.send(port);
                 let _ = stop_rx.await;
             });
@@ -119,8 +110,8 @@ mod tests {
             .check_and_apply()
             .expect("Failed to check-and-apply configuration");
         let cfg = Arc::new(config);
-        let generator = Box::new(PlacementManagerIdGenerator::new(log.clone(), &cfg));
-        let _lock = Lock::new(&cfg, generator, &log)?;
+        let generator = Box::new(PlacementManagerIdGenerator::new(&cfg));
+        let _lock = Lock::new(&cfg, generator)?;
         let _ = stop_tx.send(());
         let _ = handle.join();
         Ok(())

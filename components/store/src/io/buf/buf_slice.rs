@@ -77,15 +77,14 @@ unsafe impl Sync for BufSlice {}
 #[cfg(test)]
 mod tests {
     use crate::io::buf::AlignedBuf;
-    use slog::{info, trace};
+    use log::{info, trace};
     use std::{error::Error, sync::Arc};
     use tokio::sync::oneshot;
     use tokio_uring::net::{TcpListener, TcpStream};
 
     #[test]
     fn test_buf_slice() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-        let aligned_buf = Arc::new(AlignedBuf::new(log.clone(), 0, 4096, 4096)?);
+        let aligned_buf = Arc::new(AlignedBuf::new(0, 4096, 4096)?);
         let data = "Hello";
         aligned_buf.write_u32(0, data.len() as u32);
         aligned_buf.write_buf(4, data.as_bytes());
@@ -101,25 +100,16 @@ mod tests {
         let cloned = slice_buf.clone();
         let ptr = &cloned;
 
-        let _log = log.clone();
         std::thread::scope(|scope| {
             scope.spawn(move || {
                 let _ = slice_buf.len();
                 let _ = ptr.len();
-                info!(
-                    log,
-                    "Scoped thread {:?} completed",
-                    std::thread::current().id()
-                );
+                info!("Scoped thread {:?} completed", std::thread::current().id());
             });
         });
 
         let _ = cloned.len();
-        info!(
-            _log,
-            "main thread {:?} completed",
-            std::thread::current().id()
-        );
+        info!("main thread {:?} completed", std::thread::current().id());
 
         Ok(())
     }
@@ -129,9 +119,6 @@ mod tests {
     fn test_network() -> Result<(), Box<dyn Error>> {
         tokio_uring::start(async {
             let (tx, rx) = oneshot::channel();
-            let log = test_util::terminal_logger();
-
-            let logger = log.clone();
             tokio_uring::spawn(async move {
                 let listener = TcpListener::bind("[::]:0".parse().unwrap()).unwrap();
                 let port = listener.local_addr().unwrap().port();
@@ -147,13 +134,13 @@ mod tests {
                     }
                     let s = unsafe { std::slice::from_raw_parts(buf.as_ptr(), read) };
                     let read_str = std::str::from_utf8(s).unwrap();
-                    trace!(logger, "{}", read_str);
+                    trace!("{}", read_str);
                 }
             });
 
             let port = rx.await?;
 
-            let aligned_buf = Arc::new(AlignedBuf::new(log.clone(), 0, 4096, 4096)?);
+            let aligned_buf = Arc::new(AlignedBuf::new(0, 4096, 4096)?);
             let data = "Hello";
             aligned_buf.write_u32(0, data.len() as u32);
             aligned_buf.write_buf(4, data.as_bytes());

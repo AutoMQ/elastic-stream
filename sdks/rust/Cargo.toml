@@ -7,9 +7,7 @@ edition = "2021"
 codec = { path = "../../components/codec" }
 model = { path = "../../components/model" }
 clap = { workspace = true }
-slog =  { workspace = true }
-slog-async =  { workspace = true }
-slog-term =  { workspace = true }
+log =  { workspace = true }
 bytes = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true }

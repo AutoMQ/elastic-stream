@@ -2,22 +2,19 @@ use std::io::Cursor;
 
 use bytes::{Buf, BytesMut};
 use codec::{error::FrameError, frame::Frame};
-use slog::Logger;
 use tokio::{io::AsyncReadExt, net::tcp::OwnedReadHalf};
 
 use crate::client_error::ClientError;
 
 #[derive(Debug)]
 pub(crate) struct ChannelReader {
-    log: Logger,
     stream: OwnedReadHalf,
     buffer: BytesMut,
 }
 
 impl ChannelReader {
-    pub(crate) fn new(stream: OwnedReadHalf, log: Logger) -> Self {
+    pub(crate) fn new(stream: OwnedReadHalf) -> Self {
         Self {
-            log,
             stream,
             buffer: BytesMut::with_capacity(4096),
         }
@@ -79,7 +76,7 @@ impl ChannelReader {
         // parse of the frame, and allows us to skip allocating data structures
         // to hold the frame data unless we know the full frame has been
         // received.
-        match Frame::check(&mut buf, &self.log) {
+        match Frame::check(&mut buf) {
             Ok(_) => {
                 // The `check` function will have advanced the cursor until the
                 // end of the frame. Since the cursor had position set to zero

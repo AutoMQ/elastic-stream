@@ -1,11 +1,9 @@
 use super::AlignedBuf;
 use crate::error::StoreError;
-use slog::{error, trace, Logger};
+use log::{error, trace};
 use std::{collections::VecDeque, ptr, slice, sync::Arc};
 
 pub(crate) struct AlignedBufWriter {
-    log: Logger,
-
     /// Write cursor in the WAL space.
     ///
     /// # Note
@@ -27,9 +25,8 @@ pub(crate) struct AlignedBufWriter {
 }
 
 impl AlignedBufWriter {
-    pub(crate) fn new(log: Logger, cursor: u64, alignment: usize) -> Self {
+    pub(crate) fn new(cursor: u64, alignment: usize) -> Self {
         Self {
-            log,
             cursor,
             alignment,
             full: vec![],
@@ -84,7 +81,7 @@ impl AlignedBufWriter {
         wal_offset: u64,
         file_size: usize,
     ) -> Result<(), StoreError> {
-        trace!(self.log, "Reserve memory for WAL up to {}", wal_offset);
+        trace!("Reserve memory for WAL up to {}", wal_offset);
 
         let max_allocated_wal_offset = self.max_allocated_wal_offset();
         if wal_offset <= max_allocated_wal_offset {
@@ -106,9 +103,8 @@ impl AlignedBufWriter {
         // immediately.
         if additional >= self.alignment {
             let size = additional / self.alignment * self.alignment;
-            let buf = AlignedBuf::new(self.log.clone(), offset, size, self.alignment)?;
+            let buf = AlignedBuf::new(offset, size, self.alignment)?;
             trace!(
-                self.log,
                 "Reserved {} bytes for WAL data in complete blocks. [{}, {})",
                 buf.capacity,
                 offset,
@@ -129,9 +125,8 @@ impl AlignedBufWriter {
         // configured amount of time has elapsed before collecting enough data.
         let r = additional % self.alignment;
         if 0 != r {
-            let buf = AlignedBuf::new(self.log.clone(), offset, self.alignment, self.alignment)?;
+            let buf = AlignedBuf::new(offset, self.alignment, self.alignment)?;
             trace!(
-                self.log,
                 "Reserved {} bytes for WAL data that may only fill partial of a block. [{}, {})",
                 buf.capacity,
                 offset,
@@ -161,10 +156,7 @@ impl AlignedBufWriter {
                 self.full.push(prev);
             }
         } else {
-            error!(
-                self.log,
-                "AlignedBufWriter does not have enough pre-allocated buffers"
-            );
+            error!("AlignedBufWriter does not have enough pre-allocated buffers");
             return Err(StoreError::OutOfMemory);
         }
 
@@ -226,7 +218,7 @@ impl AlignedBufWriter {
         }
 
         items.iter().for_each(|item| {
-            trace!(self.log, "About to flush {} to disk", item);
+            trace!("About to flush {} to disk", item);
         });
 
         items
@@ -251,11 +243,10 @@ mod tests {
 
     #[test]
     fn test_aligned_buf_writer() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-        let mut buf_writer = super::AlignedBufWriter::new(log.clone(), 0, ALIGNMENT);
+        let mut buf_writer = super::AlignedBufWriter::new(0, ALIGNMENT);
         assert_eq!(0, buf_writer.cursor);
         buf_writer.reset_cursor(4100);
-        let aligned_buf = AlignedBuf::new(log.clone(), 4096, 4096, ALIGNMENT)?;
+        let aligned_buf = AlignedBuf::new(4096, 4096, ALIGNMENT)?;
         aligned_buf.write_u32(4096, 100);
         let aligned_buf = Arc::new(aligned_buf);
         buf_writer.rebase_buf(aligned_buf);
@@ -269,11 +260,10 @@ mod tests {
 
     #[test]
     fn test_max_allocated_wal_offset() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-        let mut buf_writer = super::AlignedBufWriter::new(log.clone(), 0, ALIGNMENT);
+        let mut buf_writer = super::AlignedBufWriter::new(0, ALIGNMENT);
         assert_eq!(0, buf_writer.max_allocated_wal_offset());
 
-        let aligned_buf = Arc::new(AlignedBuf::new(log.clone(), 1024, 512, 512)?);
+        let aligned_buf = Arc::new(AlignedBuf::new(1024, 512, 512)?);
         buf_writer.current = Some(Arc::clone(&aligned_buf));
         assert_eq!(buf_writer.max_allocated_wal_offset(), 1024 + 512);
 
@@ -281,7 +271,7 @@ mod tests {
         buf_writer.allocated.push_back(Arc::clone(&aligned_buf));
         assert_eq!(buf_writer.max_allocated_wal_offset(), 1024 + 512);
 
-        let aligned_buf = Arc::new(AlignedBuf::new(log.clone(), 1024 + 512, 512, 512)?);
+        let aligned_buf = Arc::new(AlignedBuf::new(1024 + 512, 512, 512)?);
         buf_writer.allocated.push_back(Arc::clone(&aligned_buf));
         assert_eq!(buf_writer.max_allocated_wal_offset(), 2048);
 
@@ -290,8 +280,7 @@ mod tests {
 
     #[test]
     fn test_reserve_to() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-        let mut buf_writer = super::AlignedBufWriter::new(log.clone(), 0, ALIGNMENT);
+        let mut buf_writer = super::AlignedBufWriter::new(0, ALIGNMENT);
         assert_eq!(0, buf_writer.cursor);
         assert_eq!(0, buf_writer.max_allocated_wal_offset());
 

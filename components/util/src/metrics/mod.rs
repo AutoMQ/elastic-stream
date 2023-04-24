@@ -2,8 +2,8 @@
 
 use std::io::Write;
 
+use log::error;
 use prometheus::{proto::MetricType, Encoder, TextEncoder, TEXT_FORMAT};
-use slog::error;
 
 pub mod process_linux;
 pub mod threads_linux;
@@ -13,11 +13,11 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-pub fn initial_metric<S: Into<String>>(log: slog::Logger, namespace: S) {
+pub fn initial_metric<S: Into<String>>(namespace: S) {
     process_linux::monitor_process()
-        .unwrap_or_else(|e| error!(log, "failed to start process monitor: {}", e));
+        .unwrap_or_else(|e| error!("failed to start process monitor: {}", e));
     threads_linux::monitor_threads(namespace)
-        .unwrap_or_else(|e| error!(log, "failed to start thread monitor: {}", e));
+        .unwrap_or_else(|e| error!("failed to start thread monitor: {}", e));
 }
 
 pub fn dump(should_simplify: bool) -> String {

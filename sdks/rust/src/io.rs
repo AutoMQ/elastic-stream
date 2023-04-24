@@ -1,25 +1,23 @@
 use crate::{command::Command, session::Session};
-use slog::{info, Logger};
+use log::info;
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 use tokio::sync::mpsc;
 
 pub(crate) struct IO {
     rx: mpsc::UnboundedReceiver<Command>,
-    log: Logger,
     sessions: HashMap<String, Rc<RefCell<Session>>>,
 }
 
 impl IO {
-    pub(crate) fn new(rx: mpsc::UnboundedReceiver<Command>, log: Logger) -> Self {
+    pub(crate) fn new(rx: mpsc::UnboundedReceiver<Command>) -> Self {
         Self {
             rx,
-            log,
             sessions: HashMap::new(),
         }
     }
 
     pub(crate) async fn run(&mut self) {
-        info!(self.log, "IO::run starts");
+        info!("IO::run starts");
         loop {
             match self.rx.recv().await {
                 Some(command) => match command {
@@ -42,12 +40,12 @@ impl IO {
                     }
                 },
                 None => {
-                    info!(self.log, "Task channel is closed");
+                    info!("Task channel is closed");
                     // log end of loop
                     break;
                 }
             }
         }
-        info!(self.log, "IO::run completes");
+        info!("IO::run completes");
     }
 }

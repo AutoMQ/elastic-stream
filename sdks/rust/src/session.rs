@@ -9,12 +9,12 @@ use std::{
 
 use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
+use log::{error, info, trace, warn};
 use model::stream::Stream;
 use protocol::rpc::header::{
     CreateStreamsRequestT, CreateStreamsResponse, ErrorCode, PlacementManagerCluster, StreamT,
     SystemErrorResponse,
 };
-use slog::{error, info, trace, warn, Logger};
 use tokio::{net::TcpStream, sync::oneshot};
 
 use crate::{
@@ -27,7 +27,6 @@ lazy_static::lazy_static! {
 
 #[derive(Debug)]
 pub(crate) struct Session {
-    log: Logger,
     inflight: Arc<Mutex<HashMap<u32, oneshot::Sender<Frame>>>>,
     channel_writer: ChannelWriter,
     peer_address: String,
@@ -37,10 +36,9 @@ impl Session {
     fn spawn_read_loop(
         mut reader: ChannelReader,
         inflight: Arc<Mutex<HashMap<u32, oneshot::Sender<Frame>>>>,
-        log: Logger,
     ) {
         tokio::spawn(async move {
-            info!(log, "Session read loop started");
+            info!("Session read loop started");
             loop {
                 match reader.read_frame().await {
                     Ok(Some(frame)) => {
@@ -49,42 +47,41 @@ impl Session {
                             if let Ok(mut guard) = inflight.lock() {
                                 if let Some(tx) = guard.remove(&stream_id) {
                                     tx.send(frame).unwrap_or_else(|_e| {
-                                        warn!(log, "Failed to notify response frame")
+                                        warn!("Failed to notify response frame")
                                     });
                                 }
                             }
                         }
                     }
                     Ok(None) => {
-                        info!(log, "Connection closed");
+                        info!("Connection closed");
                         break;
                     }
                     Err(e) => {
-                        error!(log, "Connection reset: {}", e);
+                        error!("Connection reset: {}", e);
                         break;
                     }
                 }
             }
-            info!(log, "Session read loop completed");
+            info!("Session read loop completed");
         });
     }
 
-    pub(crate) async fn new(target: &str, log: Logger) -> Result<Self, ClientError> {
+    pub(crate) async fn new(target: &str) -> Result<Self, ClientError> {
         let stream = TcpStream::connect(target).await?;
         stream.set_nodelay(true)?;
         let local_addr = stream.local_addr()?;
-        trace!(log, "Port of client: {}", local_addr.port());
+        trace!("Port of client: {}", local_addr.port());
         let (read_half, write_half) = stream.into_split();
 
-        let reader = ChannelReader::new(read_half, log.clone());
+        let reader = ChannelReader::new(read_half);
         let inflight = Arc::new(Mutex::new(HashMap::new()));
 
-        Self::spawn_read_loop(reader, Arc::clone(&inflight), log.clone());
+        Self::spawn_read_loop(reader, Arc::clone(&inflight));
 
-        let writer = ChannelWriter::new(write_half, log.clone());
+        let writer = ChannelWriter::new(write_half);
 
         Ok(Self {
-            log,
             inflight: Arc::clone(&inflight),
             channel_writer: writer,
             peer_address: target.to_owned(),
@@ -151,17 +148,16 @@ impl Session {
         // Parse create streams response
         if let Some(ref buf) = frame.header {
             let response = flatbuffers::root::<CreateStreamsResponse>(buf)?;
-            trace!(self.log, "CreateStreamsResponse: {:?}", response);
+            trace!("CreateStreamsResponse: {:?}", response);
             let response = response.unpack();
             let status = response.status;
             match status.code {
                 ErrorCode::OK => {
-                    trace!(self.log, "Stream created");
+                    trace!("Stream created");
                 }
 
                 ErrorCode::PM_NOT_LEADER => {
                     warn!(
-                        self.log,
                         "Failed to create stream: targeting placement manager node is not leader"
                     );
                     if let Some(detail) = status.detail {
@@ -178,15 +174,12 @@ impl Session {
                 }
 
                 ErrorCode::PM_NO_AVAILABLE_DN => {
-                    error!(self.log, "Placement manager has no enough data nodes");
+                    error!("Placement manager has no enough data nodes");
                     return Err(ClientError::DataNodeNotAvailable);
                 }
 
                 _ => {
-                    error!(
-                        self.log,
-                        "Unexpected error code from server: {}", self.peer_address
-                    );
+                    error!("Unexpected error code from server: {}", self.peer_address);
                     return Err(ClientError::UnexpectedResponse(format!(
                         "Unexpected response status: {:?}",
                         status
@@ -195,7 +188,7 @@ impl Session {
             }
 
             if let Some(results) = response.create_responses {
-                trace!(self.log, "CreateStreamsResults: {:?}", results);
+                trace!("CreateStreamsResults: {:?}", results);
                 let streams = results
                     .into_iter()
                     .filter(|result| result.status.code == ErrorCode::OK && result.stream.is_some())
@@ -215,7 +208,7 @@ impl Session {
 mod tests {
     use std::{error::Error, sync::atomic::Ordering, time::Duration};
 
-    use slog::{error, info};
+    use log::{error, info};
 
     use crate::{client_error::ClientError, session::Session, test_server::run_listener};
 
@@ -233,14 +226,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_stream() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let port = 2378;
-        let port = run_listener(log.clone()).await;
+        let port = run_listener().await;
         let target = format!("127.0.0.1:{}", port);
-        info!(log, "Connecting {}", target);
-        match Session::new(&target, log.clone()).await {
+        info!("Connecting {}", target);
+        match Session::new(&target).await {
             Ok(mut session) => {
-                info!(log, "Session connected");
+                info!("Session connected");
                 let streams = session
                     .create_stream(
                         1,
@@ -252,7 +244,7 @@ mod tests {
                 assert_eq!(1, streams.len());
             }
             Err(e) => {
-                error!(log, "Failed to create session: {:?}", e);
+                error!("Failed to create session: {:?}", e);
             }
         }
         Ok(())
@@ -260,13 +252,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_stream_timeout() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-        let port = run_listener(log.clone()).await;
+        let port = run_listener().await;
         let target = format!("127.0.0.1:{}", port);
-        info!(log, "Connecting {}", target);
-        match Session::new(&target, log.clone()).await {
+        info!("Connecting {}", target);
+        match Session::new(&target).await {
             Ok(mut session) => {
-                info!(log, "Session connected");
+                info!("Session connected");
                 let res = session
                     .create_stream(
                         1,
@@ -280,7 +271,7 @@ mod tests {
                 }
             }
             Err(e) => {
-                error!(log, "Failed to create session: {:?}", e);
+                error!("Failed to create session: {:?}", e);
             }
         }
         Ok(())

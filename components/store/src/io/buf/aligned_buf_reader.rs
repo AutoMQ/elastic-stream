@@ -1,19 +1,14 @@
-use slog::Logger;
-
 use crate::error::StoreError;
 
 use super::AlignedBuf;
 
-pub(crate) struct AlignedBufReader {
-    log: Logger,
-}
+pub(crate) struct AlignedBufReader {}
 
 impl AlignedBufReader {
     /// Create a new AlignedBufReader.
     /// The specified `wal_offset` doesn't need to be aligned,
     /// but the returned AlignedBuf's `wal_offset` will be aligned.
     pub(crate) fn alloc_read_buf(
-        log: Logger,
         wal_offset: u64,
         len: usize,
         alignment: usize,
@@ -25,6 +20,6 @@ impl AlignedBufReader {
         let from = wal_offset / alignment as u64 * alignment as u64;
         let to =
             (wal_offset + len as u64 + alignment as u64 - 1) / alignment as u64 * alignment as u64;
-        AlignedBuf::new(log, from, (to - from) as usize, alignment)
+        AlignedBuf::new(from, (to - from) as usize, alignment)
     }
 }

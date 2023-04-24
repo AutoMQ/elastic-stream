@@ -14,7 +14,7 @@ flatbuffers = { workspace = true }
 thiserror = { workspace = true }
 rand = { workspace = true }
 uuid = { workspace = true }
-slog =  { workspace = true }
+log =  { workspace = true }
 percentage = { version = "0.1.0" }
 nix = { workspace = true }
 prometheus = { workspace = true }
@@ -35,8 +35,6 @@ lazy_static = {version = "1.4.0"}
 minstant = { workspace = true }
 
 [dev-dependencies]
-slog-async =  { workspace = true }
-slog-term =  { workspace = true }
 cargo-llvm-cov = { workspace = true }
 uuid = { workspace = true }
 criterion = { workspace = true }

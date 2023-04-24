@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use bytes::Bytes;
 use codec::frame::Frame;
+use log::trace;
 use protocol::rpc::header::{ErrorCode, HeartbeatRequest, HeartbeatResponseT, StatusT};
-use slog::{trace, Logger};
 use store::ElasticStore;
 
 use crate::stream_manager::StreamManager;
@@ -12,12 +12,11 @@ use super::util::root_as_rpc_request;
 
 #[derive(Debug)]
 pub(crate) struct Heartbeat<'a> {
-    log: Logger,
     request: HeartbeatRequest<'a>,
 }
 
 impl<'a> Heartbeat<'a> {
-    pub(crate) fn parse_frame(log: Logger, frame: &'a Frame) -> Result<Self, ErrorCode> {
+    pub(crate) fn parse_frame(frame: &'a Frame) -> Result<Self, ErrorCode> {
         let request = frame
             .header
             .as_ref()
@@ -25,7 +24,7 @@ impl<'a> Heartbeat<'a> {
             .ok_or(ErrorCode::BAD_REQUEST)?
             .map_err(|_e| ErrorCode::BAD_REQUEST)?;
 
-        Ok(Self { log, request })
+        Ok(Self { request })
     }
 
     pub(crate) async fn apply(
@@ -34,11 +33,7 @@ impl<'a> Heartbeat<'a> {
         _stream_manager: Rc<RefCell<StreamManager>>,
         response: &mut Frame,
     ) {
-        trace!(
-            self.log,
-            "Prepare heartbeat response header for {:?}",
-            self.request
-        );
+        trace!("Prepare heartbeat response header for {:?}", self.request);
 
         let mut builder = flatbuffers::FlatBufferBuilder::new();
         let mut response_header = HeartbeatResponseT::default();
@@ -56,6 +51,6 @@ impl<'a> Heartbeat<'a> {
         let data = builder.finished_data();
         response.header = Some(Bytes::copy_from_slice(data));
 
-        trace!(self.log, "Heartbeat response header built");
+        trace!("Heartbeat response header built");
     }
 }

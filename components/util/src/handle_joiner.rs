@@ -1,17 +1,15 @@
 use std::{sync::Mutex, thread::JoinHandle};
 
-use slog::{info, Logger};
+use log::info;
 
 #[derive(Debug)]
 pub struct HandleJoiner {
-    log: Logger,
     handles: Mutex<Vec<JoinHandle<()>>>,
 }
 
 impl HandleJoiner {
-    pub fn new(log: Logger) -> Self {
+    pub fn new() -> Self {
         Self {
-            log,
             handles: Mutex::new(Vec::new()),
         }
     }
@@ -27,7 +25,7 @@ impl Drop for HandleJoiner {
     fn drop(&mut self) {
         if let Ok(mut handles) = self.handles.lock() {
             while let Some(handle) = handles.pop() {
-                info!(self.log, "Joining a thread handle");
+                info!("Joining a thread handle");
                 let _ = handle.join();
             }
         }

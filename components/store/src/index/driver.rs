@@ -6,14 +6,13 @@ use std::{
 
 use crate::{error::StoreError, index::LocalRangeManager};
 use crossbeam::channel::{self, Receiver, Select, Sender, TryRecvError};
+use log::{error, info};
 use model::range::StreamRange;
-use slog::{error, info, Logger};
 use tokio::sync::{mpsc, oneshot};
 
 use super::{indexer::Indexer, record_handle::RecordHandle, MinOffset};
 
 pub(crate) struct IndexDriver {
-    log: Logger,
     tx: Sender<IndexCommand>,
     // Issue a shutdown signal to the driver thread.
     shutdown_tx: Sender<()>,
@@ -58,29 +57,22 @@ pub(crate) enum IndexCommand {
 
 impl IndexDriver {
     pub(crate) fn new(
-        log: Logger,
         path: &str,
         min_offset: Arc<dyn MinOffset>,
         flush_threshold: usize,
     ) -> Result<Self, StoreError> {
         let (tx, rx) = channel::unbounded();
         let (shutdown_tx, shutdown_rx) = channel::bounded(1);
-        let indexer = Arc::new(Indexer::new(
-            log.clone(),
-            path,
-            min_offset,
-            flush_threshold,
-        )?);
-        let runner = IndexDriverRunner::new(log.clone(), rx, shutdown_rx, Arc::clone(&indexer));
+        let indexer = Arc::new(Indexer::new(path, min_offset, flush_threshold)?);
+        let runner = IndexDriverRunner::new(rx, shutdown_rx, Arc::clone(&indexer));
         let handle = Builder::new()
             .name("IndexDriver".to_owned())
             .spawn(move || {
                 runner.run();
             })
             .map_err(|e| StoreError::Internal(e.to_string()))?;
-        info!(log, "IndexDriver thread started");
+        info!("IndexDriver thread started");
         Ok(Self {
-            log,
             tx,
             shutdown_tx,
             indexer,
@@ -94,7 +86,7 @@ impl IndexDriver {
             offset,
             handle,
         }) {
-            error!(self.log, "Failed to send index entry to internal indexer");
+            error!("Failed to send index entry to internal indexer");
         }
     }
 
@@ -113,16 +105,13 @@ impl IndexDriver {
             max_bytes,
             observer,
         }) {
-            error!(
-                self.log,
-                "Failed to send scan record handles command to internal indexer"
-            );
+            error!("Failed to send scan record handles command to internal indexer");
         }
     }
 
     pub(crate) fn list_ranges(&self, tx: mpsc::UnboundedSender<StreamRange>) {
         if let Err(_e) = self.tx.send(IndexCommand::ListRange { tx }) {
-            error!(self.log, "Failed to send list range command");
+            error!("Failed to send list range command");
         }
     }
 
@@ -135,7 +124,7 @@ impl IndexDriver {
             .tx
             .send(IndexCommand::ListRangeByStream { stream_id, tx })
         {
-            error!(self.log, "Failed to send list range by stream command");
+            error!("Failed to send list range by stream command");
         }
     }
 
@@ -145,7 +134,7 @@ impl IndexDriver {
         tx: oneshot::Sender<Result<(), StoreError>>,
     ) {
         if let Err(e) = self.tx.send(IndexCommand::CreateRange { range, tx }) {
-            error!(self.log, "Failed to submit create range command");
+            error!("Failed to submit create range command");
             if let IndexCommand::CreateRange { tx, .. } = e.0 {
                 let _ = tx.send(Err(StoreError::Internal(
                     "Submit create range failed".to_owned(),
@@ -160,7 +149,7 @@ impl IndexDriver {
         tx: oneshot::Sender<Result<(), StoreError>>,
     ) {
         if let Err(e) = self.tx.send(IndexCommand::SealRange { range, tx }) {
-            error!(self.log, "Failed to submit create range command");
+            error!("Failed to submit create range command");
             if let IndexCommand::SealRange { tx, .. } = e.0 {
                 let _ = tx.send(Err(StoreError::Internal(
                     "Submit seal range failed".to_owned(),
@@ -171,11 +160,11 @@ impl IndexDriver {
 
     pub(crate) fn shutdown_indexer(&self) {
         if let Err(e) = self.indexer.flush(true) {
-            error!(self.log, "Failed to flush primary index. Cause: {:?}", e);
+            error!("Failed to flush primary index. Cause: {:?}", e);
         }
 
         if self.shutdown_tx.send(()).is_err() {
-            error!(self.log, "Failed to send shutdown signal to indexer");
+            error!("Failed to send shutdown signal to indexer");
         }
     }
 
@@ -201,21 +190,14 @@ impl Deref for IndexDriver {
 }
 
 struct IndexDriverRunner {
-    log: Logger,
     rx: Receiver<IndexCommand>,
     shutdown_rx: Receiver<()>,
     indexer: Arc<Indexer>,
 }
 
 impl IndexDriverRunner {
-    fn new(
-        log: Logger,
-        rx: Receiver<IndexCommand>,
-        shutdown_rx: Receiver<()>,
-        indexer: Arc<Indexer>,
-    ) -> Self {
+    fn new(rx: Receiver<IndexCommand>, shutdown_rx: Receiver<()>, indexer: Arc<Indexer>) -> Self {
         Self {
-            log,
             rx,
             shutdown_rx,
             indexer,
@@ -237,7 +219,7 @@ impl IndexDriverRunner {
                             handle,
                         } => {
                             while let Err(e) = self.indexer.index(stream_id, offset, &handle) {
-                                error!(self.log, "Failed to index: stream_id={}, offset={}, record_handle={:?}, cause: {}", 
+                                error!("Failed to index: stream_id={}, offset={}, record_handle={:?}, cause: {}", 
                                 stream_id, offset, handle, e);
                                 sleep(std::time::Duration::from_millis(100));
                             }
@@ -255,10 +237,8 @@ impl IndexDriverRunner {
                                 ))
                                 .unwrap_or_else(|_e| {
                                     error!(
-                                        self.log,
                                         "Failed to send scan result of {}/{} to observer.",
-                                        stream_id,
-                                        offset
+                                        stream_id, offset
                                     );
                                 });
                         }
@@ -277,7 +257,7 @@ impl IndexDriverRunner {
                                     let _ = tx.send(Ok(()));
                                 }
                                 Err(e) => {
-                                    error!(self.log, "Failed to add stream range: {}", range);
+                                    error!("Failed to add stream range: {}", range);
                                     let _ = tx.send(Err(e));
                                 }
                             }
@@ -289,7 +269,7 @@ impl IndexDriverRunner {
                                     let _ = tx.send(Ok(()));
                                 }
                                 Err(e) => {
-                                    error!(self.log, "Failed to seal range: {}", range);
+                                    error!("Failed to seal range: {}", range);
                                     let _ = tx.send(Err(e));
                                 }
                             }
@@ -299,16 +279,16 @@ impl IndexDriverRunner {
                         continue;
                     }
                     Err(TryRecvError::Disconnected) => {
-                        info!(self.log, "IndexChannel disconnected");
+                        info!("IndexChannel disconnected");
                         break;
                     }
                 }
             } else if 1 == index {
-                info!(self.log, "Got a command to quit IndexDriverRunner thread");
+                info!("Got a command to quit IndexDriverRunner thread");
                 break;
             }
         }
-        info!(self.log, "IndexDriverRunner thread completed");
+        info!("IndexDriverRunner thread completed");
     }
 }
 
@@ -327,12 +307,11 @@ mod tests {
 
     #[test]
     fn test_index_driver() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let db_path = test_util::create_random_path()?;
-        let _dir_guard = test_util::DirectoryRemovalGuard::new(log.clone(), db_path.as_path());
+        let _dir_guard = test_util::DirectoryRemovalGuard::new(db_path.as_path());
         let min_offset = Arc::new(TestMinOffset {});
         let index_driver =
-            super::IndexDriver::new(log, db_path.as_os_str().to_str().unwrap(), min_offset, 128)?;
+            super::IndexDriver::new(db_path.as_os_str().to_str().unwrap(), min_offset, 128)?;
         assert_eq!(0, index_driver.get_wal_checkpoint()?);
 
         index_driver.shutdown_indexer();

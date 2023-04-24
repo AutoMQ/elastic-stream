@@ -1,28 +1,22 @@
 use super::session_manager::SessionManager;
 use crate::error::ClientError;
+use log::{error, trace, warn};
 use model::{range::StreamRange, range_criteria::RangeCriteria};
-use slog::{error, trace, warn, Logger};
 use std::{cell::UnsafeCell, rc::Rc, sync::Arc, time::Duration};
 use tokio::{sync::broadcast, time};
 
 /// `Client` is used to send
 pub struct Client {
     pub(crate) session_manager: Rc<UnsafeCell<SessionManager>>,
-    pub(crate) log: Logger,
     pub(crate) config: Arc<config::Configuration>,
 }
 
 impl Client {
-    pub fn new(
-        config: Arc<config::Configuration>,
-        shutdown: broadcast::Sender<()>,
-        log: &Logger,
-    ) -> Self {
-        let session_manager = Rc::new(UnsafeCell::new(SessionManager::new(&config, shutdown, log)));
+    pub fn new(config: Arc<config::Configuration>, shutdown: broadcast::Sender<()>) -> Self {
+        let session_manager = Rc::new(UnsafeCell::new(SessionManager::new(&config, shutdown)));
 
         Self {
             session_manager,
-            log: log.clone(),
             config,
         }
     }
@@ -36,16 +30,19 @@ impl Client {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager.get_composite_session(target).await?;
         let future = session.allocate_id(host, timeout);
-        time::timeout(timeout, future).await.map_err(|e|{
-            warn!(self.log, "Timeout when allocate ID. {}", e);
-            ClientError::ClientInternal
-        })?.map_err(|e|{
-            error!(
-                self.log,
-                "Failed to receive response from broken channel. Cause: {:?}", e; "struct" => "Client"
-            );
-            ClientError::ClientInternal
-        })
+        time::timeout(timeout, future)
+            .await
+            .map_err(|e| {
+                warn!("Timeout when allocate ID. {}", e);
+                ClientError::ClientInternal
+            })?
+            .map_err(|e| {
+                error!(
+                    "Failed to receive response from broken channel. Cause: {:?}",
+                    e
+                );
+                ClientError::ClientInternal
+            })
     }
 
     pub async fn list_range(
@@ -55,12 +52,11 @@ impl Client {
         timeout: Duration,
     ) -> Result<Vec<StreamRange>, ClientError> {
         let criteria = if let Some(stream_id) = stream_id {
-            trace!(self.log, "list_range from {}", target; "stream-id" => stream_id);
+            trace!("list_range from {}, stream-id={}", target, stream_id);
             RangeCriteria::StreamId(stream_id)
         } else {
             let data_node = self.config.server.data_node();
             trace!(
-                self.log,
                 "List stream ranges from placement manager for {:?}",
                 data_node
             );
@@ -70,16 +66,19 @@ impl Client {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager.get_composite_session(target).await?;
         let future = session.list_range(criteria);
-        time::timeout(timeout, future).await.map_err(|elapsed| {
-            warn!(self.log, "Timeout when list range. {}", elapsed);
-            ClientError::RpcTimeout { timeout }
-        })?.map_err(|e| {
-            error!(
-                self.log,
-                "Failed to receive response from broken channel. Cause: {:?}", e; "struct" => "Client"
-            );
-            ClientError::ClientInternal
-        })
+        time::timeout(timeout, future)
+            .await
+            .map_err(|elapsed| {
+                warn!("Timeout when list range. {}", elapsed);
+                ClientError::RpcTimeout { timeout }
+            })?
+            .map_err(|e| {
+                error!(
+                    "Failed to receive response from broken channel. Cause: {:?}",
+                    e
+                );
+                ClientError::ClientInternal
+            })
     }
 
     /// Broadcast heartbeats to all sessions in the `CompositeSession`.
@@ -92,11 +91,7 @@ impl Client {
     pub async fn broadcast_heartbeat(&self, target: &str) -> Result<(), ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager.get_composite_session(target).await?;
-        trace!(
-            self.log,
-            "Broadcast heartbeat to composite-channel={}",
-            target
-        );
+        trace!("Broadcast heartbeat to composite-channel={}", target);
 
         composite_session.heartbeat().await
     }
@@ -104,9 +99,9 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use slog::trace;
+    use log::trace;
     use std::{error::Error, sync::Arc, time::Duration};
-    use test_util::{run_listener, terminal_logger};
+    use test_util::run_listener;
     use tokio::sync::broadcast;
 
     use crate::{
@@ -117,10 +112,9 @@ mod tests {
     #[test]
     fn test_broadcast_heartbeat() -> Result<(), ClientError> {
         tokio_uring::start(async {
-            let log = terminal_logger();
             #[allow(unused_variables)]
             let port = 2378;
-            let port = run_listener(log.clone()).await;
+            let port = run_listener().await;
             let mut config = config::Configuration::default();
             config.server.placement_manager = format!("localhost:{}", port);
             config.server.host = "localhost".to_owned();
@@ -128,7 +122,7 @@ mod tests {
             config.check_and_apply().unwrap();
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
-            let client = Client::new(Arc::clone(&config), tx, &log);
+            let client = Client::new(Arc::clone(&config), tx);
             client
                 .broadcast_heartbeat(&config.server.placement_manager)
                 .await
@@ -138,17 +132,16 @@ mod tests {
     #[test]
     fn test_allocate_id() -> Result<(), Box<dyn Error>> {
         tokio_uring::start(async {
-            let log = terminal_logger();
             #[allow(unused_variables)]
             let port = 2378;
-            let port = run_listener(log.clone()).await;
+            let port = run_listener().await;
             let addr = format!("localhost:{}", port);
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
-            let client = Client::new(config, tx, &log);
+            let client = Client::new(config, tx);
             let timeout = Duration::from_secs(3);
             let id = client.allocate_id(&addr, "localhost", timeout).await?;
             assert_eq!(1, id);
@@ -159,19 +152,17 @@ mod tests {
     #[test]
     fn test_list_range_by_stream() -> Result<(), ListRangeError> {
         tokio_uring::start(async {
-            let log = terminal_logger();
-
             #[allow(unused_variables)]
             let port = 2378;
 
-            let port = run_listener(log.clone()).await;
+            let port = run_listener().await;
             let addr = format!("localhost:{}", port);
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
-            let client = Client::new(config, tx, &log);
+            let client = Client::new(config, tx);
 
             let timeout = Duration::from_secs(10);
 
@@ -186,7 +177,7 @@ mod tests {
                     "Test server should have fed some mocking ranges"
                 );
                 for range in ranges.iter() {
-                    trace!(log, "{}", range)
+                    trace!("{}", range)
                 }
             }
 
@@ -197,12 +188,10 @@ mod tests {
     #[test]
     fn test_list_range_by_data_node() -> Result<(), ListRangeError> {
         tokio_uring::start(async {
-            let log = terminal_logger();
-
             #[allow(unused_variables)]
             let port = 2378;
 
-            let port = run_listener(log.clone()).await;
+            let port = run_listener().await;
             let addr = format!("localhost:{}", port);
 
             let mut config = config::Configuration::default();
@@ -210,7 +199,7 @@ mod tests {
             config.server.port = 10911;
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
-            let client = Client::new(config, tx, &log);
+            let client = Client::new(config, tx);
 
             let timeout = Duration::from_secs(10);
 
@@ -222,7 +211,7 @@ mod tests {
                     "Test server should have fed some mocking ranges"
                 );
                 for range in ranges.iter() {
-                    trace!(log, "{}", range)
+                    trace!("{}", range)
                 }
             }
 

@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-slog = { workspace = true }
-slog-async =  { workspace = true }
-slog-term =  { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-uring = { workspace = true }
 bytes = { workspace = true }

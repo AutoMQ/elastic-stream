@@ -1,6 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
-use slog::{error, trace, Logger};
+use log::{error, trace};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
@@ -37,8 +37,6 @@ pub(crate) enum WriteWindowError {
 /// 1.2 If the completed range offset == committed, meaning the gap is closed, we advance the committed directly.
 /// 1.3 If the completed range offset < committed, meaning we are expanding continuous writes, advance the committed as well.
 pub(crate) struct WriteWindow {
-    log: Logger,
-
     /// An offset in WAL, all data prior to it should have been completely written. All write requests whose
     /// ranges fall into [0, committed) can be safely acknowledged.
     pub(crate) committed: u64,
@@ -48,9 +46,8 @@ pub(crate) struct WriteWindow {
 }
 
 impl WriteWindow {
-    pub(crate) fn new(log: Logger, committed: u64) -> Self {
+    pub(crate) fn new(committed: u64) -> Self {
         Self {
-            log,
             committed,
             completed: BTreeMap::new(),
         }
@@ -71,11 +68,7 @@ impl WriteWindow {
             // If completed_offset <= self.committed, it means we could move forward without doubt.
             if let Some((completed_offset, completed_len)) = self.completed.pop_first() {
                 self.committed = u64::max(completed_offset + completed_len as u64, self.committed);
-                trace!(
-                    self.log,
-                    "Advance committed position of WAL to: {}",
-                    self.committed
-                );
+                trace!("Advance committed position of WAL to: {}", self.committed);
             }
         }
 
@@ -83,12 +76,7 @@ impl WriteWindow {
     }
 
     pub(crate) fn commit(&mut self, offset: u64, length: u32) -> Result<u64, WriteWindowError> {
-        trace!(
-            self.log,
-            "Try to commit WAL [{}, {})",
-            offset,
-            offset + length as u64
-        );
+        trace!("Try to commit WAL [{}, {})", offset, offset + length as u64);
         match self.completed.entry(offset) {
             Entry::Vacant(e) => {
                 e.insert(length);
@@ -97,7 +85,6 @@ impl WriteWindow {
                 let prev_len = e.get_mut();
                 if length >= *prev_len {
                     trace!(
-                        self.log,
                         "Completed WAL range expanded from [{}, {}) to [{}, {})",
                         offset,
                         offset + *prev_len as u64,
@@ -109,7 +96,6 @@ impl WriteWindow {
                     // Should not reach here, as [offset, e.get()) strictly includes [offset, length). This violates
                     // barrier mechanism.
                     error!(
-                        self.log,
                         "Unexpected invalid commit. Previously completed range[{}, {}), attempted range: [{}, {})",
                         offset,
                         offset + *prev_len as u64,
@@ -134,8 +120,7 @@ mod tests {
 
     #[test]
     fn test_write_window() -> Result<(), WriteWindowError> {
-        let log = test_util::terminal_logger();
-        let mut window = super::WriteWindow::new(log, 0);
+        let mut window = super::WriteWindow::new(0);
         window.commit(0, 10)?;
         assert_eq!(10, window.committed);
 

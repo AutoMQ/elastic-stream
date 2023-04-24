@@ -1,5 +1,4 @@
 use model::stream::Stream;
-use slog::Logger;
 use std::sync::Arc;
 use tokio::{
     runtime::Runtime,
@@ -16,20 +15,19 @@ pub(crate) struct SessionManager {
 }
 
 impl SessionManager {
-    pub(crate) fn new(log: Logger) -> Result<Self, ClientError> {
+    pub(crate) fn new() -> Result<Self, ClientError> {
         let (tx, rx) = mpsc::unbounded_channel();
-        let io_log = log.clone();
         let handle = std::thread::Builder::new()
             .name("IO".to_owned())
             .spawn(move || {
                 let rt = Runtime::new().expect("Build tokio runtime");
-                let mut io = IO::new(rx, io_log);
+                let mut io = IO::new(rx);
                 rt.block_on(async move {
                     io.run().await;
                 })
             })
             .map_err(|_e| ClientError::Thread)?;
-        let mut handle_joiner = HandleJoiner::new(log.clone());
+        let mut handle_joiner = HandleJoiner::new();
         handle_joiner.push(handle);
         Ok(Self {
             handle_jointer: Arc::new(handle_joiner),
@@ -59,8 +57,7 @@ mod tests {
 
     #[test]
     fn test_new() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-        let _session_manager = SessionManager::new(log)?;
+        let _session_manager = SessionManager::new()?;
         Ok(())
     }
 }

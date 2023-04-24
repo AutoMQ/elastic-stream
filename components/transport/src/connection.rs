@@ -1,5 +1,5 @@
 use bytes::{Buf, BytesMut};
-use slog::{error, info, trace, warn, Logger};
+use log::{error, info, trace, warn};
 use std::cell::UnsafeCell;
 use std::io::Cursor;
 use tokio_uring::net::TcpStream;
@@ -13,16 +13,14 @@ pub struct Connection {
     stream: TcpStream,
     buffer: UnsafeCell<BytesMut>,
     peer_address: String,
-    logger: Logger,
 }
 
 impl Connection {
-    pub fn new(stream: TcpStream, peer_address: &str, logger: Logger) -> Self {
+    pub fn new(stream: TcpStream, peer_address: &str) -> Self {
         Self {
             stream,
             buffer: UnsafeCell::new(BytesMut::with_capacity(BUFFER_SIZE)),
             peer_address: peer_address.to_owned(),
-            logger,
         }
     }
 
@@ -76,14 +74,11 @@ impl Connection {
 
             let read = match res {
                 Ok(n) => {
-                    trace!(self.logger, "Read {} bytes from {}", n, self.peer_address);
+                    trace!("Read {} bytes from {}", n, self.peer_address);
                     n
                 }
                 Err(_e) => {
-                    info!(
-                        self.logger,
-                        "Failed to read data from {}", self.peer_address
-                    );
+                    info!("Failed to read data from {}", self.peer_address);
                     0
                 }
             };
@@ -96,7 +91,7 @@ impl Connection {
                 if buffer.is_empty() {
                     return Ok(None);
                 } else {
-                    warn!(self.logger, "Discarded {} bytes", buffer.len());
+                    warn!("Discarded {} bytes", buffer.len());
                     return Err(FrameError::ConnectionReset);
                 }
             }
@@ -122,7 +117,7 @@ impl Connection {
         // parse of the frame, and allows us to skip allocating data structures
         // to hold the frame data unless we know the full frame has been
         // received.
-        match Frame::check(&mut buf, &self.logger) {
+        match Frame::check(&mut buf) {
             Ok(_) => {
                 // The `check` function will have advanced the cursor until the
                 // end of the frame. Since the cursor had position set to zero
@@ -181,12 +176,7 @@ impl Connection {
         })?;
 
         let total = buffers.iter().map(|b| b.len()).sum::<usize>();
-        trace!(
-            self.logger,
-            "Get {} bytes to write to: {}",
-            total,
-            self.peer_address
-        );
+        trace!("Get {} bytes to write to: {}", total, self.peer_address);
         let mut remaining = total;
         loop {
             let (res, _buffers) = self.stream.writev(buffers).await;
@@ -197,18 +187,11 @@ impl Connection {
                     if n == remaining {
                         if remaining == total {
                             // First time to write
-                            trace!(
-                                self.logger,
-                                "Wrote {}/{} bytes to {}",
-                                n,
-                                total,
-                                self.peer_address
-                            );
+                            trace!("Wrote {}/{} bytes to {}", n, total, self.peer_address);
                         } else {
                             // Last time of writing: the remaining are all written.
                             remaining -= n;
                             trace!(
-                                self.logger,
                                 "Wrote {}/{} bytes to {}. Overall, {}/{} is written.",
                                 n,
                                 total,
@@ -221,7 +204,6 @@ impl Connection {
                     } else {
                         remaining -= n;
                         trace!(
-                            self.logger,
                             "Wrote {} bytes to {}. Overall, {}/{} is written",
                             n,
                             self.peer_address,
@@ -246,10 +228,7 @@ impl Connection {
                     }
                 }
                 Err(e) => {
-                    error!(
-                        self.logger,
-                        "Failed to write Frame[stream-id={}]", frame.stream_id
-                    );
+                    error!("Failed to write Frame[stream-id={}]", frame.stream_id);
                     return Err(e);
                 }
             };
@@ -268,7 +247,6 @@ mod tests {
     use std::{error::Error, thread::JoinHandle};
 
     use bytes::{Buf, BufMut, BytesMut};
-    use slog::{o, Drain};
     use tokio::{io::AsyncReadExt, net::TcpListener};
 
     #[test]
@@ -361,11 +339,7 @@ mod tests {
                     .await
                     .unwrap();
                 tcp_stream.set_nodelay(true).unwrap();
-                let decorator = slog_term::TermDecorator::new().build();
-                let drain = slog_term::FullFormat::new(decorator).build().fuse();
-                let drain = slog_async::Async::new(drain).build().fuse();
-                let log = slog::Logger::root(drain, o!());
-                let connection = super::Connection::new(tcp_stream, &address, log);
+                let connection = super::Connection::new(tcp_stream, &address);
                 let mut frame = codec::frame::Frame::new(codec::frame::OperationCode::AllocateId);
                 let mut payload = vec![];
                 (0..8).into_iter().for_each(|_| {

@@ -11,9 +11,7 @@ byteorder =  { workspace = true }
 bytes =  { workspace = true }
 num_enum =  { workspace = true }
 thiserror =  { workspace = true }
-slog = { workspace = true }
-slog-async =  { workspace = true }
-slog-term =  { workspace = true }
+log = { workspace = true }
 
 [dev-dependencies]
 cargo-llvm-cov = { workspace = true }

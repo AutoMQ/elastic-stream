@@ -29,9 +29,7 @@ pprof = { workspace = true }
 protocol = {path = "../components/protocol" }
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = { workspace = true }
-slog =  { workspace = true }
-slog-async =  { workspace = true }
-slog-term =  { workspace = true }
+log =  { workspace = true }
 store = { path = "../components/store" }
 transport = { path = "../components/transport" }
 thiserror =  { workspace = true }

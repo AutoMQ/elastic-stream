@@ -14,7 +14,7 @@ model = { path = "../model" }
 protocol = { path = "../protocol" }
 transport = { path = "../transport" }
 bytes = { workspace = true }
-slog = { workspace = true }
+log = { workspace = true }
 thiserror = { workspace = true }
 futures = { workspace = true }
 flatbuffers = { workspace = true }
@@ -25,8 +25,6 @@ tokio = { workspace = true }
 crossbeam = { workspace = true }
 
 [dev-dependencies]
-slog-async =  { workspace = true }
-slog-term =  { workspace = true }
 mockall = { workspace = true }
 util = { path = "../util" }
 test-util = { path = "../test-util" }

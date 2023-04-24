@@ -1,10 +1,10 @@
 use bytes::Bytes;
 use codec::frame::Frame;
+use log::{trace, warn};
 use protocol::rpc::header::{
     DescribeRangeResultT, DescribeRangesRequest, DescribeRangesResponseT, ErrorCode, RangeT,
     StatusT,
 };
-use slog::{trace, warn, Logger};
 use std::{cell::RefCell, rc::Rc};
 use store::ElasticStore;
 
@@ -14,20 +14,16 @@ use super::util::root_as_rpc_request;
 
 #[derive(Debug)]
 pub(crate) struct DescribeRange<'a> {
-    /// Logger
-    logger: Logger,
-
     /// The describe request already parsed by flatbuffers
     describe_request: DescribeRangesRequest<'a>,
 }
 
 impl<'a> DescribeRange<'a> {
-    pub(crate) fn parse_frame(logger: Logger, request: &Frame) -> Result<DescribeRange, ErrorCode> {
+    pub(crate) fn parse_frame(request: &Frame) -> Result<DescribeRange, ErrorCode> {
         let request_buf = match request.header {
             Some(ref buf) => buf,
             None => {
                 warn!(
-                    logger,
                     "DescribeRangesRequest[stream-id={}] received without payload",
                     request.stream_id
                 );
@@ -39,7 +35,6 @@ impl<'a> DescribeRange<'a> {
             Ok(request) => request,
             Err(e) => {
                 warn!(
-                    logger,
                     "DescribeRangesRequest[stream-id={}] received with invalid payload. Cause: {:?}",
                     request.stream_id,
                     e
@@ -48,10 +43,7 @@ impl<'a> DescribeRange<'a> {
             }
         };
 
-        Ok(DescribeRange {
-            logger,
-            describe_request,
-        })
+        Ok(DescribeRange { describe_request })
     }
 
     pub(crate) async fn apply(
@@ -105,7 +97,7 @@ impl<'a> DescribeRange<'a> {
             describe_range_response.describe_responses = Some(results);
         }
 
-        trace!(self.logger, "{:?}", describe_range_response);
+        trace!("{:?}", describe_range_response);
 
         let describe_response = describe_range_response.pack(&mut builder);
         builder.finish(describe_response, None);

@@ -18,7 +18,7 @@ use std::io;
 use crossbeam::channel::{Receiver, Sender, TryRecvError};
 use io_uring::register;
 use io_uring::{opcode, squeue, types};
-use slog::{debug, error, info, trace, warn, Logger};
+use log::{debug, error, info, trace, warn};
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::{
@@ -64,9 +64,6 @@ pub(crate) struct IO {
     ///
     /// According to our design, there is only one instance.
     receiver: Receiver<IoTask>,
-
-    /// Logger instance.
-    log: Logger,
 
     /// A WAL instance that manages the lifecycle of write-ahead-log segments.
     ///
@@ -153,10 +150,9 @@ impl IO {
     pub(crate) fn new(
         config: &Arc<config::Configuration>,
         indexer: Arc<IndexDriver>,
-        log: Logger,
     ) -> Result<Self, StoreError> {
         let control_ring = io_uring::IoUring::builder().dontfork().build(32).map_err(|e| {
-            error!(log, "Failed to build I/O Uring instance for write-ahead-log segment file management: {:#?}", e);
+            error!("Failed to build I/O Uring instance for write-ahead-log segment file management: {:#?}", e);
             StoreError::IoUring
         })?;
 
@@ -168,7 +164,7 @@ impl IO {
             .setup_r_disabled()
             .build(config.store.uring.queue_depth)
             .map_err(|e| {
-                error!(log, "Failed to build polling I/O Uring instance: {:#?}", e);
+                error!("Failed to build polling I/O Uring instance: {:#?}", e);
                 StoreError::IoUring
             })?;
 
@@ -184,7 +180,7 @@ impl IO {
 
         check_io_uring(&probe)?;
 
-        trace!(log, "Polling I/O Uring instance created");
+        trace!("Polling I/O Uring instance created");
 
         let (sender, receiver) = crossbeam::channel::unbounded();
 
@@ -193,14 +189,9 @@ impl IO {
             data_ring,
             sender: Some(sender),
             receiver,
-            write_window: WriteWindow::new(log.clone(), 0),
-            buf_writer: UnsafeCell::new(AlignedBufWriter::new(
-                log.clone(),
-                0,
-                config.store.alignment,
-            )),
-            wal: Wal::new(control_ring, config, log.clone()),
-            log,
+            write_window: WriteWindow::new(0),
+            buf_writer: UnsafeCell::new(AlignedBufWriter::new(0, config.store.alignment)),
+            wal: Wal::new(control_ring, config),
             channel_disconnected: false,
             inflight: 0,
             pending_data_tasks: VecDeque::new(),
@@ -233,7 +224,6 @@ impl IO {
                     // Only the last cache entry is possibly partially filled.
                     if buf.remaining() > 0 {
                         trace!(
-                            self.log,
                             "Rebase `BufWriter` to include the last partially written buffer: {}",
                             buf
                         );
@@ -250,10 +240,10 @@ impl IO {
         Ok(())
     }
 
-    fn validate_io_task(io_task: &mut IoTask, log: &Logger) -> bool {
+    fn validate_io_task(io_task: &mut IoTask) -> bool {
         if let IoTask::Write(ref mut task) = io_task {
             if task.buffer.is_empty() {
-                warn!(log, "WriteTask buffer length is 0");
+                warn!("WriteTask buffer length is 0");
                 return false;
             }
         }
@@ -273,7 +263,7 @@ impl IO {
 
     #[inline]
     fn add_pending_task(&mut self, mut io_task: IoTask, received: &mut usize) {
-        if !IO::validate_io_task(&mut io_task, &self.log) {
+        if !IO::validate_io_task(&mut io_task) {
             IO::on_bad_request(io_task);
             return;
         }
@@ -281,7 +271,6 @@ impl IO {
         match &io_task {
             IoTask::Write(write_task) => {
                 trace!(
-                    self.log,
                     "Received a write-task from channel: stream-id={}, offset={}",
                     write_task.stream_id,
                     write_task.offset
@@ -289,7 +278,6 @@ impl IO {
             }
             IoTask::Read(read_task) => {
                 trace!(
-                    self.log,
                     "Received a read-task from channel: stream-id={}, wal-offset={}, len={}",
                     read_task.stream_id,
                     read_task.wal_offset,
@@ -341,17 +329,14 @@ impl IO {
                 + self.wal.inflight_control_task_num()
                 == 0
             {
-                debug!(
-                    self.log,
-                    "Block IO thread until IO tasks are received from channel"
-                );
+                debug!("Block IO thread until IO tasks are received from channel");
                 // Block the thread until at least one IO task arrives
                 match self.receiver.recv() {
                     Ok(io_task) => {
                         self.add_pending_task(io_task, &mut received);
                     }
                     Err(_e) => {
-                        info!(self.log, "Channel for submitting IO task disconnected");
+                        info!("Channel for submitting IO task disconnected");
                         self.channel_disconnected = true;
                         break received;
                     }
@@ -367,7 +352,7 @@ impl IO {
                         break received;
                     }
                     Err(TryRecvError::Disconnected) => {
-                        info!(self.log, "Channel for submitting IO task disconnected");
+                        info!("Channel for submitting IO task disconnected");
                         self.channel_disconnected = true;
                         break received;
                     }
@@ -419,21 +404,20 @@ impl IO {
                     debug_assert!(pos + FOOTER_LENGTH as usize <= file_size);
                     if pos + *n + FOOTER_LENGTH as usize > file_size {
                         trace!(
-                            self.log,
                             "Reach the end of a segment file. Take up {} bytes to append footer",
                             file_size - pos
                         );
                         if allocated >= file_size - pos {
-                            trace!(
-                                self.log,
-                                "Already pre-allocated enough buffer for the footer"
-                            );
+                            trace!("Already pre-allocated enough buffer for the footer");
                             allocated -= file_size - pos;
                         } else {
                             // Need to allocate a new buffer.
                             let extra = file_size - pos - allocated;
-                            trace!(self.log, "Need to allocate {} bytes more for the footer", 
-                                extra; "pre-allocated" => allocated);
+                            trace!(
+                                "Need to allocate {} bytes more for the footer. pre-allocated={}",
+                                extra,
+                                allocated
+                            );
                             // All pre-allocated buffers are used up.
                             allocated = 0;
                             let to = max_allocated_wal_offset + extra as u64;
@@ -501,7 +485,6 @@ impl IO {
 
             merged_ranges.iter().for_each(|range| {
                 if let Ok(buf) = AlignedBufReader::alloc_read_buf(
-                    self.log.clone(),
                     range.wal_offset,
                     range.len as usize,
                     self.options.store.alignment,
@@ -546,10 +529,11 @@ impl IO {
                         entries.push(sqe);
 
                         // Trace the submit read IO
-                        trace!(self.log, "Submit read IO";
-                            "offset" => read_offset,
-                            "len" => read_len,
-                            "segment" => segment.wal_offset,
+                        trace!(
+                            "Submit read IO. offset={}, len={}, segment={}",
+                            read_offset,
+                            read_len,
+                            segment.wal_offset,
                         );
                         // Add the ongoing entries to the block cache
                         segment.block_cache.add_loading_entry(*range);
@@ -590,7 +574,6 @@ impl IO {
                     // submit the entry, its associated context is valid.
                     let ctx = unsafe { Box::from_raw(entry.0) };
                     trace!(
-                        self.log,
                         "Submit previously blocked write to WAL[{}, {})",
                         ctx.wal_offset,
                         ctx.wal_offset + ctx.len as u64
@@ -599,11 +582,7 @@ impl IO {
                     // Need to insert a barrier if the blocked IO itself is ALSO a partial write.
                     if ctx.is_partial_write() {
                         self.barrier.borrow_mut().insert(ctx.wal_offset);
-                        trace!(
-                            self.log,
-                            "Insert a barrier with wal_offset={}",
-                            ctx.wal_offset
-                        );
+                        trace!("Insert a barrier with wal_offset={}", ctx.wal_offset);
                     }
 
                     Box::into_raw(ctx);
@@ -642,7 +621,6 @@ impl IO {
                             if buf.partial() {
                                 self.barrier.borrow_mut().insert(buf.wal_offset);
                                 trace!(
-                                    self.log,
                                     "Insert a barrier with wal_offset={}",
                                     buf.wal_offset
                                 );
@@ -665,7 +643,7 @@ impl IO {
                             .user_data(context as u64);
 
                         if io_blocked {
-                            trace!(self.log, "Write to WAL[{}, {}) is blocked", buf_wal_offset, buf_wal_offset + buf_limit as u64);
+                            trace!("Write to WAL[{}, {}) is blocked", buf_wal_offset, buf_wal_offset + buf_limit as u64);
                             if let Some((ctx, _entry)) =
                                 self.blocked.insert(buf_wal_offset, (context, sqe))
                             {
@@ -673,11 +651,11 @@ impl IO {
                                 // See https://github.com/tokio-rs/io-uring/issues/230
                                 let ctx = unsafe { Box::from_raw(ctx) };
                                 if ctx.len <= buf_limit {
-                                    debug!(self.log, "Blocked write to WAL[{}, {}) is superseded by [{}, {})",
+                                    debug!("Blocked write to WAL[{}, {}) is superseded by [{}, {})",
                                         ctx.wal_offset, ctx.wal_offset + ctx.len as u64,
                                         buf_wal_offset, buf_wal_offset + buf_limit as u64);
                                 } else {
-                                    error!(self.log, "Blocked write to WAL[{}, {}) is superseded by [{}, {})",
+                                    error!("Blocked write to WAL[{}, {}) is superseded by [{}, {})",
                                         ctx.wal_offset, ctx.wal_offset + ctx.len as u64,
                                         buf_wal_offset, buf_wal_offset + buf_limit as u64);
                                     unreachable!("An extended write is superseded by a previous small one");
@@ -689,11 +667,11 @@ impl IO {
                     } else {
                         // fatal errors
                         let msg = format!("Segment {} should be open and with valid FD", segment);
-                        error!(self.log, "{}", msg);
+                        error!("{}", msg);
                         panic!("{}", msg);
                     }
                 } else {
-                    error!(self.log, "");
+                    error!("");
                 }
                 Ok::<(), super::WriteWindowError>(())
             })
@@ -701,17 +679,16 @@ impl IO {
     }
 
     fn build_sqe(&mut self, entries: &mut Vec<squeue::Entry>) {
-        let log = self.log.clone();
         let alignment = self.options.store.alignment;
         if let Err(e) = self.reserve_write_buffers() {
-            error!(log, "Failed to reserve write buffers"; "error" => %e);
+            error!("Failed to reserve write buffers: {}", e);
             return;
         }
 
         let mut need_write = false;
 
         // Try reclaim the cache space for the upcoming entries.
-        let (_, free_bytes) = try_reclaim_from_wal(&mut self.wal, 0, &self.log);
+        let (_, free_bytes) = try_reclaim_from_wal(&mut self.wal, 0);
         let mut free_bytes = free_bytes as i64;
 
         // The missed entries that are not in the cache, group by the start offset of segments.
@@ -763,7 +740,7 @@ impl IO {
                                 } else {
                                     // There is no enough space to read the entries, the task should be blocked.
                                     // Trace the pending task
-                                    trace!(self.log, "Pending the read task"; "task" => ?task);
+                                    trace!("Pending the read task");
                                     self.pending_data_tasks.push_front(IoTask::Read(task));
                                     break 'task_loop;
                                 }
@@ -800,7 +777,6 @@ impl IO {
                         if let Some(segment) = self.wal.segment_file_of(writer.cursor) {
                             if !segment.writable() {
                                 trace!(
-                                    log,
                                     "WAL Segment {}. Yield dispatching IO to block layer",
                                     segment
                                 );
@@ -812,7 +788,6 @@ impl IO {
                                 if !segment.can_hold(payload_length as u64) {
                                     if let Ok(cursor) = segment.append_footer(writer) {
                                         trace!(
-                                            self.log,
                                             "Write cursor of WAL after padding segment footer is: {}",
                                             cursor
                                         );
@@ -826,7 +801,6 @@ impl IO {
                                 if let Ok(cursor) = segment.append_record(writer, &task.buffer[..])
                                 {
                                     trace!(
-                                        self.log,
                                         "Write cursor of WAL after appending record is: {}",
                                         cursor
                                     );
@@ -837,7 +811,7 @@ impl IO {
                                 }
                                 break;
                             } else {
-                                error!(log, "LogSegmentFile {} with read_write status does not have valid FD", segment);
+                                error!("LogSegmentFile {} with read_write status does not have valid FD", segment);
                                 unreachable!("LogSegmentFile {} should have been with a valid FD if its status is read_write", segment);
                             }
                         } else {
@@ -876,15 +850,11 @@ impl IO {
 
     fn await_data_task_completion(&self, mut wanted: usize) {
         if self.inflight == 0 {
-            trace!(
-                self.log,
-                "No inflight data task. Skip `await_data_task_completion`"
-            );
+            trace!("No inflight data task. Skip `await_data_task_completion`");
             return;
         }
 
         trace!(
-            self.log,
             "Waiting for at least {}/{} data CQE(s) to reap",
             wanted,
             self.inflight
@@ -899,7 +869,6 @@ impl IO {
             match self.data_ring.submit_and_wait(wanted) {
                 Ok(_reaped) => {
                     trace!(
-                        self.log,
                         "io_uring_enter waited {}us to reap completed data CQE(s)",
                         now.elapsed().as_micros()
                     );
@@ -916,13 +885,13 @@ impl IO {
                             // think there's anything worth fixing there. For the wait part, the
                             // application may want to handle the signal before we can wait again.
                             // We can't go to sleep with a pending signal.
-                            warn!(self.log, "io_uring_enter got an error: {:?}", e);
+                            warn!("io_uring_enter got an error: {:?}", e);
                             continue;
                         }
                         io::ErrorKind::WouldBlock => {
                             // The kernel was unable to allocate memory for the request, or otherwise ran out of resources to handle it.
                             // The application should wait for some completions and try again.
-                            warn!(self.log, "io_uring_enter got an error: {:?}", e);
+                            warn!("io_uring_enter got an error: {:?}", e);
                             continue;
                         }
                         io::ErrorKind::ResourceBusy => {
@@ -935,7 +904,7 @@ impl IO {
                         }
                         _ => {
                             // Fatal errors, crash the process and let watchdog to restart.
-                            error!(self.log, "io_uring_enter got an error: {:?}", e);
+                            error!("io_uring_enter got an error: {:?}", e);
                             panic!("io_uring_enter returns error {:?}", e);
                         }
                     }
@@ -994,26 +963,16 @@ impl IO {
                         || context.opcode == opcode::WriteFixed::CODE)
                         && self.barrier.borrow_mut().remove(&context.buf.wal_offset)
                     {
-                        trace!(
-                            self.log,
-                            "Remove the barrier with wal_offset={}",
-                            context.wal_offset
-                        );
+                        trace!("Remove the barrier with wal_offset={}", context.wal_offset);
                     }
 
-                    if let Err(e) = on_complete(
-                        &mut self.write_window,
-                        &mut context,
-                        cqe.result(),
-                        &self.log,
-                    ) {
+                    if let Err(e) = on_complete(&mut self.write_window, &mut context, cqe.result())
+                    {
                         match e {
                             StoreError::System(errno) => {
                                 error!(
-                                    self.log,
                                     "io_uring opcode `{}` failed. errno: `{}`",
-                                    context.opcode,
-                                    errno
+                                    context.opcode, errno
                                 );
 
                                 let error = io::Error::from_raw_os_error(errno);
@@ -1025,7 +984,6 @@ impl IO {
                                     if self.blocked.contains_key(&context.wal_offset) {
                                         // There is a pending write task for this block, skip this task.
                                         trace!(
-                                            self.log,
                                             "Skip retrying the failed write task for wal offset {} as there is a pending write task for this block",
                                             context.wal_offset
                                         );
@@ -1039,7 +997,6 @@ impl IO {
                                         // Partial write, set the barrier.
                                         self.barrier.borrow_mut().insert(buf.wal_offset);
                                         trace!(
-                                            self.log,
                                             "Insert a barrier with wal_offset={}",
                                             buf.wal_offset
                                         );
@@ -1049,7 +1006,6 @@ impl IO {
                                         Some(sg) => sg,
                                         None => {
                                             error!(
-                                                self.log,
                                                 "Log segment not found for wal offset {}",
                                                 wal_offset
                                             );
@@ -1061,7 +1017,6 @@ impl IO {
                                         Some(sd) => sd,
                                         None => {
                                             error!(
-                                                self.log,
                                                 "Log segment {} does not have a valid descriptor",
                                                 sg.wal_offset
                                             );
@@ -1122,7 +1077,7 @@ impl IO {
                         if opcode::Read::CODE == context.opcode {
                             if let Some(segment) = self.wal.segment_file_of(context.wal_offset) {
                                 effected_segments.insert(segment.wal_offset);
-                                trace!(self.log, "Effected segment {}", segment.wal_offset);
+                                trace!("Effected segment {}", segment.wal_offset);
                             }
                         }
                     }
@@ -1134,20 +1089,18 @@ impl IO {
             debug_assert!(self.inflight >= count);
             self.inflight -= count;
             INFLIGHT_IO.sub(count as i64);
-            trace!(self.log, "Reaped {} data CQE(s)", count);
+            trace!("Reaped {} data CQE(s)", count);
         }
 
-        let (_, free_bytes) = try_reclaim_from_wal(&mut self.wal, cache_bytes, &self.log);
+        let (_, free_bytes) = try_reclaim_from_wal(&mut self.wal, cache_bytes);
 
         if free_bytes < cache_bytes as u64 {
             // There is no enough space to cache the returned blocks.
             // It's unlikely to happen, because the uring will pend the io task if there is no enough space.
             // So we just warn this case, and ingest the blocks into the cache.
             warn!(
-                self.log,
                 "No enough space to cache the returned blocks. Cache size: {}, free space: {}",
-                cache_bytes,
-                free_bytes
+                cache_bytes, free_bytes
             );
         }
 
@@ -1172,13 +1125,12 @@ impl IO {
             wal_offset,
         };
         trace!(
-            self.log,
             "Ack `WriteTask` {{ stream-id: {}, offset: {} }}",
             task.stream_id,
             task.offset
         );
         if let Err(e) = task.observer.send(Ok(append_result)) {
-            error!(self.log, "Failed to propagate AppendResult `{:?}`", e);
+            error!("Failed to propagate AppendResult `{:?}`", e);
         }
     }
 
@@ -1218,7 +1170,6 @@ impl IO {
                                 // Wait for the next IO to complete this task
                                 // Trace the detail of uncompleted task
                                 trace!(
-                                    self.log,
                                     "Inflight read task {{ wal_offset: {}, len: {} }}",
                                     task.wal_offset,
                                     task.len
@@ -1227,10 +1178,7 @@ impl IO {
                             Err(_) => {
                                 // The error means we need issue some read IOs for this task,
                                 // but it's impossible for inflight read task since we already handle this situation in `submit_read_task`
-                                error!(
-                                    self.log,
-                                    "Unexpected error when get entries from block cache"
-                                );
+                                error!("Unexpected error when get entries from block cache");
                             }
                         }
                     }
@@ -1250,7 +1198,6 @@ impl IO {
             .iter()
             .for_each(|(wal_offset, tasks)| {
                 trace!(
-                    self.log,
                     "Inflight read tasks for wal offset {}: {}",
                     wal_offset,
                     tasks.len()
@@ -1287,7 +1234,6 @@ impl IO {
         };
 
         trace!(
-            self.log,
             "Completes read task for stream {} at WAL offset {}, return {} bytes",
             fetch_result.stream_id,
             fetch_result.wal_offset,
@@ -1295,7 +1241,7 @@ impl IO {
         );
 
         if let Err(e) = read_task.observer.send(Ok(fetch_result)) {
-            error!(self.log, "Failed to send read result to observer: {:?}", e);
+            error!("Failed to send read result to observer: {:?}", e);
         }
     }
 
@@ -1313,7 +1259,7 @@ impl IO {
                     self.build_read_index(wal_offset, written_len, &task);
                     self.acknowledge_to_observer(wal_offset, task);
                 } else {
-                    error!(self.log, "No written length for `WriteTask`");
+                    error!("No written length for `WriteTask`");
                 }
             }
         }
@@ -1332,7 +1278,6 @@ impl IO {
     fn submit_data_tasks(&mut self, entries: &Vec<squeue::Entry>) -> Result<(), StoreError> {
         // Submit io_uring entries into submission queue.
         trace!(
-            self.log,
             "Get {} incoming SQE(s) to submit, inflight: {}",
             entries.len(),
             self.inflight
@@ -1344,16 +1289,13 @@ impl IO {
                     .submission()
                     .push_multiple(entries)
                     .map_err(|e| {
-                        info!(
-                            self.log,
-                            "Failed to push SQE entries into submission queue: {:?}", e
-                        );
+                        info!("Failed to push SQE entries into submission queue: {:?}", e);
                         StoreError::IoUring
                     })?
             };
             self.inflight += cnt;
             INFLIGHT_IO.add(cnt as i64);
-            trace!(self.log, "Pushed {} SQEs into submission queue", cnt);
+            trace!("Pushed {} SQEs into submission queue", cnt);
         }
         Ok(())
     }
@@ -1362,13 +1304,12 @@ impl IO {
         io: RefCell<IO>,
         recovery_completion_tx: oneshot::Sender<()>,
     ) -> Result<(), StoreError> {
-        let log = io.borrow().log.clone();
         io.borrow_mut().load()?;
         let pos = io.borrow().indexer.get_wal_checkpoint()?;
         io.borrow_mut().recover(pos)?;
 
         if recovery_completion_tx.send(()).is_err() {
-            error!(log, "Failed to notify completion of recovery");
+            error!("Failed to notify completion of recovery");
         }
 
         let min_preallocated_segment_files =
@@ -1397,7 +1338,7 @@ impl IO {
 
                 // Receive IO tasks from channel
                 let cnt = io_mut.receive_io_tasks();
-                trace!(log, "Received {} IO requests from channel", cnt);
+                trace!("Received {} IO requests from channel", cnt);
 
                 // Convert IO tasks into io_uring entries
                 io_mut.build_sqe(&mut entries);
@@ -1413,7 +1354,6 @@ impl IO {
                     }
                 } else {
                     info!(
-                        log,
                         "Now that all IO requests are served and channel disconnects, stop main loop"
                     );
                     break;
@@ -1431,7 +1371,7 @@ impl IO {
                 io_mut.wal.reap_control_tasks()?;
             }
         }
-        info!(log, "Main loop quit");
+        info!("Main loop quit");
 
         // Flush index and metadata
         io.borrow().indexer.flush(true)?;
@@ -1442,11 +1382,10 @@ impl IO {
 
 /// Try reclaim some bytes from the wal
 ///
-fn try_reclaim_from_wal(wal: &mut Wal, reclaim_bytes: u32, log: &Logger) -> (u64, u64) {
+fn try_reclaim_from_wal(wal: &mut Wal, reclaim_bytes: u32) -> (u64, u64) {
     // Try reclaim the cache space for the upcoming entries.
     let (reclaimed_bytes, free_bytes) = wal.try_reclaim(reclaim_bytes);
     trace!(
-        log,
         "Need to reclaim {} bytes, actually {} bytes are reclaimed from WAL, now {} bytes free",
         reclaim_bytes,
         reclaimed_bytes,
@@ -1467,13 +1406,11 @@ fn on_complete(
     write_window: &mut WriteWindow,
     context: &mut Context,
     result: i32,
-    log: &Logger,
 ) -> Result<(), StoreError> {
     match context.opcode {
         opcode::Write::CODE => {
             if result < 0 {
                 error!(
-                    log,
                     "Write to WAL range `[{}, {})` failed",
                     context.buf.wal_offset,
                     context.buf.wal_offset + context.buf.capacity as u64
@@ -1482,8 +1419,8 @@ fn on_complete(
             } else {
                 if result as usize != context.buf.capacity {
                     error!(
-                        log,
-                        "Only {} of {} bytes are written to disk", result, context.buf.capacity
+                        "Only {} of {} bytes are written to disk",
+                        result, context.buf.capacity
                     );
                     todo!("Implement write_all");
                 }
@@ -1491,7 +1428,6 @@ fn on_complete(
                     .commit(context.wal_offset, context.len)
                     .map_err(|e| {
                         error!(
-                            log,
                             "Failed to commit `write`[{}, {}) into WriteWindow: {:?}",
                             context.wal_offset,
                             context.wal_offset + context.len as u64,
@@ -1505,14 +1441,13 @@ fn on_complete(
         opcode::Read::CODE => {
             if result < 0 {
                 error!(
-                    log,
-                    "Read from WAL range `[{}, {})` failed", context.wal_offset, context.len
+                    "Read from WAL range `[{}, {})` failed",
+                    context.wal_offset, context.len
                 );
                 Err(StoreError::System(-result))
             } else {
                 if result != context.len as i32 {
                     error!(
-                        log,
                         "Read {} bytes from WAL range `[{}, {})`, but {} bytes expected",
                         result,
                         context.wal_offset,
@@ -1551,8 +1486,8 @@ mod tests {
     use crate::offset_manager::WalOffsetManager;
     use bytes::BytesMut;
     use crossbeam::channel::Sender;
+    use log::trace;
     use model::flat_record::FlatRecordBatch;
-    use slog::trace;
     use std::cell::RefCell;
     use std::error::Error;
     use std::io;
@@ -1587,7 +1522,6 @@ mod tests {
         }
 
         fn build(self) -> Result<super::IO, StoreError> {
-            let logger = test_util::terminal_logger();
             let config = Arc::new(self.cfg);
 
             // Build wal offset manager
@@ -1595,7 +1529,6 @@ mod tests {
 
             // Build index driver
             let indexer = Arc::new(IndexDriver::new(
-                logger.clone(),
                 &config
                     .store
                     .path
@@ -1607,7 +1540,7 @@ mod tests {
                 128,
             )?);
 
-            super::IO::new(&config, indexer, logger.clone())
+            super::IO::new(&config, indexer)
         }
     }
 
@@ -1628,16 +1561,13 @@ mod tests {
     where
         IoCreator: Fn(&Path) -> Result<super::IO, StoreError> + Send + 'static,
     {
-        let log = test_util::terminal_logger();
-
         let (tx, rx) = oneshot::channel();
         let (recovery_completion_tx, recovery_completion_rx) = oneshot::channel();
-        let logger = log.clone();
 
         let handle = std::thread::spawn(move || {
             let store_dir = random_store_dir().unwrap();
             let store_dir = store_dir.as_path();
-            let _store_dir_guard = test_util::DirectoryRemovalGuard::new(logger, store_dir);
+            let _store_dir_guard = test_util::DirectoryRemovalGuard::new(store_dir);
             let mut io = io_creator(store_dir).unwrap();
 
             let sender = io
@@ -1668,10 +1598,10 @@ mod tests {
 
     #[test]
     fn test_receive_io_tasks() -> Result<(), StoreError> {
-        let log = test_util::terminal_logger();
+        test_util::try_init_log();
         let store_dir = random_store_dir()?;
         let store_dir = store_dir.as_path();
-        let _store_dir_guard = test_util::DirectoryRemovalGuard::new(log, store_dir);
+        let _store_dir_guard = test_util::DirectoryRemovalGuard::new(store_dir);
         let mut io = create_default_io(store_dir)?;
         let sender = io.sender.take().unwrap();
         let mut buffer = BytesMut::with_capacity(128);
@@ -1718,9 +1648,9 @@ mod tests {
 
     #[test]
     fn test_reserve_write_buffers() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
+        test_util::try_init_log();
         let store_path = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(log.clone(), store_path.as_path());
+        let _guard = test_util::DirectoryRemovalGuard::new(store_path.as_path());
 
         let file_size = 1024 * 1024;
         let mut io = IOBuilder::new(store_path.clone())
@@ -1801,10 +1731,10 @@ mod tests {
 
     #[test]
     fn test_build_sqe() -> Result<(), StoreError> {
-        let log = test_util::terminal_logger();
+        test_util::try_init_log();
         let store_dir = random_store_dir()?;
         let store_dir = store_dir.as_path();
-        let _store_dir_guard = test_util::DirectoryRemovalGuard::new(log, store_dir);
+        let _store_dir_guard = test_util::DirectoryRemovalGuard::new(store_dir);
         let mut io = create_default_io(store_dir)?;
 
         io.wal.open_segment_directly()?;
@@ -1840,8 +1770,8 @@ mod tests {
 
     #[test]
     fn test_run_basic() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let (handle, sender) = create_and_run_io(create_default_io)?;
-
         let records: Vec<_> = (0..16)
             .into_iter()
             .map(|_| {
@@ -1860,8 +1790,8 @@ mod tests {
 
     #[test]
     fn test_run_on_small_io() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let (handle, sender) = create_and_run_io(create_small_io)?;
-
         // Will cost at least 4K * 1024 = 4M bytes, which means at least 4 segments will be allocated
         // And the cache reclaim will be triggered since a small io only has 1M cache
         let records: Vec<_> = (0..4096)
@@ -1881,24 +1811,21 @@ mod tests {
 
     #[test]
     fn test_send_and_receive_half_page() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let (handle, sender) = create_and_run_io(create_default_io)?;
-
         send_and_receive_with_records(sender.clone(), 0, 0, vec![create_random_bytes(199)]);
         drop(sender);
-
         handle.join().map_err(|_| StoreError::AllocLogSegment)?;
         Ok(())
     }
 
     #[test]
     fn test_recover() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
-
+        test_util::try_init_log();
         let (tx, rx) = oneshot::channel();
-        let logger = log.clone();
         let store_dir = random_store_dir().unwrap();
         // Delete the directory after restart and verification of `recover`.
-        let _store_dir_guard = test_util::DirectoryRemovalGuard::new(logger, store_dir.as_path());
+        let _store_dir_guard = test_util::DirectoryRemovalGuard::new(store_dir.as_path());
         let store_path = store_dir.as_os_str().to_os_string();
 
         let (recovery_completion_tx, recovery_completion_rx) = oneshot::channel();
@@ -1954,8 +1881,8 @@ mod tests {
 
     #[test]
     fn test_multiple_run_with_random_bytes() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let (handle, sender) = create_and_run_io(create_small_io)?;
-
         let mut records: Vec<_> = vec![];
         records.push(create_random_bytes(4096 - 8));
         records.push(create_random_bytes(4096 - 8));
@@ -1983,6 +1910,7 @@ mod tests {
 
     #[test]
     fn test_run_with_random_bytes() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let (handle, sender) = create_and_run_io(create_small_io)?;
         let mut records: Vec<_> = vec![];
         let count = 1000;
@@ -2004,7 +1932,6 @@ mod tests {
         start_offset: i64,
         records: Vec<bytes::Bytes>,
     ) {
-        let log = test_util::terminal_logger();
         let mut receivers = vec![];
         records
             .iter()
@@ -2028,7 +1955,6 @@ mod tests {
         for receiver in receivers {
             let res = receiver.blocking_recv().unwrap().unwrap();
             trace!(
-                log,
                 "{{ stream-id: {}, offset: {} , wal_offset: {}}}",
                 res.stream_id,
                 res.offset,
@@ -2061,7 +1987,6 @@ mod tests {
         for receiver in receivers {
             let res = receiver.blocking_recv().unwrap().unwrap();
             trace!(
-                log,
                 "{{Read result is stream-id: {}, wal_offset: {}, payload length: {}}}",
                 res.stream_id,
                 res.wal_offset,

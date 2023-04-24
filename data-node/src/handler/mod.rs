@@ -17,7 +17,7 @@ use crate::{
     stream_manager::StreamManager,
 };
 use codec::frame::Frame;
-use slog::{trace, warn, Logger};
+use log::{trace, warn};
 use std::{cell::RefCell, rc::Rc};
 use store::ElasticStore;
 
@@ -32,9 +32,6 @@ pub struct ServerCall {
     ///
     /// Note the receiver part is polled by `ChannelWriter` in a spawned task.
     pub(crate) sender: tokio::sync::mpsc::UnboundedSender<Frame>,
-
-    /// Logger
-    pub(crate) logger: Logger,
 
     /// `Store` to query, persist and replicate records.
     ///
@@ -51,7 +48,6 @@ impl ServerCall {
     /// operation code.
     pub async fn call(&mut self) {
         trace!(
-            self.logger,
             "Receive a request. stream-id={}, opcode={}",
             self.request.stream_id,
             self.request.operation_code
@@ -64,7 +60,7 @@ impl ServerCall {
         // If the response sequence is not ended, please note reset the flag in the subsequent logic.
         response.flag_end_of_response_stream();
 
-        let cmd = match Command::from_frame(self.logger.clone(), &self.request).ok() {
+        let cmd = match Command::from_frame(&self.request).ok() {
             Some(it) => it,
             None => {
                 // TODO: return error response
@@ -74,7 +70,6 @@ impl ServerCall {
 
         // Log the `cmd` object.
         trace!(
-            self.logger,
             "Command of frame[stream-id={}]: {:?}",
             self.request.stream_id,
             cmd
@@ -96,11 +91,7 @@ impl ServerCall {
             }
             _ => {}
         }
-        trace!(
-            self.logger,
-            "Response frame generated. stream-id={}",
-            response.stream_id
-        );
+        trace!("Response frame generated. stream-id={}", response.stream_id);
 
         // Send response to channel.
         // Note there is a spawned task, in which channel writer is polling the channel.
@@ -108,17 +99,14 @@ impl ServerCall {
         match self.sender.send(response) {
             Ok(_) => {
                 trace!(
-                    self.logger,
                     "Response[stream-id={}] transferred to channel",
                     self.request.stream_id
                 );
             }
             Err(e) => {
                 warn!(
-                    self.logger,
                     "Failed to send response[stream-id={}] to channel. Cause: {:?}",
-                    self.request.stream_id,
-                    e
+                    self.request.stream_id, e
                 );
             }
         };

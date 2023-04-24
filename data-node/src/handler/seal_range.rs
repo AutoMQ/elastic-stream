@@ -2,10 +2,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use bytes::Bytes;
 use codec::frame::Frame;
+use log::{error, trace, warn};
 use protocol::rpc::header::{
     ErrorCode, RangeT, SealRangesRequest, SealRangesResponseT, SealRangesResultT, StatusT,
 };
-use slog::{error, trace, warn, Logger};
 use store::ElasticStore;
 
 use crate::stream_manager::StreamManager;
@@ -14,12 +14,11 @@ use super::util::root_as_rpc_request;
 
 #[derive(Debug)]
 pub(crate) struct SealRange<'a> {
-    log: Logger,
     request: SealRangesRequest<'a>,
 }
 
 impl<'a> SealRange<'a> {
-    pub(crate) fn parse_frame(log: Logger, frame: &'a Frame) -> Result<Self, ErrorCode> {
+    pub(crate) fn parse_frame(frame: &'a Frame) -> Result<Self, ErrorCode> {
         let request = frame
             .header
             .as_ref()
@@ -27,13 +26,13 @@ impl<'a> SealRange<'a> {
             .ok_or(ErrorCode::BAD_REQUEST)?
             .map_err(|_e| {
                 warn!(
-                    log,
-                    "Received an invalid seal range request[stream-id={}]", frame.stream_id
+                    "Received an invalid seal range request[stream-id={}]",
+                    frame.stream_id
                 );
                 ErrorCode::BAD_REQUEST
             })?;
 
-        Ok(Self { log, request })
+        Ok(Self { request })
     }
 
     pub(crate) async fn apply(
@@ -68,10 +67,8 @@ impl<'a> SealRange<'a> {
                 }
                 Err(e) => {
                     error!(
-                        self.log,
                         "Failed to seal stream-id={}, range_index={}",
-                        range.stream_id,
-                        range.range_index
+                        range.stream_id, range.range_index
                     );
                     status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
                     status.message = Some(format!("{:?}", e));
@@ -81,7 +78,7 @@ impl<'a> SealRange<'a> {
             results.push(result);
         }
         seal_response.seal_responses = Some(results);
-        trace!(self.log, "{:?}", seal_response);
+        trace!("{:?}", seal_response);
         let resp = seal_response.pack(&mut builder);
         builder.finish(resp, None);
         let data = builder.finished_data();

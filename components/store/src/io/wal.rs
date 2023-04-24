@@ -13,10 +13,10 @@ use crate::{
 };
 
 use io_uring::{opcode, squeue, types};
+use log::{debug, error, info, trace, warn};
 use model::flat_record::FlatRecordBatch;
 use percentage::Percentage;
 use protocol::flat_model::records::RecordBatchMeta;
-use slog::{debug, error, info, trace, warn, Logger};
 
 /// A WalCache holds the configurations of cache management, and supports count the usage of the memory.
 pub(crate) struct WalCache {
@@ -58,22 +58,17 @@ pub(crate) struct Wal {
 
     /// The cache management of the WAL.
     wal_cache: WalCache,
-
-    /// Logger instance.
-    log: Logger,
 }
 
 impl Wal {
     pub(crate) fn new(
         control_ring: io_uring::IoUring,
         config: &Arc<config::Configuration>,
-        log: Logger,
     ) -> Self {
         Self {
             control_ring,
             config: Arc::clone(config),
             segments: VecDeque::new(),
-            log,
             inflight_control_tasks: HashMap::new(),
             wal_cache: WalCache {
                 max_cache_size: config.store.max_cache_size,
@@ -98,14 +93,13 @@ impl Wal {
             .flat_map(|entry| {
                 if let Ok(metadata) = entry.metadata() {
                     if metadata.file_type().is_dir() {
-                        warn!(self.log, "Skip {:?} as it is a directory", entry.path());
+                        warn!("Skip {:?} as it is a directory", entry.path());
                         None
                     } else {
                         let path = entry.path();
                         let path = path.as_path();
                         if let Some(offset) = LogSegment::parse_offset(path) {
                             let log_segment_file = LogSegment::new(
-                                self.log.clone(),
                                 &self.config,
                                 offset,
                                 self.config.store.segment_size,
@@ -113,11 +107,7 @@ impl Wal {
                             );
                             Some(log_segment_file)
                         } else {
-                            error!(
-                                self.log,
-                                "Failed to parse offset from file name: {:?}",
-                                entry.path()
-                            );
+                            error!("Failed to parse offset from file name: {:?}", entry.path());
                             None
                         }
                     }
@@ -149,7 +139,6 @@ impl Wal {
     fn scan_record(
         segment: &mut LogSegment,
         pos: &mut u64,
-        log: &Logger,
         indexer: &Arc<IndexDriver>,
     ) -> Result<bool, StoreError> {
         let mut file_pos = *pos - segment.wal_offset;
@@ -170,10 +159,7 @@ impl Wal {
 
             // Verify the parsed `len` makes sense.
             if file_pos + len as u64 > segment.size || 0 == len {
-                info!(
-                    log,
-                    "Got an invalid record length: `{}`. Stop scanning WAL", len
-                );
+                info!("Got an invalid record length: `{}`. Stop scanning WAL", len);
                 last_found = true;
                 segment.status = Status::ReadWrite;
                 file_pos -= 8;
@@ -190,10 +176,8 @@ impl Wal {
                 segment.written = file_pos;
                 segment.status = Status::ReadWrite;
                 info!(
-                    log,
                     "Found a record failing CRC32c. Expecting: `{:#08x}`, Actual: `{:#08x}`",
-                    crc,
-                    ckm
+                    crc, ckm
                 );
                 last_found = true;
                 break;
@@ -209,7 +193,7 @@ impl Wal {
 
                     segment.written = segment.size;
                     segment.status = Status::Read;
-                    info!(log, "Reached EOF of {}", segment);
+                    info!("Reached EOF of {}", segment);
 
                     // Break if the scan operation reaches the end of file
                     break;
@@ -235,17 +219,17 @@ impl Wal {
                                 len: len as u32 + 8,
                                 hash: 0,
                             };
-                            trace!(log, "Index RecordBatch[stream-id={}, base-offset={}, wal-offset={}, len={}]", stream_id, offset, handle.wal_offset, handle.len);
+                            trace!("Index RecordBatch[stream-id={}, base-offset={}, wal-offset={}, len={}]", stream_id, offset, handle.wal_offset, handle.len);
                             indexer.index(stream_id, offset, handle);
                         }
                         Err(e) => {
-                            error!(log, "Failed to deserialize RecordBatchMeta. Cause: {:?}", e);
+                            error!("Failed to deserialize RecordBatchMeta. Cause: {:?}", e);
                             panic!("Failed to deserialize RecordBatchMeta");
                         }
                     }
                 }
                 Err(e) => {
-                    error!(log, "Failed to decode FlatRecordBatch. Cause: {}", e);
+                    error!("Failed to decode FlatRecordBatch. Cause: {}", e);
                     panic!("Failed to decode FlatRecordBatch");
                 }
             }
@@ -264,41 +248,39 @@ impl Wal {
         indexer: Arc<IndexDriver>,
     ) -> Result<u64, StoreError> {
         let mut pos = offset;
-        let log = self.log.clone();
-        info!(log, "Start to recover WAL segment files");
+        info!("Start to recover WAL segment files");
         let mut need_scan = true;
         for segment in self.segments.iter_mut() {
             if segment.wal_offset + segment.size <= offset {
                 segment.status = Status::Read;
                 segment.written = segment.size;
-                debug!(log, "Mark {} as read-only", segment);
+                debug!("Mark {} as read-only", segment);
                 continue;
             }
 
             if !need_scan {
                 segment.written = 0;
                 segment.status = Status::ReadWrite;
-                debug!(log, "Mark {} as read-write", segment);
+                debug!("Mark {} as read-write", segment);
                 continue;
             }
 
-            if Self::scan_record(segment, &mut pos, &log, &indexer)? {
+            if Self::scan_record(segment, &mut pos, &&indexer)? {
                 need_scan = false;
-                info!(log, "Recovery completed at `{}`", pos);
+                info!("Recovery completed at `{}`", pos);
             }
         }
-        info!(log, "Recovery of WAL segment files completed");
+        info!("Recovery of WAL segment files completed");
 
         Ok(pos)
     }
 
     /// New a segment, and then open it in the uring driver.
     pub(crate) fn try_open_segment(&mut self) -> Result<(), StoreError> {
-        let log = self.log.clone();
         let segment = self.alloc_segment()?;
         let offset = segment.wal_offset;
         debug_assert_eq!(segment.status, Status::OpenAt);
-        info!(log, "About to create/open LogSegmentFile: `{}`", segment);
+        info!("About to create/open LogSegmentFile: `{}`", segment);
         let status = segment.status;
         self.inflight_control_tasks.insert(offset, status);
         let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), segment.path.as_ptr())
@@ -308,10 +290,7 @@ impl Wal {
             .user_data(offset);
         unsafe {
             self.control_ring.submission().push(&sqe).map_err(|e| {
-                error!(
-                    self.log,
-                    "Failed to push OpenAt SQE to submission queue: {:?}", e
-                );
+                error!("Failed to push OpenAt SQE to submission queue: {:?}", e);
                 StoreError::IoUring
             })?
         };
@@ -336,10 +315,10 @@ impl Wal {
                 let sqe = opcode::Close::new(types::Fd(sd.fd))
                     .build()
                     .user_data(segment.wal_offset);
-                info!(self.log, "About to close LogSegmentFile: {}", segment);
+                info!("About to close LogSegmentFile: {}", segment);
                 unsafe {
                     self.control_ring.submission().push(&sqe).map_err(|e| {
-                        error!(self.log, "Failed to submit close SQE to SQ: {:?}", e);
+                        error!("Failed to submit close SQE to SQ: {:?}", e);
                         StoreError::IoUring
                     })
                 }?;
@@ -347,7 +326,7 @@ impl Wal {
         }
 
         self.control_ring.submit().map_err(|e| {
-            error!(self.log, "io_uring_enter failed when submit: {:?}", e);
+            error!("io_uring_enter failed when submit: {:?}", e);
             StoreError::IoUring
         })?;
 
@@ -469,7 +448,6 @@ impl Wal {
         let path = path.join(LogSegment::format(offset));
 
         let segment = LogSegment::new(
-            self.log.clone(),
             &self.config,
             offset,
             self.config.store.segment_size,
@@ -508,7 +486,6 @@ impl Wal {
             match self.control_ring.submit_and_wait(1) {
                 Ok(_) => {
                     info!(
-                        self.log,
                         "Waiting {}us for control plane file system operation",
                         now.elapsed().as_micros()
                     );
@@ -525,7 +502,7 @@ impl Wal {
                             // think there's anything worth fixing there. For the wait part, the
                             // application may want to handle the signal before we can wait again.
                             // We can't go to sleep with a pending signal.
-                            warn!(self.log, "io_uring_enter got an error: {:?}", e);
+                            warn!("io_uring_enter got an error: {:?}", e);
                             continue;
                         }
 
@@ -535,12 +512,12 @@ impl Wal {
                             // the overflow entries were able to be flushed to the CQ ring.
                             //
                             // See https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html
-                            warn!(self.log, "io_uring_enter got an error: {:?}", e);
+                            warn!("io_uring_enter got an error: {:?}", e);
                             continue;
                         }
 
                         _ => {
-                            error!(self.log, "io_uring_enter got an error: {:?}", e);
+                            error!("io_uring_enter got an error: {:?}", e);
                             // Fatal errors, crash the process and let watchdog to restart.
                             panic!("io_uring_enter returns error {:?}", e);
                         }
@@ -571,7 +548,6 @@ impl Wal {
             .flat_map(|(offset, result)| {
                 if self.inflight_control_tasks.remove(&offset).is_none() {
                     error!(
-                        self.log,
                         "`file_op` map should have a record for log segment with offset: {}",
                         offset
                     );
@@ -587,18 +563,17 @@ impl Wal {
     }
 
     fn on_file_op_completion(&mut self, offset: u64, result: i32) -> Result<(), StoreError> {
-        let log = self.log.clone();
         let mut to_remove = vec![];
         if let Some(segment) = self.segment_file_of(offset) {
             if -1 == result {
-                error!(log, "LogSegment file operation failed: {}", segment);
+                error!("LogSegment file operation failed: {}", segment);
                 return Err(StoreError::System(result));
             }
             match segment.status {
                 Status::OpenAt => {
                     info!(
-                        log,
-                        "LogSegmentFile: `{}` is created and open with FD: {}", segment, result
+                        "LogSegmentFile: `{}` is created and open with FD: {}",
+                        segment, result
                     );
                     segment.sd = Some(SegmentDescriptor {
                         medium: Medium::Ssd,
@@ -608,8 +583,8 @@ impl Wal {
                     segment.status = Status::Fallocate64;
 
                     info!(
-                        log,
-                        "About to fallocate LogSegmentFile: `{}` with FD: {}", segment, result
+                        "About to fallocate LogSegmentFile: `{}` with FD: {}",
+                        segment, result
                     );
                     let sqe = opcode::Fallocate64::new(types::Fd(result), segment.size as i64)
                         .offset(0)
@@ -618,10 +593,7 @@ impl Wal {
                         .user_data(offset);
                     unsafe {
                         self.control_ring.submission().push(&sqe).map_err(|e| {
-                            error!(
-                                log,
-                                "Failed to submit Fallocate SQE to io_uring SQ: {:?}", e
-                            );
+                            error!("Failed to submit Fallocate SQE to io_uring SQ: {:?}", e);
                             StoreError::IoUring
                         })
                     }?;
@@ -629,14 +601,14 @@ impl Wal {
                         .insert(offset, Status::Fallocate64);
                 }
                 Status::Fallocate64 => {
-                    info!(log, "Fallocate of LogSegmentFile `{}` completed", segment);
+                    info!("Fallocate of LogSegmentFile `{}` completed", segment);
                     segment.status = Status::ReadWrite;
                 }
                 Status::Close => {
-                    info!(log, "LogSegmentFile: `{}` is closed", segment);
+                    info!("LogSegmentFile: `{}` is closed", segment);
                     segment.sd = None;
 
-                    info!(log, "About to delete LogSegmentFile `{}`", segment);
+                    info!("About to delete LogSegmentFile `{}`", segment);
                     let sqe = opcode::UnlinkAt::new(
                         types::Fd(libc::AT_FDCWD),
                         segment.path.as_ptr() as *const libc::c_char,
@@ -646,14 +618,14 @@ impl Wal {
                     .user_data(offset);
                     unsafe {
                         self.control_ring.submission().push(&sqe).map_err(|e| {
-                            error!(log, "Failed to push Unlink SQE to SQ: {:?}", e);
+                            error!("Failed to push Unlink SQE to SQ: {:?}", e);
                             StoreError::IoUring
                         })
                     }?;
                     self.inflight_control_tasks.insert(offset, Status::Close);
                 }
                 Status::UnlinkAt => {
-                    info!(log, "LogSegmentFile: `{}` is deleted", segment);
+                    info!("LogSegmentFile: `{}` is deleted", segment);
                     to_remove.push(offset)
                 }
                 _ => {}
@@ -662,7 +634,7 @@ impl Wal {
 
         // It's OK to submit 0 entry.
         self.control_ring.submit().map_err(|e| {
-            error!(log, "Failed to submit SQEs to SQ: {:?}", e);
+            error!("Failed to submit SQEs to SQ: {:?}", e);
             StoreError::IoUring
         })?;
 
@@ -677,8 +649,8 @@ mod tests {
     use crate::error::StoreError;
     use crate::io::buf::AlignedBuf;
     use crate::io::segment::{LogSegment, Status};
+    use log::error;
     use percentage::Percentage;
-    use slog::error;
     use std::error::Error;
     use std::fs::File;
     use std::path::PathBuf;
@@ -687,13 +659,12 @@ mod tests {
     use super::Wal;
 
     fn create_wal(cfg: &Arc<config::Configuration>) -> Result<Wal, StoreError> {
-        let logger = test_util::terminal_logger();
         let control_ring = io_uring::IoUring::builder().dontfork().build(32).map_err(|e| {
-            error!(logger, "Failed to build I/O Uring instance for write-ahead-log segment file management: {:#?}", e);
+            error!( "Failed to build I/O Uring instance for write-ahead-log segment file management: {:#?}", e);
             StoreError::IoUring
         })?;
 
-        Ok(Wal::new(control_ring, cfg, logger))
+        Ok(Wal::new(control_ring, cfg))
     }
 
     fn random_wal_dir() -> Result<PathBuf, StoreError> {
@@ -702,9 +673,8 @@ mod tests {
 
     #[test]
     fn test_load_wals() -> Result<(), StoreError> {
-        let log = test_util::terminal_logger();
         let store_base = random_wal_dir()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(log, store_base.as_path());
+        let _guard = test_util::DirectoryRemovalGuard::new(store_base.as_path());
         let mut cfg = config::Configuration::default();
         cfg.store
             .path
@@ -735,8 +705,7 @@ mod tests {
     #[test]
     fn test_alloc_segment() -> Result<(), StoreError> {
         let wal_dir = random_wal_dir()?;
-        let log = test_util::terminal_logger();
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(log, wal_dir.as_path());
+        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
 
         let mut cfg = config::Configuration::default();
         cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
@@ -755,8 +724,7 @@ mod tests {
     #[test]
     fn test_writable_segment_count() -> Result<(), StoreError> {
         let wal_dir = random_wal_dir()?;
-        let log = test_util::terminal_logger();
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(log, wal_dir.as_path());
+        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
 
         let mut cfg = config::Configuration::default();
         cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
@@ -779,8 +747,7 @@ mod tests {
     #[test]
     fn test_segment_file_of() -> Result<(), StoreError> {
         let wal_dir = random_wal_dir()?;
-        let log = test_util::terminal_logger();
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(log, wal_dir.as_path());
+        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
         let mut cfg = config::Configuration::default();
         cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
         let config = Arc::new(cfg);
@@ -813,8 +780,7 @@ mod tests {
     #[test]
     fn test_delete_segments() -> Result<(), Box<dyn Error>> {
         let wal_dir = random_wal_dir()?;
-        let log = test_util::terminal_logger();
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(log, wal_dir.as_path());
+        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
         let mut cfg = config::Configuration::default();
         cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
         let config = Arc::new(cfg);
@@ -839,9 +805,8 @@ mod tests {
     /// Test try_reclaim_segments
     #[test]
     fn test_try_reclaim_segments() -> Result<(), StoreError> {
-        let log = test_util::terminal_logger();
         let wal_dir = random_wal_dir()?;
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(log.clone(), wal_dir.as_path());
+        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
         let mut cfg = config::Configuration::default();
         cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
         let config = Arc::new(cfg);
@@ -873,7 +838,6 @@ mod tests {
             (0..num_entries).for_each(|index| {
                 let buf = Arc::new(
                     AlignedBuf::new(
-                        log.clone(),
                         segment.wal_offset + index * cache_size_of_single_entry,
                         cache_size_of_single_entry as usize,
                         config.store.alignment,

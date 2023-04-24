@@ -1,13 +1,11 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use codec::frame::{Frame, OperationCode};
-use slog::{info, warn, Logger};
+use log::{info, warn};
 use tokio::sync::mpsc::UnboundedSender;
 
 /// Track all existing connections and send the `GoAway` farewell frame to peers if graceful shutdown is desirable.
 pub(crate) struct ConnectionTracker {
-    log: Logger,
-
     /// Map between peer socket address to channel sender.
     ///
     /// Note the reader half of the channel is the connection writer, responsible of writing
@@ -16,21 +14,20 @@ pub(crate) struct ConnectionTracker {
 }
 
 impl ConnectionTracker {
-    pub(crate) fn new(log: Logger) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            log,
             connections: HashMap::new(),
         }
     }
 
     pub(crate) fn insert(&mut self, peer_address: SocketAddr, sender: UnboundedSender<Frame>) {
         self.connections.insert(peer_address, sender);
-        info!(self.log, "Start to track connection to {}", peer_address);
+        info!("Start to track connection to {}", peer_address);
     }
 
     pub(crate) fn remove(&mut self, peer_address: &SocketAddr) {
         self.connections.remove(peer_address);
-        info!(self.log, "Connection to {} disconnected", peer_address);
+        info!("Connection to {} disconnected", peer_address);
     }
 
     /// Send `GoAway` frame to all existing connections.
@@ -50,13 +47,12 @@ impl ConnectionTracker {
             match sender.send(frame) {
                 Ok(_) => {
                     info!(
-                        self.log,
-                        "GoAway frame sent to channel bounded to connection={}", peer_address
+                        "GoAway frame sent to channel bounded to connection={}",
+                        peer_address
                     );
                 }
                 Err(_e) => {
                     warn!(
-                        self.log,
                         "Failed to send GoAway frame to channel bounded to connection={}",
                         peer_address
                     );

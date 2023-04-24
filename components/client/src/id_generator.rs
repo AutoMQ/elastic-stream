@@ -1,6 +1,6 @@
 //! This module contains a trait and a simple implementation to generate unique ID for data node.
 
-use slog::{error, trace, Logger};
+use log::{error, trace};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, oneshot};
 
@@ -14,14 +14,12 @@ pub trait IdGenerator {
 /// Generate unique ID across the whole cluster by placement manager.
 ///
 pub struct PlacementManagerIdGenerator {
-    log: Logger,
     config: Arc<config::Configuration>,
 }
 
 impl PlacementManagerIdGenerator {
-    pub fn new(log: Logger, config: &config::Configuration) -> Self {
+    pub fn new(config: &config::Configuration) -> Self {
         Self {
-            log,
             config: Arc::new(config.clone()),
         }
     }
@@ -33,7 +31,7 @@ impl IdGenerator for PlacementManagerIdGenerator {
         tokio_uring::start(async {
             let config = Arc::new(config::Configuration::default());
             let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
-            let client = Client::new(config, shutdown_tx, &self.log);
+            let client = Client::new(config, shutdown_tx);
 
             match client
                 .allocate_id(
@@ -45,7 +43,6 @@ impl IdGenerator for PlacementManagerIdGenerator {
             {
                 Ok(id) => {
                     trace!(
-                        self.log,
                         "Acquired ID={} for data-node[host={}]",
                         id,
                         self.config.server.host
@@ -53,10 +50,7 @@ impl IdGenerator for PlacementManagerIdGenerator {
                     let _ = tx.send(Ok(id));
                 }
                 Err(e) => {
-                    error!(
-                        self.log,
-                        "Failed to acquire ID for data-node. Cause: {:?}", e
-                    );
+                    error!("Failed to acquire ID for data-node. Cause: {:?}", e);
                     let _ = tx.send(Err(()));
                 }
             }
@@ -80,17 +74,15 @@ mod tests {
 
     #[test]
     fn test_generate() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let path = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(log.clone(), path.as_path());
+        let _guard = test_util::DirectoryRemovalGuard::new(path.as_path());
 
         let (stop_tx, stop_rx) = oneshot::channel();
         let (port_tx, port_rx) = oneshot::channel();
 
-        let logger = log.clone();
         let handle = std::thread::spawn(move || {
             tokio_uring::start(async {
-                let port = test_util::run_listener(logger).await;
+                let port = test_util::run_listener().await;
                 let _ = port_tx.send(port);
                 let _ = stop_rx.await;
             });
@@ -102,7 +94,7 @@ mod tests {
         let mut cfg = config::Configuration::default();
         cfg.server.placement_manager = pm_address;
         let config = Arc::new(cfg);
-        let generator = PlacementManagerIdGenerator::new(log, &config);
+        let generator = PlacementManagerIdGenerator::new(&config);
         let id = generator.generate()?;
         assert_eq!(1, id);
         let _ = stop_tx.send(());

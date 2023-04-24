@@ -3,17 +3,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use slog::{error, trace, Logger};
+use log::{error, trace};
 use uuid::Uuid;
 
 pub struct DirectoryRemovalGuard<'a> {
-    log: Logger,
     path: &'a Path,
 }
 
 impl<'a> DirectoryRemovalGuard<'a> {
-    pub fn new(log: Logger, path: &'a Path) -> Self {
-        Self { log, path }
+    pub fn new(path: &'a Path) -> Self {
+        Self { path }
     }
 }
 
@@ -24,15 +23,12 @@ impl<'a> Drop for DirectoryRemovalGuard<'a> {
             read_dir
                 .flatten()
                 .map(|entry| {
-                    trace!(self.log, "Deleting {:?}", entry.path());
+                    trace!("Deleting {:?}", entry.path());
                 })
                 .count();
         });
         if let Err(e) = fs::remove_dir_all(path) {
-            error!(
-                self.log,
-                "Failed to remove directory: {:?}. Error: {:?}", path, e
-            );
+            error!("Failed to remove directory: {:?}. Error: {:?}", path, e);
         }
     }
 }
@@ -55,8 +51,7 @@ mod tests {
         let path = super::create_random_path()?;
         let path = path.as_path();
         {
-            let log = crate::terminal_logger();
-            let _guard = super::DirectoryRemovalGuard::new(log, path);
+            let _guard = super::DirectoryRemovalGuard::new(path);
             if !path.exists() {
                 fs::create_dir(path)?;
             }

@@ -2,7 +2,6 @@ use std::{cell::RefCell, rc::Rc};
 
 use codec::frame::{Frame, OperationCode};
 use protocol::rpc::header::ErrorCode;
-use slog::Logger;
 use store::ElasticStore;
 
 use crate::stream_manager::StreamManager;
@@ -23,37 +22,29 @@ pub(crate) enum Command<'a> {
 }
 
 impl<'a> Command<'a> {
-    pub fn from_frame(logger: Logger, frame: &Frame) -> Result<Command, ErrorCode> {
+    pub fn from_frame(frame: &Frame) -> Result<Command, ErrorCode> {
         match frame.operation_code {
-            OperationCode::DescribeRanges => Ok(Command::DescribeRange(
-                DescribeRange::parse_frame(logger.clone(), frame)?,
-            )),
+            OperationCode::DescribeRanges => {
+                Ok(Command::DescribeRange(DescribeRange::parse_frame(frame)?))
+            }
 
             OperationCode::Unknown => todo!(),
 
-            OperationCode::Ping => Ok(Command::Ping(Ping::new(logger.clone(), frame))),
+            OperationCode::Ping => Ok(Command::Ping(Ping::new(frame))),
 
             OperationCode::GoAway => todo!(),
 
-            OperationCode::Heartbeat => Ok(Command::Heartbeat(Heartbeat::parse_frame(
-                logger.clone(),
-                frame,
-            )?)),
+            OperationCode::Heartbeat => Ok(Command::Heartbeat(Heartbeat::parse_frame(frame)?)),
 
             OperationCode::AllocateId => unreachable!(),
 
-            OperationCode::Append => {
-                Ok(Command::Append(Append::parse_frame(logger.clone(), frame)?))
-            }
+            OperationCode::Append => Ok(Command::Append(Append::parse_frame(frame)?)),
 
-            OperationCode::Fetch => Ok(Command::Fetch(Fetch::parse_frame(logger.clone(), frame)?)),
+            OperationCode::Fetch => Ok(Command::Fetch(Fetch::parse_frame(frame)?)),
 
             OperationCode::ListRanges => todo!(),
 
-            OperationCode::SealRanges => Ok(Command::SealRange(SealRange::parse_frame(
-                logger.clone(),
-                frame,
-            )?)),
+            OperationCode::SealRanges => Ok(Command::SealRange(SealRange::parse_frame(frame)?)),
 
             OperationCode::SyncRanges => todo!(),
             OperationCode::CreateStreams => todo!(),

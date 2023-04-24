@@ -1,4 +1,4 @@
-use slog::{debug, Logger};
+use log::debug;
 use std::{
     alloc::{self, Layout},
     fmt::{self, Display, Formatter},
@@ -15,8 +15,6 @@ use crate::error::StoreError;
 /// This struct is designed to be NOT `Copy` nor `Clone`; otherwise, we will have double-free issue.
 #[derive(Debug)]
 pub(crate) struct AlignedBuf {
-    log: Logger,
-
     /// An aligned WAL offset which is an absolute address in the WAL.
     pub(crate) wal_offset: u64,
 
@@ -38,12 +36,7 @@ pub(crate) struct AlignedBuf {
 }
 
 impl AlignedBuf {
-    pub(crate) fn new(
-        log: Logger,
-        wal_offset: u64,
-        len: usize,
-        alignment: usize,
-    ) -> Result<Self, StoreError> {
+    pub(crate) fn new(wal_offset: u64, len: usize, alignment: usize) -> Result<Self, StoreError> {
         debug_assert!(len > 0, "Memory to allocate should be positive");
         debug_assert!(alignment > 0, "Alignment should be positive");
         debug_assert!(
@@ -68,7 +61,6 @@ impl AlignedBuf {
         };
 
         Ok(Self {
-            log,
             wal_offset,
             ptr,
             layout,
@@ -228,7 +220,7 @@ impl AlignedBuf {
 impl Drop for AlignedBuf {
     fn drop(&mut self) {
         unsafe { alloc::dealloc(self.ptr.as_ptr(), self.layout) };
-        debug!(self.log, "Deallocated {}", self);
+        debug!("Deallocated {}", self);
     }
 }
 
@@ -252,9 +244,8 @@ mod tests {
 
     #[test]
     fn test_aligned_buf() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let alignment = 4096;
-        let buf = AlignedBuf::new(log.clone(), 0, 128, alignment)?;
+        let buf = AlignedBuf::new(0, 128, alignment)?;
         assert_eq!(alignment as usize, buf.remaining());
         let v = 1;
         buf.write_u32(0, 1);

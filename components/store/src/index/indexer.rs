@@ -10,12 +10,12 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use log::{error, info, trace, warn};
 use model::range::{Range, StreamRange};
 use rocksdb::{
     BlockBasedOptions, ColumnFamilyDescriptor, DBCompressionType, FlushOptions, IteratorMode,
     Options, ReadOptions, WriteOptions, DB,
 };
-use slog::{error, info, trace, warn, Logger};
 use tokio::sync::mpsc;
 
 use crate::error::StoreError;
@@ -34,8 +34,6 @@ const WAL_CHECKPOINT: &str = "wal_checkpoint";
 const RANGE_PREFIX: u8 = b'r';
 
 pub(crate) struct Indexer {
-    log: Logger,
-
     /// RocksDB instance
     db: DB,
 
@@ -57,7 +55,6 @@ impl Indexer {
     /// Build RocksDB column family options for index.
     ///
     fn build_index_column_family_options(
-        log: Logger,
         min_offset: Arc<dyn MinOffset>,
     ) -> Result<Options, StoreError> {
         let mut index_cf_opts = Options::default();
@@ -82,7 +79,6 @@ impl Indexer {
         })?;
 
         let index_compaction_filter_factory = super::compaction::IndexCompactionFilterFactory::new(
-            log.clone(),
             compaction_filter_name,
             min_offset,
         );
@@ -95,24 +91,21 @@ impl Indexer {
     ///
     /// # Arguments
     ///
-    /// * `log` - Logger
     /// * `path` - Path where RocksDB store shall live
     /// * `min_offset` - Pointer to struct where current minimum WAL offset can be retrieved
     /// * `flush_threshold` - Flush index and metadata records every N operations.
     pub(crate) fn new(
-        log: Logger,
         path: &str,
         min_offset: Arc<dyn MinOffset>,
         flush_threshold: usize,
     ) -> Result<Self, StoreError> {
         let path = Path::new(path);
         if !path.exists() {
-            info!(log, "Create directory: {:?}", path);
+            info!("Create directory: {:?}", path);
             fs::create_dir_all(path)?;
         }
 
-        let index_cf_opts =
-            Self::build_index_column_family_options(log.clone(), Arc::clone(&min_offset))?;
+        let index_cf_opts = Self::build_index_column_family_options(Arc::clone(&min_offset))?;
         let index_cf = ColumnFamilyDescriptor::new(INDEX_COLUMN_FAMILY, index_cf_opts);
 
         let mut metadata_cf_opts = Options::default();
@@ -128,7 +121,6 @@ impl Indexer {
                 )
             })?;
         let range_compaction_filter_factory = super::compaction::IndexCompactionFilterFactory::new(
-            log.clone(),
             range_compaction_filter_name,
             Arc::clone(&min_offset),
         );
@@ -154,7 +146,6 @@ impl Indexer {
             .map_err(|e| StoreError::RocksDB(e.into_string()))?;
 
         Ok(Self {
-            log,
             db,
             write_opts,
             count: AtomicUsize::new(0),
@@ -252,11 +243,7 @@ impl Indexer {
                     .flatten()
                     .filter(|(_k, v)| {
                         if v.len() < 8 + 4 {
-                            warn!(
-                                self.log,
-                                "Got an invalid index entry: len(value) = {}",
-                                v.len()
-                            );
+                            warn!("Got an invalid index entry: len(value) = {}", v.len());
                         }
                         v.len() > 8 /* WAL offset */ + 4 /* length-type */
                     })
@@ -306,27 +293,21 @@ impl Indexer {
             {
                 Some(value) => {
                     if value.len() < 8 {
-                        error!(self.log, "Value of wal_checkpoint is corrupted. Expecting 8 bytes in big endian, actual: {:?}", value);
+                        error!("Value of wal_checkpoint is corrupted. Expecting 8 bytes in big endian, actual: {:?}", value);
                         return Err(StoreError::DataCorrupted);
                     }
                     let mut cursor = Cursor::new(&value[..]);
                     let wal_offset = cursor.get_u64();
-                    trace!(self.log, "Checkpoint WAL-offset={}", wal_offset);
+                    trace!("Checkpoint WAL-offset={}", wal_offset);
                     Ok(wal_offset)
                 }
                 None => {
-                    info!(
-                        self.log,
-                        "No KV entry for wal_checkpoint yet. Default wal_checkpoint to 0"
-                    );
+                    info!("No KV entry for wal_checkpoint yet. Default wal_checkpoint to 0");
                     Ok(0)
                 }
             }
         } else {
-            info!(
-                self.log,
-                "No column family metadata yet. Default wal_checkpoint to 0"
-            );
+            info!("No column family metadata yet. Default wal_checkpoint to 0");
             Ok(0)
         }
     }
@@ -362,7 +343,7 @@ impl Indexer {
     /// To minimize the amount of WAL data to recover, for example, in case of planned reboot, we shall update checkpoint
     /// offset and invoke this method before stopping.
     pub(crate) fn flush(&self, wait: bool) -> Result<(), StoreError> {
-        info!(self.log, "AtomicFlush RocksDB column families");
+        info!("AtomicFlush RocksDB column families");
         let mut flush_opt = FlushOptions::default();
         flush_opt.set_wait(wait);
         self.db
@@ -506,8 +487,8 @@ impl super::LocalRangeManager for Indexer {
                 .for_each(|range| {
                     if tx.send(range).is_err() {
                         error!(
-                            self.log,
-                            "Channel to transfer range for stream={} is closed", stream_id
+                            "Channel to transfer range for stream={} is closed",
+                            stream_id
                         );
                     }
                 });
@@ -555,7 +536,7 @@ impl super::LocalRangeManager for Indexer {
                 })
                 .for_each(|range| {
                     if tx.send(range).is_err() {
-                        warn!(self.log, "Channel to transfer stream ranges is closed");
+                        warn!("Channel to transfer stream ranges is closed");
                     }
                 });
         }
@@ -644,14 +625,13 @@ mod tests {
     }
 
     fn new_indexer() -> Result<super::Indexer, Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let path = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(log.clone(), path.as_path());
+        let _guard = test_util::DirectoryRemovalGuard::new(path.as_path());
         let path_str = path.as_os_str().to_str().unwrap();
         let min_offset = Arc::new(SampleMinOffset {
             min: AtomicU64::new(0),
         });
-        let indexer = super::Indexer::new(log, path_str, min_offset as Arc<dyn MinOffset>, 128)?;
+        let indexer = super::Indexer::new(path_str, min_offset as Arc<dyn MinOffset>, 128)?;
         Ok(indexer)
     }
 
@@ -875,19 +855,14 @@ mod tests {
 
     #[test]
     fn test_compaction() -> Result<(), Box<dyn Error>> {
-        let log = test_util::terminal_logger();
         let path = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(log.clone(), path.as_path());
+        let _guard = test_util::DirectoryRemovalGuard::new(path.as_path());
         let path_str = path.as_os_str().to_str().unwrap();
         let min_offset = Arc::new(SampleMinOffset {
             min: AtomicU64::new(0),
         });
-        let indexer = super::Indexer::new(
-            log,
-            path_str,
-            Arc::clone(&min_offset) as Arc<dyn MinOffset>,
-            128,
-        )?;
+        let indexer =
+            super::Indexer::new(path_str, Arc::clone(&min_offset) as Arc<dyn MinOffset>, 128)?;
 
         const CNT: u64 = 1024;
         (0..CNT)

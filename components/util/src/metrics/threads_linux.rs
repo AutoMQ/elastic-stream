@@ -386,7 +386,7 @@ pub mod thread {
                 .filter_map(|task| {
                     let file_name = match task {
                         Ok(t) => t.file_name(),
-                        Err(e) => {
+                        Err(_e) => {
                             return None;
                         }
                     };

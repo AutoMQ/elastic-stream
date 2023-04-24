@@ -11,23 +11,18 @@ use rocksdb::{
     CompactionDecision,
 };
 
-use slog::{info, trace, Logger};
+use log::{info, trace};
 
 use super::MinOffset;
 
 pub(crate) struct IndexCompactionFilter {
-    log: Logger,
     name: CString,
     min_offset: u64,
 }
 
 impl IndexCompactionFilter {
-    pub(crate) fn new(log: Logger, name: CString, min_offset: u64) -> Self {
-        Self {
-            log,
-            name,
-            min_offset,
-        }
+    pub(crate) fn new(name: CString, min_offset: u64) -> Self {
+        Self { name, min_offset }
     }
 }
 
@@ -44,7 +39,6 @@ impl CompactionFilter for IndexCompactionFilter {
         let offset = rdr.get_u64();
         if offset < self.min_offset {
             trace!(
-                self.log,
                 "Removed {} -> {}, min-offset: {}",
                 Cursor::new(key).get_u64(),
                 offset,
@@ -62,18 +56,13 @@ impl CompactionFilter for IndexCompactionFilter {
 }
 
 pub(crate) struct IndexCompactionFilterFactory {
-    log: Logger,
     name: CString,
     min_offset: Arc<dyn MinOffset>,
 }
 
 impl IndexCompactionFilterFactory {
-    pub(crate) fn new(log: Logger, name: CString, min_offset: Arc<dyn MinOffset>) -> Self {
-        Self {
-            log,
-            name,
-            min_offset,
-        }
+    pub(crate) fn new(name: CString, min_offset: Arc<dyn MinOffset>) -> Self {
+        Self { name, min_offset }
     }
 }
 
@@ -82,18 +71,13 @@ impl CompactionFilterFactory for IndexCompactionFilterFactory {
 
     fn create(&mut self, context: CompactionFilterContext) -> Self::Filter {
         info!(
-            self.log,
             "Created a `IndexCompactionFilter`: full_compaction: {}, manual_compaction: {}, min_offset: {}",
             context.is_full_compaction,
             context.is_manual_compaction,
             self.min_offset.min_offset(),
         );
 
-        IndexCompactionFilter::new(
-            self.log.clone(),
-            self.name.clone(),
-            self.min_offset.min_offset(),
-        )
+        IndexCompactionFilter::new(self.name.clone(), self.min_offset.min_offset())
     }
 
     fn name(&self) -> &CStr {
@@ -102,18 +86,13 @@ impl CompactionFilterFactory for IndexCompactionFilterFactory {
 }
 
 pub(crate) struct RangeCompactionFilter {
-    log: Logger,
     name: CString,
     min_offset: u64,
 }
 
 impl RangeCompactionFilter {
-    pub(crate) fn new(log: Logger, name: CString, min_offset: u64) -> Self {
-        Self {
-            log,
-            name,
-            min_offset,
-        }
+    pub(crate) fn new(name: CString, min_offset: u64) -> Self {
+        Self { name, min_offset }
     }
 }
 
@@ -145,7 +124,6 @@ impl CompactionFilter for RangeCompactionFilter {
 }
 
 pub(crate) struct RangeCompactionFilterFactory {
-    log: Logger,
     name: CString,
     min_offset: Arc<dyn MinOffset>,
 }
@@ -154,11 +132,7 @@ impl CompactionFilterFactory for RangeCompactionFilterFactory {
     type Filter = RangeCompactionFilter;
 
     fn create(&mut self, _context: CompactionFilterContext) -> Self::Filter {
-        Self::Filter::new(
-            self.log.clone(),
-            self.name.clone(),
-            self.min_offset.min_offset(),
-        )
+        Self::Filter::new(self.name.clone(), self.min_offset.min_offset())
     }
 
     fn name(&self) -> &CStr {

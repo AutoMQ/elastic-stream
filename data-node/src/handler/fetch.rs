@@ -3,10 +3,10 @@ use codec::frame::Frame;
 
 use flatbuffers::FlatBufferBuilder;
 use futures::Future;
+use log::warn;
 use protocol::rpc::header::{
     ErrorCode, FetchRequest, FetchResponseArgs, FetchResultArgs, StatusArgs,
 };
-use slog::{warn, Logger};
 use std::{cell::RefCell, pin::Pin, rc::Rc};
 use store::{error::FetchError, option::ReadOptions, ElasticStore, FetchResult, Store};
 
@@ -16,21 +16,18 @@ use super::util::{finish_response_builder, root_as_rpc_request, MIN_BUFFER_SIZE}
 
 #[derive(Debug)]
 pub(crate) struct Fetch<'a> {
-    /// Logger
-    logger: Logger,
-
     /// The append request already parsed by flatbuffers
     fetch_request: FetchRequest<'a>,
 }
 
 impl<'a> Fetch<'a> {
-    pub(crate) fn parse_frame(logger: Logger, request: &Frame) -> Result<Fetch, ErrorCode> {
+    pub(crate) fn parse_frame(request: &Frame) -> Result<Fetch, ErrorCode> {
         let request_buf = match request.header {
             Some(ref buf) => buf,
             None => {
                 warn!(
-                    logger,
-                    "FetchRequest[stream-id={}] received without payload", request.stream_id
+                    "FetchRequest[stream-id={}] received without payload",
+                    request.stream_id
                 );
                 return Err(ErrorCode::BAD_REQUEST);
             }
@@ -40,19 +37,14 @@ impl<'a> Fetch<'a> {
             Ok(request) => request,
             Err(e) => {
                 warn!(
-                    logger,
                     "FetchRequest[stream-id={}] received with invalid payload. Cause: {:?}",
-                    request.stream_id,
-                    e
+                    request.stream_id, e
                 );
                 return Err(ErrorCode::BAD_REQUEST);
             }
         };
 
-        Ok(Fetch {
-            logger,
-            fetch_request,
-        })
+        Ok(Fetch { fetch_request })
     }
 
     /// Apply the fetch requests to the store
@@ -105,7 +97,7 @@ impl<'a> Fetch<'a> {
                         protocol::rpc::header::FetchResult::create(&mut builder, &fetch_result_args)
                     }
                     Err(e) => {
-                        warn!(self.logger, "Failed to fetch from store. Cause: {:?}", e);
+                        warn!("Failed to fetch from store. Cause: {:?}", e);
 
                         let (err_code, err_message) = self.convert_store_error(&e);
                         let mut err_message_fb = None;

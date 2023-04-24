@@ -7,7 +7,7 @@ use std::{
 };
 
 use config::Configuration;
-use slog::{info, Logger};
+use log::info;
 use transport::connection::Connection;
 
 use crate::connection_tracker::ConnectionTracker;
@@ -24,21 +24,13 @@ impl IdleHandler {
         addr: SocketAddr,
         config: Arc<Configuration>,
         conn_tracker: Rc<RefCell<ConnectionTracker>>,
-        log: Logger,
     ) -> Rc<Self> {
         let handler = Rc::new(Self {
             config: Arc::clone(&config),
             last_read: Rc::new(RefCell::new(Instant::now())),
             last_write: Rc::new(RefCell::new(Instant::now())),
         });
-        Self::run(
-            Rc::clone(&handler),
-            connection,
-            addr,
-            config,
-            conn_tracker,
-            log,
-        );
+        Self::run(Rc::clone(&handler), connection, addr, config, conn_tracker);
         handler
     }
 
@@ -72,7 +64,6 @@ impl IdleHandler {
         addr: SocketAddr,
         config: Arc<Configuration>,
         conn_tracker: Rc<RefCell<ConnectionTracker>>,
-        log: Logger,
     ) {
         tokio_uring::spawn(async move {
             let mut interval = tokio::time::interval(config.connection_idle_duration());
@@ -84,7 +75,6 @@ impl IdleHandler {
                             conn_tracker.borrow_mut().remove(&addr);
                             if let Ok(_) = channel.close() {
                                 info!(
-                                    log,
                                     "Close connection to {} since read has been idle for {}ms and write has been idle for {}ms",
                                     channel.peer_address(),
                                     handler.read_elapsed().as_millis(),
@@ -117,21 +107,19 @@ mod tests {
     fn test_read_idle() -> Result<(), Box<dyn Error>> {
         let mut config = Configuration::default();
         config.server.connection_idle_duration = 1;
-        let log = test_util::terminal_logger();
         let config = Arc::new(config);
         tokio_uring::start(async {
-            let port = test_util::run_listener(log.clone()).await;
+            let port = test_util::run_listener().await;
             let target = format!("127.0.0.1:{}", port);
             let addr = target.parse::<SocketAddr>().unwrap();
             let stream = TcpStream::connect(addr.clone()).await.unwrap();
-            let connection = Rc::new(Connection::new(stream, &target, log.clone()));
-            let conn_tracker = Rc::new(RefCell::new(ConnectionTracker::new(log.clone())));
+            let connection = Rc::new(Connection::new(stream, &target));
+            let conn_tracker = Rc::new(RefCell::new(ConnectionTracker::new()));
             let handler = super::IdleHandler::new(
                 Rc::downgrade(&connection),
                 addr,
                 Arc::clone(&config),
                 conn_tracker,
-                log,
             );
             tokio::time::sleep(config.connection_idle_duration()).await;
             assert!(handler.read_idle(), "Read should be idle");
