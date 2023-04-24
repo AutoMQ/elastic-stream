@@ -4,6 +4,9 @@ use tokio::sync::broadcast;
 
 fn main() {
     let cli = Cli::parse();
+
+    cli.init_log().unwrap();
+
     let config = match cli.create_config() {
         Ok(config) => config,
         Err(e) => {

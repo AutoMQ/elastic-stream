@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = { workspace = true }
 byteorder =  { workspace = true }
 bytes =  { workspace = true }
 cfg-if = { workspace = true }
@@ -30,6 +31,7 @@ protocol = {path = "../components/protocol" }
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = { workspace = true }
 log =  { workspace = true }
+log4rs = { workspace = true }
 store = { path = "../components/store" }
 transport = { path = "../components/transport" }
 thiserror =  { workspace = true }

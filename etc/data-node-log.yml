@@ -1,0 +1,35 @@
+refresh_rate: 30 seconds
+
+appenders:
+  stdout:
+    kind: console
+
+  store:
+    kind: file
+    path: "log/store.log"
+    encoder:
+      pattern: "{d} - {m}{n}"
+
+  data-node:
+    kind: file
+    path: "log/data-node.log"
+    encoder:
+      pattern: "{d} - {m}{n}"
+
+root:
+  level: warn
+  appenders:
+    - stdout
+
+loggers:
+  store:
+    level: info
+    appenders:
+      - store
+    additive: false
+
+  data-node:
+    level: info
+    appenders:
+      - data-node
+    additive: false
