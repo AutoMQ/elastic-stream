@@ -14,6 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env: 
       RUSTC_WRAPPER: sccache
+      RUST_LOG: trace
     steps:
     - uses: actions/checkout@v3
     - name: Cache Cargo Crates
@@ -28,6 +29,6 @@ jobs:
       run: |
         ./scripts/install_deps.sh
     - name: Build
-      run: cargo build --verbose
+      run: cargo build
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test -- --nocapture
