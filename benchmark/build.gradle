@@ -18,6 +18,7 @@ dependencies {
     implementation 'org.openjdk.jmh:jmh-generator-annprocess:1.36'
     implementation 'org.projectlombok:lombok:1.18.26'
     implementation 'commons-cli:commons-cli:1.5.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
     annotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.36'
     annotationProcessor 'org.projectlombok:lombok:1.18.26'
 }
@@ -28,4 +29,8 @@ application {
 
 shadowJar {
     manifest.attributes.put("Main-Class", "elastic.stream.benchmark.Main")
+}
+
+test {
+    useJUnitPlatform()
 }
