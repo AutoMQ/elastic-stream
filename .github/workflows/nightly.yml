@@ -11,6 +11,9 @@ jobs:
         go-version: [ "1.20" ]
         platform: [ "ubuntu-latest" ]
     runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        working-directory: ./placement-manager
     timeout-minutes: 30
     steps:
       - name: Checkout Code
