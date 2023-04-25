@@ -17,7 +17,7 @@ public class CreateStreamOptions {
         private final CreateStreamOptions options = new CreateStreamOptions();
 
         public Builder replicaCount(int replicaCount) {
-            Arguments.check(replicaCount <= 0, "replica count should larger than 0");
+            Arguments.check(replicaCount > 0, "replica count should larger than 0");
             options.replicaCount = replicaCount;
             return this;
         }

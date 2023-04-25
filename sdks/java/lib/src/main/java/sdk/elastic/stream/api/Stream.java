@@ -10,6 +10,22 @@ import java.util.concurrent.CompletableFuture;
 public interface Stream {
 
     /**
+     * Get stream id
+     */
+    long streamId();
+
+    /**
+     * Get stream start offset.
+     */
+    long startOffset();
+
+    /**
+     * Get stream next append record offset.
+     */
+    long nextOffset();
+
+
+    /**
      * Append recordBatch to stream.
      *
      * @param recordBatch {@link RecordBatch}.
