@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 5
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
       - name: Install Flatbuffers
         run: |
@@ -39,7 +39,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 10
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
       - name: Go Cache
         uses: actions/cache@v3
@@ -60,7 +60,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 30
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
       - name: Go Cache
         uses: actions/cache@v3
@@ -81,7 +81,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 10
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
       - name: Go Cache
         uses: actions/cache@v3
