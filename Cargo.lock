@@ -2283,6 +2283,7 @@ dependencies = [
  "client",
  "config",
  "log",
+ "model",
  "thiserror",
  "tokio",
  "tokio-uring",

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 client = { path = "../client" }
 config = { path = "../config" }
+model = { path = "../model" }
 log = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

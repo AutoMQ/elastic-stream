@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     request::{AppendRequest, AppendResponse, ReadRequest, ReadResponse, Request},
-    stream_manager::StreamManager,
+    stream_manager::stream_manager::StreamManager,
     ReplicationError,
 };
 

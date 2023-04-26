@@ -1,22 +1,33 @@
-use std::sync::Arc;
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use client::Client;
 use config::Configuration;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
-use crate::request::{AppendRequest, AppendResponse, ReadRequest, ReadResponse, Request};
+use crate::{
+    request::{AppendRequest, AppendResponse, ReadRequest, ReadResponse, Request},
+    stream_manager::stream::Stream,
+    ReplicationError,
+};
 
 pub(crate) struct StreamManager {
     config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Request>,
     client: Client,
+    streams: HashMap<i64, Rc<RefCell<Stream>>>,
 }
 
 impl StreamManager {
     pub(crate) fn new(config: Arc<Configuration>, rx: mpsc::UnboundedReceiver<Request>) -> Self {
         let (shutdown, _rx) = broadcast::channel(1);
         let client = Client::new(Arc::clone(&config), shutdown);
-        Self { config, rx, client }
+        let streams = HashMap::new();
+        Self {
+            config,
+            rx,
+            client,
+            streams,
+        }
     }
 
     pub(crate) fn spawn_loop(mut this: Self) {
@@ -42,4 +53,10 @@ impl StreamManager {
     async fn append(&mut self, request: AppendRequest, tx: oneshot::Sender<AppendResponse>) {}
 
     async fn read(&mut self, request: ReadRequest, tx: oneshot::Sender<ReadResponse>) {}
+
+    async fn open(&mut self, stream_id: i64) -> Result<Stream, ReplicationError> {
+        Ok(Stream::new(0, vec![]))
+    }
+
+    async fn close(&mut self, stream_id: i64, range_id: i32, offset: i64) {}
 }
