@@ -9,6 +9,7 @@ members = [
     "components/model",
     "components/protocol",
     "components/client",
+    "components/replication",
     "components/transport",
     "components/store",
     "components/util",
