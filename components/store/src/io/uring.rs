@@ -129,7 +129,6 @@ fn check_io_uring(probe: &register::Probe) -> Result<(), StoreError> {
     let codes = [
         opcode::OpenAt::CODE,
         opcode::Fallocate64::CODE,
-        opcode::FilesUpdate::CODE,
         opcode::Write::CODE,
         opcode::Read::CODE,
         opcode::Close::CODE,
@@ -178,6 +177,10 @@ impl IO {
         submitter.register_probe(&mut probe)?;
         submitter.register_enable_rings()?;
 
+        if !data_ring.params().is_feature_sqpoll_nonfixed() {
+            error!("io_uring feature: IORING_FEAT_SQPOLL_NONFIXED is required. Current kernel version is too old");
+            return Err(StoreError::IoUring);
+        }
         check_io_uring(&probe)?;
 
         trace!("Polling I/O Uring instance created");
