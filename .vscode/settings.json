@@ -22,6 +22,7 @@
         "monoio",
         "MPMC",
         "NODROP",
+        "NONFIXED",
         "oneshot",
         "overcommit",
         "rocksdb",

@@ -16,8 +16,8 @@ use crate::BufSlice;
 use std::io;
 
 use crossbeam::channel::{Receiver, Sender, TryRecvError};
-use io_uring::register;
 use io_uring::{opcode, squeue, types};
+use io_uring::{register, Parameters};
 use log::{debug, error, info, trace, warn};
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
@@ -125,7 +125,20 @@ pub(crate) struct IO {
 /// # Arguments
 /// * `probe` - Probe result, which contains all features that are supported.
 ///
-fn check_io_uring(probe: &register::Probe) -> Result<(), StoreError> {
+fn check_io_uring(probe: &register::Probe, params: &Parameters) -> Result<(), StoreError> {
+    if !params.is_feature_sqpoll_nonfixed() {
+        error!("io_uring feature: IORING_FEAT_SQPOLL_NONFIXED is required. Current kernel version is too old");
+        return Err(StoreError::IoUring);
+    }
+    info!("io_uring has feature IORING_FEAT_SQPOLL_NONFIXED");
+
+    // io_uring should support never dropping completion events.
+    if !params.is_feature_nodrop() {
+        error!("io_uring setup: IORING_SETUP_CQ_NODROP is required.");
+        return Err(StoreError::IoUring);
+    }
+    info!("io_uring has feature IORING_SETUP_CQ_NODROP");
+
     let codes = [
         opcode::OpenAt::CODE,
         opcode::Fallocate64::CODE,
@@ -177,11 +190,7 @@ impl IO {
         submitter.register_probe(&mut probe)?;
         submitter.register_enable_rings()?;
 
-        if !data_ring.params().is_feature_sqpoll_nonfixed() {
-            error!("io_uring feature: IORING_FEAT_SQPOLL_NONFIXED is required. Current kernel version is too old");
-            return Err(StoreError::IoUring);
-        }
-        check_io_uring(&probe)?;
+        check_io_uring(&probe, data_ring.params())?;
 
         trace!("Polling I/O Uring instance created");
 
