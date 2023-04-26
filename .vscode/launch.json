@@ -7,8 +7,12 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/target/debug/data-node",
+            "env": {
+                "RUST_LOG": "trace"
+            },
             "args": [
-                "-c", "/root/elastic-stream/etc/data-node.yaml",
+                "-c", "${workspaceFolder}/etc/data-node.yaml",
+                "-l", "${workspaceFolder}/etc/data-node-log.yaml",
             ]
         }
     ]
