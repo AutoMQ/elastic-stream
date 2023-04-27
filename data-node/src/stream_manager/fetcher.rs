@@ -32,7 +32,7 @@ impl Fetcher {
     pub(crate) async fn bootstrap(&mut self) -> Result<Vec<StreamRange>, ServiceError> {
         if let Fetcher::PlacementClient { client } = self {
             return client
-                .list_range(None, Duration::from_secs(3))
+                .list_range(None)
                 .await
                 .map_err(|_e| {
                     error!("Failed to list ranges by data node from placement manager");
@@ -61,7 +61,7 @@ impl Fetcher {
         stream_id: i64,
     ) -> Result<Vec<StreamRange>, ServiceError> {
         client
-            .list_range(Some(stream_id), Duration::from_secs(3))
+            .list_range(Some(stream_id))
             .await
             .map_err(|_e| {
                 error!(

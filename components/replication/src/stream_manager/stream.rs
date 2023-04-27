@@ -23,7 +23,7 @@ impl Stream {
 
     pub(crate) async fn open(&mut self) -> Result<(), ReplicationError> {
         let client = self.client.upgrade().ok_or(ReplicationError::Internal)?;
-        // client.list_range(target, stream_id, timeout)
+        // client.list_range( Some(stream_id), self.)
         Ok(())
     }
 }

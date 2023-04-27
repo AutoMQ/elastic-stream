@@ -2,7 +2,7 @@ use super::session_manager::SessionManager;
 use crate::error::ClientError;
 use log::{error, trace, warn};
 use model::{range::StreamRange, range_criteria::RangeCriteria};
-use std::{cell::UnsafeCell, rc::Rc, sync::Arc, time::Duration};
+use std::{cell::UnsafeCell, rc::Rc, sync::Arc};
 use tokio::{sync::broadcast, time};
 
 /// `Client` is used to send
@@ -21,13 +21,13 @@ impl Client {
         }
     }
 
-    pub async fn allocate_id(&self, host: &str, timeout: Duration) -> Result<i32, ClientError> {
+    pub async fn allocate_id(&self, host: &str) -> Result<i32, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager
             .get_composite_session(&self.config.placement_manager)
             .await?;
-        let future = session.allocate_id(host, timeout);
-        time::timeout(timeout, future)
+        let future = session.allocate_id(host, self.config.client_io_timeout());
+        time::timeout(self.config.client_io_timeout(), future)
             .await
             .map_err(|e| {
                 warn!("Timeout when allocate ID. {}", e);
@@ -45,7 +45,6 @@ impl Client {
     pub async fn list_range(
         &self,
         stream_id: Option<i64>,
-        timeout: Duration,
     ) -> Result<Vec<StreamRange>, ClientError> {
         let criteria = if let Some(stream_id) = stream_id {
             trace!(
@@ -68,11 +67,13 @@ impl Client {
             .get_composite_session(&self.config.placement_manager)
             .await?;
         let future = session.list_range(criteria);
-        time::timeout(timeout, future)
+        time::timeout(self.config.client_io_timeout(), future)
             .await
             .map_err(|elapsed| {
                 warn!("Timeout when list range. {}", elapsed);
-                ClientError::RpcTimeout { timeout }
+                ClientError::RpcTimeout {
+                    timeout: self.config.client_io_timeout(),
+                }
             })?
             .map_err(|e| {
                 error!(
@@ -102,7 +103,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use log::trace;
-    use std::{error::Error, sync::Arc, time::Duration};
+    use std::{error::Error, sync::Arc};
     use test_util::run_listener;
     use tokio::sync::broadcast;
 
@@ -142,8 +143,7 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
-            let timeout = Duration::from_secs(3);
-            let id = client.allocate_id("localhost", timeout).await?;
+            let id = client.allocate_id("localhost").await?;
             assert_eq!(1, id);
             Ok(())
         })
@@ -163,10 +163,8 @@ mod tests {
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
 
-            let timeout = Duration::from_secs(10);
-
             for i in 1..2 {
-                let ranges = client.list_range(Some(i as i64), timeout).await.unwrap();
+                let ranges = client.list_range(Some(i as i64)).await.unwrap();
                 assert_eq!(
                     false,
                     ranges.is_empty(),
@@ -195,10 +193,8 @@ mod tests {
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
 
-            let timeout = Duration::from_secs(10);
-
             for _i in 1..2 {
-                let ranges = client.list_range(None, timeout).await.unwrap();
+                let ranges = client.list_range(None).await.unwrap();
                 assert_eq!(
                     false,
                     ranges.is_empty(),
