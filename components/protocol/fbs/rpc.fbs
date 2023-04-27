@@ -295,10 +295,40 @@ table ReplicaNode {
     is_primary: bool (id: 1);
 }
 
+// Seal action type.
+//
+// Replication layer SDK performs two kinds of seals: seal-data-node and seal-placement-manager.
+// The former one renders ranges on data-node immutable and blocks further writes. In the scenario of chasing
+// write, replication SDK acknowledges application if MinCopy out of MaxCopy replicas are successfully written in data nodes
+// within the configured amount of tolerance, where 2 * MinCopy > MaxCopy. Otherwise, replication SDK initiates seal actions
+// of the range towards data-nodes. Data nodes, on receipt of replication SDK seal, immediately changes range as immutable and
+// returns currently confirmed offset and fails all inflight and future writes to current range.
+//
+// After receiving at least MinCopy of data-node seal responses, replication layer SDK is safe to seal the range in placement manager
+// and potentially create a new range, replicas of which reside on a different set of data nodes. This achieves fast fault toleration
+// as well as overall low write latency.
+enum SealType : byte {
+    UNSPECIFIED = 0,
+    DATA_NODE = 1,
+    PLACEMENT_MANAGER = 2,
+}
+
 table SealRangesRequest {
     timeout_ms: int32 (id: 0);
     // The ranges to seal.
-    ranges: [RangeId] (id: 1);
+    entries: [SealRequestEntry] (id: 1);
+}
+
+table SealRequestEntry {
+    type: SealType      (id: 0);
+    
+    range: RangeId      (id: 1, required);
+    
+    // If the seal-type is placement-manager, end is the final upper boundary of the range being sealed. 
+    end: int64 = -1     (id: 2);
+    
+    // If the seal-type is placement-manager, indicate whether a new range should be created, following completion of the seal action.
+    renew: bool         (id: 3);
 }
 
 table RangeId {
