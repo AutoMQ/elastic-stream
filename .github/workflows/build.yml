@@ -19,8 +19,8 @@ jobs:
         with:
           filters: |
             java:
-              - 'sdks/java/**'
-              - 'components/protocol/fbs/*.fbs'
+#              - 'sdks/java/**'
+#              - 'components/protocol/fbs/*.fbs'
             rust:
               - 'data-node/**'
               - 'components/**'
