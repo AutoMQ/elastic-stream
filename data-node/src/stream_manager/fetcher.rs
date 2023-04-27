@@ -1,7 +1,7 @@
 use client::Client;
 use log::{error, trace};
 use model::range::StreamRange;
-use std::{rc::Rc, time::Duration};
+use std::rc::Rc;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::error::ServiceError;

@@ -4,7 +4,7 @@ use bytes::Bytes;
 use codec::frame::Frame;
 use log::{error, trace, warn};
 use protocol::rpc::header::{
-    ErrorCode, RangeT, SealRangesRequest, SealRangesResponseT, SealRangesResultT, StatusT,
+    ErrorCode, RangeT, SealRangesRequest, SealRangesResponseT, SealRangesResultT, SealType, StatusT,
 };
 use store::ElasticStore;
 
@@ -51,16 +51,20 @@ impl<'a> SealRange<'a> {
         let mut manager = stream_manager.borrow_mut();
 
         let mut results = vec![];
-        for range in request.ranges.iter().flatten() {
+        for entry in request.entries.iter().flatten() {
+            debug_assert_eq!(entry.type_, SealType::DATA_NODE);
             let mut result = SealRangesResultT::default();
             let mut status = StatusT::default();
-            match manager.seal(range.stream_id, range.range_index).await {
+            match manager
+                .seal(entry.range.stream_id, entry.range.range_index)
+                .await
+            {
                 Ok(offset) => {
                     status.code = ErrorCode::OK;
                     status.message = Some(String::from("OK"));
                     let mut item = RangeT::default();
-                    item.stream_id = range.stream_id;
-                    item.range_index = range.range_index;
+                    item.stream_id = entry.range.stream_id;
+                    item.range_index = entry.range.range_index;
                     item.end_offset = offset as i64;
                     item.next_offset = offset as i64;
                     result.range = Some(Box::new(item));
@@ -68,7 +72,7 @@ impl<'a> SealRange<'a> {
                 Err(e) => {
                     error!(
                         "Failed to seal stream-id={}, range_index={}",
-                        range.stream_id, range.range_index
+                        entry.range.stream_id, entry.range.range_index
                     );
                     status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
                     status.message = Some(format!("{:?}", e));
