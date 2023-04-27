@@ -421,7 +421,7 @@ mod tests {
 
     fn build_store(pm_address: &str, store_path: &str) -> ElasticStore {
         let mut config = config::Configuration::default();
-        config.server.placement_manager = pm_address.to_owned();
+        config.placement_manager = pm_address.to_owned();
         config.store.path.set_base(store_path);
         config.check_and_apply().expect("Configuration is invalid");
         let (tx, rx) = oneshot::channel();

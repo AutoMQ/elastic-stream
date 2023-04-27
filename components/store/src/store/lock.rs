@@ -105,7 +105,7 @@ mod tests {
         let port = port_rx.blocking_recv().unwrap();
         let pm_address = format!("localhost:{}", port);
         let mut config = config::Configuration::default();
-        config.server.placement_manager = pm_address;
+        config.placement_manager = pm_address;
         config
             .check_and_apply()
             .expect("Failed to check-and-apply configuration");

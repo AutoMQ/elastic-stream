@@ -13,14 +13,14 @@ use crate::{
 pub(crate) struct StreamManager {
     config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Request>,
-    client: Client,
+    client: Rc<Client>,
     streams: HashMap<i64, Rc<RefCell<Stream>>>,
 }
 
 impl StreamManager {
     pub(crate) fn new(config: Arc<Configuration>, rx: mpsc::UnboundedReceiver<Request>) -> Self {
         let (shutdown, _rx) = broadcast::channel(1);
-        let client = Client::new(Arc::clone(&config), shutdown);
+        let client = Rc::new(Client::new(Arc::clone(&config), shutdown));
         let streams = HashMap::new();
         Self {
             config,
@@ -55,7 +55,8 @@ impl StreamManager {
     async fn read(&mut self, request: ReadRequest, tx: oneshot::Sender<ReadResponse>) {}
 
     async fn open(&mut self, stream_id: i64) -> Result<Stream, ReplicationError> {
-        Ok(Stream::new(0, vec![]))
+        let client = Rc::downgrade(&self.client);
+        Ok(Stream::new(0, client))
     }
 
     async fn close(&mut self, stream_id: i64, range_id: i32, offset: i64) {}

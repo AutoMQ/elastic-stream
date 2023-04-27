@@ -34,11 +34,7 @@ impl IdGenerator for PlacementManagerIdGenerator {
             let client = Client::new(config, shutdown_tx);
 
             match client
-                .allocate_id(
-                    &self.config.server.placement_manager,
-                    &self.config.server.host,
-                    Duration::from_secs(3),
-                )
+                .allocate_id(&self.config.server.host, Duration::from_secs(3))
                 .await
             {
                 Ok(id) => {
@@ -92,7 +88,7 @@ mod tests {
         let pm_address = format!("localhost:{}", port);
 
         let mut cfg = config::Configuration::default();
-        cfg.server.placement_manager = pm_address;
+        cfg.placement_manager = pm_address;
         let config = Arc::new(cfg);
         let generator = PlacementManagerIdGenerator::new(&config);
         let id = generator.generate()?;

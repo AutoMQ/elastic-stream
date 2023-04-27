@@ -21,14 +21,11 @@ impl Client {
         }
     }
 
-    pub async fn allocate_id(
-        &self,
-        target: &str,
-        host: &str,
-        timeout: Duration,
-    ) -> Result<i32, ClientError> {
+    pub async fn allocate_id(&self, host: &str, timeout: Duration) -> Result<i32, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
-        let session = session_manager.get_composite_session(target).await?;
+        let session = session_manager
+            .get_composite_session(&self.config.placement_manager)
+            .await?;
         let future = session.allocate_id(host, timeout);
         time::timeout(timeout, future)
             .await
@@ -47,12 +44,15 @@ impl Client {
 
     pub async fn list_range(
         &self,
-        target: &str,
         stream_id: Option<i64>,
         timeout: Duration,
     ) -> Result<Vec<StreamRange>, ClientError> {
         let criteria = if let Some(stream_id) = stream_id {
-            trace!("list_range from {}, stream-id={}", target, stream_id);
+            trace!(
+                "list_range from {}, stream-id={}",
+                self.config.placement_manager,
+                stream_id
+            );
             RangeCriteria::StreamId(stream_id)
         } else {
             let data_node = self.config.server.data_node();
@@ -64,7 +64,9 @@ impl Client {
         };
 
         let session_manager = unsafe { &mut *self.session_manager.get() };
-        let session = session_manager.get_composite_session(target).await?;
+        let session = session_manager
+            .get_composite_session(&self.config.placement_manager)
+            .await?;
         let future = session.list_range(criteria);
         time::timeout(timeout, future)
             .await
@@ -116,16 +118,14 @@ mod tests {
             let port = 2378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
-            config.server.placement_manager = format!("localhost:{}", port);
+            config.placement_manager = format!("localhost:{}", port);
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             config.check_and_apply().unwrap();
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx);
-            client
-                .broadcast_heartbeat(&config.server.placement_manager)
-                .await
+            client.broadcast_heartbeat(&config.placement_manager).await
         })
     }
 
@@ -135,15 +135,15 @@ mod tests {
             #[allow(unused_variables)]
             let port = 2378;
             let port = run_listener().await;
-            let addr = format!("localhost:{}", port);
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
+            config.placement_manager = format!("localhost:{}", port);
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
             let timeout = Duration::from_secs(3);
-            let id = client.allocate_id(&addr, "localhost", timeout).await?;
+            let id = client.allocate_id("localhost", timeout).await?;
             assert_eq!(1, id);
             Ok(())
         })
@@ -167,10 +167,7 @@ mod tests {
             let timeout = Duration::from_secs(10);
 
             for i in 1..2 {
-                let ranges = client
-                    .list_range(&addr, Some(i as i64), timeout)
-                    .await
-                    .unwrap();
+                let ranges = client.list_range(Some(i as i64), timeout).await.unwrap();
                 assert_eq!(
                     false,
                     ranges.is_empty(),
@@ -190,13 +187,11 @@ mod tests {
         tokio_uring::start(async {
             #[allow(unused_variables)]
             let port = 2378;
-
             let port = run_listener().await;
-            let addr = format!("localhost:{}", port);
-
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
+            config.placement_manager = format!("localhost:{}", port);
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
@@ -204,7 +199,7 @@ mod tests {
             let timeout = Duration::from_secs(10);
 
             for _i in 1..2 {
-                let ranges = client.list_range(&addr, None, timeout).await.unwrap();
+                let ranges = client.list_range(None, timeout).await.unwrap();
                 assert_eq!(
                     false,
                     ranges.is_empty(),

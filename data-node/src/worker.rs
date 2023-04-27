@@ -123,7 +123,7 @@ impl Worker {
                     }
                     _ = interval.tick() => {
                         let _ = client
-                        .broadcast_heartbeat(&config.server.placement_manager)
+                        .broadcast_heartbeat(&config.placement_manager)
                         .await;
                     }
 

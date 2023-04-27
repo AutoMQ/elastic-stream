@@ -104,7 +104,6 @@ pub fn launch(
                 ));
                 let fetcher = Fetcher::PlacementClient {
                     client: Rc::clone(&client),
-                    target: worker_config.server_config.server.placement_manager.clone(),
                 };
                 let store = Rc::new(store);
 

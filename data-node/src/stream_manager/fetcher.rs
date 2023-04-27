@@ -20,7 +20,7 @@ pub(crate) enum Fetcher {
     /// `PlacementManager`.
     ///
     /// Primary `Node` fetches ranges of a stream for itself or on behalf of other `Node`s.
-    PlacementClient { target: String, client: Rc<Client> },
+    PlacementClient { client: Rc<Client> },
 
     /// Non-primary `Node`s acquires ranges of a stream through delegating to the primary node.
     Channel {
@@ -30,9 +30,9 @@ pub(crate) enum Fetcher {
 
 impl Fetcher {
     pub(crate) async fn bootstrap(&mut self) -> Result<Vec<StreamRange>, ServiceError> {
-        if let Fetcher::PlacementClient { client, target } = self {
+        if let Fetcher::PlacementClient { client } = self {
             return client
-                .list_range(target, None, Duration::from_secs(3))
+                .list_range(None, Duration::from_secs(3))
                 .await
                 .map_err(|_e| {
                     error!("Failed to list ranges by data node from placement manager");
@@ -52,19 +52,16 @@ impl Fetcher {
     pub(crate) async fn fetch(&mut self, stream_id: i64) -> Result<Vec<StreamRange>, ServiceError> {
         match self {
             Fetcher::Channel { sender } => Self::fetch_from_peer_node(sender, stream_id).await,
-            Fetcher::PlacementClient { client, target } => {
-                Self::fetch_by_client(client, target, stream_id).await
-            }
+            Fetcher::PlacementClient { client } => Self::fetch_by_client(client, stream_id).await,
         }
     }
 
     async fn fetch_by_client(
         client: &Client,
-        target: &str,
         stream_id: i64,
     ) -> Result<Vec<StreamRange>, ServiceError> {
         client
-            .list_range(target, Some(stream_id), Duration::from_secs(3))
+            .list_range(Some(stream_id), Duration::from_secs(3))
             .await
             .map_err(|_e| {
                 error!(

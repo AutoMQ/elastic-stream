@@ -108,9 +108,6 @@ pub struct Server {
 
     pub uring: Uring,
 
-    #[serde(rename = "placement-manager")]
-    pub placement_manager: String,
-
     #[serde(rename = "connection-idle-duration")]
     pub connection_idle_duration: u64,
 
@@ -137,7 +134,6 @@ impl Default for Server {
             node_id: 0,
             concurrency: 1,
             uring: Uring::default(),
-            placement_manager: "127.0.0.1:2378".to_owned(),
             connection_idle_duration: 60,
             grace_period: 120,
             profiling: Profiling::default(),
@@ -306,6 +302,9 @@ pub struct Configuration {
     /// Unit of time in milliseconds.
     pub tick: u64,
 
+    #[serde(rename = "placement-manager")]
+    pub placement_manager: String,
+
     pub client: Client,
 
     pub server: Server,
@@ -317,6 +316,7 @@ impl Default for Configuration {
     fn default() -> Self {
         Self {
             tick: 100,
+            placement_manager: "127.0.0.1:12378".to_owned(),
             client: Default::default(),
             server: Default::default(),
             store: Default::default(),
