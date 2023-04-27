@@ -154,12 +154,11 @@ mod tests {
         tokio_uring::start(async {
             #[allow(unused_variables)]
             let port = 2378;
-
             let port = run_listener().await;
-            let addr = format!("localhost:{}", port);
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
+            config.placement_manager = format!("localhost:{}", port);
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);

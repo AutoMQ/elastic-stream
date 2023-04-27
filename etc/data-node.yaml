@@ -33,7 +33,7 @@ server:
   # grace period in ticks, after this period of time, disconnect lingering client connections
   grace-period: 120
   profiling:
-    enable: true
+    enable: false
     # profiler sampling frequency
     sampling-frequency: 1000
     # Generate flamegraph interval in seconds
