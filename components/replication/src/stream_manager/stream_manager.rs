@@ -56,7 +56,9 @@ impl StreamManager {
 
     async fn open(&mut self, stream_id: i64) -> Result<Stream, ReplicationError> {
         let client = Rc::downgrade(&self.client);
-        Ok(Stream::new(0, client))
+        let mut stream = Stream::new(stream_id, client);
+        stream.open().await?;
+        Ok(stream)
     }
 
     async fn close(&mut self, stream_id: i64, range_id: i32, offset: i64) {}
