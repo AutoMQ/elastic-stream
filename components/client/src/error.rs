@@ -12,6 +12,9 @@ pub enum ClientError {
     #[error("Bad address")]
     BadAddress,
 
+    #[error("Bad request")]
+    BadRequest,
+
     #[error("Connection to `{0}` is refused")]
     ConnectionRefused(String),
 
@@ -33,7 +36,7 @@ pub enum ClientError {
     #[error("Client internal error")]
     ClientInternal,
 
-    #[error("Client fails to recieve response from server within {timeout:#?}")]
+    #[error("Client fails to receive response from server within {timeout:#?}")]
     RpcTimeout { timeout: Duration },
 }
 

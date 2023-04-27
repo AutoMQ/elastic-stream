@@ -3,7 +3,10 @@ use crate::{error::ClientError, Response};
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
-    client_role::ClientRole, range::StreamRange, range_criteria::RangeCriteria, request::Request,
+    client_role::ClientRole,
+    range::StreamRange,
+    range_criteria::RangeCriteria,
+    request::{seal::SealRangeRequest, Request},
     PlacementManagerNode,
 };
 use protocol::rpc::header::ErrorCode;
@@ -393,6 +396,22 @@ impl CompositeSession {
                 timeout: self.config.client_connect_timeout(),
             }),
         }
+    }
+
+    /// Seal range on data-node or placement manager.
+    ///
+    /// # Implementation Walkthrough
+    /// 1. If the seal kind is placement manager, find the session to the leader node;
+    /// 2. Send the request to the session and await response;
+    ///
+    /// # Returns
+    /// If seal kind is seal-placement-manager and renew, returns the newly created mutable range;
+    /// Otherwise, return the range that is being sealed with the end properly filled.
+    ///
+    /// If the seal kind is seal-data-node, the returning `StreamRange` is the result of the
+    /// data-node only. Final end value of the range will be resolved after MinCopy of data nodes responded.
+    pub(crate) async fn seal(&self, request: SealRangeRequest) -> Result<StreamRange, ClientError> {
+        todo!()
     }
 
     /// Try to reconnect to the endpoints that is absent from sessions.

@@ -1,7 +1,12 @@
 use super::session_manager::SessionManager;
 use crate::error::ClientError;
 use log::{error, trace, warn};
-use model::{range::StreamRange, range_criteria::RangeCriteria};
+use model::{
+    range::StreamRange,
+    range_criteria::RangeCriteria,
+    request::seal::{self, SealRangeRequest},
+};
+use protocol::rpc::header::SealRangeEntryT;
 use std::{cell::UnsafeCell, rc::Rc, sync::Arc};
 use tokio::{sync::broadcast, time};
 
@@ -97,6 +102,51 @@ impl Client {
         trace!("Broadcast heartbeat to composite-channel={}", target);
 
         composite_session.heartbeat().await
+    }
+
+    pub async fn seal(
+        &self,
+        target: Option<&str>,
+        request: SealRangeRequest,
+    ) -> Result<StreamRange, ClientError> {
+        // Validate request
+        match request.kind {
+            seal::Kind::Unspecified => {
+                error!("Seal request kind must specify");
+                return Err(ClientError::BadRequest);
+            }
+            seal::Kind::DataNode => {
+                if target.is_none() {
+                    error!("Target is required while sealing against data nodes");
+                    return Err(ClientError::BadRequest);
+                }
+
+                if request.end.is_some() {
+                    error!("SealRequest#end should be None while sealing against data nodes");
+                    return Err(ClientError::BadRequest);
+                }
+            }
+            seal::Kind::PlacementManager => {
+                if request.end.is_none() {
+                    error!(
+                        "SealRequest#end MUST be present while sealing against placement manager"
+                    );
+                    return Err(ClientError::BadRequest);
+                }
+            }
+        }
+
+        let session_manager = unsafe { &mut *self.session_manager.get() };
+        let composite_session = match target {
+            None => {
+                session_manager
+                    .get_composite_session(&self.config.placement_manager)
+                    .await?
+            }
+
+            Some(addr) => session_manager.get_composite_session(addr).await?,
+        };
+        composite_session.seal(request).await
     }
 }
 

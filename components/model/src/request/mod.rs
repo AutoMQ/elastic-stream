@@ -1,3 +1,5 @@
+pub mod seal;
+
 use crate::{client_role::ClientRole, data_node::DataNode, range_criteria::RangeCriteria};
 use bytes::{Bytes, BytesMut};
 use protocol::rpc::header::{
