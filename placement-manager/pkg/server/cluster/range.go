@@ -172,11 +172,11 @@ func (c *RaftCluster) SealRange(ctx context.Context, rangeID *rpcfb.RangeIdT) (*
 	return writableRange.RangeT, nil
 }
 
+// TODO No need to seal range on data nodes now
 func (c *RaftCluster) sealRangeOnDataNode(ctx context.Context, writableRange *rpcfb.RangeT) (endOffset int64, err error) {
 	logger := c.lg.With(zap.Int64("range-stream-id", writableRange.StreamId), zap.Int32("range-index", writableRange.RangeIndex), traceutil.TraceLogField(ctx))
 
 	req := &protocol.SealRangesRequest{SealRangesRequestT: rpcfb.SealRangesRequestT{
-		Ranges:    []*rpcfb.RangeIdT{{StreamId: writableRange.StreamId, RangeIndex: writableRange.RangeIndex}},
 		TimeoutMs: c.cfg.SealReqTimeoutMs,
 	}}
 	ch := make(chan *rpcfb.RangeT)

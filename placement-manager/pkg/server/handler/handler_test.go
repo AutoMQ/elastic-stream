@@ -85,8 +85,9 @@ func (m mockSbpClient) Do(_ protocol.OutRequest, _ sbpClient.Address) (protocol.
 }
 
 func (m mockSbpClient) SealRanges(req *protocol.SealRangesRequest, addr sbpClient.Address) (*protocol.SealRangesResponse, error) {
-	results := make([]*rpcfb.SealRangesResultT, 0, len(req.Ranges))
-	for _, rangeID := range req.Ranges {
+	results := make([]*rpcfb.SealRangesResultT, 0, len(req.Entries))
+	for _, entry := range req.Entries {
+		rangeID := entry.Range
 		start := int64(rangeID.RangeIndex * 100)
 		end := start
 		if m.endOffsetF != nil {

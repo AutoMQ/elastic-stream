@@ -34,12 +34,10 @@ func TestClient_SealRanges(t *testing.T) {
 	defer client.Shutdown(context.Background())
 
 	req := &protocol.SealRangesRequest{SealRangesRequestT: rpcfb.SealRangesRequestT{
-		Ranges: []*rpcfb.RangeIdT{
-			{
-				StreamId:   1,
-				RangeIndex: 2,
-			},
-		},
+		Entries: []*rpcfb.SealRangeEntryT{{Range: &rpcfb.RangeIdT{
+			StreamId:   1,
+			RangeIndex: 2,
+		}}},
 	}}
 	resp, err := client.SealRanges(req, addr)
 	re.NoError(err)
@@ -98,8 +96,9 @@ type mockHandler struct {
 }
 
 func normalSealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
-	results := make([]*rpcfb.SealRangesResultT, 0, len(req.Ranges))
-	for _, r := range req.Ranges {
+	results := make([]*rpcfb.SealRangesResultT, 0, len(req.Entries))
+	for _, e := range req.Entries {
+		r := e.Range
 		results = append(results, &rpcfb.SealRangesResultT{
 			Range: &rpcfb.RangeT{
 				StreamId:    r.StreamId,

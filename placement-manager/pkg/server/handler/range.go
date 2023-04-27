@@ -42,14 +42,16 @@ func (h *Handler) ListRanges(req *protocol.ListRangesRequest, resp *protocol.Lis
 }
 
 func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
+	// TODO check and save ranges' end offset, optionally create new ranges
 	ctx := req.Context()
 	logger := h.lg.With(traceutil.TraceLogField(ctx))
 
-	ranges := typeutil.FilterZero[*rpcfb.RangeIdT](req.Ranges)
-	sealResponses := make([]*rpcfb.SealRangesResultT, 0, len(ranges))
+	entries := typeutil.FilterZero[*rpcfb.SealRangeEntryT](req.Entries)
+	sealResponses := make([]*rpcfb.SealRangesResultT, 0, len(entries))
 	ch := make(chan *rpcfb.SealRangesResultT)
 
-	for _, rangeID := range ranges {
+	for _, entry := range entries {
+		rangeID := entry.Range
 		go func(rangeID *rpcfb.RangeIdT) {
 			writableRange, err := h.c.SealRange(ctx, rangeID)
 
@@ -77,7 +79,7 @@ func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.Sea
 		}(rangeID)
 	}
 
-	for range ranges {
+	for range entries {
 		sealResponses = append(sealResponses, <-ch)
 	}
 	resp.SealResponses = sealResponses

@@ -92,38 +92,6 @@ func TestSealRanges(t *testing.T) {
 		want       want
 	}{
 		{
-			name: "normal case",
-			endOffsetF: func(rangeIndex int32, addr sbpClient.Address) int64 {
-				switch addr[len(addr)-1] {
-				case '0':
-					return 42
-				case '1':
-					return 42
-				case '2':
-					return 42
-				default:
-					panic(fmt.Sprintf("unexpected address: %s", addr))
-				}
-			},
-			want: want{endOffset: 42},
-		},
-		{
-			name: "offset not match",
-			endOffsetF: func(rangeIndex int32, addr sbpClient.Address) int64 {
-				switch addr[len(addr)-1] {
-				case '0':
-					return -1
-				case '1':
-					return 84
-				case '2':
-					return 42
-				default:
-					panic(fmt.Sprintf("unexpected address: %s", addr))
-				}
-			},
-			want: want{endOffset: 42},
-		},
-		{
 			name: "no data node responded",
 			endOffsetF: func(rangeIndex int32, addr sbpClient.Address) int64 {
 				return -1
@@ -146,7 +114,7 @@ func TestSealRanges(t *testing.T) {
 			preCreateStreams(t, h, 1, 3)
 
 			req := &protocol.SealRangesRequest{SealRangesRequestT: rpcfb.SealRangesRequestT{
-				Ranges: []*rpcfb.RangeIdT{{StreamId: 0, RangeIndex: 0}},
+				Entries: []*rpcfb.SealRangeEntryT{{Range: &rpcfb.RangeIdT{StreamId: 0, RangeIndex: 0}}},
 			}}
 			resp := &protocol.SealRangesResponse{}
 			h.SealRanges(req, resp)

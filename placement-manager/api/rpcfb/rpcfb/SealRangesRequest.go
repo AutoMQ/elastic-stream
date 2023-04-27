@@ -8,38 +8,38 @@ import (
 
 type SealRangesRequestT struct {
 	TimeoutMs int32 `json:"timeout_ms"`
-	Ranges []*RangeIdT `json:"ranges"`
+	Entries []*SealRangeEntryT `json:"entries"`
 }
 
 func (t *SealRangesRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	rangesOffset := flatbuffers.UOffsetT(0)
-	if t.Ranges != nil {
-		rangesLength := len(t.Ranges)
-		rangesOffsets := make([]flatbuffers.UOffsetT, rangesLength)
-		for j := 0; j < rangesLength; j++ {
-			rangesOffsets[j] = t.Ranges[j].Pack(builder)
+	entriesOffset := flatbuffers.UOffsetT(0)
+	if t.Entries != nil {
+		entriesLength := len(t.Entries)
+		entriesOffsets := make([]flatbuffers.UOffsetT, entriesLength)
+		for j := 0; j < entriesLength; j++ {
+			entriesOffsets[j] = t.Entries[j].Pack(builder)
 		}
-		SealRangesRequestStartRangesVector(builder, rangesLength)
-		for j := rangesLength - 1; j >= 0; j-- {
-			builder.PrependUOffsetT(rangesOffsets[j])
+		SealRangesRequestStartEntriesVector(builder, entriesLength)
+		for j := entriesLength - 1; j >= 0; j-- {
+			builder.PrependUOffsetT(entriesOffsets[j])
 		}
-		rangesOffset = builder.EndVector(rangesLength)
+		entriesOffset = builder.EndVector(entriesLength)
 	}
 	SealRangesRequestStart(builder)
 	SealRangesRequestAddTimeoutMs(builder, t.TimeoutMs)
-	SealRangesRequestAddRanges(builder, rangesOffset)
+	SealRangesRequestAddEntries(builder, entriesOffset)
 	return SealRangesRequestEnd(builder)
 }
 
 func (rcv *SealRangesRequest) UnPackTo(t *SealRangesRequestT) {
 	t.TimeoutMs = rcv.TimeoutMs()
-	rangesLength := rcv.RangesLength()
-	t.Ranges = make([]*RangeIdT, rangesLength)
-	for j := 0; j < rangesLength; j++ {
-		x := RangeId{}
-		rcv.Ranges(&x, j)
-		t.Ranges[j] = x.UnPack()
+	entriesLength := rcv.EntriesLength()
+	t.Entries = make([]*SealRangeEntryT, entriesLength)
+	for j := 0; j < entriesLength; j++ {
+		x := SealRangeEntry{}
+		rcv.Entries(&x, j)
+		t.Entries[j] = x.UnPack()
 	}
 }
 
@@ -89,7 +89,7 @@ func (rcv *SealRangesRequest) MutateTimeoutMs(n int32) bool {
 	return rcv._tab.MutateInt32Slot(4, n)
 }
 
-func (rcv *SealRangesRequest) Ranges(obj *RangeId, j int) bool {
+func (rcv *SealRangesRequest) Entries(obj *SealRangeEntry, j int) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Vector(o)
@@ -101,7 +101,7 @@ func (rcv *SealRangesRequest) Ranges(obj *RangeId, j int) bool {
 	return false
 }
 
-func (rcv *SealRangesRequest) RangesLength() int {
+func (rcv *SealRangesRequest) EntriesLength() int {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
@@ -115,10 +115,10 @@ func SealRangesRequestStart(builder *flatbuffers.Builder) {
 func SealRangesRequestAddTimeoutMs(builder *flatbuffers.Builder, timeoutMs int32) {
 	builder.PrependInt32Slot(0, timeoutMs, 0)
 }
-func SealRangesRequestAddRanges(builder *flatbuffers.Builder, ranges flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(ranges), 0)
+func SealRangesRequestAddEntries(builder *flatbuffers.Builder, entries flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(entries), 0)
 }
-func SealRangesRequestStartRangesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func SealRangesRequestStartEntriesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
 func SealRangesRequestEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
