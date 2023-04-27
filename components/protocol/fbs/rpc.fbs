@@ -316,10 +316,10 @@ enum SealType : byte {
 table SealRangesRequest {
     timeout_ms: int32 (id: 0);
     // The ranges to seal.
-    entries: [SealRequestEntry] (id: 1);
+    entries: [SealRangeEntry] (id: 1);
 }
 
-table SealRequestEntry {
+table SealRangeEntry {
     type: SealType      (id: 0);
     
     range: RangeId      (id: 1, required);
