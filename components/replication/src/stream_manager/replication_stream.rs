@@ -1,18 +1,19 @@
 use crate::ReplicationError;
 
-use super::{range::Range, window::Window};
+use super::{replication_range::ReplicationRange, window::Window};
 use client::Client;
 use log::error;
+use model::range::Range;
 use std::rc::Weak;
 
-pub(crate) struct Stream {
+pub(crate) struct ReplicationStream {
     id: i64,
     window: Option<Window>,
-    ranges: Vec<Range>,
+    ranges: Vec<ReplicationRange>,
     client: Weak<Client>,
 }
 
-impl Stream {
+impl ReplicationStream {
     pub(crate) fn new(id: i64, client: Weak<Client>) -> Self {
         Self {
             id,
@@ -26,7 +27,7 @@ impl Stream {
         self.ranges
             .iter()
             .last()
-            .map(|range| range.boundary.end.is_none())
+            .map(|range| !range.metadata.is_sealed())
             .unwrap_or(false)
     }
 
@@ -39,8 +40,10 @@ impl Stream {
                 error!("Failed to list ranges from placement-manager: {e}");
                 ReplicationError::Internal
             })?
-            .iter()
-            .map(Into::into)
+            .into_iter()
+            .map(|stream_range| ReplicationRange {
+                metadata: stream_range,
+            })
             .collect();
         if self.is_open() {
             // TODO: seal data nodes that are backing up the last mutable range.

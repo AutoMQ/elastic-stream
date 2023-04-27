@@ -6,7 +6,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{
     request::{AppendRequest, AppendResponse, ReadRequest, ReadResponse, Request},
-    stream_manager::stream::Stream,
+    stream_manager::replication_stream::ReplicationStream,
     ReplicationError,
 };
 
@@ -14,7 +14,7 @@ pub(crate) struct StreamManager {
     config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Request>,
     client: Rc<Client>,
-    streams: HashMap<i64, Rc<RefCell<Stream>>>,
+    streams: HashMap<i64, Rc<RefCell<ReplicationStream>>>,
 }
 
 impl StreamManager {
@@ -54,9 +54,9 @@ impl StreamManager {
 
     async fn read(&mut self, request: ReadRequest, tx: oneshot::Sender<ReadResponse>) {}
 
-    async fn open(&mut self, stream_id: i64) -> Result<Stream, ReplicationError> {
+    async fn open(&mut self, stream_id: i64) -> Result<ReplicationStream, ReplicationError> {
         let client = Rc::downgrade(&self.client);
-        let mut stream = Stream::new(stream_id, client);
+        let mut stream = ReplicationStream::new(stream_id, client);
         stream.open().await?;
         Ok(stream)
     }
