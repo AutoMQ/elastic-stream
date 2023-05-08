@@ -50,13 +50,14 @@ pub struct FlatRecordBatch {
 impl FlatRecordBatch {
     /// Converts a RecordBatch to a FlatRecordBatch.
     pub fn init_from_struct(record_batch: RecordBatch) -> Self {
-        // Build up a serialized buffer for the specfic record_batch.
+        // Build up a serialized buffer for the specific record_batch.
         // Initialize it with a capacity of 1024 bytes.
         let mut builder = FlatBufferBuilder::with_capacity(1024);
 
         // Make a RecordBatchMeta
         let args = RecordBatchMetaArgs {
             stream_id: record_batch.stream_id(),
+            range_index: record_batch.range_index(),
             base_timestamp: record_batch.base_timestamp(),
             last_offset_delta: record_batch.records().len() as i32,
             base_offset: 0, // The base offset will be set by the storage.
@@ -236,12 +237,16 @@ impl FlatRecordBatch {
 
         let batch_meta = root_as_record_batch_meta_unchecked(self.meta_buffer.as_ref());
         let stream_id = batch_meta.stream_id();
-        record_batch_builder = record_batch_builder.with_stream_id(stream_id);
+        let range_index = batch_meta.range_index();
+        record_batch_builder = record_batch_builder
+            .with_stream_id(stream_id)
+            .with_range_index(range_index);
 
         for flat_record in self.records {
             let record_meta = root_as_record_meta_unchecked(flat_record.meta_buffer.as_ref());
             let mut record = Record::new_builder()
                 .with_stream_id(stream_id)
+                .with_range_index(range_index)
                 .with_body(flat_record.body)
                 .build()?;
 
@@ -298,7 +303,7 @@ pub struct FlatRecord {
 }
 
 /// Verifies that a buffer of bytes contains a `RecordBatchMeta` and returns it.
-/// For this unchecked behavior to be maximally peformant, use unchecked function
+/// For this unchecked behavior to be maximally performant, use unchecked function
 fn root_as_record_batch_meta(
     buf: &[u8],
 ) -> Result<RecordBatchMeta, flatbuffers::InvalidFlatbuffer> {
@@ -313,7 +318,7 @@ fn root_as_record_batch_meta_unchecked(buf: &[u8]) -> RecordBatchMeta {
 }
 
 /// Verifies that a buffer of bytes contains a `RecordMeta` and returns it.
-/// For this unchecked behavior to be maximally peformant, use unchecked function
+/// For this unchecked behavior to be maximally performant, use unchecked function
 fn root_as_record_meta(buf: &[u8]) -> Result<RecordMeta, flatbuffers::InvalidFlatbuffer> {
     flatbuffers::root::<RecordMeta>(buf)
 }
@@ -336,6 +341,7 @@ mod tests {
         let stream_id = 1 as i64;
         let mut record1 = RecordBuilder::default()
             .with_stream_id(stream_id)
+            .with_range_index(0)
             .with_body(Bytes::from("hello"))
             .with_keys("foo bar".to_string())
             .with_tag("baz".to_string())
@@ -353,6 +359,7 @@ mod tests {
         let base_timestamp = record1.created_at().unwrap().parse::<i64>().unwrap();
         let mut record2 = RecordBuilder::default()
             .with_stream_id(stream_id)
+            .with_range_index(0)
             .with_body(Bytes::from("world"))
             .with_keys("foo bar".to_string())
             .with_tag("baz".to_string())
@@ -365,6 +372,7 @@ mod tests {
         );
         let batch = RecordBatchBuilder::default()
             .with_stream_id(stream_id)
+            .with_range_index(0)
             .add_record(record1)
             .add_record(record2)
             .build()

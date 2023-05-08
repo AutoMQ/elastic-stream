@@ -190,44 +190,52 @@ table AppendResult {
 table FetchRequest {
     // The maximum time in milliseconds to wait for the response.
     max_wait_ms: int32 (id: 0);
+
     // The minimum bytes to accumulate before returning a response.
     min_bytes: int32 (id: 1);
+
     // A batch of fetch requests to fetch data from different streams.
-    fetch_requests: [FetchInfo] (id: 2);
+    entries: [FetchEntry] (id: 2);
 }
 
-table FetchInfo {
+table FetchEntry {
     // The stream range to fetch.
     range: Range (id: 0);
+
     // The index of the request in the batch.
     request_index: int32 (id: 1);
+    
     // The offset to fetch from.
     fetch_offset: int64 (id: 2);
+    
     // The maximum number of bytes to fetch.
     batch_max_bytes: int32 (id: 3);
 }
 
 table FetchResponse {
+    status: Status (id: 0, required);
+
+    // A batch of `FetchResult`.
+    results: [FetchResult] (id: 1);
+
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // A batch of fetch responses.
-    fetch_responses: [FetchResult] (id: 1);
-    status: Status (id: 2, required);
+    throttle_time_ms: int32 (id: 2);
 }
 
 table FetchResult {
+    status: Status (id: 0, required);
+
     // The id of the stream
-    stream_id: int64 = -1 (id: 0);
+    stream_id: int64 = -1 (id: 1);
+
     // The index of the request that this response is for.
-    request_index: int32 (id: 1);
+    request_index: int32 (id: 2);
 
     // The quantity of record batches to be decoded from the payload for current fetch result.
     //
     // Note: Record batches MUST be decoded sequentially. 
     // This field defines the quantity of record batches that are belonging to the current FetchResult.
-    batch_count: int32 (id: 2);
-
-    status: Status (id: 3, required);
+    batch_count: int32 (id: 3);
 }
 
 // Used to fetch the ranges from a specific data node or a specific stream list.

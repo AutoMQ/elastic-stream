@@ -7,17 +7,25 @@ namespace records;
 table RecordBatchMeta {
     /// The stream id of this record batch.
     stream_id: int64 (id: 0);
+
+    /// The range index of this record batch.
+    range_index: int32 (id: 1);
+
     /// The flags of this record batch. Each bit is used to indicate a specific flag.
-    flags: short (id: 1);
+    flags: short (id: 2);
+
     /// The base offset of the batch record, also is the logical offset of the first record.
     /// This field may be empty, since rust flatbuffers doesn't support update in place.
-    base_offset: int64 (id: 2);
+    base_offset: int64 (id: 3);
+
     /// The delta value between the last offset and the base offset.
-    last_offset_delta: int32 (id: 3);
+    last_offset_delta: int32 (id: 4);
+
     /// The create timestamp of the first record in this batch.
-    base_timestamp: int64 (id: 4);
+    base_timestamp: int64 (id: 5);
+
     /// Other attributes that may not be corresponding with the storage layer.
-    properties: [KeyValue] (id: 5);
+    properties: [KeyValue] (id: 6);
 }
 
 table KeyValue {

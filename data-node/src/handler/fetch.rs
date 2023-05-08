@@ -127,7 +127,7 @@ impl<'a> Fetch<'a> {
         let fetch_results_fb = builder.create_vector(&fetch_results);
         let res_args = FetchResponseArgs {
             throttle_time_ms: 0,
-            fetch_responses: Some(fetch_results_fb),
+            results: Some(fetch_results_fb),
             status: Some(ok_status),
         };
         let res_offset = protocol::rpc::header::FetchResponse::create(&mut builder, &res_args);
@@ -168,7 +168,7 @@ impl<'a> Fetch<'a> {
         stream_manager: Rc<RefCell<StreamManager>>,
     ) -> Vec<Result<ReadOptions, FetchError>> {
         self.fetch_request
-            .fetch_requests()
+            .entries()
             .iter()
             .flatten()
             .map(|req| {

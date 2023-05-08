@@ -19,6 +19,7 @@ use model::{Record, RecordBatch, RecordMetadata};
 ///     let body = BytesMut::with_capacity(128).freeze();
 ///     let record = Record::new_builder()
 ///         .with_stream_id(3)
+///         .with_range_index(0)
 ///         .with_body(body)
 ///         .build()?;
 ///
