@@ -10,21 +10,21 @@ import (
 
 // Cache is the cache for all metadata.
 type Cache struct {
-	writableRanges cmap.ConcurrentMap[int64, *Range]
-	dataNodes      cmap.ConcurrentMap[int32, *DataNode]
+	lastRanges cmap.ConcurrentMap[int64, *Range]
+	dataNodes  cmap.ConcurrentMap[int32, *DataNode]
 }
 
 // NewCache creates a new Cache.
 func NewCache() *Cache {
 	return &Cache{
-		writableRanges: cmap.NewWithCustomShardingFunction[int64, *Range](func(key int64) uint32 { return uint32(key) }),
-		dataNodes:      cmap.NewWithCustomShardingFunction[int32, *DataNode](func(key int32) uint32 { return uint32(key) }),
+		lastRanges: cmap.NewWithCustomShardingFunction[int64, *Range](func(key int64) uint32 { return uint32(key) }),
+		dataNodes:  cmap.NewWithCustomShardingFunction[int32, *DataNode](func(key int32) uint32 { return uint32(key) }),
 	}
 }
 
 // Reset resets the cache.
 func (c *Cache) Reset() {
-	c.writableRanges.Clear()
+	c.lastRanges.Clear()
 }
 
 type Range struct {
@@ -38,9 +38,9 @@ func (r *Range) Mu() chan struct{} {
 	return r.mu
 }
 
-// WritableRange returns the writable range of the stream.
-func (c *Cache) WritableRange(streamID int64) *Range {
-	return c.writableRanges.Upsert(streamID, nil, func(exist bool, valueInMap, _ *Range) *Range {
+// LastRange returns the last range of the stream.
+func (c *Cache) LastRange(streamID int64) *Range {
+	return c.lastRanges.Upsert(streamID, nil, func(exist bool, valueInMap, _ *Range) *Range {
 		if exist {
 			return valueInMap
 		}

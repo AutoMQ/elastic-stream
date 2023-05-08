@@ -47,30 +47,40 @@ type Range interface {
 	GetRangeIDsByDataNodeAndStream(ctx context.Context, streamID int64, dataNodeID int32) ([]*rpcfb.RangeIdT, error)
 }
 
-func (e *Endpoint) SealRange(ctx context.Context, sealedRange *rpcfb.RangeT, writableRange *rpcfb.RangeT) (*rpcfb.RangeT, error) {
-	logger := e.lg.With(zap.Int64("sealed-stream-id", sealedRange.StreamId), zap.Int32("sealed-range-index", sealedRange.RangeIndex),
-		zap.Int64("writable-stream-id", writableRange.StreamId), zap.Int32("writable-range-index", writableRange.RangeIndex), traceutil.TraceLogField(ctx))
+func (e *Endpoint) SealRange(ctx context.Context, sealedRange *rpcfb.RangeT, writableRange *rpcfb.RangeT) (lastRange *rpcfb.RangeT, err error) {
+	logger := e.lg.With(traceutil.TraceLogField(ctx))
 
-	kvs := make([]kv.KeyValue, 2)
-	kvs[0] = kv.KeyValue{Key: rangePathInSteam(sealedRange.StreamId, sealedRange.RangeIndex), Value: fbutil.Marshal(sealedRange)}
-	kvs[1] = kv.KeyValue{Key: rangePathInSteam(writableRange.StreamId, writableRange.RangeIndex), Value: fbutil.Marshal(writableRange)}
+	kvs := make([]kv.KeyValue, 0, 2)
+	if sealedRange != nil {
+		logger = logger.With(zap.Int64("sealed-stream-id", sealedRange.StreamId), zap.Int32("sealed-range-index", sealedRange.RangeIndex))
+		kvs = append(kvs, kv.KeyValue{Key: rangePathInSteam(sealedRange.StreamId, sealedRange.RangeIndex), Value: fbutil.Marshal(sealedRange)})
+		lastRange = sealedRange
+	}
+	if writableRange != nil {
+		logger = logger.With(zap.Int64("writable-stream-id", writableRange.StreamId), zap.Int32("writable-range-index", writableRange.RangeIndex))
+		kvs = append(kvs, kv.KeyValue{Key: rangePathInSteam(writableRange.StreamId, writableRange.RangeIndex), Value: fbutil.Marshal(writableRange)})
+		lastRange = writableRange
+	}
 
 	preKvs, err := e.BatchPut(ctx, kvs, true)
-	mcache.Free(kvs[0].Value)
-	mcache.Free(kvs[1].Value)
+	for _, keyValue := range kvs {
+		mcache.Free(keyValue.Value)
+	}
 	if err != nil {
 		logger.Error("failed to seal range", zap.Error(err))
 		return nil, errors.Wrap(err, "seal range")
 	}
 
-	if len(preKvs) > 1 {
-		logger.Warn("seal range: writable range already exists")
-	}
-	if len(preKvs) < 1 {
-		logger.Warn("seal range: sealed range not exists")
-	}
+	// TODO: check preKvs
+	_ = preKvs
+	//if len(preKvs) > 1 {
+	//	logger.Warn("seal range: writable range already exists")
+	//}
+	//if len(preKvs) < 1 {
+	//	logger.Warn("seal range: sealed range not exists")
+	//}
 
-	return writableRange, nil
+	return
 }
 
 func (e *Endpoint) GetRange(ctx context.Context, rangeID *rpcfb.RangeIdT) (*rpcfb.RangeT, error) {

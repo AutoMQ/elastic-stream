@@ -90,15 +90,7 @@ func TestSealRanges(t *testing.T) {
 		name       string
 		endOffsetF func(rangeIndex int32, addr sbpClient.Address) int64
 		want       want
-	}{
-		{
-			name: "no data node responded",
-			endOffsetF: func(rangeIndex int32, addr sbpClient.Address) int64 {
-				return -1
-			},
-			want: want{wantErr: true, errCode: rpcfb.ErrorCodePM_SEAL_RANGE_NO_DN_RESPONDED},
-		},
-	}
+	}{}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {

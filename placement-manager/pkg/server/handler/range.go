@@ -42,46 +42,41 @@ func (h *Handler) ListRanges(req *protocol.ListRangesRequest, resp *protocol.Lis
 }
 
 func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
-	// TODO check and save ranges' end offset, optionally create new ranges
 	ctx := req.Context()
 	logger := h.lg.With(traceutil.TraceLogField(ctx))
 
 	entries := typeutil.FilterZero[*rpcfb.SealRangeEntryT](req.Entries)
 	sealResponses := make([]*rpcfb.SealRangesResultT, 0, len(entries))
-	ch := make(chan *rpcfb.SealRangesResultT)
 
 	for _, entry := range entries {
-		rangeID := entry.Range
-		go func(rangeID *rpcfb.RangeIdT) {
-			writableRange, err := h.c.SealRange(ctx, rangeID)
+		logger := logger.With(zap.Int64("stream-id", entry.Range.StreamId), zap.Int32("range-index", entry.Range.RangeIndex),
+			zap.Int64("range-end-offset", entry.End))
+		writableRange, err := h.c.SealRange(ctx, entry)
 
-			result := &rpcfb.SealRangesResultT{
-				Range: writableRange,
+		result := &rpcfb.SealRangesResultT{
+			Range: writableRange,
+		}
+		if err != nil {
+			logger.Error("failed to seal range", zap.Error(err))
+			switch {
+			case errors.Is(err, cluster.ErrRangeNotFound):
+				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_SEAL_RANGE_NOT_FOUND, Message: err.Error()}
+			case errors.Is(err, cluster.ErrNotEnoughDataNodes):
+				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()}
+			case errors.Is(err, cluster.ErrRangeAlreadySealed):
+				// TODO: add a new error code
+				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
+			default:
+				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
 			}
-			if err != nil {
-				logger.Error("failed to seal range", zap.Int64("stream-id", rangeID.StreamId), zap.Int32("range-index", rangeID.RangeIndex), zap.Error(err))
-				switch {
-				case errors.Is(err, cluster.ErrRangeNotFound):
-					result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_SEAL_RANGE_NOT_FOUND, Message: err.Error()}
-				case errors.Is(err, cluster.ErrNoDataNodeResponded):
-					result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_SEAL_RANGE_NO_DN_RESPONDED, Message: err.Error()}
-				case errors.Is(err, cluster.ErrNotEnoughDataNodes):
-					result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()}
-				default:
-					result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
-				}
-			} else {
-				logger.Info("range sealed", zap.Int64("stream-id", rangeID.StreamId), zap.Int32("range-index", rangeID.RangeIndex),
-					zap.Int64("range-end-offset", writableRange.StartOffset)) // writableRange.StartOffset == sealedRange.EndOffset
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
-			}
-			ch <- result
-		}(rangeID)
+		} else {
+			logger.Info("range sealed")
+			result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
+		}
+
+		sealResponses = append(sealResponses, result)
 	}
 
-	for range entries {
-		sealResponses = append(sealResponses, <-ch)
-	}
 	resp.SealResponses = sealResponses
 	resp.OK()
 }
