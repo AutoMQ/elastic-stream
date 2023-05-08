@@ -142,37 +142,46 @@ table IdAllocationResponse {
 table AppendRequest {
     // The timeout to await a response in milliseconds.
     timeout_ms: int32 (id: 0);
-    // A batch of append requests.
-    append_requests: [AppendInfo] (id: 1);
+
+    // A batch of append request entries.
+    entries: [AppendEntry] (id: 1);
 }
 
-table AppendInfo {
+table BatchOffset {
+    // Base offset of the batch.
+    offset: int64 (id: 0);
+
+    // Quantity of the records contained in the batch.
+    len: int32 (id: 1);
+}
+
+table AppendEntry {
     // The stream range to append records into.
     range: Range (id: 0);
-    // The index of the request in the batch.
-    request_index: int32 (id: 1);
+
+    offset: BatchOffset (id: 1, required);
+
     // The payload length of this record batch to append
-    batch_length: int32 (id: 2);
+    payload_length: int32 (id: 2);
 }
 
 table AppendResponse {
-    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
+    // Status for overall RPC.
+    status: Status (id: 0, required);
+
     // A batch of append responses.
-    append_responses: [AppendResult] (id: 1);
-    status: Status (id: 2, required);
+    results: [AppendResult] (id: 1);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 2);
 }
 
 table AppendResult {
-    // The id of the stream
-    stream_id: int64 = -1 (id: 0);
-    // The index of the request that this response is for.
-    request_index: int32 (id: 1);
-    // The offset of the first record in the record batch.
-    base_offset: int64 (id: 2);
+    // Status for the AppendEntry
+    status: Status (id: 0, required);
+
     // The timestamp returned by the data node server after appending the records.
-    stream_append_time_ms: int64 (id: 3);
-    status: Status (id: 4, required);
+    timestamp_ms: int64 (id: 1);
 }
 
 // The fetch request is used to fetch records from the data node.
@@ -236,7 +245,7 @@ table DataNode {
 
     // The advertise address of the data node, for client traffic from outside.
     // The schema of the address is `host:port`, while host supports both domain name and IPv4/IPv6 address.
-    advertise_addr: string (id: 1);
+    advertise_addr: string (id: 1, required);
 }
 
 // The list streams request is used to list the ranges of a batch of streams.
@@ -245,7 +254,7 @@ table ListRangesRequest {
     timeout_ms: int32 (id: 0);
 
     // The range criteria could be a data node or a list of streams.
-    range_criteria: [RangeCriteria] (id: 1);
+    range_criteria: [RangeCriteria] (id: 1, required);
 }
 
 table ListRangesResponse {
@@ -283,16 +292,8 @@ table Range {
     // as a result, clients should NOT cache these empty ones.
     end_offset: int64 (id: 3);
 
-    // The next writable offset for incoming records of the range.
-    // It's a snapshot of the next offset of the range, and it may be changed after the response is sent.
-    next_offset: int64 (id: 4);
-    // The set of all nodes that host this range.
-    replica_nodes: [ReplicaNode] (id: 5);
-}
-
-table ReplicaNode {
-    data_node: DataNode (id: 0);
-    is_primary: bool (id: 1);
+    // The collection of data-node that host this range.
+    replica_nodes: [DataNode] (id: 4);
 }
 
 // Seal action type.

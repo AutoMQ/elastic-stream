@@ -56,7 +56,6 @@ fn serve_list_ranges(request: &ListRangesRequest, frame: &mut Frame) {
                 range.stream_id = 0;
                 range.range_index = i as i32;
                 range.start_offset = i * 100;
-                range.next_offset = (i + 1) * 100;
                 range.end_offset = (i + 1) * 100;
                 range
             })

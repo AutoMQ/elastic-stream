@@ -22,7 +22,16 @@ impl From<&DataNode> for DataNodeT {
     fn from(value: &DataNode) -> Self {
         let mut ret = DataNodeT::default();
         ret.node_id = value.node_id;
-        ret.advertise_addr = Some(value.advertise_address.to_owned());
+        ret.advertise_addr = value.advertise_address.clone();
         ret
+    }
+}
+
+impl From<&DataNodeT> for DataNode {
+    fn from(value: &DataNodeT) -> Self {
+        Self {
+            node_id: value.node_id,
+            advertise_address: value.advertise_addr.clone(),
+        }
     }
 }

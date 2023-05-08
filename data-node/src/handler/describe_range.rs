@@ -78,7 +78,6 @@ impl<'a> DescribeRange<'a> {
                         range_t.stream_id = range.stream_id();
                         range_t.range_index = range.index();
                         range_t.start_offset = range.start() as i64;
-                        range_t.next_offset = range.limit() as i64;
                         if let Some(end) = range.end() {
                             range_t.end_offset = end as i64;
                         } else {

@@ -67,7 +67,7 @@ impl From<&Request> for Bytes {
                     .collect();
                 let mut request = ListRangesRequestT::default();
                 request.timeout_ms = timeout.as_millis() as i32;
-                request.range_criteria = Some(list);
+                request.range_criteria = list;
                 let req = request.pack(&mut builder);
                 builder.finish(req, None);
             }

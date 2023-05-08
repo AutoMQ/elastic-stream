@@ -135,11 +135,7 @@ impl<'a> Append<'a> {
                             );
                         }
                         let args = AppendResultArgs {
-                            stream_id: result.stream_id,
-                            // TODO: fill the write request index
-                            request_index: 0,
-                            base_offset: result.offset,
-                            stream_append_time_ms: Utc::now().timestamp(),
+                            timestamp_ms: Utc::now().timestamp(),
                             status: Some(ok_status),
                         };
                         protocol::rpc::header::AppendResult::create(&mut builder, &args)
@@ -163,10 +159,7 @@ impl<'a> Append<'a> {
                         );
 
                         let args = AppendResultArgs {
-                            stream_id: 0,
-                            request_index: 0,
-                            base_offset: 0,
-                            stream_append_time_ms: 0,
+                            timestamp_ms: 0,
                             status: Some(status),
                         };
                         protocol::rpc::header::AppendResult::create(&mut builder, &args)
@@ -179,7 +172,7 @@ impl<'a> Append<'a> {
 
         let res_args = AppendResponseArgs {
             throttle_time_ms: 0,
-            append_responses: Some(append_results_fb),
+            results: Some(append_results_fb),
             status: Some(ok_status),
         };
 
@@ -201,7 +194,7 @@ impl<'a> Append<'a> {
         // Iterate over the append requests and append each record batch
         let to_store_requests: Vec<_> = self
             .append_request
-            .append_requests()
+            .entries()
             .iter()
             .flatten()
             .map_while(|record_batch| {
@@ -214,8 +207,7 @@ impl<'a> Append<'a> {
                     }
                 };
 
-                let _request_index = record_batch.request_index();
-                let batch_len = record_batch.batch_length();
+                let batch_len = record_batch.payload_length();
 
                 // the current data node owns the newly writable range of the stream
 

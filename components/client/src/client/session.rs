@@ -338,7 +338,7 @@ impl Session {
                                 range.stream_id,
                                 range.range_index,
                                 range.start_offset as u64,
-                                range.next_offset as u64,
+                                range.end_offset as u64,
                                 Some(range.end_offset as u64),
                             )
                         } else {
@@ -346,7 +346,7 @@ impl Session {
                                 range.stream_id,
                                 range.range_index,
                                 range.start_offset as u64,
-                                range.next_offset as u64,
+                                range.start_offset as u64,
                                 None,
                             )
                         };
@@ -356,20 +356,7 @@ impl Session {
                             .iter()
                             .flat_map(|nodes| nodes.iter())
                             .for_each(|node| {
-                                if let Some(ref n) = node.data_node {
-                                    if node.is_primary {
-                                        stream_range.set_primary(n.node_id);
-                                    }
-
-                                    if let Some(ref addr) = n.advertise_addr {
-                                        let data_node = DataNode::new(n.node_id, addr.clone());
-                                        stream_range.replica_mut().push(data_node);
-                                    } else {
-                                        warn!("Invalid replica node: {:?}", node)
-                                    }
-                                } else {
-                                    warn!("Invalid replica node: {:?}", node)
-                                }
+                                stream_range.replica_mut().push(node.into());
                             });
 
                         stream_range

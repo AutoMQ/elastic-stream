@@ -257,22 +257,13 @@ impl StreamManager {
             range.start_offset() as u64,
             None,
         );
-        range
-            .replica_nodes()
-            .iter()
-            .flatten()
-            .for_each(|replica_node| {
-                if let Some(node) = replica_node.data_node() {
-                    let data_node = DataNode {
-                        node_id: node.node_id(),
-                        advertise_address: node
-                            .advertise_addr()
-                            .map(|addr| addr.to_owned())
-                            .unwrap_or_default(),
-                    };
-                    stream_range.replica_mut().push(data_node);
-                }
-            });
+        range.replica_nodes().iter().flatten().for_each(|node| {
+            let data_node = DataNode {
+                node_id: node.node_id(),
+                advertise_address: node.advertise_addr().to_owned(),
+            };
+            stream_range.replica_mut().push(data_node);
+        });
 
         let mut append_window = AppendWindow::new(range_index, range.start_offset() as u64);
         let offset = append_window.alloc_batch_slots(batch_size);

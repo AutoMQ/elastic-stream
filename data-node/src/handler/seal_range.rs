@@ -66,7 +66,6 @@ impl<'a> SealRange<'a> {
                     item.stream_id = entry.range.stream_id;
                     item.range_index = entry.range.range_index;
                     item.end_offset = offset as i64;
-                    item.next_offset = offset as i64;
                     result.range = Some(Box::new(item));
                 }
                 Err(e) => {
