@@ -58,7 +58,7 @@ func (e *Endpoint) CreateStreams(ctx context.Context, params []*CreateStreamPara
 		})
 		for _, node := range param.RangeT.ReplicaNodes {
 			kvs = append(kvs, kv.KeyValue{
-				Key:   rangePathOnDataNode(node.DataNode.NodeId, param.StreamT.StreamId, param.RangeT.RangeIndex),
+				Key:   rangePathOnDataNode(node.NodeId, param.StreamT.StreamId, param.RangeT.RangeIndex),
 				Value: nil,
 			})
 		}

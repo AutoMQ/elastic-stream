@@ -69,7 +69,7 @@ func (c *RaftCluster) CreateStreams(ctx context.Context, streams []*rpcfb.Stream
 
 	for _, result := range results {
 		for _, node := range result.Range.ReplicaNodes {
-			c.fillDataNodeInfo(node.DataNode)
+			c.fillDataNodeInfo(node)
 		}
 	}
 	return results, err

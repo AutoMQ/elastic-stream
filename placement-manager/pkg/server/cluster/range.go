@@ -52,7 +52,7 @@ func (c *RaftCluster) ListRanges(ctx context.Context, rangeCriteria *rpcfb.Range
 
 	for _, r := range ranges {
 		for _, node := range r.ReplicaNodes {
-			c.fillDataNodeInfo(node.DataNode)
+			c.fillDataNodeInfo(node)
 		}
 	}
 	return
@@ -136,7 +136,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, rangeID *rpcfb.RangeIdT) (*
 		return nil, errors.Wrapf(ErrRangeNotFound, "stream %d does not exist", rangeID.StreamId)
 	}
 	for _, node := range lastRange.ReplicaNodes {
-		c.fillDataNodeInfo(node.DataNode)
+		c.fillDataNodeInfo(node)
 	}
 	writableRange.RangeT = lastRange
 
@@ -165,7 +165,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, rangeID *rpcfb.RangeIdT) (*
 		return writableRange.RangeT, err
 	}
 	for _, node := range newRange.ReplicaNodes {
-		c.fillDataNodeInfo(node.DataNode)
+		c.fillDataNodeInfo(node)
 	}
 	writableRange.RangeT = newRange
 
@@ -181,15 +181,15 @@ func (c *RaftCluster) sealRangeOnDataNode(ctx context.Context, writableRange *rp
 	}}
 	ch := make(chan *rpcfb.RangeT)
 	for _, node := range writableRange.ReplicaNodes {
-		go func(node *rpcfb.ReplicaNodeT) {
-			resp, err := c.client.SealRanges(req, node.DataNode.AdvertiseAddr)
+		go func(node *rpcfb.DataNodeT) {
+			resp, err := c.client.SealRanges(req, node.AdvertiseAddr)
 			if resp == nil || err != nil {
-				logger.Error("failed to seal range on data node: request failed", zap.Int32("data-node-id", node.DataNode.NodeId), zap.Error(err))
+				logger.Error("failed to seal range on data node: request failed", zap.Int32("data-node-id", node.NodeId), zap.Error(err))
 				ch <- nil
 				return
 			}
 			if resp.Status.Code != rpcfb.ErrorCodeOK {
-				logger.Error("failed to seal range on data node: error response", zap.Int32("data-node-id", node.DataNode.NodeId),
+				logger.Error("failed to seal range on data node: error response", zap.Int32("data-node-id", node.NodeId),
 					zap.String("status-code", resp.Status.Code.String()), zap.String("status-msg", resp.Status.Message))
 				ch <- nil
 				return
@@ -197,17 +197,17 @@ func (c *RaftCluster) sealRangeOnDataNode(ctx context.Context, writableRange *rp
 			for _, result := range resp.SealResponses {
 				if result.Range != nil && result.Range.StreamId == writableRange.StreamId && result.Range.RangeIndex == writableRange.RangeIndex {
 					if result.Status.Code != rpcfb.ErrorCodeOK {
-						logger.Error("failed to seal range on data node: error status", zap.Int32("data-node-id", node.DataNode.NodeId),
+						logger.Error("failed to seal range on data node: error status", zap.Int32("data-node-id", node.NodeId),
 							zap.String("status-code", result.Status.Code.String()), zap.String("status-msg", result.Status.Message))
 						ch <- nil
 						return
 					}
-					logger.Info("range sealed on data node", zap.Int32("data-node-id", node.DataNode.NodeId), zap.Int64("range-end-offset", result.Range.EndOffset))
+					logger.Info("range sealed on data node", zap.Int32("data-node-id", node.NodeId), zap.Int64("range-end-offset", result.Range.EndOffset))
 					ch <- result.Range
 					return
 				}
 			}
-			logger.Error("failed to seal range on data node: no response for the range", zap.Int32("data-node-id", node.DataNode.NodeId))
+			logger.Error("failed to seal range on data node: no response for the range", zap.Int32("data-node-id", node.NodeId))
 			ch <- nil
 		}(node)
 	}
@@ -246,11 +246,10 @@ func (c *RaftCluster) sealRangeOnDataNode(ctx context.Context, writableRange *rp
 func (c *RaftCluster) newRange(ctx context.Context, r *rpcfb.RangeT, endOffset int64) (or *rpcfb.RangeT, nr *rpcfb.RangeT, err error) {
 	logger := c.lg.With(zap.Int64("range-stream-id", r.StreamId), zap.Int32("range-index", r.RangeIndex), traceutil.TraceLogField(ctx))
 
-	oldNodes := make([]*rpcfb.ReplicaNodeT, 0, len(r.ReplicaNodes))
+	oldNodes := make([]*rpcfb.DataNodeT, 0, len(r.ReplicaNodes))
 	for _, node := range r.ReplicaNodes {
-		oldNodes = append(oldNodes, &rpcfb.ReplicaNodeT{
-			DataNode:  node.DataNode,
-			IsPrimary: node.IsPrimary,
+		oldNodes = append(oldNodes, &rpcfb.DataNodeT{
+			NodeId: node.NodeId,
 		})
 	}
 	or = &rpcfb.RangeT{

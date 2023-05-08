@@ -7,31 +7,22 @@ import (
 )
 
 type AppendResultT struct {
-	StreamId int64 `json:"stream_id"`
-	RequestIndex int32 `json:"request_index"`
-	BaseOffset int64 `json:"base_offset"`
-	StreamAppendTimeMs int64 `json:"stream_append_time_ms"`
 	Status *StatusT `json:"status"`
+	TimestampMs int64 `json:"timestamp_ms"`
 }
 
 func (t *AppendResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	statusOffset := t.Status.Pack(builder)
 	AppendResultStart(builder)
-	AppendResultAddStreamId(builder, t.StreamId)
-	AppendResultAddRequestIndex(builder, t.RequestIndex)
-	AppendResultAddBaseOffset(builder, t.BaseOffset)
-	AppendResultAddStreamAppendTimeMs(builder, t.StreamAppendTimeMs)
 	AppendResultAddStatus(builder, statusOffset)
+	AppendResultAddTimestampMs(builder, t.TimestampMs)
 	return AppendResultEnd(builder)
 }
 
 func (rcv *AppendResult) UnPackTo(t *AppendResultT) {
-	t.StreamId = rcv.StreamId()
-	t.RequestIndex = rcv.RequestIndex()
-	t.BaseOffset = rcv.BaseOffset()
-	t.StreamAppendTimeMs = rcv.StreamAppendTimeMs()
 	t.Status = rcv.Status(nil).UnPack()
+	t.TimestampMs = rcv.TimestampMs()
 }
 
 func (rcv *AppendResult) UnPack() *AppendResultT {
@@ -68,56 +59,8 @@ func (rcv *AppendResult) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *AppendResult) StreamId() int64 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
-	if o != 0 {
-		return rcv._tab.GetInt64(o + rcv._tab.Pos)
-	}
-	return -1
-}
-
-func (rcv *AppendResult) MutateStreamId(n int64) bool {
-	return rcv._tab.MutateInt64Slot(4, n)
-}
-
-func (rcv *AppendResult) RequestIndex() int32 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
-	if o != 0 {
-		return rcv._tab.GetInt32(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *AppendResult) MutateRequestIndex(n int32) bool {
-	return rcv._tab.MutateInt32Slot(6, n)
-}
-
-func (rcv *AppendResult) BaseOffset() int64 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
-	if o != 0 {
-		return rcv._tab.GetInt64(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *AppendResult) MutateBaseOffset(n int64) bool {
-	return rcv._tab.MutateInt64Slot(8, n)
-}
-
-func (rcv *AppendResult) StreamAppendTimeMs() int64 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
-	if o != 0 {
-		return rcv._tab.GetInt64(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *AppendResult) MutateStreamAppendTimeMs(n int64) bool {
-	return rcv._tab.MutateInt64Slot(10, n)
-}
-
 func (rcv *AppendResult) Status(obj *Status) *Status {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -129,23 +72,26 @@ func (rcv *AppendResult) Status(obj *Status) *Status {
 	return nil
 }
 
+func (rcv *AppendResult) TimestampMs() int64 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.GetInt64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *AppendResult) MutateTimestampMs(n int64) bool {
+	return rcv._tab.MutateInt64Slot(6, n)
+}
+
 func AppendResultStart(builder *flatbuffers.Builder) {
-	builder.StartObject(5)
-}
-func AppendResultAddStreamId(builder *flatbuffers.Builder, streamId int64) {
-	builder.PrependInt64Slot(0, streamId, -1)
-}
-func AppendResultAddRequestIndex(builder *flatbuffers.Builder, requestIndex int32) {
-	builder.PrependInt32Slot(1, requestIndex, 0)
-}
-func AppendResultAddBaseOffset(builder *flatbuffers.Builder, baseOffset int64) {
-	builder.PrependInt64Slot(2, baseOffset, 0)
-}
-func AppendResultAddStreamAppendTimeMs(builder *flatbuffers.Builder, streamAppendTimeMs int64) {
-	builder.PrependInt64Slot(3, streamAppendTimeMs, 0)
+	builder.StartObject(2)
 }
 func AppendResultAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(4, flatbuffers.UOffsetT(status), 0)
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
+}
+func AppendResultAddTimestampMs(builder *flatbuffers.Builder, timestampMs int64) {
+	builder.PrependInt64Slot(1, timestampMs, 0)
 }
 func AppendResultEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

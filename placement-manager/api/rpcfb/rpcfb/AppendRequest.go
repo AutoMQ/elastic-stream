@@ -8,38 +8,38 @@ import (
 
 type AppendRequestT struct {
 	TimeoutMs int32 `json:"timeout_ms"`
-	AppendRequests []*AppendInfoT `json:"append_requests"`
+	Entries []*AppendEntryT `json:"entries"`
 }
 
 func (t *AppendRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	appendRequestsOffset := flatbuffers.UOffsetT(0)
-	if t.AppendRequests != nil {
-		appendRequestsLength := len(t.AppendRequests)
-		appendRequestsOffsets := make([]flatbuffers.UOffsetT, appendRequestsLength)
-		for j := 0; j < appendRequestsLength; j++ {
-			appendRequestsOffsets[j] = t.AppendRequests[j].Pack(builder)
+	entriesOffset := flatbuffers.UOffsetT(0)
+	if t.Entries != nil {
+		entriesLength := len(t.Entries)
+		entriesOffsets := make([]flatbuffers.UOffsetT, entriesLength)
+		for j := 0; j < entriesLength; j++ {
+			entriesOffsets[j] = t.Entries[j].Pack(builder)
 		}
-		AppendRequestStartAppendRequestsVector(builder, appendRequestsLength)
-		for j := appendRequestsLength - 1; j >= 0; j-- {
-			builder.PrependUOffsetT(appendRequestsOffsets[j])
+		AppendRequestStartEntriesVector(builder, entriesLength)
+		for j := entriesLength - 1; j >= 0; j-- {
+			builder.PrependUOffsetT(entriesOffsets[j])
 		}
-		appendRequestsOffset = builder.EndVector(appendRequestsLength)
+		entriesOffset = builder.EndVector(entriesLength)
 	}
 	AppendRequestStart(builder)
 	AppendRequestAddTimeoutMs(builder, t.TimeoutMs)
-	AppendRequestAddAppendRequests(builder, appendRequestsOffset)
+	AppendRequestAddEntries(builder, entriesOffset)
 	return AppendRequestEnd(builder)
 }
 
 func (rcv *AppendRequest) UnPackTo(t *AppendRequestT) {
 	t.TimeoutMs = rcv.TimeoutMs()
-	appendRequestsLength := rcv.AppendRequestsLength()
-	t.AppendRequests = make([]*AppendInfoT, appendRequestsLength)
-	for j := 0; j < appendRequestsLength; j++ {
-		x := AppendInfo{}
-		rcv.AppendRequests(&x, j)
-		t.AppendRequests[j] = x.UnPack()
+	entriesLength := rcv.EntriesLength()
+	t.Entries = make([]*AppendEntryT, entriesLength)
+	for j := 0; j < entriesLength; j++ {
+		x := AppendEntry{}
+		rcv.Entries(&x, j)
+		t.Entries[j] = x.UnPack()
 	}
 }
 
@@ -89,7 +89,7 @@ func (rcv *AppendRequest) MutateTimeoutMs(n int32) bool {
 	return rcv._tab.MutateInt32Slot(4, n)
 }
 
-func (rcv *AppendRequest) AppendRequests(obj *AppendInfo, j int) bool {
+func (rcv *AppendRequest) Entries(obj *AppendEntry, j int) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Vector(o)
@@ -101,7 +101,7 @@ func (rcv *AppendRequest) AppendRequests(obj *AppendInfo, j int) bool {
 	return false
 }
 
-func (rcv *AppendRequest) AppendRequestsLength() int {
+func (rcv *AppendRequest) EntriesLength() int {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
@@ -115,10 +115,10 @@ func AppendRequestStart(builder *flatbuffers.Builder) {
 func AppendRequestAddTimeoutMs(builder *flatbuffers.Builder, timeoutMs int32) {
 	builder.PrependInt32Slot(0, timeoutMs, 0)
 }
-func AppendRequestAddAppendRequests(builder *flatbuffers.Builder, appendRequests flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(appendRequests), 0)
+func AppendRequestAddEntries(builder *flatbuffers.Builder, entries flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(entries), 0)
 }
-func AppendRequestStartAppendRequestsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func AppendRequestStartEntriesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
 func AppendRequestEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {

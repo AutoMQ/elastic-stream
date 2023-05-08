@@ -7,44 +7,44 @@ import (
 )
 
 type FetchResponseT struct {
-	ThrottleTimeMs int32 `json:"throttle_time_ms"`
-	FetchResponses []*FetchResultT `json:"fetch_responses"`
 	Status *StatusT `json:"status"`
+	Results []*FetchResultT `json:"results"`
+	ThrottleTimeMs int32 `json:"throttle_time_ms"`
 }
 
 func (t *FetchResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	fetchResponsesOffset := flatbuffers.UOffsetT(0)
-	if t.FetchResponses != nil {
-		fetchResponsesLength := len(t.FetchResponses)
-		fetchResponsesOffsets := make([]flatbuffers.UOffsetT, fetchResponsesLength)
-		for j := 0; j < fetchResponsesLength; j++ {
-			fetchResponsesOffsets[j] = t.FetchResponses[j].Pack(builder)
-		}
-		FetchResponseStartFetchResponsesVector(builder, fetchResponsesLength)
-		for j := fetchResponsesLength - 1; j >= 0; j-- {
-			builder.PrependUOffsetT(fetchResponsesOffsets[j])
-		}
-		fetchResponsesOffset = builder.EndVector(fetchResponsesLength)
-	}
 	statusOffset := t.Status.Pack(builder)
+	resultsOffset := flatbuffers.UOffsetT(0)
+	if t.Results != nil {
+		resultsLength := len(t.Results)
+		resultsOffsets := make([]flatbuffers.UOffsetT, resultsLength)
+		for j := 0; j < resultsLength; j++ {
+			resultsOffsets[j] = t.Results[j].Pack(builder)
+		}
+		FetchResponseStartResultsVector(builder, resultsLength)
+		for j := resultsLength - 1; j >= 0; j-- {
+			builder.PrependUOffsetT(resultsOffsets[j])
+		}
+		resultsOffset = builder.EndVector(resultsLength)
+	}
 	FetchResponseStart(builder)
-	FetchResponseAddThrottleTimeMs(builder, t.ThrottleTimeMs)
-	FetchResponseAddFetchResponses(builder, fetchResponsesOffset)
 	FetchResponseAddStatus(builder, statusOffset)
+	FetchResponseAddResults(builder, resultsOffset)
+	FetchResponseAddThrottleTimeMs(builder, t.ThrottleTimeMs)
 	return FetchResponseEnd(builder)
 }
 
 func (rcv *FetchResponse) UnPackTo(t *FetchResponseT) {
-	t.ThrottleTimeMs = rcv.ThrottleTimeMs()
-	fetchResponsesLength := rcv.FetchResponsesLength()
-	t.FetchResponses = make([]*FetchResultT, fetchResponsesLength)
-	for j := 0; j < fetchResponsesLength; j++ {
-		x := FetchResult{}
-		rcv.FetchResponses(&x, j)
-		t.FetchResponses[j] = x.UnPack()
-	}
 	t.Status = rcv.Status(nil).UnPack()
+	resultsLength := rcv.ResultsLength()
+	t.Results = make([]*FetchResultT, resultsLength)
+	for j := 0; j < resultsLength; j++ {
+		x := FetchResult{}
+		rcv.Results(&x, j)
+		t.Results[j] = x.UnPack()
+	}
+	t.ThrottleTimeMs = rcv.ThrottleTimeMs()
 }
 
 func (rcv *FetchResponse) UnPack() *FetchResponseT {
@@ -81,40 +81,8 @@ func (rcv *FetchResponse) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *FetchResponse) ThrottleTimeMs() int32 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
-	if o != 0 {
-		return rcv._tab.GetInt32(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *FetchResponse) MutateThrottleTimeMs(n int32) bool {
-	return rcv._tab.MutateInt32Slot(4, n)
-}
-
-func (rcv *FetchResponse) FetchResponses(obj *FetchResult, j int) bool {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
-	if o != 0 {
-		x := rcv._tab.Vector(o)
-		x += flatbuffers.UOffsetT(j) * 4
-		x = rcv._tab.Indirect(x)
-		obj.Init(rcv._tab.Bytes, x)
-		return true
-	}
-	return false
-}
-
-func (rcv *FetchResponse) FetchResponsesLength() int {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
-	if o != 0 {
-		return rcv._tab.VectorLen(o)
-	}
-	return 0
-}
-
 func (rcv *FetchResponse) Status(obj *Status) *Status {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -126,20 +94,52 @@ func (rcv *FetchResponse) Status(obj *Status) *Status {
 	return nil
 }
 
+func (rcv *FetchResponse) Results(obj *FetchResult, j int) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		x := rcv._tab.Vector(o)
+		x += flatbuffers.UOffsetT(j) * 4
+		x = rcv._tab.Indirect(x)
+		obj.Init(rcv._tab.Bytes, x)
+		return true
+	}
+	return false
+}
+
+func (rcv *FetchResponse) ResultsLength() int {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.VectorLen(o)
+	}
+	return 0
+}
+
+func (rcv *FetchResponse) ThrottleTimeMs() int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	if o != 0 {
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FetchResponse) MutateThrottleTimeMs(n int32) bool {
+	return rcv._tab.MutateInt32Slot(8, n)
+}
+
 func FetchResponseStart(builder *flatbuffers.Builder) {
 	builder.StartObject(3)
 }
-func FetchResponseAddThrottleTimeMs(builder *flatbuffers.Builder, throttleTimeMs int32) {
-	builder.PrependInt32Slot(0, throttleTimeMs, 0)
+func FetchResponseAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
 }
-func FetchResponseAddFetchResponses(builder *flatbuffers.Builder, fetchResponses flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(fetchResponses), 0)
+func FetchResponseAddResults(builder *flatbuffers.Builder, results flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(results), 0)
 }
-func FetchResponseStartFetchResponsesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func FetchResponseStartResultsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
-func FetchResponseAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(status), 0)
+func FetchResponseAddThrottleTimeMs(builder *flatbuffers.Builder, throttleTimeMs int32) {
+	builder.PrependInt32Slot(2, throttleTimeMs, 0)
 }
 func FetchResponseEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

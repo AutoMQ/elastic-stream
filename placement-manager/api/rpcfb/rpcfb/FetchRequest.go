@@ -9,40 +9,40 @@ import (
 type FetchRequestT struct {
 	MaxWaitMs int32 `json:"max_wait_ms"`
 	MinBytes int32 `json:"min_bytes"`
-	FetchRequests []*FetchInfoT `json:"fetch_requests"`
+	Entries []*FetchEntryT `json:"entries"`
 }
 
 func (t *FetchRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	fetchRequestsOffset := flatbuffers.UOffsetT(0)
-	if t.FetchRequests != nil {
-		fetchRequestsLength := len(t.FetchRequests)
-		fetchRequestsOffsets := make([]flatbuffers.UOffsetT, fetchRequestsLength)
-		for j := 0; j < fetchRequestsLength; j++ {
-			fetchRequestsOffsets[j] = t.FetchRequests[j].Pack(builder)
+	entriesOffset := flatbuffers.UOffsetT(0)
+	if t.Entries != nil {
+		entriesLength := len(t.Entries)
+		entriesOffsets := make([]flatbuffers.UOffsetT, entriesLength)
+		for j := 0; j < entriesLength; j++ {
+			entriesOffsets[j] = t.Entries[j].Pack(builder)
 		}
-		FetchRequestStartFetchRequestsVector(builder, fetchRequestsLength)
-		for j := fetchRequestsLength - 1; j >= 0; j-- {
-			builder.PrependUOffsetT(fetchRequestsOffsets[j])
+		FetchRequestStartEntriesVector(builder, entriesLength)
+		for j := entriesLength - 1; j >= 0; j-- {
+			builder.PrependUOffsetT(entriesOffsets[j])
 		}
-		fetchRequestsOffset = builder.EndVector(fetchRequestsLength)
+		entriesOffset = builder.EndVector(entriesLength)
 	}
 	FetchRequestStart(builder)
 	FetchRequestAddMaxWaitMs(builder, t.MaxWaitMs)
 	FetchRequestAddMinBytes(builder, t.MinBytes)
-	FetchRequestAddFetchRequests(builder, fetchRequestsOffset)
+	FetchRequestAddEntries(builder, entriesOffset)
 	return FetchRequestEnd(builder)
 }
 
 func (rcv *FetchRequest) UnPackTo(t *FetchRequestT) {
 	t.MaxWaitMs = rcv.MaxWaitMs()
 	t.MinBytes = rcv.MinBytes()
-	fetchRequestsLength := rcv.FetchRequestsLength()
-	t.FetchRequests = make([]*FetchInfoT, fetchRequestsLength)
-	for j := 0; j < fetchRequestsLength; j++ {
-		x := FetchInfo{}
-		rcv.FetchRequests(&x, j)
-		t.FetchRequests[j] = x.UnPack()
+	entriesLength := rcv.EntriesLength()
+	t.Entries = make([]*FetchEntryT, entriesLength)
+	for j := 0; j < entriesLength; j++ {
+		x := FetchEntry{}
+		rcv.Entries(&x, j)
+		t.Entries[j] = x.UnPack()
 	}
 }
 
@@ -104,7 +104,7 @@ func (rcv *FetchRequest) MutateMinBytes(n int32) bool {
 	return rcv._tab.MutateInt32Slot(6, n)
 }
 
-func (rcv *FetchRequest) FetchRequests(obj *FetchInfo, j int) bool {
+func (rcv *FetchRequest) Entries(obj *FetchEntry, j int) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		x := rcv._tab.Vector(o)
@@ -116,7 +116,7 @@ func (rcv *FetchRequest) FetchRequests(obj *FetchInfo, j int) bool {
 	return false
 }
 
-func (rcv *FetchRequest) FetchRequestsLength() int {
+func (rcv *FetchRequest) EntriesLength() int {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
@@ -133,10 +133,10 @@ func FetchRequestAddMaxWaitMs(builder *flatbuffers.Builder, maxWaitMs int32) {
 func FetchRequestAddMinBytes(builder *flatbuffers.Builder, minBytes int32) {
 	builder.PrependInt32Slot(1, minBytes, 0)
 }
-func FetchRequestAddFetchRequests(builder *flatbuffers.Builder, fetchRequests flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(fetchRequests), 0)
+func FetchRequestAddEntries(builder *flatbuffers.Builder, entries flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(entries), 0)
 }
-func FetchRequestStartFetchRequestsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func FetchRequestStartEntriesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
 func FetchRequestEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
