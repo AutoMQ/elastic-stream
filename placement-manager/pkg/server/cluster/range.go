@@ -21,6 +21,8 @@ var (
 	ErrRangeNotFound = errors.New("range not found")
 	// ErrRangeAlreadySealed is returned when the specified range is already sealed.
 	ErrRangeAlreadySealed = errors.New("range already sealed")
+	// ErrInvalidEndOffset is returned when the end offset is invalid.
+	ErrInvalidEndOffset = errors.New("invalid end offset")
 )
 
 type Range interface {
@@ -124,6 +126,7 @@ func (c *RaftCluster) getRanges(ctx context.Context, rangeIDs []*rpcfb.RangeIdT,
 // It returns the current writable range if entry.Renew == true.
 // It returns ErrRangeNotFound if the range does not exist.
 // It returns ErrRangeAlreadySealed if the range is already sealed.
+// It returns ErrInvalidEndOffset if the end offset is invalid.
 // It returns ErrNotEnoughDataNodes if there are not enough data nodes to allocate.
 func (c *RaftCluster) SealRange(ctx context.Context, entry *rpcfb.SealRangeEntryT) (*rpcfb.RangeT, error) {
 	lastRange, err := c.getLastRange(ctx, entry.Range.StreamId)
@@ -202,7 +205,7 @@ func (c *RaftCluster) sealRangeLocked(ctx context.Context, lastRange *rpcfb.Rang
 
 	if endOffset < lastRange.StartOffset {
 		logger.Error("invalid end offset", zap.Int64("end-offset", endOffset), zap.Int64("start-offset", lastRange.StartOffset))
-		return nil, errors.Errorf("invalid end offset %d (< start offset %d) for range %d in stream %d",
+		return nil, errors.Wrapf(ErrInvalidEndOffset, "invalid end offset %d (< start offset %d) for range %d in stream %d",
 			endOffset, lastRange.StartOffset, lastRange.RangeIndex, lastRange.StreamId)
 	}
 

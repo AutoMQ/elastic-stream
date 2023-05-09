@@ -75,6 +75,8 @@ func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.Sea
 				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_NOT_FOUND, Message: err.Error()}
 			case errors.Is(err, cluster.ErrRangeAlreadySealed):
 				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_ALREADY_SEALED, Message: err.Error()}
+			case errors.Is(err, cluster.ErrInvalidEndOffset):
+				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()}
 			case errors.Is(err, cluster.ErrNotEnoughDataNodes):
 				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()}
 			default:

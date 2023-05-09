@@ -109,9 +109,13 @@ func (e *Endpoint) GetLastRange(ctx context.Context, streamID int64) (*rpcfb.Ran
 	logger := e.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
 
 	kvs, err := e.GetByRange(ctx, kv.Range{StartKey: rangePathInSteam(streamID, MinRangeIndex), EndKey: e.endRangePathInStream(streamID)}, 1, true)
-	if len(kvs) < 1 || err != nil {
+	if err != nil {
 		logger.Error("failed to get last range", zap.Error(err))
 		return nil, err
+	}
+	if len(kvs) < 1 {
+		logger.Error("failed to get last range: stream not found")
+		return nil, errors.Errorf("stream not found: %d", streamID)
 	}
 
 	return rpcfb.GetRootAsRange(kvs[0].Value, 0).UnPack(), nil
