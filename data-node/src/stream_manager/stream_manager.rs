@@ -67,7 +67,7 @@ impl StreamManager {
                     let stream_id = range.stream_id();
                     let start = if let Some(offset) = self
                         .store
-                        .max_record_offset(stream_id)
+                        .max_record_offset(stream_id, range.index() as u32)
                         .expect("Should get max record offset of given stream")
                     {
                         if offset > range.start() {

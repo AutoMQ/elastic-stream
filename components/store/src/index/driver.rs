@@ -23,12 +23,14 @@ pub(crate) struct IndexDriver {
 pub(crate) enum IndexCommand {
     Index {
         stream_id: i64,
+        range: u32,
         offset: u64,
         handle: RecordHandle,
     },
     /// Used to retrieve a batch of record handles from a given offset.
     ScanRecord {
         stream_id: i64,
+        range: u32,
         offset: u64,
         max_offset: Option<u64>,
         max_bytes: u32,
@@ -80,9 +82,10 @@ impl IndexDriver {
         })
     }
 
-    pub(crate) fn index(&self, stream_id: i64, offset: u64, handle: RecordHandle) {
+    pub(crate) fn index(&self, stream_id: i64, range: u32, offset: u64, handle: RecordHandle) {
         if let Err(_e) = self.tx.send(IndexCommand::Index {
             stream_id,
+            range,
             offset,
             handle,
         }) {
@@ -93,6 +96,7 @@ impl IndexDriver {
     pub(crate) fn scan_record_handles(
         &self,
         stream_id: i64,
+        range: u32,
         offset: u64,
         max_offset: Option<u64>,
         max_bytes: u32,
@@ -100,6 +104,7 @@ impl IndexDriver {
     ) {
         if let Err(_e) = self.tx.send(IndexCommand::ScanRecord {
             stream_id,
+            range,
             offset,
             max_offset,
             max_bytes,
@@ -215,10 +220,12 @@ impl IndexDriverRunner {
                     Ok(index_command) => match index_command {
                         IndexCommand::Index {
                             stream_id,
+                            range,
                             offset,
                             handle,
                         } => {
-                            while let Err(e) = self.indexer.index(stream_id, offset, &handle) {
+                            while let Err(e) = self.indexer.index(stream_id, range, offset, &handle)
+                            {
                                 error!("Failed to index: stream_id={}, offset={}, record_handle={:?}, cause: {}", 
                                 stream_id, offset, handle, e);
                                 sleep(std::time::Duration::from_millis(100));
@@ -226,6 +233,7 @@ impl IndexDriverRunner {
                         }
                         IndexCommand::ScanRecord {
                             stream_id,
+                            range,
                             offset,
                             max_offset,
                             max_bytes,
@@ -233,7 +241,7 @@ impl IndexDriverRunner {
                         } => {
                             observer
                                 .send(self.indexer.scan_record_handles_left_shift(
-                                    stream_id, offset, max_offset, max_bytes,
+                                    stream_id, range, offset, max_offset, max_bytes,
                                 ))
                                 .unwrap_or_else(|_e| {
                                     error!(

@@ -26,6 +26,8 @@ pub struct ReadOptions {
     /// Target stream
     pub stream_id: i64,
 
+    pub range: u32,
+
     /// Logical offset, from which to read records
     pub offset: i64,
 

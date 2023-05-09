@@ -187,6 +187,7 @@ impl ElasticStore {
     ) {
         let task = WriteTask {
             stream_id: request.stream_id,
+            range: request.range as u32,
             offset: request.offset,
             buffer: request.buffer,
             observer,
@@ -232,6 +233,7 @@ impl Store for ElasticStore {
         let (index_tx, index_rx) = oneshot::channel();
         self.indexer.scan_record_handles(
             options.stream_id,
+            options.range,
             options.offset as u64,
             options.max_offset.map(|o| o as u64),
             options.max_bytes as u32,
@@ -370,14 +372,14 @@ impl Store for ElasticStore {
             .flatten()
     }
 
-    /// Find max record offset of the specified stream.
+    /// Find max record offset of the specified stream and range.
     ///
     /// # Returns
     /// `StoreError` - If something is wrong when accessing RocksDB;
     /// `Some(u64)` - If the max record offset is found;
     /// `None` - If there is no record of the given stream;
-    fn max_record_offset(&self, stream_id: i64) -> Result<Option<u64>, StoreError> {
-        self.indexer.retrieve_max_key(stream_id).map(|buf| {
+    fn max_record_offset(&self, stream_id: i64, range: u32) -> Result<Option<u64>, StoreError> {
+        self.indexer.retrieve_max_key(stream_id, range).map(|buf| {
             if let Some(ref buf) = buf {
                 // Layout of the buffer is [stream-id: 8B][offset: 8B]
                 let mut cursor = Cursor::new(&buf[..]);
@@ -473,6 +475,7 @@ mod tests {
             .into_iter()
             .map(|i| AppendRecordRequest {
                 stream_id: 1,
+                range: 0,
                 offset: i,
                 buffer: Bytes::from(format!("{}-{}", "hello, world", i)),
             })
@@ -494,6 +497,7 @@ mod tests {
                         trace!("Append result: {:?}", res);
                         let options = ReadOptions {
                             stream_id: 1,
+                            range: 0,
                             offset: 0,
                             max_offset: None,
                             max_bytes: 1,
@@ -528,6 +532,7 @@ mod tests {
             let mut fetch_fs = vec![];
             let options = ReadOptions {
                 stream_id: 1,
+                range: 0,
                 offset: 0,
                 max_offset: None,
                 max_bytes: 1024 * 1024 * 1024,

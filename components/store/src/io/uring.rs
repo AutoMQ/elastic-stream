@@ -1153,7 +1153,7 @@ impl IO {
             wal_offset,
         };
         self.indexer
-            .index(task.stream_id, task.offset as u64, handle);
+            .index(task.stream_id, task.range, task.offset as u64, handle);
     }
 
     fn complete_read_tasks(&mut self, affected_segments: HashSet<u64>) {
@@ -1626,6 +1626,7 @@ mod tests {
                 let (tx, _rx) = oneshot::channel();
                 let io_task = IoTask::Write(WriteTask {
                     stream_id: 0,
+                    range: 0,
                     offset: 0,
                     buffer: buffer.clone(),
                     observer: tx,
@@ -1682,6 +1683,7 @@ mod tests {
             let (tx, _rx) = oneshot::channel();
             let write_task = WriteTask {
                 stream_id: 0,
+                range: 0,
                 offset: 0,
                 buffer: bytes.clone(),
                 observer: tx,
@@ -1701,6 +1703,7 @@ mod tests {
             let (tx, _rx) = oneshot::channel();
             let write_task = WriteTask {
                 stream_id: 0,
+                range: 0,
                 offset: 0,
                 buffer: bytes.clone(),
                 observer: tx,
@@ -1720,6 +1723,7 @@ mod tests {
             let (tx, _rx) = oneshot::channel();
             let write_task = WriteTask {
                 stream_id: 0,
+                range: 0,
                 offset: 0,
                 buffer: bytes.clone(),
                 observer: tx,
@@ -1762,6 +1766,7 @@ mod tests {
                 let (tx, _rx) = oneshot::channel();
                 IoTask::Write(WriteTask {
                     stream_id: 0,
+                    range: 0,
                     offset: n,
                     buffer: buffer.clone(),
                     observer: tx,
@@ -1952,6 +1957,7 @@ mod tests {
                 receivers.push(rx);
                 IoTask::Write(WriteTask {
                     stream_id: stream_id,
+                    range: 0,
                     offset: start_offset + i as i64,
                     buffer: buf.clone(),
                     observer: tx,

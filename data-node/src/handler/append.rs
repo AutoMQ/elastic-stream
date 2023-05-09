@@ -267,6 +267,7 @@ impl<'a> Append<'a> {
 
                         let to_store = AppendRecordRequest {
                             stream_id: range.stream_id(),
+                            range: range.range_index(),
                             offset: offset as i64,
                             buffer: payload_b,
                         };

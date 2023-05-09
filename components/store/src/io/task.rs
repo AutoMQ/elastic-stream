@@ -50,6 +50,10 @@ impl SingleFetchResult {
 pub(crate) struct WriteTask {
     /// Stream ID of the record.
     pub(crate) stream_id: i64,
+
+    /// Range Index
+    pub(crate) range: u32,
+
     /// Logical primary index offset
     pub(crate) offset: i64,
 

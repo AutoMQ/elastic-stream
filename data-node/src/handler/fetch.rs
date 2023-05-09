@@ -83,40 +83,38 @@ impl<'a> Fetch<'a> {
         );
         let fetch_results: Vec<_> = res_from_store
             .into_iter()
-            .map(|res| {
-                match res {
-                    Ok(fetch_result) => {
-                        let fetch_result_args = FetchResultArgs {
-                            stream_id: fetch_result.stream_id,
-                            batch_count: fetch_result.results.len() as i32,
-                            status: Some(ok_status),
-                        };
-                        payloads.push(fetch_result.results);
-                        protocol::rpc::header::FetchResult::create(&mut builder, &fetch_result_args)
-                    }
-                    Err(e) => {
-                        warn!("Failed to fetch from store. Cause: {:?}", e);
+            .map(|res| match res {
+                Ok(fetch_result) => {
+                    let fetch_result_args = FetchResultArgs {
+                        stream_id: fetch_result.stream_id,
+                        batch_count: fetch_result.results.len() as i32,
+                        status: Some(ok_status),
+                    };
+                    payloads.push(fetch_result.results);
+                    protocol::rpc::header::FetchResult::create(&mut builder, &fetch_result_args)
+                }
+                Err(e) => {
+                    warn!("Failed to fetch from store. Cause: {:?}", e);
 
-                        let (err_code, err_message) = self.convert_store_error(&e);
-                        let mut err_message_fb = None;
-                        if let Some(err_message) = err_message {
-                            err_message_fb = Some(builder.create_string(err_message.as_str()));
-                        }
-                        let status = protocol::rpc::header::Status::create(
-                            &mut builder,
-                            &StatusArgs {
-                                code: err_code,
-                                message: err_message_fb,
-                                detail: None,
-                            },
-                        );
-                        let fetch_result_args = FetchResultArgs {
-                            stream_id: 0,
-                            batch_count: 0,
-                            status: Some(status),
-                        };
-                        protocol::rpc::header::FetchResult::create(&mut builder, &fetch_result_args)
+                    let (err_code, err_message) = self.convert_store_error(&e);
+                    let mut err_message_fb = None;
+                    if let Some(err_message) = err_message {
+                        err_message_fb = Some(builder.create_string(err_message.as_str()));
                     }
+                    let status = protocol::rpc::header::Status::create(
+                        &mut builder,
+                        &StatusArgs {
+                            code: err_code,
+                            message: err_message_fb,
+                            detail: None,
+                        },
+                    );
+                    let fetch_result_args = FetchResultArgs {
+                        stream_id: 0,
+                        batch_count: 0,
+                        status: Some(status),
+                    };
+                    protocol::rpc::header::FetchResult::create(&mut builder, &fetch_result_args)
                 }
             })
             .collect();
@@ -189,6 +187,7 @@ impl<'a> Fetch<'a> {
                     };
                     return Ok(ReadOptions {
                         stream_id: stream_id,
+                        range: range.index() as u32,
                         offset: req.fetch_offset(),
                         max_offset: max_offset,
                         max_wait_ms: self.fetch_request.max_wait_ms(),

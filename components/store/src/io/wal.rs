@@ -214,13 +214,15 @@ impl Wal {
                     match flatbuffers::root::<RecordBatchMeta>(&batch.meta_buffer[..]) {
                         Ok(metadata) => {
                             let stream_id = metadata.stream_id();
+                            let range = metadata.range_index() as u32;
                             let handle = RecordHandle {
                                 wal_offset: segment.wal_offset + file_pos - len as u64 - 8,
                                 len: len as u32 + 8,
                                 hash: 0,
                             };
-                            trace!("Index RecordBatch[stream-id={}, base-offset={}, wal-offset={}, len={}]", stream_id, offset, handle.wal_offset, handle.len);
-                            indexer.index(stream_id, offset, handle);
+                            trace!("Index RecordBatch[stream-id={}, range={}, base-offset={}, wal-offset={}, len={}]",
+                             stream_id, range, offset, handle.wal_offset, handle.len);
+                            indexer.index(stream_id, range, offset, handle);
                         }
                         Err(e) => {
                             error!("Failed to deserialize RecordBatchMeta. Cause: {:?}", e);
