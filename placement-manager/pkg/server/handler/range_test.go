@@ -81,14 +81,48 @@ func TestListRanges(t *testing.T) {
 
 func TestSealRanges(t *testing.T) {
 	type want struct {
-		endOffset int64
-		wantErr   bool
-		errCode   rpcfb.ErrorCode
+		writableRange *rpcfb.RangeT
+		ranges        []*rpcfb.RangeT
+		wantErr       bool
+		errCode       rpcfb.ErrorCode
 	}
 	tests := []struct {
-		name string
-		want want
-	}{}
+		name  string
+		entry *rpcfb.SealRangeEntryT
+		want  want
+	}{
+		{
+			name: "seal and renew",
+			entry: &rpcfb.SealRangeEntryT{
+				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
+				Range: &rpcfb.RangeIdT{RangeIndex: 1},
+				End:   42,
+				Renew: true,
+			},
+			want: want{
+				writableRange: &rpcfb.RangeT{RangeIndex: 2, StartOffset: 42, EndOffset: -1},
+				ranges: []*rpcfb.RangeT{
+					{},
+					{RangeIndex: 1, EndOffset: 42},
+					{RangeIndex: 2, StartOffset: 42, EndOffset: -1},
+				},
+			},
+		},
+		{
+			name: "seal only",
+			entry: &rpcfb.SealRangeEntryT{
+				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
+				Range: &rpcfb.RangeIdT{RangeIndex: 1},
+				End:   42,
+			},
+			want: want{
+				ranges: []*rpcfb.RangeT{
+					{},
+					{RangeIndex: 1, EndOffset: 42},
+				},
+			},
+		},
+	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
@@ -98,17 +132,21 @@ func TestSealRanges(t *testing.T) {
 			h, closeFunc := startSbpHandler(t, nil, true)
 			defer closeFunc()
 
+			// prepare
 			preHeartbeat(t, h, 0)
 			preHeartbeat(t, h, 1)
 			preHeartbeat(t, h, 2)
 			preCreateStreams(t, h, 1, 3)
+			preSealRange(t, h, &rpcfb.RangeIdT{}, 0)
 
+			// seal ranges
 			req := &protocol.SealRangesRequest{SealRangesRequestT: rpcfb.SealRangesRequestT{
-				Entries: []*rpcfb.SealRangeEntryT{{Range: &rpcfb.RangeIdT{StreamId: 0, RangeIndex: 0}}},
+				Entries: []*rpcfb.SealRangeEntryT{tt.entry},
 			}}
 			resp := &protocol.SealRangesResponse{}
 			h.SealRanges(req, resp)
 
+			// check seal response
 			re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code)
 			re.Len(resp.SealResponses, 1)
 			if tt.want.wantErr {
@@ -116,9 +154,13 @@ func TestSealRanges(t *testing.T) {
 			} else {
 				re.Equal(rpcfb.ErrorCodeOK, resp.SealResponses[0].Status.Code)
 			}
-			re.Equal(tt.want.endOffset, resp.SealResponses[0].Range.StartOffset)
-			re.Equal(int64(-1), resp.SealResponses[0].Range.EndOffset)
 
+			if resp.SealResponses[0].Range != nil {
+				resp.SealResponses[0].Range.ReplicaNodes = nil // no need check replica nodes
+			}
+			re.Equal(tt.want.writableRange, resp.SealResponses[0].Range)
+
+			// list ranges
 			lReq := &protocol.ListRangesRequest{ListRangesRequestT: rpcfb.ListRangesRequestT{
 				RangeCriteria: []*rpcfb.RangeCriteriaT{
 					{StreamId: 0, DataNode: &rpcfb.DataNodeT{NodeId: -1}},
@@ -130,17 +172,11 @@ func TestSealRanges(t *testing.T) {
 			re.Len(lResp.ListResponses, 1)
 			re.Equal(rpcfb.ErrorCodeOK, lResp.ListResponses[0].Status.Code)
 
-			if tt.want.wantErr {
-				re.Len(lResp.ListResponses[0].Ranges, 1)
-				re.Equal(int64(0), lResp.ListResponses[0].Ranges[0].StartOffset)
-				re.Equal(int64(-1), lResp.ListResponses[0].Ranges[0].EndOffset)
-				return
+			// check list range response
+			for _, rangeT := range lResp.ListResponses[0].Ranges {
+				rangeT.ReplicaNodes = nil // no need check replica nodes
 			}
-			re.Len(lResp.ListResponses[0].Ranges, 2)
-			re.Equal(int64(0), lResp.ListResponses[0].Ranges[0].StartOffset)
-			re.Equal(tt.want.endOffset, lResp.ListResponses[0].Ranges[0].EndOffset)
-			re.Equal(tt.want.endOffset, lResp.ListResponses[0].Ranges[1].StartOffset)
-			re.Equal(int64(-1), lResp.ListResponses[0].Ranges[1].EndOffset)
+			re.Equal(tt.want.ranges, lResp.ListResponses[0].Ranges)
 		})
 	}
 }
@@ -173,4 +209,29 @@ func preCreateStreams(tb testing.TB, h *Handler, num int, replicaNum int8) {
 	h.CreateStreams(req, resp)
 
 	re.Equal(resp.Status.Code, rpcfb.ErrorCodeOK)
+}
+
+func preSealRange(tb testing.TB, h *Handler, rangeID *rpcfb.RangeIdT, end int64) {
+	re := require.New(tb)
+
+	req := &protocol.SealRangesRequest{SealRangesRequestT: rpcfb.SealRangesRequestT{
+		Entries: []*rpcfb.SealRangeEntryT{{
+			Type:  rpcfb.SealTypePLACEMENT_MANAGER,
+			Range: rangeID,
+			End:   end,
+			Renew: true,
+		}},
+	}}
+	resp := &protocol.SealRangesResponse{}
+	h.SealRanges(req, resp)
+
+	re.Equal(resp.Status.Code, rpcfb.ErrorCodeOK)
+	re.Equal(resp.SealResponses[0].Status.Code, rpcfb.ErrorCodeOK)
+	resp.SealResponses[0].Range.ReplicaNodes = nil // no need check replica nodes
+	re.Equal(&rpcfb.RangeT{
+		StreamId:    rangeID.StreamId,
+		RangeIndex:  rangeID.RangeIndex + 1,
+		StartOffset: end,
+		EndOffset:   -1,
+	}, resp.SealResponses[0].Range)
 }
