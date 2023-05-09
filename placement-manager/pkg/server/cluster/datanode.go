@@ -91,11 +91,10 @@ func (c *RaftCluster) chooseDataNodes(cnt int8) ([]*rpcfb.DataNodeT, error) {
 	return replicaNodes, nil
 }
 
-func (c *RaftCluster) eraseDataNodeInfo(node *rpcfb.DataNodeT) {
-	if node == nil {
-		return
+func (c *RaftCluster) fillDataNodesInfo(nodes []*rpcfb.DataNodeT) {
+	for _, node := range nodes {
+		c.fillDataNodeInfo(node)
 	}
-	node.AdvertiseAddr = ""
 }
 
 func (c *RaftCluster) fillDataNodeInfo(node *rpcfb.DataNodeT) {
@@ -108,4 +107,17 @@ func (c *RaftCluster) fillDataNodeInfo(node *rpcfb.DataNodeT) {
 		return
 	}
 	node.AdvertiseAddr = n.AdvertiseAddr
+}
+
+func eraseDataNodesInfo(o []*rpcfb.DataNodeT) (n []*rpcfb.DataNodeT) {
+	if o == nil {
+		return
+	}
+	n = make([]*rpcfb.DataNodeT, len(o))
+	for i, node := range o {
+		n[i] = &rpcfb.DataNodeT{
+			NodeId: node.NodeId,
+		}
+	}
+	return
 }

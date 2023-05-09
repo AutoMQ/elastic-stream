@@ -10,26 +10,10 @@ import (
 
 	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/placement-manager/pkg/server/cluster/cache"
-	"github.com/AutoMQ/placement-manager/pkg/util/fbutil"
 )
 
-// TestRaftCluster_eraseDataNodeInfo will fail if there are new fields in rpcfb.DataNodeT
-func TestRaftCluster_eraseDataNodeInfo(t *testing.T) {
-	t.Parallel()
-	re := require.New(t)
-
-	var node rpcfb.DataNodeT
-	_ = gofakeit.New(1).Struct(&node)
-
-	cluster := NewRaftCluster(context.Background(), nil, zap.NewNop())
-	cluster.eraseDataNodeInfo(&node)
-
-	bytes := fbutil.Marshal(&node)
-	re.Equal(20, len(bytes))
-}
-
-// TestRaftCluster_fillDataNodeInfo will fail if there are new fields in rpcfb.DataNodeT
-func TestRaftCluster_fillDataNodeInfo(t *testing.T) {
+// TestRaftCluster_fillDataNodesInfo will fail if there are new fields in rpcfb.DataNodeT
+func TestRaftCluster_fillDataNodesInfo(t *testing.T) {
 	t.Parallel()
 	re := require.New(t)
 
@@ -43,7 +27,26 @@ func TestRaftCluster_fillDataNodeInfo(t *testing.T) {
 	node2 := rpcfb.DataNodeT{
 		NodeId: node.NodeId,
 	}
-	cluster.fillDataNodeInfo(&node2)
+	cluster.fillDataNodesInfo([]*rpcfb.DataNodeT{&node2})
 
 	re.Equal(node, node2)
+}
+
+// Test_eraseDataNodesInfo will fail if there are new fields in rpcfb.DataNodeT
+func Test_eraseDataNodesInfo(t *testing.T) {
+	t.Parallel()
+	re := require.New(t)
+
+	var node rpcfb.DataNodeT
+	_ = gofakeit.New(1).Struct(&node)
+
+	nodes := eraseDataNodesInfo([]*rpcfb.DataNodeT{&node})
+
+	// `AdvertiseAddr` should not be copied
+	node.AdvertiseAddr = ""
+	re.Equal(node, *nodes[0])
+
+	// returned nodes should be a copy
+	node.AdvertiseAddr = "modified"
+	re.Equal("", nodes[0].AdvertiseAddr)
 }

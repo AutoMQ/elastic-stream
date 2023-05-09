@@ -51,9 +51,7 @@ func (c *RaftCluster) ListRanges(ctx context.Context, rangeCriteria *rpcfb.Range
 	}
 
 	for _, r := range ranges {
-		for _, node := range r.ReplicaNodes {
-			c.fillDataNodeInfo(node)
-		}
+		c.fillDataNodesInfo(r.ReplicaNodes)
 	}
 	return
 }
@@ -107,14 +105,28 @@ func (c *RaftCluster) listRangesOnDataNode(ctx context.Context, dataNodeID int32
 	return ranges, nil
 }
 
+func (c *RaftCluster) getRanges(ctx context.Context, rangeIDs []*rpcfb.RangeIdT, logger *zap.Logger) ([]*rpcfb.RangeT, error) {
+	ranges := make([]*rpcfb.RangeT, 0, len(rangeIDs))
+	for _, rangeID := range rangeIDs {
+		r, err := c.storage.GetRange(ctx, rangeID)
+		if err != nil {
+			return nil, err
+		}
+		if r == nil {
+			logger.Warn("range not found", zap.Int64("range-stream-id", rangeID.StreamId), zap.Int32("range-index", rangeID.RangeIndex))
+			continue
+		}
+		ranges = append(ranges, r)
+	}
+	return ranges, nil
+}
+
 // SealRange seals a range.
 // It returns the current writable range if entry.Renew == true.
 // It returns ErrRangeNotFound if the range does not exist.
 // It returns ErrNotEnoughDataNodes if there are not enough data nodes to allocate.
 // It returns ErrRangeAlreadySealed if the range is already sealed.
 func (c *RaftCluster) SealRange(ctx context.Context, entry *rpcfb.SealRangeEntryT) (*rpcfb.RangeT, error) {
-	logger := c.lg.With(zap.Int64("stream-id", entry.Range.StreamId), zap.Int32("range-index", entry.Range.RangeIndex), traceutil.TraceLogField(ctx))
-
 	lastRange, err := c.getLastRange(ctx, entry.Range.StreamId)
 	if err != nil {
 		return nil, err
@@ -130,129 +142,101 @@ func (c *RaftCluster) SealRange(ctx context.Context, entry *rpcfb.SealRangeEntry
 		<-mu
 	}()
 
-	var needSeal bool
-	var needRenew bool
 	var rerr error
-
 	switch {
+	case isWritable(lastRange.RangeT) && entry.Range.RangeIndex == lastRange.RangeIndex:
+		err := c.sealRangeLocked(ctx, lastRange, entry.End)
+		if err != nil {
+			return nil, err
+		}
 	case entry.Range.RangeIndex > lastRange.RangeIndex:
 		// Range not found.
 		rerr = errors.Wrapf(ErrRangeNotFound, "range %d not found in stream %d", entry.Range.RangeIndex, entry.Range.StreamId)
-	case isWritable(lastRange.RangeT) && entry.Range.RangeIndex == lastRange.RangeIndex:
-		needSeal = true
 	default:
 		// The range is already sealed.
 		rerr = ErrRangeAlreadySealed
 	}
 
-	needRenew = entry.Renew
-	if !needSeal {
-		needRenew = needRenew && !isWritable(lastRange.RangeT)
-	}
-
-	if !needSeal && !needRenew {
-		var writableRange *rpcfb.RangeT
-		if entry.Renew {
-			writableRange = lastRange.RangeT
-			for _, node := range writableRange.ReplicaNodes {
-				c.fillDataNodeInfo(node)
-			}
-		}
-		return writableRange, rerr
-	}
-
-	var sealedRange, newRange *rpcfb.RangeT
-	if needSeal {
-		sealedRange, err = c.sealRange(logger, lastRange.RangeT, entry.End)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if needRenew {
-		var startOffset int64
-		if needSeal {
-			startOffset = entry.End
-		} else {
-			startOffset = lastRange.EndOffset
-		}
-
-		newRange, err = c.newRange(logger, lastRange.RangeT, startOffset)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	lRange, err := c.storage.SealRange(ctx, sealedRange, newRange)
-	if err != nil {
-		return nil, err
-	}
-	// DO NOT modify the range in the cache before this line.
-	lastRange.RangeT = lRange
-
 	var writableRange *rpcfb.RangeT
 	if entry.Renew {
-		writableRange = lastRange.RangeT
-		for _, node := range writableRange.ReplicaNodes {
-			c.fillDataNodeInfo(node)
+		if !isWritable(lastRange.RangeT) {
+			err := c.newRangeLocked(ctx, lastRange)
+			if err != nil {
+				return nil, err
+			}
 		}
+		writableRange = lastRange.RangeT
+		c.fillDataNodesInfo(writableRange.ReplicaNodes)
 	}
 
 	return writableRange, rerr
 }
 
-func (c *RaftCluster) sealRange(logger *zap.Logger, lastRange *rpcfb.RangeT, endOffset int64) (*rpcfb.RangeT, error) {
+// sealRangeLocked seals a range and saves it to the storage.
+// The sealed range will be set to the cache if the operation succeeds.
+// It should be called with the Range lock held.
+func (c *RaftCluster) sealRangeLocked(ctx context.Context, lastRange *cache.Range, endOffset int64) error {
+	logger := c.lg.With(zap.Int64("stream-id", lastRange.StreamId), zap.Int32("range-index", lastRange.RangeIndex), traceutil.TraceLogField(ctx))
+
 	if endOffset < lastRange.StartOffset {
 		logger.Error("invalid end offset", zap.Int64("end-offset", endOffset), zap.Int64("start-offset", lastRange.StartOffset))
-		return nil, errors.Errorf("invalid end offset %d (< start offset %d) for range %d in stream %d",
+		return errors.Errorf("invalid end offset %d (< start offset %d) for range %d in stream %d",
 			endOffset, lastRange.StartOffset, lastRange.RangeIndex, lastRange.StreamId)
 	}
 
-	oldNodes := make([]*rpcfb.DataNodeT, 0, len(lastRange.ReplicaNodes))
-	for _, node := range lastRange.ReplicaNodes {
-		oldNodes = append(oldNodes, &rpcfb.DataNodeT{
-			NodeId: node.NodeId,
-		})
-	}
-
-	return &rpcfb.RangeT{
+	sealedRange := &rpcfb.RangeT{
 		StreamId:     lastRange.StreamId,
 		RangeIndex:   lastRange.RangeIndex,
 		StartOffset:  lastRange.StartOffset,
 		EndOffset:    endOffset,
-		ReplicaNodes: oldNodes,
-	}, nil
+		ReplicaNodes: eraseDataNodesInfo(lastRange.ReplicaNodes),
+	}
+
+	prevRange, err := c.storage.UpdateRange(ctx, sealedRange)
+	if err != nil {
+		return err
+	}
+	// check the range in the storage is the same as the last range in the cache
+	if prevRange != nil && (prevRange.StartOffset != lastRange.StartOffset || prevRange.EndOffset != lastRange.EndOffset) {
+		// if everything is ok, we should never see this error
+		logger.Error("range in storage is different from the last range in cache", zap.Any("range-in-storage", prevRange), zap.Any("range-in-cache", lastRange.RangeT))
+		// reset cache
+		lastRange.RangeT = nil
+	}
+
+	lastRange.RangeT = sealedRange
+	logger.Info("range sealed", zap.Int64("end-offset", endOffset))
+	return nil
 }
 
-func (c *RaftCluster) newRange(logger *zap.Logger, lastRange *rpcfb.RangeT, startOffset int64) (*rpcfb.RangeT, error) {
-	newNodes, err := c.chooseDataNodes(int8(len(lastRange.ReplicaNodes)))
+// newRangeLocked creates a new range and saves it to the storage.
+// The new range will be set to the cache if the operation succeeds.
+// It should be called with the Range lock held.
+func (c *RaftCluster) newRangeLocked(ctx context.Context, lastRange *cache.Range) error {
+	logger := c.lg.With(zap.Int64("stream-id", lastRange.StreamId), zap.Int32("sealed-range-index", lastRange.RangeIndex), traceutil.TraceLogField(ctx))
+
+	nodes, err := c.chooseDataNodes(int8(len(lastRange.ReplicaNodes)))
 	if err != nil {
 		logger.Error("failed to choose data nodes", zap.Error(err))
-		return nil, err
+		return err
 	}
 
-	return &rpcfb.RangeT{
+	newRange := &rpcfb.RangeT{
 		StreamId:     lastRange.StreamId,
 		RangeIndex:   lastRange.RangeIndex + 1,
-		StartOffset:  startOffset,
+		StartOffset:  lastRange.EndOffset,
 		EndOffset:    _writableRangeEndOffset,
-		ReplicaNodes: newNodes,
-	}, nil
-}
-
-func (c *RaftCluster) getRanges(ctx context.Context, rangeIDs []*rpcfb.RangeIdT, logger *zap.Logger) ([]*rpcfb.RangeT, error) {
-	ranges := make([]*rpcfb.RangeT, 0, len(rangeIDs))
-	for _, rangeID := range rangeIDs {
-		r, err := c.storage.GetRange(ctx, rangeID)
-		if err != nil {
-			return nil, err
-		}
-		if r == nil {
-			logger.Warn("range not found", zap.Int64("range-stream-id", rangeID.StreamId), zap.Int32("range-index", rangeID.RangeIndex))
-			continue
-		}
-		ranges = append(ranges, r)
+		ReplicaNodes: nodes,
 	}
-	return ranges, nil
+
+	err = c.storage.CreateRange(ctx, newRange)
+	if err != nil {
+		return err
+	}
+
+	lastRange.RangeT = newRange
+	logger.Info("range created", zap.Int32("range-index", newRange.RangeIndex), zap.Int64("start-offset", newRange.StartOffset))
+	return nil
 }
 
 func (c *RaftCluster) getLastRange(ctx context.Context, streamID int64) (lastRange *cache.Range, err error) {

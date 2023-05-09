@@ -37,7 +37,8 @@ const (
 )
 
 type Range interface {
-	SealRange(ctx context.Context, sealedRange *rpcfb.RangeT, writableRange *rpcfb.RangeT) (*rpcfb.RangeT, error)
+	CreateRange(ctx context.Context, rangeT *rpcfb.RangeT) error
+	UpdateRange(ctx context.Context, rangeT *rpcfb.RangeT) (*rpcfb.RangeT, error)
 	GetRange(ctx context.Context, rangeID *rpcfb.RangeIdT) (*rpcfb.RangeT, error)
 	GetLastRange(ctx context.Context, streamID int64) (*rpcfb.RangeT, error)
 	GetRangesByStream(ctx context.Context, streamID int64) ([]*rpcfb.RangeT, error)
@@ -47,40 +48,45 @@ type Range interface {
 	GetRangeIDsByDataNodeAndStream(ctx context.Context, streamID int64, dataNodeID int32) ([]*rpcfb.RangeIdT, error)
 }
 
-func (e *Endpoint) SealRange(ctx context.Context, sealedRange *rpcfb.RangeT, writableRange *rpcfb.RangeT) (lastRange *rpcfb.RangeT, err error) {
-	logger := e.lg.With(traceutil.TraceLogField(ctx))
+func (e *Endpoint) CreateRange(ctx context.Context, rangeT *rpcfb.RangeT) error {
+	logger := e.lg.With(zap.Int64("stream-id", rangeT.StreamId), zap.Int32("range-index", rangeT.RangeIndex), traceutil.TraceLogField(ctx))
 
-	kvs := make([]kv.KeyValue, 0, 2)
-	if sealedRange != nil {
-		logger = logger.With(zap.Int64("sealed-stream-id", sealedRange.StreamId), zap.Int32("sealed-range-index", sealedRange.RangeIndex))
-		kvs = append(kvs, kv.KeyValue{Key: rangePathInSteam(sealedRange.StreamId, sealedRange.RangeIndex), Value: fbutil.Marshal(sealedRange)})
-		lastRange = sealedRange
-	}
-	if writableRange != nil {
-		logger = logger.With(zap.Int64("writable-stream-id", writableRange.StreamId), zap.Int32("writable-range-index", writableRange.RangeIndex))
-		kvs = append(kvs, kv.KeyValue{Key: rangePathInSteam(writableRange.StreamId, writableRange.RangeIndex), Value: fbutil.Marshal(writableRange)})
-		lastRange = writableRange
-	}
+	key := rangePathInSteam(rangeT.StreamId, rangeT.RangeIndex)
+	value := fbutil.Marshal(rangeT)
 
-	preKvs, err := e.BatchPut(ctx, kvs, true)
-	for _, keyValue := range kvs {
-		mcache.Free(keyValue.Value)
-	}
+	prevValue, err := e.Put(ctx, key, value, true)
+	mcache.Free(value)
 	if err != nil {
-		logger.Error("failed to seal range", zap.Error(err))
-		return nil, errors.Wrap(err, "seal range")
+		logger.Error("failed to create range", zap.Error(err))
+		return errors.Wrap(err, "create range")
+	}
+	if prevValue != nil {
+		logger.Warn("range already exists when create range")
+		return nil
 	}
 
-	// TODO: check preKvs
-	_ = preKvs
-	//if len(preKvs) > 1 {
-	//	logger.Warn("seal range: writable range already exists")
-	//}
-	//if len(preKvs) < 1 {
-	//	logger.Warn("seal range: sealed range not exists")
-	//}
+	return nil
+}
 
-	return
+// UpdateRange updates the range and returns the previous range.
+func (e *Endpoint) UpdateRange(ctx context.Context, rangeT *rpcfb.RangeT) (*rpcfb.RangeT, error) {
+	logger := e.lg.With(zap.Int64("stream-id", rangeT.StreamId), zap.Int32("range-index", rangeT.RangeIndex), traceutil.TraceLogField(ctx))
+
+	key := rangePathInSteam(rangeT.StreamId, rangeT.RangeIndex)
+	value := fbutil.Marshal(rangeT)
+
+	prevValue, err := e.Put(ctx, key, value, true)
+	mcache.Free(value)
+	if err != nil {
+		logger.Error("failed to update range", zap.Error(err))
+		return nil, errors.Wrap(err, "update range")
+	}
+	if prevValue == nil {
+		logger.Warn("range not found when update range")
+		return nil, nil
+	}
+
+	return rpcfb.GetRootAsRange(prevValue, 0).UnPack(), nil
 }
 
 func (e *Endpoint) GetRange(ctx context.Context, rangeID *rpcfb.RangeIdT) (*rpcfb.RangeT, error) {

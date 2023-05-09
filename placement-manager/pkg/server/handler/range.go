@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 
 	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/placement-manager/pkg/sbp/protocol"
 	"github.com/AutoMQ/placement-manager/pkg/server/cluster"
-	"github.com/AutoMQ/placement-manager/pkg/util/traceutil"
 	"github.com/AutoMQ/placement-manager/pkg/util/typeutil"
 )
 
@@ -43,22 +43,34 @@ func (h *Handler) ListRanges(req *protocol.ListRangesRequest, resp *protocol.Lis
 
 func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
 	ctx := req.Context()
-	logger := h.lg.With(traceutil.TraceLogField(ctx))
 
 	entries := typeutil.FilterZero[*rpcfb.SealRangeEntryT](req.Entries)
 	sealResponses := make([]*rpcfb.SealRangesResultT, 0, len(entries))
 
 	for _, entry := range entries {
-		logger := logger.With(zap.Int64("stream-id", entry.Range.StreamId), zap.Int32("range-index", entry.Range.RangeIndex),
-			zap.Int64("range-end-offset", entry.End))
+		if entry.Type != rpcfb.SealTypePLACEMENT_MANAGER {
+			sealResponses = append(sealResponses, &rpcfb.SealRangesResultT{
+				Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: fmt.Sprintf("invalid seal type: %s", entry.Type)},
+			})
+			continue
+		}
+		if entry.Range == nil {
+			sealResponses = append(sealResponses, &rpcfb.SealRangesResultT{
+				Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "range is nil"},
+			})
+			continue
+		}
+
 		writableRange, err := h.c.SealRange(ctx, entry)
 
 		result := &rpcfb.SealRangesResultT{
 			Range: writableRange,
 		}
 		if err != nil {
-			logger.Error("failed to seal range", zap.Error(err))
 			switch {
+			case errors.Is(err, cluster.ErrNotLeader):
+				resp.Error(h.notLeaderError())
+				return
 			case errors.Is(err, cluster.ErrRangeNotFound):
 				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_SEAL_RANGE_NOT_FOUND, Message: err.Error()}
 			case errors.Is(err, cluster.ErrNotEnoughDataNodes):
@@ -70,7 +82,6 @@ func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.Sea
 				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
 			}
 		} else {
-			logger.Info("range sealed")
 			result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
 		}
 
