@@ -8,7 +8,6 @@ import (
 
 type FetchEntryT struct {
 	Range *RangeT `json:"range"`
-	RequestIndex int32 `json:"request_index"`
 	FetchOffset int64 `json:"fetch_offset"`
 	BatchMaxBytes int32 `json:"batch_max_bytes"`
 }
@@ -18,7 +17,6 @@ func (t *FetchEntryT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	range_Offset := t.Range.Pack(builder)
 	FetchEntryStart(builder)
 	FetchEntryAddRange(builder, range_Offset)
-	FetchEntryAddRequestIndex(builder, t.RequestIndex)
 	FetchEntryAddFetchOffset(builder, t.FetchOffset)
 	FetchEntryAddBatchMaxBytes(builder, t.BatchMaxBytes)
 	return FetchEntryEnd(builder)
@@ -26,7 +24,6 @@ func (t *FetchEntryT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 
 func (rcv *FetchEntry) UnPackTo(t *FetchEntryT) {
 	t.Range = rcv.Range(nil).UnPack()
-	t.RequestIndex = rcv.RequestIndex()
 	t.FetchOffset = rcv.FetchOffset()
 	t.BatchMaxBytes = rcv.BatchMaxBytes()
 }
@@ -78,20 +75,8 @@ func (rcv *FetchEntry) Range(obj *Range) *Range {
 	return nil
 }
 
-func (rcv *FetchEntry) RequestIndex() int32 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
-	if o != 0 {
-		return rcv._tab.GetInt32(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *FetchEntry) MutateRequestIndex(n int32) bool {
-	return rcv._tab.MutateInt32Slot(6, n)
-}
-
 func (rcv *FetchEntry) FetchOffset() int64 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		return rcv._tab.GetInt64(o + rcv._tab.Pos)
 	}
@@ -99,11 +84,11 @@ func (rcv *FetchEntry) FetchOffset() int64 {
 }
 
 func (rcv *FetchEntry) MutateFetchOffset(n int64) bool {
-	return rcv._tab.MutateInt64Slot(8, n)
+	return rcv._tab.MutateInt64Slot(6, n)
 }
 
 func (rcv *FetchEntry) BatchMaxBytes() int32 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
 	}
@@ -111,23 +96,20 @@ func (rcv *FetchEntry) BatchMaxBytes() int32 {
 }
 
 func (rcv *FetchEntry) MutateBatchMaxBytes(n int32) bool {
-	return rcv._tab.MutateInt32Slot(10, n)
+	return rcv._tab.MutateInt32Slot(8, n)
 }
 
 func FetchEntryStart(builder *flatbuffers.Builder) {
-	builder.StartObject(4)
+	builder.StartObject(3)
 }
 func FetchEntryAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(range_), 0)
 }
-func FetchEntryAddRequestIndex(builder *flatbuffers.Builder, requestIndex int32) {
-	builder.PrependInt32Slot(1, requestIndex, 0)
-}
 func FetchEntryAddFetchOffset(builder *flatbuffers.Builder, fetchOffset int64) {
-	builder.PrependInt64Slot(2, fetchOffset, 0)
+	builder.PrependInt64Slot(1, fetchOffset, 0)
 }
 func FetchEntryAddBatchMaxBytes(builder *flatbuffers.Builder, batchMaxBytes int32) {
-	builder.PrependInt32Slot(3, batchMaxBytes, 0)
+	builder.PrependInt32Slot(2, batchMaxBytes, 0)
 }
 func FetchEntryEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

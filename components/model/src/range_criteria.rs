@@ -1,7 +1,5 @@
-use super::data_node::DataNode;
-
 #[derive(Debug)]
 pub enum RangeCriteria {
-    DataNode(DataNode),
+    DataNode(i32),
     StreamId(i64),
 }

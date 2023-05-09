@@ -36,14 +36,14 @@ type Range interface {
 // It returns ErrNotLeader if the transaction failed.
 func (c *RaftCluster) ListRanges(ctx context.Context, rangeCriteria *rpcfb.RangeCriteriaT) (ranges []*rpcfb.RangeT, err error) {
 	byStream := rangeCriteria.StreamId >= endpoint.MinStreamID
-	byDataNode := rangeCriteria.DataNode != nil && rangeCriteria.DataNode.NodeId >= endpoint.MinDataNodeID
+	byDataNode := rangeCriteria.NodeId >= endpoint.MinDataNodeID
 	switch {
 	case byStream && byDataNode:
-		ranges, err = c.listRangesOnDataNodeInStream(ctx, rangeCriteria.StreamId, rangeCriteria.DataNode.NodeId)
+		ranges, err = c.listRangesOnDataNodeInStream(ctx, rangeCriteria.StreamId, rangeCriteria.NodeId)
 	case byStream && !byDataNode:
 		ranges, err = c.listRangesInStream(ctx, rangeCriteria.StreamId)
 	case !byStream && byDataNode:
-		ranges, err = c.listRangesOnDataNode(ctx, rangeCriteria.DataNode.NodeId)
+		ranges, err = c.listRangesOnDataNode(ctx, rangeCriteria.NodeId)
 	default:
 	}
 	if errors.Is(err, kv.ErrTxnFailed) {

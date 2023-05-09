@@ -59,12 +59,11 @@ impl Client {
             );
             RangeCriteria::StreamId(stream_id)
         } else {
-            let data_node = self.config.server.data_node();
             trace!(
-                "List stream ranges from placement manager for {:?}",
-                data_node
+                "List stream ranges from placement manager for node-id={}",
+                self.config.server.node_id
             );
-            RangeCriteria::DataNode(data_node)
+            RangeCriteria::DataNode(self.config.server.node_id)
         };
 
         let session_manager = unsafe { &mut *self.session_manager.get() };

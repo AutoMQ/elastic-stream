@@ -58,8 +58,8 @@ impl From<&Request> for Bytes {
                             RangeCriteria::StreamId(stream_id) => {
                                 criteria.stream_id = *stream_id;
                             }
-                            RangeCriteria::DataNode(data_node) => {
-                                criteria.data_node = Some(Box::new(data_node.into()));
+                            RangeCriteria::DataNode(node_id) => {
+                                criteria.node_id = *node_id;
                             }
                         };
                         criteria

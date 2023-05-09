@@ -7,21 +7,20 @@ import (
 )
 
 type RangeCriteriaT struct {
-	DataNode *DataNodeT `json:"data_node"`
+	NodeId int32 `json:"node_id"`
 	StreamId int64 `json:"stream_id"`
 }
 
 func (t *RangeCriteriaT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	dataNodeOffset := t.DataNode.Pack(builder)
 	RangeCriteriaStart(builder)
-	RangeCriteriaAddDataNode(builder, dataNodeOffset)
+	RangeCriteriaAddNodeId(builder, t.NodeId)
 	RangeCriteriaAddStreamId(builder, t.StreamId)
 	return RangeCriteriaEnd(builder)
 }
 
 func (rcv *RangeCriteria) UnPackTo(t *RangeCriteriaT) {
-	t.DataNode = rcv.DataNode(nil).UnPack()
+	t.NodeId = rcv.NodeId()
 	t.StreamId = rcv.StreamId()
 }
 
@@ -59,17 +58,16 @@ func (rcv *RangeCriteria) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *RangeCriteria) DataNode(obj *DataNode) *DataNode {
+func (rcv *RangeCriteria) NodeId() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
-		x := rcv._tab.Indirect(o + rcv._tab.Pos)
-		if obj == nil {
-			obj = new(DataNode)
-		}
-		obj.Init(rcv._tab.Bytes, x)
-		return obj
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
 	}
-	return nil
+	return -1
+}
+
+func (rcv *RangeCriteria) MutateNodeId(n int32) bool {
+	return rcv._tab.MutateInt32Slot(4, n)
 }
 
 func (rcv *RangeCriteria) StreamId() int64 {
@@ -87,8 +85,8 @@ func (rcv *RangeCriteria) MutateStreamId(n int64) bool {
 func RangeCriteriaStart(builder *flatbuffers.Builder) {
 	builder.StartObject(2)
 }
-func RangeCriteriaAddDataNode(builder *flatbuffers.Builder, dataNode flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(dataNode), 0)
+func RangeCriteriaAddNodeId(builder *flatbuffers.Builder, nodeId int32) {
+	builder.PrependInt32Slot(0, nodeId, -1)
 }
 func RangeCriteriaAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(1, streamId, -1)

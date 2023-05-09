@@ -147,6 +147,7 @@ table AppendRequest {
     entries: [AppendEntry] (id: 1);
 }
 
+// Offsets for the record batch.
 table BatchOffset {
     // Base offset of the batch.
     offset: int64 (id: 0);
@@ -201,15 +202,12 @@ table FetchRequest {
 table FetchEntry {
     // The stream range to fetch.
     range: Range (id: 0);
-
-    // The index of the request in the batch.
-    request_index: int32 (id: 1);
     
     // The offset to fetch from.
-    fetch_offset: int64 (id: 2);
+    fetch_offset: int64 (id: 1);
     
     // The maximum number of bytes to fetch.
-    batch_max_bytes: int32 (id: 3);
+    batch_max_bytes: int32 (id: 2);
 }
 
 table FetchResponse {
@@ -228,21 +226,20 @@ table FetchResult {
     // The id of the stream
     stream_id: int64 = -1 (id: 1);
 
-    // The index of the request that this response is for.
-    request_index: int32 (id: 2);
-
     // The quantity of record batches to be decoded from the payload for current fetch result.
     //
     // Note: Record batches MUST be decoded sequentially. 
     // This field defines the quantity of record batches that are belonging to the current FetchResult.
-    batch_count: int32 (id: 3);
+    batch_count: int32 (id: 2);
 }
 
 // Used to fetch the ranges from a specific data node or a specific stream list.
 // Regard this table as a union type.
 // Alway set one of the fields.
 table RangeCriteria {
-    data_node: DataNode (id: 0);
+    // If non-negative, placement managers are expected to filter ranges assigned to the specified node.
+    node_id: int32 = -1 (id: 0);
+
     // The stream id to list the ranges.
     stream_id: int64 = -1 (id: 1);
 }

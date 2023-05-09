@@ -9,7 +9,6 @@ import (
 type FetchResultT struct {
 	Status *StatusT `json:"status"`
 	StreamId int64 `json:"stream_id"`
-	RequestIndex int32 `json:"request_index"`
 	BatchCount int32 `json:"batch_count"`
 }
 
@@ -19,7 +18,6 @@ func (t *FetchResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	FetchResultStart(builder)
 	FetchResultAddStatus(builder, statusOffset)
 	FetchResultAddStreamId(builder, t.StreamId)
-	FetchResultAddRequestIndex(builder, t.RequestIndex)
 	FetchResultAddBatchCount(builder, t.BatchCount)
 	return FetchResultEnd(builder)
 }
@@ -27,7 +25,6 @@ func (t *FetchResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 func (rcv *FetchResult) UnPackTo(t *FetchResultT) {
 	t.Status = rcv.Status(nil).UnPack()
 	t.StreamId = rcv.StreamId()
-	t.RequestIndex = rcv.RequestIndex()
 	t.BatchCount = rcv.BatchCount()
 }
 
@@ -90,7 +87,7 @@ func (rcv *FetchResult) MutateStreamId(n int64) bool {
 	return rcv._tab.MutateInt64Slot(6, n)
 }
 
-func (rcv *FetchResult) RequestIndex() int32 {
+func (rcv *FetchResult) BatchCount() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
@@ -98,24 +95,12 @@ func (rcv *FetchResult) RequestIndex() int32 {
 	return 0
 }
 
-func (rcv *FetchResult) MutateRequestIndex(n int32) bool {
+func (rcv *FetchResult) MutateBatchCount(n int32) bool {
 	return rcv._tab.MutateInt32Slot(8, n)
 }
 
-func (rcv *FetchResult) BatchCount() int32 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
-	if o != 0 {
-		return rcv._tab.GetInt32(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *FetchResult) MutateBatchCount(n int32) bool {
-	return rcv._tab.MutateInt32Slot(10, n)
-}
-
 func FetchResultStart(builder *flatbuffers.Builder) {
-	builder.StartObject(4)
+	builder.StartObject(3)
 }
 func FetchResultAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
@@ -123,11 +108,8 @@ func FetchResultAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffs
 func FetchResultAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(1, streamId, -1)
 }
-func FetchResultAddRequestIndex(builder *flatbuffers.Builder, requestIndex int32) {
-	builder.PrependInt32Slot(2, requestIndex, 0)
-}
 func FetchResultAddBatchCount(builder *flatbuffers.Builder, batchCount int32) {
-	builder.PrependInt32Slot(3, batchCount, 0)
+	builder.PrependInt32Slot(2, batchCount, 0)
 }
 func FetchResultEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
