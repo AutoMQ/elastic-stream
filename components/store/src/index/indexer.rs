@@ -699,9 +699,11 @@ mod tests {
         indexer.index(stream_id, range, start_offset + 1, &ptr)?;
 
         // Case one: have a max key
-        let mut max_key = indexer.retrieve_max_key(stream_id, range).unwrap().unwrap();
-        assert_eq!(stream_id, max_key.get_i64());
-        assert_eq!(start_offset + 1, max_key.get_u64());
+        let max_key = indexer.retrieve_max_key(stream_id, range).unwrap().unwrap();
+        assert_eq!(
+            (stream_id, range, start_offset + 1),
+            indexer.decompose_index_key(&max_key[..])
+        );
 
         //Case two: no max key
         let max_key = indexer.retrieve_max_key(stream_id, range + 1).unwrap();
@@ -727,21 +729,24 @@ mod tests {
         indexer.index(stream_id, range, left_offset + 2, &ptr)?;
         indexer.index(stream_id, range, left_offset + 4, &ptr)?;
 
-        let mut left_key = indexer
+        let left_key = indexer
             .retrieve_left_key(stream_id, range, left_offset + 1)
             .unwrap()
             .unwrap();
-        assert_eq!(stream_id, left_key.get_i64());
-        assert_eq!(left_offset, left_key.get_u64());
+        assert_eq!(
+            (stream_id, range, left_offset),
+            indexer.decompose_index_key(&left_key[..])
+        );
 
         // Case two: the specific key is equal to the left key
-        let mut left_key = indexer
+        let left_key = indexer
             .retrieve_left_key(stream_id, range, left_offset + 2)
             .unwrap()
             .unwrap();
-
-        assert_eq!(stream_id, left_key.get_i64());
-        assert_eq!(left_offset + 2, left_key.get_u64());
+        assert_eq!(
+            (stream_id, range, left_offset + 2),
+            indexer.decompose_index_key(&left_key[..])
+        );
 
         // Case three: no left key
         let left_key = indexer
@@ -750,22 +755,25 @@ mod tests {
         assert_eq!(None, left_key);
 
         // Case four: the smallest key
-        let mut left_key = indexer
+        let left_key = indexer
             .retrieve_left_key(stream_id, range, left_offset)
             .unwrap()
             .unwrap();
-
-        assert_eq!(stream_id, left_key.get_i64());
-        assert_eq!(left_offset, left_key.get_u64());
+        assert_eq!(
+            (stream_id, range, left_offset),
+            indexer.decompose_index_key(&left_key[..])
+        );
 
         // Case five: the biggest key
-        let mut left_key = indexer
+        let left_key = indexer
             .retrieve_left_key(stream_id, range, left_offset + 4)
             .unwrap()
             .unwrap();
 
-        assert_eq!(stream_id, left_key.get_i64());
-        assert_eq!(left_offset + 4, left_key.get_u64());
+        assert_eq!(
+            (stream_id, range, left_offset + 4),
+            indexer.decompose_index_key(&left_key[..])
+        );
 
         // Case six: the biggest key + 1
 
