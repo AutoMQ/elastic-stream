@@ -230,7 +230,12 @@ impl Indexer {
         let mut read_opts = ReadOptions::default();
         let lower = self.build_index_key(stream_id, range, offset);
         read_opts.set_iterate_lower_bound(&lower[..]);
-        read_opts.set_iterate_upper_bound((stream_id + 1).to_be_bytes());
+
+        let mut upper = BytesMut::with_capacity(8 + 4);
+        upper.put_i64(stream_id);
+        upper.put_u32(range + 1);
+        read_opts.set_iterate_upper_bound(upper.freeze());
+
         self.scan_record_handles_from(read_opts, max_bytes)
     }
 
