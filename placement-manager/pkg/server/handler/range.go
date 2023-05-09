@@ -72,12 +72,11 @@ func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.Sea
 				resp.Error(h.notLeaderError())
 				return
 			case errors.Is(err, cluster.ErrRangeNotFound):
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_SEAL_RANGE_NOT_FOUND, Message: err.Error()}
+				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_NOT_FOUND, Message: err.Error()}
+			case errors.Is(err, cluster.ErrRangeAlreadySealed):
+				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_ALREADY_SEALED, Message: err.Error()}
 			case errors.Is(err, cluster.ErrNotEnoughDataNodes):
 				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()}
-			case errors.Is(err, cluster.ErrRangeAlreadySealed):
-				// TODO: add a new error code
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
 			default:
 				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
 			}

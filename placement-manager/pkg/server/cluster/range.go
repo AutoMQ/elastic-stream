@@ -123,8 +123,8 @@ func (c *RaftCluster) getRanges(ctx context.Context, rangeIDs []*rpcfb.RangeIdT,
 // SealRange seals a range.
 // It returns the current writable range if entry.Renew == true.
 // It returns ErrRangeNotFound if the range does not exist.
-// It returns ErrNotEnoughDataNodes if there are not enough data nodes to allocate.
 // It returns ErrRangeAlreadySealed if the range is already sealed.
+// It returns ErrNotEnoughDataNodes if there are not enough data nodes to allocate.
 func (c *RaftCluster) SealRange(ctx context.Context, entry *rpcfb.SealRangeEntryT) (*rpcfb.RangeT, error) {
 	lastRange, err := c.getLastRange(ctx, entry.Range.StreamId)
 	if err != nil {
