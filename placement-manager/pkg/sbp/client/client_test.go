@@ -11,7 +11,6 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
 
-	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/placement-manager/pkg/sbp/protocol"
 	"github.com/AutoMQ/placement-manager/pkg/sbp/server"
 	"github.com/AutoMQ/placement-manager/pkg/server/config"
@@ -22,29 +21,23 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func TestClient_SealRanges(t *testing.T) {
-	t.Parallel()
-	logger := zap.NewNop()
-	re := require.New(t)
+type timeoutHandler struct {
+	baseHandler
+	UsedTime time.Duration
+}
 
-	addr, shutdown := startServer(t, &mockHandler{}, logger)
-	defer shutdown()
+func (th *timeoutHandler) Heartbeat(_ *protocol.HeartbeatRequest, resp *protocol.HeartbeatResponse) {
+	time.Sleep(th.UsedTime)
+	resp.OK()
+}
 
-	client := NewClient(&config.SbpClient{}, logger)
-	defer client.Shutdown(context.Background())
+type timeoutRequest struct {
+	protocol.HeartbeatRequest
+	RequestTimeout time.Duration
+}
 
-	req := &protocol.SealRangesRequest{SealRangesRequestT: rpcfb.SealRangesRequestT{
-		Entries: []*rpcfb.SealRangeEntryT{{Range: &rpcfb.RangeIdT{
-			StreamId:   1,
-			RangeIndex: 2,
-		}}},
-	}}
-	resp, err := client.SealRanges(req, addr)
-	re.NoError(err)
-	re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code)
-	re.Len(resp.SealResponses, 1)
-	re.Equal(rpcfb.ErrorCodeOK, resp.SealResponses[0].Status.Code)
-	re.Equal(int32(2), resp.SealResponses[0].Range.RangeIndex)
+func (tr *timeoutRequest) Timeout() int32 {
+	return int32(tr.RequestTimeout / time.Millisecond)
 }
 
 func TestClientTimeout(t *testing.T) {
@@ -52,23 +45,22 @@ func TestClientTimeout(t *testing.T) {
 	logger := zap.NewNop()
 	re := require.New(t)
 
-	addr, shutdown := startServer(t, &mockHandler{SealRangesF: func(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
-		time.Sleep(40 * time.Millisecond)
-	}}, logger)
+	var used = 40 * time.Millisecond
+	var timeout = 20 * time.Millisecond
+
+	addr, shutdown := startServer(t, &timeoutHandler{UsedTime: used}, logger)
 	defer shutdown()
 
 	client := NewClient(&config.SbpClient{}, logger)
 	defer client.Shutdown(context.Background())
 
-	req := &protocol.SealRangesRequest{SealRangesRequestT: rpcfb.SealRangesRequestT{
-		TimeoutMs: 20,
-	}}
+	req := &timeoutRequest{RequestTimeout: timeout}
 	now := time.Now()
-	_, err := client.SealRanges(req, addr)
+	_, err := client.Do(req, addr)
 	cost := time.Since(now)
 	re.True(errors.Is(err, context.DeadlineExceeded))
-	re.Greater(cost, 20*time.Millisecond)
-	re.Less(cost, 40*time.Millisecond)
+	re.Greater(cost, timeout)
+	re.Less(cost, used)
 }
 
 func startServer(tb testing.TB, handler server.Handler, lg *zap.Logger) (addr string, shutdown func()) {
@@ -87,40 +79,6 @@ func startServer(tb testing.TB, handler server.Handler, lg *zap.Logger) (addr st
 		_ = s.Shutdown(context.Background())
 	}
 	return
-}
-
-type mockHandler struct {
-	baseHandler
-
-	SealRangesF func(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse)
-}
-
-func normalSealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
-	results := make([]*rpcfb.SealRangesResultT, 0, len(req.Entries))
-	for _, e := range req.Entries {
-		r := e.Range
-		results = append(results, &rpcfb.SealRangesResultT{
-			Range: &rpcfb.RangeT{
-				StreamId:    r.StreamId,
-				RangeIndex:  r.RangeIndex,
-				StartOffset: 1024,
-				EndOffset:   2048,
-			},
-			Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK},
-		})
-	}
-	resp.SealRangesResponseT = rpcfb.SealRangesResponseT{
-		SealResponses: results,
-	}
-	resp.OK()
-}
-
-func (m *mockHandler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
-	if m.SealRangesF != nil {
-		m.SealRangesF(req, resp)
-		return
-	}
-	normalSealRanges(req, resp)
 }
 
 type baseHandler struct{}

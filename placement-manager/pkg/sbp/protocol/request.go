@@ -144,18 +144,9 @@ func (lr *ListRangesRequest) Timeout() int32 {
 // SealRangesRequest is a request to operation.OpSealRanges
 type SealRangesRequest struct {
 	baseRequest
-	baseMarshaller
 	baseUnmarshaler
 
 	rpcfb.SealRangesRequestT
-}
-
-func (sr *SealRangesRequest) marshalFlatBuffer() ([]byte, error) {
-	return fbutil.Marshal(&sr.SealRangesRequestT), nil
-}
-
-func (sr *SealRangesRequest) Marshal(fmt format.Format) ([]byte, error) {
-	return marshal(sr, fmt)
 }
 
 func (sr *SealRangesRequest) unmarshalFlatBuffer(data []byte) error {
@@ -169,10 +160,6 @@ func (sr *SealRangesRequest) Unmarshal(fmt format.Format, data []byte) error {
 
 func (sr *SealRangesRequest) Timeout() int32 {
 	return sr.TimeoutMs
-}
-
-func (sr *SealRangesRequest) Operation() operation.Operation {
-	return operation.Operation{Code: operation.OpSealRanges}
 }
 
 // CreateStreamsRequest is a request to operation.OpCreateStreams

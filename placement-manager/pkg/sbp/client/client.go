@@ -33,7 +33,6 @@ var (
 
 type Client interface {
 	Do(req protocol.OutRequest, addr Address) (protocol.InResponse, error)
-	SealRanges(req *protocol.SealRangesRequest, addr Address) (*protocol.SealRangesResponse, error)
 }
 
 // A SbpClient internally caches connections to servers.
@@ -97,20 +96,6 @@ func (c *SbpClient) Do(req protocol.OutRequest, addr Address) (protocol.InRespon
 	}
 
 	return resp, err
-}
-
-func (c *SbpClient) SealRanges(req *protocol.SealRangesRequest, addr Address) (*protocol.SealRangesResponse, error) {
-	resp, err := c.Do(req, addr)
-	if err != nil {
-		return nil, err
-	}
-	if sealResp, ok := resp.(*protocol.SealRangesResponse); ok {
-		return sealResp, nil
-	}
-	if sysErr, ok := resp.(*protocol.SystemErrorResponse); ok {
-		return nil, errors.Errorf("system error, code: %s, message: %s", sysErr.Status.Code, sysErr.Status.Message)
-	}
-	return nil, errors.Errorf("sbp: unexpected response type %T", resp)
 }
 
 // CloseIdleConnections closes any connections which were previously

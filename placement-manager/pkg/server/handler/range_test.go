@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
-	sbpClient "github.com/AutoMQ/placement-manager/pkg/sbp/client"
 	"github.com/AutoMQ/placement-manager/pkg/sbp/protocol"
 )
 
@@ -87,9 +86,8 @@ func TestSealRanges(t *testing.T) {
 		errCode   rpcfb.ErrorCode
 	}
 	tests := []struct {
-		name       string
-		endOffsetF func(rangeIndex int32, addr sbpClient.Address) int64
-		want       want
+		name string
+		want want
 	}{}
 	for _, tt := range tests {
 		tt := tt
@@ -97,7 +95,7 @@ func TestSealRanges(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
 
-			h, closeFunc := startSbpHandler(t, mockSbpClient{tt.endOffsetF}, true)
+			h, closeFunc := startSbpHandler(t, nil, true)
 			defer closeFunc()
 
 			preHeartbeat(t, h, 0)

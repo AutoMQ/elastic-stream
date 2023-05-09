@@ -173,7 +173,6 @@ func (lr *ListRangesResponse) OK() {
 // SealRangesResponse is a response to operation.OpSealRanges
 type SealRangesResponse struct {
 	baseMarshaller
-	baseUnmarshaler
 	singleResponse
 
 	rpcfb.SealRangesResponseT
@@ -187,25 +186,12 @@ func (sr *SealRangesResponse) Marshal(fmt format.Format) ([]byte, error) {
 	return marshal(sr, fmt)
 }
 
-func (sr *SealRangesResponse) unmarshalFlatBuffer(data []byte) error {
-	sr.SealRangesResponseT = *rpcfb.GetRootAsSealRangesResponse(data, 0).UnPack()
-	return nil
-}
-
-func (sr *SealRangesResponse) Unmarshal(fmt format.Format, data []byte) error {
-	return unmarshal(sr, fmt, data)
-}
-
 func (sr *SealRangesResponse) Error(status *rpcfb.StatusT) {
 	sr.Status = status
 }
 
 func (sr *SealRangesResponse) OK() {
 	sr.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
-}
-
-func (sr *SealRangesResponse) ThrottleTime() int32 {
-	return sr.ThrottleTimeMs
 }
 
 // CreateStreamsResponse is a response to operation.OpCreateStreams
