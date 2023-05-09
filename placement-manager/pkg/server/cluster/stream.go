@@ -113,29 +113,20 @@ func (c *RaftCluster) DescribeStreams(ctx context.Context, streamIDs []int64) ([
 	logger := c.lg.With(zap.Int("stream-cnt", len(streamIDs)), traceutil.TraceLogField(ctx))
 
 	logger.Info("start to describe streams", zap.Int64s("stream-ids", streamIDs))
-	results := make([]*rpcfb.DescribeStreamResultT, 0, len(streamIDs))
-	for _, streamID := range streamIDs {
-		stream, err := c.storage.GetStream(ctx, streamID)
-		if err != nil {
-			if errors.Is(err, kv.ErrTxnFailed) {
-				return nil, ErrNotLeader
-			}
+	streams, err := c.storage.GetStreams(ctx, streamIDs)
+	if err != nil {
+		if errors.Is(err, kv.ErrTxnFailed) {
+			return nil, ErrNotLeader
+		}
+		return nil, err
+	}
 
-			results = append(results, &rpcfb.DescribeStreamResultT{
-				Status: &rpcfb.StatusT{
-					Code:    rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR,
-					Message: err.Error(),
-				},
-			})
-			continue
-		}
-		if stream == nil {
-			continue
-		}
-		results = append(results, &rpcfb.DescribeStreamResultT{
+	results := make([]*rpcfb.DescribeStreamResultT, len(streams))
+	for i, stream := range streams {
+		results[i] = &rpcfb.DescribeStreamResultT{
 			Stream: stream,
 			Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK},
-		})
+		}
 	}
 	logger.Info("finish describing streams")
 	return results, nil

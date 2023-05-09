@@ -38,6 +38,7 @@ type Stream interface {
 	DeleteStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error)
 	UpdateStreams(ctx context.Context, streams []*rpcfb.StreamT) ([]*rpcfb.StreamT, error)
 	GetStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error)
+	GetStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error)
 	ForEachStream(ctx context.Context, f func(stream *rpcfb.StreamT) error) error
 }
 
@@ -158,18 +159,46 @@ func (e *Endpoint) UpdateStreams(ctx context.Context, streams []*rpcfb.StreamT) 
 
 // GetStream gets the stream with the given stream id.
 func (e *Endpoint) GetStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error) {
-	logger := e.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
-
-	value, err := e.Get(ctx, streamPath(streamID))
+	streams, err := e.GetStreams(ctx, []int64{streamID})
 	if err != nil {
-		logger.Error("failed to get stream", zap.Error(err))
-		return nil, errors.Wrap(err, "get stream")
+		return nil, err
 	}
-	if value == nil {
+	if len(streams) == 0 {
 		return nil, nil
 	}
 
-	return rpcfb.GetRootAsStream(value, 0).UnPack(), nil
+	return streams[0], nil
+}
+
+// GetStreams gets the streams with the given stream ids.
+func (e *Endpoint) GetStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error) {
+	logger := e.lg.With(traceutil.TraceLogField(ctx))
+
+	keys := make([][]byte, len(streamIDs))
+	for i, streamID := range streamIDs {
+		keys[i] = streamPath(streamID)
+	}
+
+	kvs, err := e.BatchGet(ctx, keys)
+	if err != nil {
+		logger.Error("failed to get streams", zap.Int64s("stream-ids", streamIDs), zap.Error(err))
+		return nil, errors.Wrap(err, "get streams")
+	}
+
+	streams := make([]*rpcfb.StreamT, 0, len(kvs))
+	for _, streamKV := range kvs {
+		if streamKV.Value == nil {
+			continue
+		}
+		streams = append(streams, rpcfb.GetRootAsStream(streamKV.Value, 0).UnPack())
+	}
+
+	if len(streams) < len(streamIDs) {
+		logger.Warn("some steams not found", zap.Int("expected-count", len(streamIDs)), zap.Int("got-count", len(streams)),
+			zap.Int64s("expected-stream-ids", streamIDs), zap.Int64s("got-stream-ids", streamIDsFromPaths(kvs)))
+	}
+
+	return streams, nil
 }
 
 // ForEachStream calls the given function for every stream in the storage.
@@ -225,7 +254,10 @@ func streamPath(streamID int64) []byte {
 func streamIDsFromPaths(prevKvs []kv.KeyValue) []int64 {
 	streamIDs := make([]int64, 0, len(prevKvs))
 	for _, prevKv := range prevKvs {
-		streamID, _ := streamIDFromPath(prevKv.Key)
+		streamID, err := streamIDFromPath(prevKv.Key)
+		if err != nil {
+			continue
+		}
 		streamIDs = append(streamIDs, streamID)
 	}
 	return streamIDs

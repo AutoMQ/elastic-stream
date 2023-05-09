@@ -67,7 +67,7 @@ func (c *RaftCluster) listRangesOnDataNodeInStream(ctx context.Context, streamID
 		return nil, err
 	}
 
-	ranges, err := c.getRanges(ctx, rangeIDs, logger)
+	ranges, err := c.storage.GetRanges(ctx, rangeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -97,28 +97,12 @@ func (c *RaftCluster) listRangesOnDataNode(ctx context.Context, dataNodeID int32
 		return nil, err
 	}
 
-	ranges, err := c.getRanges(ctx, rangeIDs, logger)
+	ranges, err := c.storage.GetRanges(ctx, rangeIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	logger.Info("finish listing ranges on data node", zap.Int("range-cnt", len(ranges)))
-	return ranges, nil
-}
-
-func (c *RaftCluster) getRanges(ctx context.Context, rangeIDs []*rpcfb.RangeIdT, logger *zap.Logger) ([]*rpcfb.RangeT, error) {
-	ranges := make([]*rpcfb.RangeT, 0, len(rangeIDs))
-	for _, rangeID := range rangeIDs {
-		r, err := c.storage.GetRange(ctx, rangeID)
-		if err != nil {
-			return nil, err
-		}
-		if r == nil {
-			logger.Warn("range not found", zap.Int64("range-stream-id", rangeID.StreamId), zap.Int32("range-index", rangeID.RangeIndex))
-			continue
-		}
-		ranges = append(ranges, r)
-	}
 	return ranges, nil
 }
 
