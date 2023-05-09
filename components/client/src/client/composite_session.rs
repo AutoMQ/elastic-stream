@@ -57,9 +57,9 @@ impl CompositeSession {
             let res = Self::connect(
                 socket_addr.clone(),
                 config.client_connect_timeout(),
-                &config,
-                &sessions,
-                shutdown.subscribe(),
+                Arc::clone(&config),
+                Rc::clone(&sessions),
+                shutdown.clone(),
             )
             .await;
             match res {
@@ -144,9 +144,9 @@ impl CompositeSession {
                         Self::connect(
                             addr,
                             self.config.client_connect_timeout(),
-                            &self.config,
-                            &self.sessions,
-                            self.shutdown.subscribe(),
+                            Arc::clone(&self.config),
+                            Rc::clone(&self.sessions),
+                            self.shutdown.clone(),
                         )
                     });
 
@@ -358,9 +358,9 @@ impl CompositeSession {
                     let session = Self::connect(
                         *addr,
                         self.config.client_connect_timeout(),
-                        &self.config,
-                        &self.sessions,
-                        self.shutdown.subscribe(),
+                        Arc::clone(&self.config),
+                        Rc::clone(&self.sessions),
+                        self.shutdown.clone(),
                     )
                     .await?;
                     self.sessions.borrow_mut().insert(*addr, session);
@@ -408,8 +408,8 @@ impl CompositeSession {
     /// If seal kind is seal-placement-manager and renew, returns the newly created mutable range;
     /// Otherwise, return the range that is being sealed with the end properly filled.
     ///
-    /// If the seal kind is seal-data-node, the returning `StreamRange` is the result of the
-    /// data-node only. Final end value of the range will be resolved after MinCopy of data nodes responded.
+    /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
+    /// Final end value of the range will be resolved after MinCopy of data nodes responded.
     pub(crate) async fn seal(&self, request: SealRangeRequest) -> Result<StreamRange, ClientError> {
         todo!()
     }
@@ -420,6 +420,7 @@ impl CompositeSession {
     /// # Implementation walkthrough
     /// 1. filter endpoints that is not found in sessions
     /// 2. connect to the target and then create a session
+    /// 3. if there is no existing sessions, await till connect attempts completed or failed.
     async fn try_reconnect(&self) {
         if self.endpoints.borrow().is_empty() {
             return;
@@ -435,9 +436,9 @@ impl CompositeSession {
                     Self::connect(
                         *target,
                         self.config.client_connect_timeout(),
-                        &self.config,
-                        &self.sessions,
-                        self.shutdown.subscribe(),
+                        Arc::clone(&self.config),
+                        Rc::clone(&self.sessions),
+                        self.shutdown.clone(),
                     )
                 })
                 .collect::<Vec<_>>();
@@ -446,28 +447,35 @@ impl CompositeSession {
                 return;
             }
             trace!("Reconnecting {} sessions", futures.len());
+            let need_await = self.sessions.borrow().is_empty();
+            let sessions = Rc::clone(&self.sessions);
+            let handle = tokio_uring::spawn(async move {
+                futures::future::join_all(futures)
+                    .await
+                    .into_iter()
+                    .for_each(|res| match res {
+                        Ok(session) => {
+                            let target = session.target;
+                            sessions.borrow_mut().insert(target, session);
+                        }
+                        Err(e) => {
+                            error!("Failed to connect. Cause: {:?}", e);
+                        }
+                    });
+            });
 
-            futures::future::join_all(futures)
-                .await
-                .into_iter()
-                .for_each(|res| match res {
-                    Ok(session) => {
-                        let target = session.target;
-                        self.sessions.borrow_mut().insert(target, session);
-                    }
-                    Err(e) => {
-                        error!("Failed to connect. Cause: {:?}", e);
-                    }
-                });
+            if need_await {
+                let _ = handle.await;
+            }
         }
     }
 
     async fn connect(
         addr: SocketAddr,
         duration: Duration,
-        config: &Arc<config::Configuration>,
-        sessions: &Rc<RefCell<HashMap<SocketAddr, Session>>>,
-        shutdown: broadcast::Receiver<()>,
+        config: Arc<config::Configuration>,
+        sessions: Rc<RefCell<HashMap<SocketAddr, Session>>>,
+        shutdown: broadcast::Sender<()>,
     ) -> Result<Session, ClientError> {
         trace!("Establishing connection to {:?}", addr);
         let endpoint = addr.to_string();
@@ -502,9 +510,9 @@ impl CompositeSession {
             addr,
             stream,
             &endpoint,
-            config,
-            Rc::downgrade(sessions),
-            shutdown,
+            &config,
+            Rc::downgrade(&sessions),
+            shutdown.clone(),
         ))
     }
 }

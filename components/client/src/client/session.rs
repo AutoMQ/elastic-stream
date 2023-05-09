@@ -4,9 +4,7 @@ use codec::{
     error::FrameError,
     frame::{Frame, OperationCode},
 };
-use model::{
-    data_node::DataNode, range::StreamRange, request::Request, PlacementManagerNode, Status,
-};
+use model::{range::StreamRange, request::Request, PlacementManagerNode, Status};
 use protocol::rpc::header::{
     DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse, IdAllocationResponse,
     ListRangesResponse, SystemErrorResponse,
@@ -155,7 +153,7 @@ impl Session {
         endpoint: &str,
         config: &Arc<config::Configuration>,
         sessions: Weak<RefCell<HashMap<SocketAddr, Session>>>,
-        shutdown: broadcast::Receiver<()>,
+        shutdown: broadcast::Sender<()>,
     ) -> Self {
         let connection = Rc::new(Connection::new(stream, endpoint));
         let inflight = Rc::new(UnsafeCell::new(HashMap::new()));
@@ -165,7 +163,7 @@ impl Session {
             Rc::clone(&inflight),
             sessions,
             target,
-            shutdown,
+            shutdown.subscribe(),
         );
 
         Self {
@@ -598,14 +596,14 @@ mod tests {
             let stream = TcpStream::connect(target.parse()?).await?;
             let config = Arc::new(config::Configuration::default());
             let sessions = Rc::new(RefCell::new(HashMap::new()));
-            let (_tx, rx) = broadcast::channel(1);
+            let (tx, _rx) = broadcast::channel(1);
             let _session = Session::new(
                 target.parse()?,
                 stream,
                 &target,
                 &config,
                 Rc::downgrade(&sessions),
-                rx,
+                tx,
             );
 
             Ok(())
