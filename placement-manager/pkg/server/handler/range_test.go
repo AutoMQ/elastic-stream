@@ -25,9 +25,9 @@ func TestListRanges(t *testing.T) {
 	// test list range by stream id
 	req := &protocol.ListRangesRequest{ListRangesRequestT: rpcfb.ListRangesRequestT{
 		RangeCriteria: []*rpcfb.RangeCriteriaT{
-			{StreamId: 0, DataNode: &rpcfb.DataNodeT{NodeId: -1}},
-			{StreamId: 1, DataNode: &rpcfb.DataNodeT{NodeId: -1}},
-			{StreamId: 2, DataNode: &rpcfb.DataNodeT{NodeId: -1}},
+			{StreamId: 0, NodeId: -1},
+			{StreamId: 1, NodeId: -1},
+			{StreamId: 2, NodeId: -1},
 		},
 	}}
 	resp := &protocol.ListRangesResponse{}
@@ -44,9 +44,9 @@ func TestListRanges(t *testing.T) {
 	// test list range by data node id
 	req = &protocol.ListRangesRequest{ListRangesRequestT: rpcfb.ListRangesRequestT{
 		RangeCriteria: []*rpcfb.RangeCriteriaT{
-			{StreamId: -1, DataNode: &rpcfb.DataNodeT{NodeId: 0}},
-			{StreamId: -1, DataNode: &rpcfb.DataNodeT{NodeId: 1}},
-			{StreamId: -1, DataNode: &rpcfb.DataNodeT{NodeId: 2}},
+			{StreamId: -1, NodeId: 0},
+			{StreamId: -1, NodeId: 1},
+			{StreamId: -1, NodeId: 2},
 		},
 	}}
 	resp = &protocol.ListRangesResponse{}
@@ -63,9 +63,9 @@ func TestListRanges(t *testing.T) {
 	// test list range by stream id and data node id
 	req = &protocol.ListRangesRequest{ListRangesRequestT: rpcfb.ListRangesRequestT{
 		RangeCriteria: []*rpcfb.RangeCriteriaT{
-			{StreamId: 0, DataNode: &rpcfb.DataNodeT{NodeId: 0}},
-			{StreamId: 1, DataNode: &rpcfb.DataNodeT{NodeId: 1}},
-			{StreamId: 2, DataNode: &rpcfb.DataNodeT{NodeId: 2}},
+			{StreamId: 0, NodeId: 0},
+			{StreamId: 1, NodeId: 1},
+			{StreamId: 2, NodeId: 2},
 		},
 	}}
 	resp = &protocol.ListRangesResponse{}
@@ -131,7 +131,7 @@ func TestSealRanges(t *testing.T) {
 
 			lReq := &protocol.ListRangesRequest{ListRangesRequestT: rpcfb.ListRangesRequestT{
 				RangeCriteria: []*rpcfb.RangeCriteriaT{
-					{StreamId: 0, DataNode: &rpcfb.DataNodeT{NodeId: -1}},
+					{StreamId: 0, NodeId: -1},
 				},
 			}}
 			lResp := &protocol.ListRangesResponse{}
