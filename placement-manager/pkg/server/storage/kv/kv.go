@@ -42,6 +42,11 @@ type KV interface {
 	// If the key is empty, Get returns nil and no error.
 	Get(ctx context.Context, key []byte) ([]byte, error)
 
+	// BatchGet retrieves the values associated with the given keys.
+	// If the key does not exist, BatchGet returns no error.
+	// Any empty key will be ignored.
+	BatchGet(ctx context.Context, keys [][]byte) ([]KeyValue, error)
+
 	// GetByRange retrieves a list of key-value pairs whose keys fall within the given range (r)
 	// and limits the number of results returned to "limit".
 	// If the Range.StartKey is empty, GetByRange returns nil and no error.

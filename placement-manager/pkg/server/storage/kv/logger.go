@@ -30,6 +30,26 @@ func (l Logger) Get(ctx context.Context, k []byte) (v []byte, err error) {
 	return
 }
 
+func (l Logger) BatchGet(ctx context.Context, keys [][]byte) (kvs []KeyValue, err error) {
+	kvs, err = l.Kv.BatchGet(ctx, keys)
+
+	logger := l.logger()
+	if logger.Core().Enabled(zap.DebugLevel) {
+		logger = logger.With(traceutil.TraceLogField(ctx))
+		fields := []zap.Field{
+			zap.Error(err),
+		}
+		for i, key := range keys {
+			fields = append(fields, zap.ByteString(fmt.Sprintf("query-key-%d", i), key))
+		}
+		for i, kv := range kvs {
+			fields = append(fields, zap.ByteString(fmt.Sprintf("key-%d", i), kv.Key), zap.Binary(fmt.Sprintf("value-%d", i), kv.Value))
+		}
+		logger.Debug("kv batch get", fields...)
+	}
+	return
+}
+
 func (l Logger) GetByRange(ctx context.Context, r Range, limit int64, desc bool) (kvs []KeyValue, err error) {
 	kvs, err = l.Kv.GetByRange(ctx, r, limit, desc)
 

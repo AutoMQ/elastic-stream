@@ -67,16 +67,60 @@ func (e *Etcd) Get(ctx context.Context, k []byte) ([]byte, error) {
 	if len(k) == 0 {
 		return nil, nil
 	}
-	logger := e.lg.With(traceutil.TraceLogField(ctx))
 
-	key := e.addPrefix(k)
-
-	kv, err := etcdutil.GetOne(ctx, e.client, key, logger)
+	kvs, err := e.BatchGet(ctx, [][]byte{k})
 	if err != nil {
 		return nil, errors.Wrap(err, "kv get")
 	}
 
-	return kv.Value, nil
+	for _, kv := range kvs {
+		if bytes.Equal(kv.Key, k) {
+			return kv.Value, nil
+		}
+	}
+	return nil, nil
+}
+
+func (e *Etcd) BatchGet(ctx context.Context, keys [][]byte) ([]KeyValue, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+
+	ops := make([]clientv3.Op, 0, len(keys))
+	for _, k := range keys {
+		if len(k) == 0 {
+			continue
+		}
+		key := e.addPrefix(k)
+		ops = append(ops, clientv3.OpGet(string(key)))
+	}
+
+	txn := e.newTxnFunc(ctx).Then(ops...)
+	resp, err := txn.Commit()
+	if err != nil {
+		return nil, errors.Wrap(err, "kv batch get")
+	}
+	if !resp.Succeeded {
+		return nil, errors.Wrap(ErrTxnFailed, "kv batch get")
+	}
+
+	kvs := make([]KeyValue, 0, len(resp.Responses))
+	for _, resp := range resp.Responses {
+		rangeResp := resp.GetResponseRange()
+		if rangeResp == nil {
+			continue
+		}
+		for _, kv := range rangeResp.Kvs {
+			if !e.hasPrefix(kv.Key) {
+				continue
+			}
+			kvs = append(kvs, KeyValue{
+				Key:   e.trimPrefix(kv.Key),
+				Value: kv.Value,
+			})
+		}
+	}
+	return kvs, nil
 }
 
 func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) ([]KeyValue, error) {
@@ -102,6 +146,9 @@ func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) 
 
 	kvs := make([]KeyValue, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
+		if !e.hasPrefix(kv.Key) {
+			continue
+		}
 		kvs = append(kvs, KeyValue{
 			Key:   e.trimPrefix(kv.Key),
 			Value: kv.Value,
@@ -236,6 +283,9 @@ func (e *Etcd) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool) ([]K
 	for _, resp := range resp.Responses {
 		deleteResp := resp.GetResponseDeleteRange()
 		for _, kv := range deleteResp.PrevKvs {
+			if !e.hasPrefix(kv.Key) {
+				continue
+			}
 			prevKvs = append(prevKvs, KeyValue{
 				Key:   e.trimPrefix(kv.Key),
 				Value: kv.Value,
