@@ -25,10 +25,7 @@ pub struct StreamRange {
     /// The start slot index, inclusive.
     start: u64,
 
-    /// Records within `[start, limit)` are properly stored and readily readable.
-    ///
-    /// # Note
-    /// The following relation holds: `limit <= end`.
+    /// TODO: remove this field.
     limit: u64,
 
     /// The end of the range, exclusive

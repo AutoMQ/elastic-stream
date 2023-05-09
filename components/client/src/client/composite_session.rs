@@ -1,5 +1,5 @@
-use super::{lb_policy::LbPolicy, response, session::Session};
-use crate::{error::ClientError, Response};
+use super::{invocation_context::InvocationContext, lb_policy::LbPolicy, session::Session};
+use crate::error::ClientError;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
@@ -7,6 +7,7 @@ use model::{
     range::StreamRange,
     range_criteria::RangeCriteria,
     request::{seal::SealRangeRequest, Request},
+    response::Response,
     PlacementManagerNode,
 };
 use protocol::rpc::header::ErrorCode;
@@ -110,7 +111,7 @@ impl CompositeSession {
             if let Ok(Some(nodes)) = self.describe_placement_manager_cluster().await {
                 if !nodes.is_empty() {
                     *self.refresh_cluster_instant.borrow_mut() = Instant::now();
-
+                    // TODO: Leadership of the placement manager node is NOT preserved here.
                     let mut addrs = nodes
                         .into_iter()
                         .map(|node| node.advertise_addr.to_socket_addrs().into_iter())
@@ -188,11 +189,10 @@ impl CompositeSession {
                 .map(|(_addr, session)| {
                     let (tx, rx) = oneshot::channel();
                     receivers.push(rx);
-                    session.write(&request, tx)
+                    session.write(request.clone(), tx)
                 })
                 .collect::<Vec<_>>();
-            let _res: Vec<Result<(), oneshot::Sender<Response>>> =
-                futures::future::join_all(futures).await;
+            let _res: Vec<Result<(), InvocationContext>> = futures::future::join_all(futures).await;
         }
 
         let res: Vec<Result<Response, oneshot::error::RecvError>> =
@@ -230,7 +230,7 @@ impl CompositeSession {
                 host: host.to_owned(),
             };
             let (tx, rx) = oneshot::channel();
-            if let Err(e) = session.write(&request, tx).await {
+            if let Err(e) = session.write(request, tx).await {
                 error!(
                     "Failed to send ID-allocation-request to {}. Cause: {:?}",
                     self.target, e
@@ -273,11 +273,8 @@ impl CompositeSession {
                 criteria: vec![criteria],
             };
             let (tx, rx) = oneshot::channel();
-            if let Err(e) = session.write(&request, tx).await {
-                error!(
-                    "Failed to send list-range request to {}. Cause: {:?}",
-                    self.target, e
-                );
+            if let Err(_ctx) = session.write(request, tx).await {
+                error!("Failed to send list-range request to {}.", self.target);
                 return Err(ClientError::ClientInternal);
             }
 
@@ -339,8 +336,10 @@ impl CompositeSession {
             for addr in &addrs {
                 // TODO: RefCell is held across await, which should be avoided. Drop it before await.
                 if let Some(session) = self.sessions.borrow().get(addr) {
-                    if let Err(tx_) = session.write(&request, tx).await {
-                        tx = tx_;
+                    if let Err(mut ctx) = session.write(request.clone(), tx).await {
+                        tx = ctx
+                            .response_observer()
+                            .expect("Response observer should NOT be consumed");
                         error!("Failed to send request to {}", addr);
                         continue;
                     }
@@ -377,8 +376,7 @@ impl CompositeSession {
         match time::timeout(self.config.client_connect_timeout(), rx).await {
             Ok(response) => match response {
                 Ok(response) => {
-                    if let response::Response::DescribePlacementManager { status, nodes } = response
-                    {
+                    if let Response::DescribePlacementManager { status, nodes } = response {
                         if ErrorCode::OK == status.code {
                             trace!("Received placement manager cluster {:?}", nodes);
                             Ok(nodes)
@@ -411,7 +409,54 @@ impl CompositeSession {
     /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
     /// Final end value of the range will be resolved after MinCopy of data nodes responded.
     pub(crate) async fn seal(&self, request: SealRangeRequest) -> Result<StreamRange, ClientError> {
-        todo!()
+        self.try_reconnect().await;
+        // TODO: If the seal kind is PM, we need to pick the session/connection to the leader node.
+        let session = self
+            .sessions
+            .borrow()
+            .iter()
+            .next()
+            .map(|(_addr, session)| session.clone())
+            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+        let request = Request::SealRange {
+            timeout: self.config.client_io_timeout(),
+            kind: request.kind,
+            stream_id: request.stream_id as i64,
+            range: request.range_index,
+            end: request.end.map(|end| end as i64),
+            renew: request.renew,
+        };
+        let (tx, rx) = oneshot::channel();
+        if let Err(ctx) = session.write(request, tx).await {
+            let request = ctx.request();
+            error!("Failed to seal range {request:?}");
+            return Err(ClientError::ClientInternal);
+        }
+
+        let response = rx.await.map_err(|_e| ClientError::ClientInternal)?;
+        if let Response::SealRange {
+            status,
+            stream_id,
+            range_index,
+            start_offset,
+            end_offset,
+        } = response
+        {
+            if ErrorCode::OK != status.code {
+                warn!("Failed to seal range: {:?}", status);
+                return Err(ClientError::ServerInternal);
+            }
+
+            Ok(StreamRange::new(
+                stream_id,
+                range_index,
+                start_offset as u64,
+                0,
+                end_offset.map(|end| end as u64),
+            ))
+        } else {
+            Err(ClientError::ClientInternal)
+        }
     }
 
     /// Try to reconnect to the endpoints that is absent from sessions.

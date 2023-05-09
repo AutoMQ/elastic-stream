@@ -1,6 +1,6 @@
-use model::range::StreamRange;
-use model::PlacementManagerNode;
-use model::Status;
+use crate::range::StreamRange;
+use crate::PlacementManagerNode;
+use crate::Status;
 
 #[derive(Debug, Clone)]
 pub enum Response {
@@ -19,5 +19,13 @@ pub enum Response {
     DescribePlacementManager {
         status: Status,
         nodes: Option<Vec<PlacementManagerNode>>,
+    },
+    
+    SealRange {
+        status: Status,
+        stream_id: i64,
+        range_index: i32,
+        start_offset: i64,
+        end_offset: Option<i64>,
     },
 }

@@ -2,8 +2,6 @@ use std::time::Duration;
 
 use thiserror::Error;
 
-use crate::client::session_state::SessionState;
-
 #[derive(Debug, Error, PartialEq)]
 pub enum CommandError {}
 
@@ -38,15 +36,6 @@ pub enum ClientError {
 
     #[error("Client fails to receive response from server within {timeout:#?}")]
     RpcTimeout { timeout: Duration },
-}
-
-#[derive(Debug, Error)]
-pub enum SessionError {
-    #[error("Session state is `{actual:?}`, expecting `{expected:?}`")]
-    IllegalState {
-        actual: SessionState,
-        expected: SessionState,
-    },
 }
 
 #[derive(Debug, Error)]

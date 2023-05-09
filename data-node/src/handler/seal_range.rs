@@ -66,7 +66,7 @@ impl<'a> SealRange<'a> {
                     item.stream_id = entry.range.stream_id;
                     item.range_index = entry.range.range_index;
                     item.end_offset = offset as i64;
-                    result.range = Some(Box::new(item));
+                    result.range = Box::new(item);
                 }
                 Err(e) => {
                     error!(
@@ -80,7 +80,7 @@ impl<'a> SealRange<'a> {
             result.status = Box::new(status);
             results.push(result);
         }
-        seal_response.seal_responses = Some(results);
+        seal_response.results = results;
         trace!("{:?}", seal_response);
         let resp = seal_response.pack(&mut builder);
         builder.finish(resp, None);

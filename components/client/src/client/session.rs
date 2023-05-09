@@ -1,13 +1,11 @@
-use super::response;
-use super::session_state::SessionState;
 use codec::{
     error::FrameError,
     frame::{Frame, OperationCode},
 };
-use model::{range::StreamRange, request::Request, PlacementManagerNode, Status};
+use model::{range::StreamRange, request::Request, response, PlacementManagerNode, Status};
 use protocol::rpc::header::{
     DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse, IdAllocationResponse,
-    ListRangesResponse, SystemErrorResponse,
+    ListRangesResponse, SealRangesResponse, SystemErrorResponse,
 };
 use transport::connection::Connection;
 
@@ -26,28 +24,28 @@ use tokio::sync::{
 };
 use tokio_uring::net::TcpStream;
 
+use super::invocation_context::InvocationContext;
+
 pub(crate) struct Session {
     pub(crate) target: SocketAddr,
 
     config: Arc<config::Configuration>,
-
-    state: SessionState,
 
     // Unlike {tokio, monoio}::TcpStream where we need to split underlying TcpStream into two owned mutable,
     // tokio_uring::TcpStream requires immutable references only to perform read/write.
     connection: Rc<Connection>,
 
     /// In-flight requests.
-    inflight_requests: Rc<UnsafeCell<HashMap<u32, oneshot::Sender<response::Response>>>>,
+    inflight_requests: Rc<UnsafeCell<HashMap<u32, InvocationContext>>>,
 
-    idle_since: RefCell<Instant>,
+    idle_since: Rc<RefCell<Instant>>,
 }
 
 impl Session {
     /// Spawn a loop to continuously read responses and server-side requests.
     fn spawn_read_loop(
         connection: Rc<Connection>,
-        inflight_requests: Rc<UnsafeCell<HashMap<u32, oneshot::Sender<response::Response>>>>,
+        inflight_requests: Rc<UnsafeCell<HashMap<u32, InvocationContext>>>,
         sessions: Weak<RefCell<HashMap<SocketAddr, Session>>>,
         target: SocketAddr,
         mut shutdown: broadcast::Receiver<()>,
@@ -133,14 +131,14 @@ impl Session {
                 }
 
                 let inflight = unsafe { &mut *inflight_requests.get() };
-                inflight.drain_filter(|stream_id, tx| {
-                    if tx.is_closed() {
+                inflight.drain_filter(|stream_id, ctx| {
+                    if ctx.is_closed() {
                         info!(
                             "Caller has cancelled request[stream-id={}], potentially due to timeout",
                             stream_id
                         );
                     }
-                    tx.is_closed()
+                    ctx.is_closed()
                 });
             }
             trace!("Read loop for session[target={}] completed", target);
@@ -169,124 +167,73 @@ impl Session {
         Self {
             config: Arc::clone(config),
             target,
-            state: SessionState::Active,
             connection,
             inflight_requests: inflight,
-            idle_since: RefCell::new(Instant::now()),
+            idle_since: Rc::new(RefCell::new(Instant::now())),
         }
     }
 
     pub(crate) async fn write(
         &self,
-        request: &Request,
+        request: Request,
         response_observer: oneshot::Sender<response::Response>,
-    ) -> Result<(), oneshot::Sender<response::Response>> {
+    ) -> Result<(), InvocationContext> {
         trace!("Sending request {:?}", request);
 
         // Update last read/write instant.
         *self.idle_since.borrow_mut() = Instant::now();
         let mut frame = Frame::new(OperationCode::Unknown);
-        let inflight_requests = unsafe { &mut *self.inflight_requests.get() };
-        inflight_requests.insert(frame.stream_id, response_observer);
 
+        // Set frame header
+        frame.header = Some((&request).into());
+
+        // Set operation code
         match request {
             Request::Heartbeat { .. } => {
                 frame.operation_code = OperationCode::Heartbeat;
-                let header = request.into();
-                frame.header = Some(header);
-                match self.connection.write_frame(&frame).await {
-                    Ok(_) => {
-                        trace!(
-                            "Write `Heartbeat` request bounded for {} using stream-id={} to socket buffer",
-                            self.connection.peer_address(),
-                            frame.stream_id,
-                        );
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to write `Heartbeat` request bounded for {} to socket buffer. Cause: {:?}", 
-                            self.connection.peer_address(), e
-                        );
-                        if let Some(observer) = inflight_requests.remove(&frame.stream_id) {
-                            return Err(observer);
-                        }
-                    }
-                }
             }
 
             Request::ListRanges { .. } => {
                 frame.operation_code = OperationCode::ListRanges;
-                let header = request.into();
-                frame.header = Some(header);
-
-                match self.connection.write_frame(&frame).await {
-                    Ok(_) => {
-                        trace!(
-                            "Write `ListRange` request to {}, stream-id={}",
-                            self.connection.peer_address(),
-                            frame.stream_id,
-                        );
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failed to write `ListRange` request to {}. Cause: {:?}",
-                            self.connection.peer_address(),
-                            e
-                        );
-                        if let Some(observer) = inflight_requests.remove(&frame.stream_id) {
-                            return Err(observer);
-                        }
-                    }
-                }
             }
 
             Request::AllocateId { .. } => {
                 frame.operation_code = OperationCode::AllocateId;
-                let header = request.into();
-                frame.header = Some(header);
-                match self.connection.write_frame(&frame).await {
-                    Ok(_) => {
-                        trace!(
-                            "Write `AllocateId` request to {}, stream-id={}",
-                            self.connection.peer_address(),
-                            frame.stream_id
-                        );
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to write `AllocateId` request to network. Cause: {:?}",
-                            e
-                        );
-                        if let Some(observer) = inflight_requests.remove(&frame.stream_id) {
-                            return Err(observer);
-                        }
-                    }
-                }
             }
 
             Request::DescribePlacementManager { .. } => {
                 frame.operation_code = OperationCode::DescribePlacementManager;
-                let header = request.into();
-                frame.header = Some(header);
-                match self.connection.write_frame(&frame).await {
-                    Ok(_) => {
-                        trace!(
-                            "Write `DescribePlacementManager` request to {}, stream-id={}",
-                            self.connection.peer_address(),
-                            frame.stream_id
-                        );
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to write `DescribePlacementManager` request to network. Cause: {:?}", e
-                        );
-                        if let Some(observer) = inflight_requests.remove(&frame.stream_id) {
-                            return Err(observer);
-                        }
-                    }
-                }
+            }
+
+            Request::SealRange { .. } => {
+                frame.operation_code = OperationCode::SealRanges;
             }
         };
+
+        let inflight_requests = unsafe { &mut *self.inflight_requests.get() };
+        let context = InvocationContext::new(request, response_observer);
+        inflight_requests.insert(frame.stream_id, context);
+
+        // Write frame to network
+        match self.connection.write_frame(&frame).await {
+            Ok(_) => {
+                trace!(
+                    "Write request[opcode={}] bounded for {} using stream-id={} to socket buffer",
+                    frame.operation_code,
+                    self.connection.peer_address(),
+                    frame.stream_id,
+                );
+            }
+            Err(e) => {
+                error!(
+                    "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}", 
+                    frame.operation_code, self.connection.peer_address(), e
+                );
+                if let Some(ctx) = inflight_requests.remove(&frame.stream_id) {
+                    return Err(ctx);
+                }
+            }
+        }
 
         Ok(())
     }
@@ -486,10 +433,79 @@ impl Session {
         resp
     }
 
-    fn handle_response(
-        inflight: &mut HashMap<u32, oneshot::Sender<response::Response>>,
-        frame: Frame,
-    ) {
+    fn handle_seal_ranges_response(frame: &Frame, _ctx: &InvocationContext) -> response::Response {
+        let mut resp = response::Response::SealRange {
+            status: Status::decode(),
+            stream_id: -1,
+            range_index: -1,
+            start_offset: -1,
+            end_offset: None,
+        };
+
+        if frame.system_error() {
+            if let Some(ref buf) = frame.header {
+                match flatbuffers::root::<SystemErrorResponse>(buf) {
+                    Ok(response) => {
+                        let response = response.unpack();
+                        // Update status
+                        if let response::Response::SealRange { ref mut status, .. } = resp {
+                            *status = response.status.as_ref().into();
+                        }
+                    }
+                    Err(e) => {
+                        // Deserialize error
+                        warn!(
+                            "Failed to decode `SystemErrorResponse` using FlatBuffers. Cause: {}",
+                            e
+                        );
+                    }
+                }
+            }
+        } else if let Some(ref buf) = frame.header {
+            match flatbuffers::root::<SealRangesResponse>(buf) {
+                Ok(response) => {
+                    let response = response.unpack();
+                    if let response::Response::SealRange {
+                        ref mut stream_id,
+                        ref mut range_index,
+                        ref mut start_offset,
+                        ref mut end_offset,
+                        ref mut status,
+                    } = resp
+                    {
+                        if response.status.code == ErrorCode::OK {
+                            *status = Status::ok();
+                            debug_assert_eq!(
+                                response.results.len(),
+                                1,
+                                "SealRangesResponse should have exactly one result"
+                            );
+                            let result = &response.results[0];
+                            *stream_id = result.range.stream_id;
+                            *range_index = result.range.range_index as i32;
+                            *start_offset = result.range.start_offset;
+                            if result.range.end_offset >= 0 {
+                                *end_offset = Some(result.range.end_offset);
+                            } else {
+                                *end_offset = None;
+                            }
+                        } else {
+                            *status = response.status.as_ref().into();
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to decode SealRangesResponse using FlatBuffers. Cause: {}",
+                        e
+                    );
+                }
+            }
+        }
+        resp
+    }
+
+    fn handle_response(inflight: &mut HashMap<u32, InvocationContext>, frame: Frame) {
         let stream_id = frame.stream_id;
         trace!(
             "Received {} response for stream-id={}",
@@ -498,7 +514,7 @@ impl Session {
         );
 
         match inflight.remove(&stream_id) {
-            Some(sender) => {
+            Some(mut ctx) => {
                 let response = match frame.operation_code {
                     OperationCode::Heartbeat => Self::handle_heartbeat_response(&frame),
                     OperationCode::ListRanges => Self::handle_list_ranges_response(&frame),
@@ -517,10 +533,7 @@ impl Session {
                         warn!("Received an unexpected `Fetch` response");
                         return;
                     }
-                    OperationCode::SealRanges => {
-                        warn!("Received an unexpected `SealRanges` response");
-                        return;
-                    }
+                    OperationCode::SealRanges => Self::handle_seal_ranges_response(&frame, &ctx),
                     OperationCode::SyncRanges => {
                         warn!("Received an unexpected `SyncRanges` response");
                         return;
@@ -551,9 +564,7 @@ impl Session {
                         Self::handle_describe_placement_manager_response(&frame)
                     }
                 };
-                sender.send(response).unwrap_or_else(|response| {
-                    warn!("Failed to forward response to client: {:?}", response);
-                });
+                ctx.write_response(response);
             }
             None => {
                 warn!(
@@ -568,15 +579,25 @@ impl Session {
 impl Drop for Session {
     fn drop(&mut self) {
         let requests = unsafe { &mut *self.inflight_requests.get() };
-        requests.drain().for_each(|(_stream_id, sender)| {
+        requests.drain().for_each(|(_stream_id, mut ctx)| {
             let aborted_response = response::Response::ListRange {
                 status: Status::pm_internal("Aborted".to_owned()),
                 ranges: None,
             };
-            sender.send(aborted_response).unwrap_or_else(|_response| {
-                warn!("Failed to notify connection reset");
-            });
+            ctx.write_response(aborted_response);
         });
+    }
+}
+
+impl Clone for Session {
+    fn clone(&self) -> Self {
+        Self {
+            target: self.target,
+            config: Arc::clone(&self.config),
+            connection: Rc::clone(&self.connection),
+            inflight_requests: Rc::clone(&self.inflight_requests),
+            idle_since: Rc::clone(&self.idle_since),
+        }
     }
 }
 

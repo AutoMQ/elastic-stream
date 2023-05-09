@@ -337,18 +337,21 @@ table RangeId {
 }
 
 table SealRangesResponse {
-    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
+    status: Status (id: 0, required);
+
     // The responses of seal ranges request
-    seal_responses: [SealRangesResult] (id: 1);
-    status: Status (id: 2, required);
+    results: [SealRangesResult] (id: 1, required);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 2);
 }
 
 table SealRangesResult {
+    status: Status (id: 0, required);
+
     // Both the PM and the data node will handle the seal ranges request.
     // The data node returns the sealed range, while the PM returns the newly writable range.
-    range: Range (id: 0);
-    status: Status (id: 1, required);
+    range: Range (id: 1, required);
 }
 
 // The sync ranges request is used to sync newly writable ranges to accelerate the availability of a newly created writable range.

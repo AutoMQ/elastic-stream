@@ -10,9 +10,7 @@ pub struct AppendResponse {}
 pub struct ReadRequest {}
 
 #[derive(Debug)]
-pub struct ReadResponse {
-
-}
+pub struct ReadResponse {}
 
 #[derive(Debug)]
 pub(crate) enum Request {
@@ -22,6 +20,6 @@ pub(crate) enum Request {
     },
     Read {
         request: ReadRequest,
-        tx: oneshot::Sender<ReadResponse>
+        tx: oneshot::Sender<ReadResponse>,
     },
 }

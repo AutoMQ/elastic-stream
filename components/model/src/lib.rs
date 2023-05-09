@@ -10,6 +10,7 @@ pub mod range;
 pub mod range_criteria;
 pub mod record;
 pub mod request;
+pub mod response;
 pub mod status;
 pub mod stream;
 

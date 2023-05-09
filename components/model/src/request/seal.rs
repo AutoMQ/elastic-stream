@@ -1,6 +1,6 @@
 use protocol::rpc::header::{RangeIdT, SealRangeEntryT, SealType};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Kind {
     Unspecified,
     DataNode,
