@@ -51,7 +51,7 @@ impl<'a> SealRange<'a> {
         let mut manager = stream_manager.borrow_mut();
 
         let mut results = vec![];
-        for entry in request.entries.iter().flatten() {
+        for entry in request.entries.iter() {
             debug_assert_eq!(entry.type_, SealType::DATA_NODE);
             let mut result = SealRangeResultT::default();
             let mut status = StatusT::default();

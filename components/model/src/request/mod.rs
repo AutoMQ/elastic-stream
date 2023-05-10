@@ -107,7 +107,7 @@ impl From<&Request> for Bytes {
                 entry_t.renew = entry.renew;
 
                 let entries = vec![entry_t];
-                request.entries = Some(entries);
+                request.entries = entries;
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }

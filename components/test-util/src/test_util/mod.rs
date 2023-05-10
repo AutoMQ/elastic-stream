@@ -266,8 +266,8 @@ fn serve_seal_ranges(req: &SealRangesRequest, response_frame: &mut Frame) {
     status_ok.message = Some(String::from("OK"));
     response.status = Box::new(status_ok.clone());
 
-    if let Some(entries) = request.entries {
-        for entry in &entries {
+    if !request.entries.is_empty() {
+        for entry in &request.entries {
             let mut result = SealRangeResultT::default();
             result.status = Box::new(status_ok.clone());
             match entry.type_ {
@@ -315,7 +315,7 @@ fn serve_seal_ranges(req: &SealRangesRequest, response_frame: &mut Frame) {
         let mut status_bad_request = StatusT::default();
         status_bad_request.code = ErrorCode::BAD_REQUEST;
         status_bad_request.message = Some(String::from(
-            "end-offset should be -1 in case of data-node seal",
+            "Seal ranges request should contain at least one range",
         ));
         response.status = Box::new(status_bad_request);
     }
