@@ -370,17 +370,17 @@ func TestSealRanges(t *testing.T) {
 
 			// check seal response
 			re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code)
-			re.Len(resp.SealResponses, 1)
+			re.Len(resp.Results, 1)
 			if tt.want.wantErr {
-				re.Equal(tt.want.errCode, resp.SealResponses[0].Status.Code)
+				re.Equal(tt.want.errCode, resp.Results[0].Status.Code)
 			} else {
-				re.Equal(rpcfb.ErrorCodeOK, resp.SealResponses[0].Status.Code)
+				re.Equal(rpcfb.ErrorCodeOK, resp.Results[0].Status.Code)
 			}
 
-			if resp.SealResponses[0].Range != nil {
-				resp.SealResponses[0].Range.ReplicaNodes = nil // no need check replica nodes
+			if resp.Results[0].Range != nil {
+				resp.Results[0].Range.ReplicaNodes = nil // no need check replica nodes
 			}
-			re.Equal(tt.want.writableRange, resp.SealResponses[0].Range)
+			re.Equal(tt.want.writableRange, resp.Results[0].Range)
 
 			// list ranges
 			lReq := &protocol.ListRangesRequest{ListRangesRequestT: rpcfb.ListRangesRequestT{
@@ -444,14 +444,14 @@ func preSealRange(tb testing.TB, h *Handler, entry *rpcfb.SealRangeEntryT) {
 	h.SealRanges(req, resp)
 
 	re.Equal(resp.Status.Code, rpcfb.ErrorCodeOK)
-	re.Equal(resp.SealResponses[0].Status.Code, rpcfb.ErrorCodeOK)
+	re.Equal(resp.Results[0].Status.Code, rpcfb.ErrorCodeOK)
 	if entry.Renew {
-		resp.SealResponses[0].Range.ReplicaNodes = nil // no need check replica nodes
+		resp.Results[0].Range.ReplicaNodes = nil // no need check replica nodes
 		re.Equal(&rpcfb.RangeT{
 			StreamId:    entry.Range.StreamId,
 			RangeIndex:  entry.Range.RangeIndex + 1,
 			StartOffset: entry.End,
 			EndOffset:   -1,
-		}, resp.SealResponses[0].Range)
+		}, resp.Results[0].Range)
 	}
 }
