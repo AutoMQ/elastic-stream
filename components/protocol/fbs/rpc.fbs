@@ -95,8 +95,8 @@ table PlacementManagerNode {
     is_leader: bool (id: 2);
 }
 
-// The system error response is used to return the error code and error message if the system error flag of sbp is set.
-table SystemErrorResponse {
+// The system error is used to return the error code and error message if the system error flag of sbp is set.
+table SystemError {
     status: Status (id: 0, required);
 }
 
