@@ -30,13 +30,14 @@ func (l Logger) Get(ctx context.Context, k []byte) (v []byte, err error) {
 	return
 }
 
-func (l Logger) BatchGet(ctx context.Context, keys [][]byte) (kvs []KeyValue, err error) {
-	kvs, err = l.KV.BatchGet(ctx, keys)
+func (l Logger) BatchGet(ctx context.Context, keys [][]byte, inTxn bool) (kvs []KeyValue, err error) {
+	kvs, err = l.KV.BatchGet(ctx, keys, inTxn)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
 		logger = logger.With(traceutil.TraceLogField(ctx))
 		fields := []zap.Field{
+			zap.Bool("in-txn", inTxn),
 			zap.Error(err),
 		}
 		for i, key := range keys {
@@ -60,6 +61,7 @@ func (l Logger) GetByRange(ctx context.Context, r Range, limit int64, desc bool)
 			zap.ByteString("start-key", r.StartKey),
 			zap.ByteString("end-key", r.EndKey),
 			zap.Int64("limit", limit),
+			zap.Bool("desc", desc),
 			zap.Error(err),
 		}
 		for i, kv := range kvs {
@@ -81,14 +83,15 @@ func (l Logger) Put(ctx context.Context, k, v []byte, prevKV bool) (prevV []byte
 	return
 }
 
-func (l Logger) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool) (prevKvs []KeyValue, err error) {
-	prevKvs, err = l.KV.BatchPut(ctx, kvs, prevKV)
+func (l Logger) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn bool) (prevKvs []KeyValue, err error) {
+	prevKvs, err = l.KV.BatchPut(ctx, kvs, prevKV, inTxn)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
 		logger = logger.With(traceutil.TraceLogField(ctx))
 		fields := []zap.Field{
 			zap.Bool("prev-kv", prevKV),
+			zap.Bool("in-txn", inTxn),
 			zap.Error(err),
 		}
 		for i, kv := range kvs {
@@ -113,17 +116,18 @@ func (l Logger) Delete(ctx context.Context, k []byte, prevKV bool) (prevV []byte
 	return
 }
 
-func (l Logger) BatchDelete(ctx context.Context, ks [][]byte, prevKV bool) (prevKvs []KeyValue, err error) {
-	prevKvs, err = l.KV.BatchDelete(ctx, ks, prevKV)
+func (l Logger) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inTxn bool) (prevKvs []KeyValue, err error) {
+	prevKvs, err = l.KV.BatchDelete(ctx, keys, prevKV, inTxn)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
 		logger = logger.With(traceutil.TraceLogField(ctx))
 		fields := []zap.Field{
 			zap.Bool("prev-kv", prevKV),
+			zap.Bool("in-txn", inTxn),
 			zap.Error(err),
 		}
-		for i, k := range ks {
+		for i, k := range keys {
 			fields = append(fields, zap.ByteString(fmt.Sprintf("key-%d", i), k))
 		}
 		for i, kv := range prevKvs {

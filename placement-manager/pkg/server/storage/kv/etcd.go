@@ -30,6 +30,8 @@ import (
 var (
 	// ErrTxnFailed is the error when etcd transaction failed.
 	ErrTxnFailed = errors.New("etcd transaction failed")
+	// ErrTooManyTxnOps is the error when the number of operations in a transaction exceeds the limit.
+	ErrTooManyTxnOps = errors.New("too many txn operations")
 )
 
 // Etcd is a kv based on etcd.
@@ -78,12 +80,13 @@ func NewEtcd(param EtcdParam, lg *zap.Logger) *Etcd {
 	return e
 }
 
+// Get returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
 func (e *Etcd) Get(ctx context.Context, k []byte) ([]byte, error) {
 	if len(k) == 0 {
 		return nil, nil
 	}
 
-	kvs, err := e.BatchGet(ctx, [][]byte{k})
+	kvs, err := e.BatchGet(ctx, [][]byte{k}, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "kv get")
 	}
@@ -96,48 +99,65 @@ func (e *Etcd) Get(ctx context.Context, k []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (e *Etcd) BatchGet(ctx context.Context, keys [][]byte) ([]KeyValue, error) {
+// BatchGet returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
+// If inTxn is true, BatchGet returns ErrTooManyTxnOps if the number of keys exceeds EtcdParam.MaxTxnOps.
+func (e *Etcd) BatchGet(ctx context.Context, keys [][]byte, inTxn bool) ([]KeyValue, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
+	batchSize := int(e.maxTxnOps)
+	if inTxn && len(keys) > batchSize {
+		return nil, errors.Wrap(ErrTooManyTxnOps, "kv batch get")
+	}
 
-	ops := make([]clientv3.Op, 0, len(keys))
-	for _, k := range keys {
-		if len(k) == 0 {
-			continue
+	kvs := make([]KeyValue, 0, len(keys))
+
+	for i := 0; i < len(keys); i += batchSize {
+		end := i + batchSize
+		if end > len(keys) {
+			end = len(keys)
 		}
-		key := e.addPrefix(k)
-		ops = append(ops, clientv3.OpGet(string(key)))
-	}
+		batchKeys := keys[i:end]
 
-	txn := e.newTxnFunc(ctx).Then(ops...)
-	resp, err := txn.Commit()
-	if err != nil {
-		return nil, errors.Wrap(err, "kv batch get")
-	}
-	if !resp.Succeeded {
-		return nil, errors.Wrap(ErrTxnFailed, "kv batch get")
-	}
-
-	kvs := make([]KeyValue, 0, len(resp.Responses))
-	for _, resp := range resp.Responses {
-		rangeResp := resp.GetResponseRange()
-		if rangeResp == nil {
-			continue
-		}
-		for _, kv := range rangeResp.Kvs {
-			if !e.hasPrefix(kv.Key) {
+		ops := make([]clientv3.Op, 0, len(batchKeys))
+		for _, k := range batchKeys {
+			if len(k) == 0 {
 				continue
 			}
-			kvs = append(kvs, KeyValue{
-				Key:   e.trimPrefix(kv.Key),
-				Value: kv.Value,
-			})
+			key := e.addPrefix(k)
+			ops = append(ops, clientv3.OpGet(string(key)))
+		}
+
+		txn := e.newTxnFunc(ctx).Then(ops...)
+		resp, err := txn.Commit()
+		if err != nil {
+			return nil, errors.Wrap(err, "kv batch get")
+		}
+		if !resp.Succeeded {
+			return nil, errors.Wrap(ErrTxnFailed, "kv batch get")
+		}
+
+		for _, resp := range resp.Responses {
+			rangeResp := resp.GetResponseRange()
+			if rangeResp == nil {
+				continue
+			}
+			for _, kv := range rangeResp.Kvs {
+				if !e.hasPrefix(kv.Key) {
+					continue
+				}
+				kvs = append(kvs, KeyValue{
+					Key:   e.trimPrefix(kv.Key),
+					Value: kv.Value,
+				})
+			}
 		}
 	}
+
 	return kvs, nil
 }
 
+// GetByRange returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
 func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) ([]KeyValue, error) {
 	if len(r.StartKey) == 0 {
 		return nil, nil
@@ -189,12 +209,13 @@ func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) 
 	return kvs, nil
 }
 
+// Put returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
 func (e *Etcd) Put(ctx context.Context, k, v []byte, prevKV bool) ([]byte, error) {
 	if len(k) == 0 {
 		return nil, nil
 	}
 
-	prevKvs, err := e.BatchPut(ctx, []KeyValue{{Key: k, Value: v}}, prevKV)
+	prevKvs, err := e.BatchPut(ctx, []KeyValue{{Key: k, Value: v}}, prevKV, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "kv put")
 	}
@@ -211,60 +232,79 @@ func (e *Etcd) Put(ctx context.Context, k, v []byte, prevKV bool) ([]byte, error
 	return nil, nil
 }
 
-// BatchPut returns ErrTxnFailed if transaction failed.
-func (e *Etcd) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool) ([]KeyValue, error) {
+// BatchPut returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
+// If inTxn is true, BatchPut returns ErrTooManyTxnOps if the number of kvs exceeds EtcdParam.MaxTxnOps.
+func (e *Etcd) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn bool) ([]KeyValue, error) {
 	if len(kvs) == 0 {
 		return nil, nil
 	}
+	batchSize := int(e.maxTxnOps)
+	if inTxn && len(kvs) > batchSize {
+		return nil, errors.Wrap(ErrTooManyTxnOps, "kv batch put")
+	}
 
-	ops := make([]clientv3.Op, 0, len(kvs))
-	var opts []clientv3.OpOption
+	var prevKvs []KeyValue
 	if prevKV {
-		opts = append(opts, clientv3.WithPrevKV())
-	}
-	for _, kv := range kvs {
-		if len(kv.Key) == 0 {
-			continue
-		}
-		key := e.addPrefix(kv.Key)
-		ops = append(ops, clientv3.OpPut(string(key), string(kv.Value), opts...))
+		prevKvs = make([]KeyValue, 0, len(kvs))
 	}
 
-	txn := e.newTxnFunc(ctx).Then(ops...)
-	resp, err := txn.Commit()
-	if err != nil {
-		return nil, errors.Wrap(err, "kv batch put")
-	}
-	if !resp.Succeeded {
-		return nil, errors.Wrap(ErrTxnFailed, "kv batch put")
+	for i := 0; i < len(kvs); i += batchSize {
+		end := i + batchSize
+		if end > len(kvs) {
+			end = len(kvs)
+		}
+		batchKvs := kvs[i:end]
+
+		ops := make([]clientv3.Op, 0, len(batchKvs))
+		var opts []clientv3.OpOption
+		if prevKV {
+			opts = append(opts, clientv3.WithPrevKV())
+		}
+		for _, kv := range batchKvs {
+			if len(kv.Key) == 0 {
+				continue
+			}
+			key := e.addPrefix(kv.Key)
+			ops = append(ops, clientv3.OpPut(string(key), string(kv.Value), opts...))
+		}
+
+		txn := e.newTxnFunc(ctx).Then(ops...)
+		resp, err := txn.Commit()
+		if err != nil {
+			return nil, errors.Wrap(err, "kv batch put")
+		}
+		if !resp.Succeeded {
+			return nil, errors.Wrap(ErrTxnFailed, "kv batch put")
+		}
+
+		if !prevKV {
+			continue
+		}
+		for _, resp := range resp.Responses {
+			putResp := resp.GetResponsePut()
+			if putResp.PrevKv == nil {
+				continue
+			}
+			if !e.hasPrefix(putResp.PrevKv.Key) {
+				continue
+			}
+			prevKvs = append(prevKvs, KeyValue{
+				Key:   e.trimPrefix(putResp.PrevKv.Key),
+				Value: putResp.PrevKv.Value,
+			})
+		}
 	}
 
-	if !prevKV {
-		return nil, nil
-	}
-	prevKvs := make([]KeyValue, 0, len(resp.Responses))
-	for _, resp := range resp.Responses {
-		putResp := resp.GetResponsePut()
-		if putResp.PrevKv == nil {
-			continue
-		}
-		if !e.hasPrefix(putResp.PrevKv.Key) {
-			continue
-		}
-		prevKvs = append(prevKvs, KeyValue{
-			Key:   e.trimPrefix(putResp.PrevKv.Key),
-			Value: putResp.PrevKv.Value,
-		})
-	}
 	return prevKvs, nil
 }
 
+// Delete returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
 func (e *Etcd) Delete(ctx context.Context, k []byte, prevKV bool) ([]byte, error) {
 	if len(k) == 0 {
 		return nil, nil
 	}
 
-	prevKvs, err := e.BatchDelete(ctx, [][]byte{k}, prevKV)
+	prevKvs, err := e.BatchDelete(ctx, [][]byte{k}, prevKV, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "kv delete")
 	}
@@ -280,50 +320,68 @@ func (e *Etcd) Delete(ctx context.Context, k []byte, prevKV bool) ([]byte, error
 	return nil, nil
 }
 
-// BatchDelete returns ErrTxnFailed if transaction failed.
-func (e *Etcd) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool) ([]KeyValue, error) {
+// BatchDelete returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
+// If inTxn is true, BatchDelete returns ErrTooManyTxnOps if the number of keys exceeds EtcdParam.MaxTxnOps.
+func (e *Etcd) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inTxn bool) ([]KeyValue, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
+	batchSize := int(e.maxTxnOps)
+	if inTxn && len(keys) > batchSize {
+		return nil, errors.Wrap(ErrTooManyTxnOps, "kv batch delete")
+	}
 
-	ops := make([]clientv3.Op, 0, len(keys))
-	var opts []clientv3.OpOption
+	var prevKvs []KeyValue
 	if prevKV {
-		opts = append(opts, clientv3.WithPrevKV())
+		prevKvs = make([]KeyValue, 0, len(keys))
 	}
-	for _, k := range keys {
-		if len(k) == 0 {
-			continue
+
+	for i := 0; i < len(keys); i += batchSize {
+		end := i + batchSize
+		if end > len(keys) {
+			end = len(keys)
 		}
-		key := e.addPrefix(k)
-		ops = append(ops, clientv3.OpDelete(string(key), opts...))
-	}
+		batchKeys := keys[i:end]
 
-	txn := e.newTxnFunc(ctx).Then(ops...)
-	resp, err := txn.Commit()
-	if err != nil {
-		return nil, errors.Wrap(err, "kv batch delete")
-	}
-	if !resp.Succeeded {
-		return nil, errors.Wrap(ErrTxnFailed, "kv batch delete")
-	}
-
-	if !prevKV {
-		return nil, nil
-	}
-	prevKvs := make([]KeyValue, 0, len(resp.Responses))
-	for _, resp := range resp.Responses {
-		deleteResp := resp.GetResponseDeleteRange()
-		for _, kv := range deleteResp.PrevKvs {
-			if !e.hasPrefix(kv.Key) {
+		ops := make([]clientv3.Op, 0, len(batchKeys))
+		var opts []clientv3.OpOption
+		if prevKV {
+			opts = append(opts, clientv3.WithPrevKV())
+		}
+		for _, k := range batchKeys {
+			if len(k) == 0 {
 				continue
 			}
-			prevKvs = append(prevKvs, KeyValue{
-				Key:   e.trimPrefix(kv.Key),
-				Value: kv.Value,
-			})
+			key := e.addPrefix(k)
+			ops = append(ops, clientv3.OpDelete(string(key), opts...))
+		}
+
+		txn := e.newTxnFunc(ctx).Then(ops...)
+		resp, err := txn.Commit()
+		if err != nil {
+			return nil, errors.Wrap(err, "kv batch delete")
+		}
+		if !resp.Succeeded {
+			return nil, errors.Wrap(ErrTxnFailed, "kv batch delete")
+		}
+
+		if !prevKV {
+			continue
+		}
+		for _, resp := range resp.Responses {
+			deleteResp := resp.GetResponseDeleteRange()
+			for _, kv := range deleteResp.PrevKvs {
+				if !e.hasPrefix(kv.Key) {
+					continue
+				}
+				prevKvs = append(prevKvs, KeyValue{
+					Key:   e.trimPrefix(kv.Key),
+					Value: kv.Value,
+				})
+			}
 		}
 	}
+
 	return prevKvs, nil
 }
 

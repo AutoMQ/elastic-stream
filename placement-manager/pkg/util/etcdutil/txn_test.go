@@ -62,7 +62,7 @@ func TestNormalTxn(t *testing.T) {
 	t.Parallel()
 	re := require.New(t)
 
-	_, client, closeFunc := testutil.StartEtcd(t)
+	_, client, closeFunc := testutil.StartEtcd(t, nil)
 	defer closeFunc()
 
 	txn := NewTxn(context.Background(), client, zap.NewNop())

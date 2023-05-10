@@ -11,11 +11,13 @@ import (
 	"go.uber.org/zap"
 )
 
-func StartEtcd(tb testing.TB) (*embed.Etcd, *clientv3.Client, func()) {
+func StartEtcd(tb testing.TB, cfg *embed.Config) (*embed.Etcd, *clientv3.Client, func()) {
 	re := require.New(tb)
 
 	// start etcd
-	cfg := NewEtcdConfig(tb)
+	if cfg == nil {
+		cfg = NewEtcdConfig(tb)
+	}
 	etcd, err := embed.StartEtcd(cfg)
 	re.NoError(err)
 

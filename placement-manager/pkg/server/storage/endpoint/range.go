@@ -110,7 +110,7 @@ func (e *Endpoint) GetRanges(ctx context.Context, rangeIDs []*rpcfb.RangeIdT) ([
 		keys[i] = rangePathInSteam(rangeID.StreamId, rangeID.RangeIndex)
 	}
 
-	kvs, err := e.BatchGet(ctx, keys)
+	kvs, err := e.BatchGet(ctx, keys, false)
 	if err != nil {
 		logger.Error("failed to get ranges", zap.Error(err))
 		return nil, errors.Wrap(err, "get ranges")

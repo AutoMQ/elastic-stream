@@ -45,7 +45,8 @@ type KV interface {
 	// BatchGet retrieves the values associated with the given keys.
 	// If the key does not exist, BatchGet returns no error.
 	// Any empty key will be ignored.
-	BatchGet(ctx context.Context, keys [][]byte) ([]KeyValue, error)
+	// If inTxn is true, BatchGet will try to get all keys in a single transaction.
+	BatchGet(ctx context.Context, keys [][]byte, inTxn bool) ([]KeyValue, error)
 
 	// GetByRange retrieves a list of key-value pairs whose keys fall within the given range (r)
 	// and limits the number of results returned to "limit".
@@ -64,7 +65,8 @@ type KV interface {
 	// If the key already exists, BatchPut overwrites the existing value.
 	// Any empty key will be ignored.
 	// If prevKV is true, the old key-value pairs (if any) will be returned.
-	BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool) ([]KeyValue, error)
+	// If inTxn is true, BatchPut will try to put all keys in a single transaction.
+	BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn bool) ([]KeyValue, error)
 
 	// Delete removes the key-value pair associated with the given key.
 	// If the key is empty, Delete does nothing and returns no error.
@@ -76,7 +78,8 @@ type KV interface {
 	// If the key does not exist, BatchDelete returns no error.
 	// Any empty key will be ignored.
 	// If prevKV is true, the old key-value pairs (if any) will be returned.
-	BatchDelete(ctx context.Context, keys [][]byte, prevKV bool) ([]KeyValue, error)
+	// If inTxn is true, BatchDelete will try to delete all keys in a single transaction.
+	BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inTxn bool) ([]KeyValue, error)
 
 	// GetPrefixRangeEnd returns the end key for a prefix range query.
 	GetPrefixRangeEnd(prefix []byte) []byte

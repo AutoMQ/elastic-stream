@@ -90,7 +90,7 @@ func startSbpHandler(tb testing.TB, sbpClient sbpClient.Client, isLeader bool) (
 		sbpClient = mockSbpClient{}
 	}
 
-	_, client, closeFunc := testutil.StartEtcd(tb)
+	_, client, closeFunc := testutil.StartEtcd(tb, nil)
 
 	var server cluster.Server
 	server = &mockServer{kv: client, sbpClient: sbpClient}

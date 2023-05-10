@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 func TestEtcdAllocator_Alloc(t *testing.T) {
 	t.Parallel()
 
-	_, client, closeFunc := testutil.StartEtcd(t)
+	_, client, closeFunc := testutil.StartEtcd(t, nil)
 	defer closeFunc()
 
 	// run twice to test the allocator can recover from the previous allocation
@@ -67,7 +67,7 @@ func testEtcdAlloc(t *testing.T, kv clientv3.KV) (start, end uint64) {
 func TestEtcdAllocator_AllocN(t *testing.T) {
 	t.Parallel()
 
-	_, client, closeFunc := testutil.StartEtcd(t)
+	_, client, closeFunc := testutil.StartEtcd(t, nil)
 	defer closeFunc()
 
 	// run twice to test the allocator can recover from the previous allocation
@@ -122,7 +122,7 @@ func TestEtcdAllocator_Reset(t *testing.T) {
 	t.Parallel()
 	re := require.New(t)
 
-	_, client, closeFunc := testutil.StartEtcd(t)
+	_, client, closeFunc := testutil.StartEtcd(t, nil)
 	defer closeFunc()
 
 	allocator := NewEtcdAllocator(&EtcdAllocatorParam{

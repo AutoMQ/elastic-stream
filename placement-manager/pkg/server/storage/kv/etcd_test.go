@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/server/v3/embed"
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
 
@@ -85,7 +86,7 @@ func TestEtcd_Get(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
-			_, client, closeFunc := testutil.StartEtcd(t)
+			_, client, closeFunc := testutil.StartEtcd(t, nil)
 			defer closeFunc()
 
 			etcd := NewEtcd(EtcdParam{
@@ -117,9 +118,11 @@ func TestEtcd_Get(t *testing.T) {
 func TestEtcd_BatchGet(t *testing.T) {
 	type fields struct {
 		newCmpFunc func() clientv3.Cmp
+		maxTxnOps  uint
 	}
 	type args struct {
-		keys [][]byte
+		keys  [][]byte
+		inTxn bool
 	}
 	tests := []struct {
 		name    string
@@ -182,19 +185,60 @@ func TestEtcd_BatchGet(t *testing.T) {
 			wantErr: true,
 			errMsg:  "etcd transaction failed",
 		},
+		{
+			name: "get in multiple transactions",
+			preset: map[string]string{
+				"/test/key1": "val1",
+				"/test/key2": "val2",
+			},
+			fields: fields{
+				maxTxnOps: 1,
+			},
+			args: args{keys: [][]byte{
+				[]byte("key1"),
+				[]byte("key2"),
+			}},
+			want: []KeyValue{
+				{Key: []byte("key1"), Value: []byte("val1")},
+				{Key: []byte("key2"), Value: []byte("val2")},
+			},
+		},
+		{
+			name: "get when exceeding maxTxnOps",
+			preset: map[string]string{
+				"/test/key1": "val1",
+				"/test/key2": "val2",
+			},
+			fields: fields{
+				maxTxnOps: 1,
+			},
+			args: args{keys: [][]byte{
+				[]byte("key1"),
+				[]byte("key2"),
+			}, inTxn: true},
+			wantErr: true,
+			errMsg:  "too many txn operations",
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
-			_, client, closeFunc := testutil.StartEtcd(t)
+
+			var cfg *embed.Config
+			if tt.fields.maxTxnOps != 0 {
+				cfg = testutil.NewEtcdConfig(t)
+				cfg.MaxTxnOps = tt.fields.maxTxnOps
+			}
+			_, client, closeFunc := testutil.StartEtcd(t, cfg)
 			defer closeFunc()
 
 			etcd := NewEtcd(EtcdParam{
-				KV:       client,
-				RootPath: "/test",
-				CmpFunc:  tt.fields.newCmpFunc,
+				KV:        client,
+				RootPath:  "/test",
+				CmpFunc:   tt.fields.newCmpFunc,
+				MaxTxnOps: tt.fields.maxTxnOps,
 			}, zap.NewNop())
 
 			// prepare
@@ -205,7 +249,7 @@ func TestEtcd_BatchGet(t *testing.T) {
 			}
 
 			// run
-			got, err := etcd.BatchGet(context.Background(), tt.args.keys)
+			got, err := etcd.BatchGet(context.Background(), tt.args.keys, tt.args.inTxn)
 
 			// check
 			if tt.wantErr {
@@ -303,7 +347,7 @@ func TestEtcd_GetByRange(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
-			_, client, closeFunc := testutil.StartEtcd(t)
+			_, client, closeFunc := testutil.StartEtcd(t, nil)
 			defer closeFunc()
 
 			etcd := NewEtcd(EtcdParam{
@@ -462,7 +506,7 @@ func TestEtcd_Put(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
-			_, client, closeFunc := testutil.StartEtcd(t)
+			_, client, closeFunc := testutil.StartEtcd(t, nil)
 			defer closeFunc()
 
 			etcd := NewEtcd(EtcdParam{
@@ -500,10 +544,12 @@ func TestEtcd_Put(t *testing.T) {
 func TestEtcd_BatchPut(t *testing.T) {
 	type fields struct {
 		newCmpFunc func() clientv3.Cmp
+		maxTxnOps  uint
 	}
 	type args struct {
 		kvs    []KeyValue
 		prevKV bool
+		inTxn  bool
 	}
 	tests := []struct {
 		name    string
@@ -694,19 +740,93 @@ func TestEtcd_BatchPut(t *testing.T) {
 			wantErr: true,
 			errMsg:  "etcd transaction failed",
 		},
+		{
+			name: "put in multiple transactions",
+			preset: map[string]string{
+				"/test/key1": "val1",
+				"/test/key2": "val2",
+			},
+			fields: fields{
+				maxTxnOps: 1,
+			},
+			args: args{
+				kvs: []KeyValue{
+					{
+						Key:   []byte("key1"),
+						Value: []byte("val10"),
+					},
+					{
+						Key:   []byte("key2"),
+						Value: []byte("val20"),
+					},
+				},
+				prevKV: true,
+			},
+			want: []KeyValue{
+				{
+					Key:   []byte("key1"),
+					Value: []byte("val1"),
+				},
+				{
+					Key:   []byte("key2"),
+					Value: []byte("val2"),
+				},
+			},
+			after: map[string]string{
+				"/test/key1": "val10",
+				"/test/key2": "val20",
+			},
+		},
+		{
+			name: "put when exceeding maxTxnOps",
+			preset: map[string]string{
+				"/test/key1": "val1",
+				"/test/key2": "val2",
+			},
+			fields: fields{
+				maxTxnOps: 1,
+			},
+			args: args{
+				kvs: []KeyValue{
+					{
+						Key:   []byte("key1"),
+						Value: []byte("val10"),
+					},
+					{
+						Key:   []byte("key2"),
+						Value: []byte("val20"),
+					},
+				},
+				prevKV: true,
+				inTxn:  true,
+			},
+			wantErr: true,
+			errMsg:  "too many txn operations",
+			after: map[string]string{
+				"/test/key1": "val1",
+				"/test/key2": "val2",
+			},
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
-			_, client, closeFunc := testutil.StartEtcd(t)
+
+			var cfg *embed.Config
+			if tt.fields.maxTxnOps != 0 {
+				cfg = testutil.NewEtcdConfig(t)
+				cfg.MaxTxnOps = tt.fields.maxTxnOps
+			}
+			_, client, closeFunc := testutil.StartEtcd(t, cfg)
 			defer closeFunc()
 
 			etcd := NewEtcd(EtcdParam{
-				KV:       client,
-				RootPath: "/test",
-				CmpFunc:  tt.fields.newCmpFunc,
+				KV:        client,
+				RootPath:  "/test",
+				CmpFunc:   tt.fields.newCmpFunc,
+				MaxTxnOps: tt.fields.maxTxnOps,
 			}, zap.NewNop())
 
 			// prepare
@@ -717,7 +837,7 @@ func TestEtcd_BatchPut(t *testing.T) {
 			}
 
 			// run
-			got, err := etcd.BatchPut(context.Background(), tt.args.kvs, tt.args.prevKV)
+			got, err := etcd.BatchPut(context.Background(), tt.args.kvs, tt.args.prevKV, tt.args.inTxn)
 
 			// check
 			if tt.wantErr {
@@ -820,7 +940,7 @@ func TestEtcd_Delete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
-			_, client, closeFunc := testutil.StartEtcd(t)
+			_, client, closeFunc := testutil.StartEtcd(t, nil)
 			defer closeFunc()
 
 			etcd := NewEtcd(EtcdParam{
@@ -858,10 +978,12 @@ func TestEtcd_Delete(t *testing.T) {
 func TestEtcd_BatchDelete(t *testing.T) {
 	type fields struct {
 		newCmpFunc func() clientv3.Cmp
+		maxTxnOps  uint
 	}
 	type args struct {
 		keys   [][]byte
 		prevKV bool
+		inTxn  bool
 	}
 	tests := []struct {
 		name    string
@@ -978,19 +1100,72 @@ func TestEtcd_BatchDelete(t *testing.T) {
 			wantErr: true,
 			errMsg:  "etcd transaction failed",
 		},
+		{
+			name: "delete in multiple transactions",
+			preset: map[string]string{
+				"/test/key1": "val1",
+				"/test/key2": "val2",
+			},
+			fields: fields{
+				maxTxnOps: 1,
+			},
+			args: args{
+				keys:   [][]byte{[]byte("key1"), []byte("key2")},
+				prevKV: true,
+			},
+			want: []KeyValue{
+				{
+					Key:   []byte("key1"),
+					Value: []byte("val1"),
+				},
+				{
+					Key:   []byte("key2"),
+					Value: []byte("val2"),
+				},
+			},
+			after: map[string]string{},
+		},
+		{
+			name: "delete when exceeding maxTxnOps",
+			preset: map[string]string{
+				"/test/key1": "val1",
+				"/test/key2": "val2",
+			},
+			fields: fields{
+				maxTxnOps: 1,
+			},
+			args: args{
+				keys:   [][]byte{[]byte("key1"), []byte("key2")},
+				prevKV: true,
+				inTxn:  true,
+			},
+			wantErr: true,
+			errMsg:  "too many txn operations",
+			after: map[string]string{
+				"/test/key1": "val1",
+				"/test/key2": "val2",
+			},
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
-			_, client, closeFunc := testutil.StartEtcd(t)
+
+			var cfg *embed.Config
+			if tt.fields.maxTxnOps != 0 {
+				cfg = testutil.NewEtcdConfig(t)
+				cfg.MaxTxnOps = tt.fields.maxTxnOps
+			}
+			_, client, closeFunc := testutil.StartEtcd(t, cfg)
 			defer closeFunc()
 
 			etcd := NewEtcd(EtcdParam{
-				KV:       client,
-				RootPath: "/test",
-				CmpFunc:  tt.fields.newCmpFunc,
+				KV:        client,
+				RootPath:  "/test",
+				CmpFunc:   tt.fields.newCmpFunc,
+				MaxTxnOps: tt.fields.maxTxnOps,
 			}, zap.NewNop())
 
 			// prepare
@@ -1001,7 +1176,7 @@ func TestEtcd_BatchDelete(t *testing.T) {
 			}
 
 			// run
-			got, err := etcd.BatchDelete(context.Background(), tt.args.keys, tt.args.prevKV)
+			got, err := etcd.BatchDelete(context.Background(), tt.args.keys, tt.args.prevKV, tt.args.inTxn)
 
 			// check
 			if tt.wantErr {

@@ -69,7 +69,7 @@ func (e *Endpoint) CreateStreams(ctx context.Context, params []*CreateStreamPara
 		})
 	}
 
-	prevKvs, err := e.BatchPut(ctx, kvs, true)
+	prevKvs, err := e.BatchPut(ctx, kvs, true, true)
 	for _, keyValue := range kvs {
 		if keyValue.Value != nil {
 			mcache.Free(keyValue.Value)
@@ -99,7 +99,7 @@ func (e *Endpoint) DeleteStreams(ctx context.Context, streamIDs []int64) ([]*rpc
 	for _, streamID := range streamIDs {
 		streamPaths = append(streamPaths, streamPath(streamID))
 	}
-	prevKvs, err := e.BatchDelete(ctx, streamPaths, true)
+	prevKvs, err := e.BatchDelete(ctx, streamPaths, true, true)
 	if err != nil {
 		logger.Error("failed to delete stream", zap.Error(err))
 		return nil, errors.Wrap(err, "delete stream")
@@ -133,7 +133,7 @@ func (e *Endpoint) UpdateStreams(ctx context.Context, streams []*rpcfb.StreamT) 
 		})
 	}
 
-	prevKvs, err := e.BatchPut(ctx, kvs, true)
+	prevKvs, err := e.BatchPut(ctx, kvs, true, true)
 	for _, keyValue := range kvs {
 		mcache.Free(keyValue.Value)
 	}
@@ -179,7 +179,7 @@ func (e *Endpoint) GetStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.
 		keys[i] = streamPath(streamID)
 	}
 
-	kvs, err := e.BatchGet(ctx, keys)
+	kvs, err := e.BatchGet(ctx, keys, false)
 	if err != nil {
 		logger.Error("failed to get streams", zap.Int64s("stream-ids", streamIDs), zap.Error(err))
 		return nil, errors.Wrap(err, "get streams")
