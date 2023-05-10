@@ -10,7 +10,8 @@ use protocol::rpc::header::{
     DescribePlacementManagerClusterRequest, DescribePlacementManagerClusterResponseT, ErrorCode,
     HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
     ListRangesRequest, ListRangesResponseT, ListRangesResultT, PlacementManagerClusterT,
-    PlacementManagerNodeT, RangeT, SealRangeResultT, SealRangesRequest, StatusT,
+    PlacementManagerNodeT, RangeT, SealRangeResultT, SealRangesRequest, SealRangesResponseT,
+    SealType, StatusT,
 };
 
 use tokio::sync::oneshot;
@@ -258,22 +259,73 @@ pub async fn run_listener() -> u16 {
 
 fn serve_seal_ranges(req: &SealRangesRequest, response_frame: &mut Frame) {
     let request = req.unpack();
+
+    let mut response = SealRangesResponseT::default();
+    let mut status_ok = StatusT::default();
+    status_ok.code = ErrorCode::OK;
+    status_ok.message = Some(String::from("OK"));
+    response.status = Box::new(status_ok.clone());
+
     if let Some(entries) = request.entries {
-        info!("Seal ranges: {:?}", entries);
-        debug_assert_eq!(1, entries.len());
-        let entry = &entries[0];
-        let mut result = SealRangeResultT::default();
-        let mut status = StatusT::default();
-        status.code = ErrorCode::OK;
-        status.message = Some(String::from("OK"));
-        result.status = Box::new(status);
-        let mut range = RangeT::default();
-        range.stream_id = entry.range.stream_id;
-        range.range_index = entry.range.range_index;
-        result.range = Some(Box::new(range));
+        for entry in &entries {
+            let mut result = SealRangeResultT::default();
+            result.status = Box::new(status_ok.clone());
+            match entry.type_ {
+                SealType::DATA_NODE => {
+                    if entry.range.end_offset != -1 {
+                        let mut status_bad_request = StatusT::default();
+                        status_bad_request.code = ErrorCode::BAD_REQUEST;
+                        status_bad_request.message = Some(String::from(
+                            "end-offset should be -1 in case of data-node seal",
+                        ));
+                        result.status = Box::new(status_bad_request);
+                        response.results.push(result);
+                        continue;
+                    }
+                }
+
+                SealType::PLACEMENT_MANAGER => {
+                    if entry.range.end_offset < 0 {
+                        let mut status_bad_request = StatusT::default();
+                        status_bad_request.code = ErrorCode::BAD_REQUEST;
+                        status_bad_request.message = Some(String::from(
+                            "end-offset should be non-negative in case of placement manager seal",
+                        ));
+                        result.status = Box::new(status_bad_request);
+                        response.results.push(result);
+                        continue;
+                    }
+                }
+
+                _ => {
+                    let mut status_bad_request = StatusT::default();
+                    status_bad_request.code = ErrorCode::BAD_REQUEST;
+                    status_bad_request.message = Some(String::from("Unsupported seal type"));
+                    result.status = Box::new(status_bad_request);
+                    response.results.push(result);
+                    continue;
+                }
+            };
+            let mut range = entry.range.clone();
+            range.end_offset = 100;
+            result.range = Some(range);
+            response.results.push(result);
+        }
     } else {
-        warn!("No ranges to seal");
+        let mut status_bad_request = StatusT::default();
+        status_bad_request.code = ErrorCode::BAD_REQUEST;
+        status_bad_request.message = Some(String::from(
+            "end-offset should be -1 in case of data-node seal",
+        ));
+        response.status = Box::new(status_bad_request);
     }
+
+    let mut builder = flatbuffers::FlatBufferBuilder::new();
+    let resp = response.pack(&mut builder);
+    builder.finish(resp, None);
+    let data = builder.finished_data();
+    response_frame.flag_response();
+    response_frame.header = Some(Bytes::copy_from_slice(data));
 }
 
 fn allocate_id(request: &IdAllocationRequest, response_frame: &mut Frame) {
