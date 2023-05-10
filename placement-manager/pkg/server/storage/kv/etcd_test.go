@@ -218,6 +218,121 @@ func TestEtcd_BatchGet(t *testing.T) {
 	}
 }
 
+func TestEtcd_GetByRange(t *testing.T) {
+	type fields struct {
+		newCmpFunc func() clientv3.Cmp
+	}
+	type args struct {
+		r     Range
+		limit int64
+		desc  bool
+	}
+	tests := []struct {
+		name    string
+		preset  map[string]string
+		fields  fields
+		args    args
+		want    []KeyValue
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:   "get keys",
+			preset: map[string]string{"/test/key1": "val1", "/test/key2": "val2", "/test/key3": "val3"},
+			args: args{
+				r: Range{[]byte("key1"), []byte("key3")},
+			},
+			want: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}, {Key: []byte("key2"), Value: []byte("val2")}},
+		},
+		{
+			name:   "get keys with prefix",
+			preset: map[string]string{"/test/key1": "val1", "/test/key2": "val2", "/test/key3": "val3"},
+			args: args{
+				r: Range{[]byte("key"), []byte(clientv3.GetPrefixRangeEnd("key"))},
+			},
+			want: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}, {Key: []byte("key2"), Value: []byte("val2")}, {Key: []byte("key3"), Value: []byte("val3")}},
+		},
+		{
+			name:   "get keys with limit",
+			preset: map[string]string{"/test/key1": "val1", "/test/key2": "val2", "/test/key3": "val3"},
+			args: args{
+				r:     Range{[]byte("key1"), []byte("key3")},
+				limit: 1,
+			},
+			want: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}},
+		},
+		{
+			name:   "get keys with desc",
+			preset: map[string]string{"/test/key1": "val1", "/test/key2": "val2", "/test/key3": "val3"},
+			args: args{
+				r:    Range{[]byte("key1"), []byte("key3")},
+				desc: true,
+			},
+			want: []KeyValue{{Key: []byte("key2"), Value: []byte("val2")}, {Key: []byte("key1"), Value: []byte("val1")}},
+		},
+
+		{
+			name:   "end key greater than start key",
+			preset: map[string]string{"/test/key1": "val1", "/test/key2": "val2", "/test/key3": "val3"},
+			args: args{
+				r: Range{[]byte("key3"), []byte("key1")},
+			},
+			want: []KeyValue{},
+		},
+		{
+			name:   "get keys with empty range",
+			preset: map[string]string{"/test/key1": "val1", "/test/key2": "val2", "/test/key3": "val3"},
+			args: args{
+				r: Range{[]byte(""), []byte("")},
+			},
+			want: nil,
+		},
+		{
+			name:   "get when transaction failed",
+			preset: map[string]string{"/test/key1": "val1", "/test/key2": "val2", "/test/key3": "val3"},
+			fields: fields{newCmpFunc: alwaysFailedTxnFunc},
+			args: args{
+				r: Range{[]byte("key1"), []byte("key3")},
+			},
+			wantErr: true,
+			errMsg:  "etcd transaction failed",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			re := require.New(t)
+			_, client, closeFunc := testutil.StartEtcd(t)
+			defer closeFunc()
+
+			etcd := NewEtcd(EtcdParam{
+				KV:       client,
+				RootPath: "/test",
+				CmpFunc:  tt.fields.newCmpFunc,
+			}, zap.NewNop())
+
+			// prepare
+			kv := client.KV
+			for k, v := range tt.preset {
+				_, err := kv.Put(context.Background(), k, v)
+				re.NoError(err)
+			}
+
+			// run
+			got, err := etcd.GetByRange(context.Background(), tt.args.r, tt.args.limit, tt.args.desc)
+
+			// check
+			if tt.wantErr {
+				re.ErrorContains(err, tt.errMsg)
+			} else {
+				re.NoError(err)
+				re.Equal(tt.want, got)
+			}
+		})
+	}
+}
+
 func TestEtcd_Put(t *testing.T) {
 	type args struct {
 		key    []byte
