@@ -8,6 +8,7 @@ import (
 
 type RangeT struct {
 	StreamId int64 `json:"stream_id"`
+	Epoch int64 `json:"epoch"`
 	RangeIndex int32 `json:"range_index"`
 	StartOffset int64 `json:"start_offset"`
 	EndOffset int64 `json:"end_offset"`
@@ -31,6 +32,7 @@ func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	}
 	RangeStart(builder)
 	RangeAddStreamId(builder, t.StreamId)
+	RangeAddEpoch(builder, t.Epoch)
 	RangeAddRangeIndex(builder, t.RangeIndex)
 	RangeAddStartOffset(builder, t.StartOffset)
 	RangeAddEndOffset(builder, t.EndOffset)
@@ -40,6 +42,7 @@ func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 
 func (rcv *Range) UnPackTo(t *RangeT) {
 	t.StreamId = rcv.StreamId()
+	t.Epoch = rcv.Epoch()
 	t.RangeIndex = rcv.RangeIndex()
 	t.StartOffset = rcv.StartOffset()
 	t.EndOffset = rcv.EndOffset()
@@ -98,8 +101,20 @@ func (rcv *Range) MutateStreamId(n int64) bool {
 	return rcv._tab.MutateInt64Slot(4, n)
 }
 
-func (rcv *Range) RangeIndex() int32 {
+func (rcv *Range) Epoch() int64 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.GetInt64(o + rcv._tab.Pos)
+	}
+	return -1
+}
+
+func (rcv *Range) MutateEpoch(n int64) bool {
+	return rcv._tab.MutateInt64Slot(6, n)
+}
+
+func (rcv *Range) RangeIndex() int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
 	}
@@ -107,22 +122,10 @@ func (rcv *Range) RangeIndex() int32 {
 }
 
 func (rcv *Range) MutateRangeIndex(n int32) bool {
-	return rcv._tab.MutateInt32Slot(6, n)
+	return rcv._tab.MutateInt32Slot(8, n)
 }
 
 func (rcv *Range) StartOffset() int64 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
-	if o != 0 {
-		return rcv._tab.GetInt64(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *Range) MutateStartOffset(n int64) bool {
-	return rcv._tab.MutateInt64Slot(8, n)
-}
-
-func (rcv *Range) EndOffset() int64 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		return rcv._tab.GetInt64(o + rcv._tab.Pos)
@@ -130,12 +133,24 @@ func (rcv *Range) EndOffset() int64 {
 	return 0
 }
 
-func (rcv *Range) MutateEndOffset(n int64) bool {
+func (rcv *Range) MutateStartOffset(n int64) bool {
 	return rcv._tab.MutateInt64Slot(10, n)
 }
 
-func (rcv *Range) ReplicaNodes(obj *DataNode, j int) bool {
+func (rcv *Range) EndOffset() int64 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
+	if o != 0 {
+		return rcv._tab.GetInt64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *Range) MutateEndOffset(n int64) bool {
+	return rcv._tab.MutateInt64Slot(12, n)
+}
+
+func (rcv *Range) ReplicaNodes(obj *DataNode, j int) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
 	if o != 0 {
 		x := rcv._tab.Vector(o)
 		x += flatbuffers.UOffsetT(j) * 4
@@ -147,7 +162,7 @@ func (rcv *Range) ReplicaNodes(obj *DataNode, j int) bool {
 }
 
 func (rcv *Range) ReplicaNodesLength() int {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
 	}
@@ -155,22 +170,25 @@ func (rcv *Range) ReplicaNodesLength() int {
 }
 
 func RangeStart(builder *flatbuffers.Builder) {
-	builder.StartObject(5)
+	builder.StartObject(6)
 }
 func RangeAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(0, streamId, -1)
 }
+func RangeAddEpoch(builder *flatbuffers.Builder, epoch int64) {
+	builder.PrependInt64Slot(1, epoch, -1)
+}
 func RangeAddRangeIndex(builder *flatbuffers.Builder, rangeIndex int32) {
-	builder.PrependInt32Slot(1, rangeIndex, -1)
+	builder.PrependInt32Slot(2, rangeIndex, -1)
 }
 func RangeAddStartOffset(builder *flatbuffers.Builder, startOffset int64) {
-	builder.PrependInt64Slot(2, startOffset, 0)
+	builder.PrependInt64Slot(3, startOffset, 0)
 }
 func RangeAddEndOffset(builder *flatbuffers.Builder, endOffset int64) {
-	builder.PrependInt64Slot(3, endOffset, 0)
+	builder.PrependInt64Slot(4, endOffset, 0)
 }
 func RangeAddReplicaNodes(builder *flatbuffers.Builder, replicaNodes flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(4, flatbuffers.UOffsetT(replicaNodes), 0)
+	builder.PrependUOffsetTSlot(5, flatbuffers.UOffsetT(replicaNodes), 0)
 }
 func RangeStartReplicaNodesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)

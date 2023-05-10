@@ -8,8 +8,7 @@ import (
 
 type SealRangeEntryT struct {
 	Type SealType `json:"type"`
-	Range *RangeIdT `json:"range"`
-	End int64 `json:"end"`
+	Range *RangeT `json:"range"`
 	Renew bool `json:"renew"`
 }
 
@@ -19,7 +18,6 @@ func (t *SealRangeEntryT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffset
 	SealRangeEntryStart(builder)
 	SealRangeEntryAddType(builder, t.Type)
 	SealRangeEntryAddRange(builder, range_Offset)
-	SealRangeEntryAddEnd(builder, t.End)
 	SealRangeEntryAddRenew(builder, t.Renew)
 	return SealRangeEntryEnd(builder)
 }
@@ -27,7 +25,6 @@ func (t *SealRangeEntryT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffset
 func (rcv *SealRangeEntry) UnPackTo(t *SealRangeEntryT) {
 	t.Type = rcv.Type()
 	t.Range = rcv.Range(nil).UnPack()
-	t.End = rcv.End()
 	t.Renew = rcv.Renew()
 }
 
@@ -77,12 +74,12 @@ func (rcv *SealRangeEntry) MutateType(n SealType) bool {
 	return rcv._tab.MutateInt8Slot(4, int8(n))
 }
 
-func (rcv *SealRangeEntry) Range(obj *RangeId) *RangeId {
+func (rcv *SealRangeEntry) Range(obj *Range) *Range {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
-			obj = new(RangeId)
+			obj = new(Range)
 		}
 		obj.Init(rcv._tab.Bytes, x)
 		return obj
@@ -90,20 +87,8 @@ func (rcv *SealRangeEntry) Range(obj *RangeId) *RangeId {
 	return nil
 }
 
-func (rcv *SealRangeEntry) End() int64 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
-	if o != 0 {
-		return rcv._tab.GetInt64(o + rcv._tab.Pos)
-	}
-	return -1
-}
-
-func (rcv *SealRangeEntry) MutateEnd(n int64) bool {
-	return rcv._tab.MutateInt64Slot(8, n)
-}
-
 func (rcv *SealRangeEntry) Renew() bool {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
 	}
@@ -111,11 +96,11 @@ func (rcv *SealRangeEntry) Renew() bool {
 }
 
 func (rcv *SealRangeEntry) MutateRenew(n bool) bool {
-	return rcv._tab.MutateBoolSlot(10, n)
+	return rcv._tab.MutateBoolSlot(8, n)
 }
 
 func SealRangeEntryStart(builder *flatbuffers.Builder) {
-	builder.StartObject(4)
+	builder.StartObject(3)
 }
 func SealRangeEntryAddType(builder *flatbuffers.Builder, type_ SealType) {
 	builder.PrependInt8Slot(0, int8(type_), 0)
@@ -123,11 +108,8 @@ func SealRangeEntryAddType(builder *flatbuffers.Builder, type_ SealType) {
 func SealRangeEntryAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(range_), 0)
 }
-func SealRangeEntryAddEnd(builder *flatbuffers.Builder, end int64) {
-	builder.PrependInt64Slot(2, end, -1)
-}
 func SealRangeEntryAddRenew(builder *flatbuffers.Builder, renew bool) {
-	builder.PrependBoolSlot(3, renew, false)
+	builder.PrependBoolSlot(2, renew, false)
 }
 func SealRangeEntryEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

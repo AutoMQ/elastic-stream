@@ -1,4 +1,6 @@
-use protocol::rpc::header::{RangeIdT, SealRangeEntryT, SealType};
+use protocol::rpc::header::{RangeT, SealRangeEntryT, SealType};
+
+use crate::range::StreamRange;
 
 #[derive(Debug, Clone)]
 pub enum Kind {
@@ -7,18 +9,16 @@ pub enum Kind {
     PlacementManager,
 }
 
-#[derive(Debug)]
-pub struct SealRangeRequest {
+#[derive(Debug, Clone)]
+pub struct SealRangeEntry {
     pub kind: Kind,
-    pub stream_id: u64,
-    pub range_index: u32,
-    pub end: Option<u64>,
+    pub range: StreamRange,
     pub renew: bool,
 }
 
 /// Convert custom type to table defined in FlatBuffers IDL
-impl From<&SealRangeRequest> for SealRangeEntryT {
-    fn from(value: &SealRangeRequest) -> Self {
+impl From<&SealRangeEntry> for SealRangeEntryT {
+    fn from(value: &SealRangeEntry) -> Self {
         let mut req = SealRangeEntryT::default();
         req.type_ = match value.kind {
             Kind::Unspecified => SealType::UNSPECIFIED,
@@ -26,13 +26,14 @@ impl From<&SealRangeRequest> for SealRangeEntryT {
             Kind::PlacementManager => SealType::PLACEMENT_MANAGER,
         };
         req.renew = value.renew;
-        req.end = match value.end {
+        let mut range = RangeT::default();
+        range.stream_id = value.range.stream_id() as i64;
+        range.range_index = value.range.index() as i32;
+        range.end_offset = match value.range.end() {
             Some(end) => end as i64,
             None => -1,
         };
-        let mut range = RangeIdT::default();
-        range.stream_id = value.stream_id as i64;
-        range.range_index = value.range_index as i32;
+        
         req.range = Box::new(range);
         req
     }

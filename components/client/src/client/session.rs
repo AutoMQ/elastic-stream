@@ -277,35 +277,7 @@ impl Session {
                     .flat_map(|result| result.iter())
                     .flat_map(|res| res.ranges.as_ref())
                     .flat_map(|e| e.iter())
-                    .map(|range| {
-                        let mut stream_range = if range.end_offset >= 0 {
-                            StreamRange::new(
-                                range.stream_id,
-                                range.range_index,
-                                range.start_offset as u64,
-                                range.end_offset as u64,
-                                Some(range.end_offset as u64),
-                            )
-                        } else {
-                            StreamRange::new(
-                                range.stream_id,
-                                range.range_index,
-                                range.start_offset as u64,
-                                range.start_offset as u64,
-                                None,
-                            )
-                        };
-
-                        range
-                            .replica_nodes
-                            .iter()
-                            .flat_map(|nodes| nodes.iter())
-                            .for_each(|node| {
-                                stream_range.replica_mut().push(node.into());
-                            });
-
-                        stream_range
-                    })
+                    .map(Into::into)
                     .collect::<Vec<_>>();
                 if let response::Response::ListRange { ranges, .. } = &mut response {
                     *ranges = Some(_ranges);
@@ -436,10 +408,7 @@ impl Session {
     fn handle_seal_ranges_response(frame: &Frame, _ctx: &InvocationContext) -> response::Response {
         let mut resp = response::Response::SealRange {
             status: Status::decode(),
-            stream_id: -1,
-            range_index: -1,
-            start_offset: -1,
-            end_offset: None,
+            range: None,
         };
 
         if frame.system_error() {
@@ -466,11 +435,8 @@ impl Session {
                 Ok(response) => {
                     let response = response.unpack();
                     if let response::Response::SealRange {
-                        ref mut stream_id,
-                        ref mut range_index,
-                        ref mut start_offset,
-                        ref mut end_offset,
                         ref mut status,
+                        ref mut range,
                     } = resp
                     {
                         if response.status.code == ErrorCode::OK {
@@ -481,14 +447,7 @@ impl Session {
                                 "SealRangesResponse should have exactly one result"
                             );
                             let result = &response.results[0];
-                            *stream_id = result.range.stream_id;
-                            *range_index = result.range.range_index as i32;
-                            *start_offset = result.range.start_offset;
-                            if result.range.end_offset >= 0 {
-                                *end_offset = Some(result.range.end_offset);
-                            } else {
-                                *end_offset = None;
-                            }
+                            *range = result.range.clone().map(|range| range.as_ref().into());
                         } else {
                             *status = response.status.as_ref().into();
                         }

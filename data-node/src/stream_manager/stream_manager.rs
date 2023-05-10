@@ -252,6 +252,7 @@ impl StreamManager {
         debug_assert_eq!(-1, range.end_offset());
         let mut stream_range = StreamRange::new(
             stream_id,
+            0,
             range_index,
             range.start_offset() as u64,
             range.start_offset() as u64,
@@ -451,13 +452,14 @@ mod tests {
                                 if i < TOTAL - 1 {
                                     StreamRange::new(
                                         stream_id,
+                                        0,
                                         i,
                                         (i * 100) as u64,
                                         ((i + 1) * 100) as u64,
                                         Some(((i + 1) * 100) as u64),
                                     )
                                 } else {
-                                    StreamRange::new(stream_id, i, (i * 100) as u64, 0, None)
+                                    StreamRange::new(stream_id, 0, i, (i * 100) as u64, 0, None)
                                 }
                             })
                             .collect::<Vec<_>>();
@@ -592,8 +594,8 @@ mod tests {
         let (recovery_completion_tx, _recovery_completion_rx) = tokio::sync::oneshot::channel();
         let store = Rc::new(ElasticStore::new(config, recovery_completion_tx)?);
         let mut stream_manager = StreamManager::new(fetcher, store);
-        let range1 = StreamRange::new(0, 0, 0, 10, Some(10));
-        let range2 = StreamRange::new(0, 1, 10, 0, None);
+        let range1 = StreamRange::new(0, 0, 0, 0, 10, Some(10));
+        let range2 = StreamRange::new(0, 0, 1, 10, 0, None);
         let stream = Stream::new(0, vec![range1, range2]);
         stream_manager.streams.insert(0, stream);
         let append_window = AppendWindow::new(0, 100);

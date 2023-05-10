@@ -276,11 +276,15 @@ table ListRangesResult {
 table Range {
     // The id of the stream
     stream_id: int64 = -1 (id: 0);
+
+    // At the epoch when the range is created. Valid values are non-negative.
+    epoch: int64 = -1 (id: 1);
+
     // The index of the range in the stream.
-    range_index: int32 = -1 (id: 1);
+    range_index: int32 = -1 (id: 2);
 
     // The start offset of the range. Offset is 0-based index and follows left-boundary-inclusive and right-boundary-exclusive.
-    start_offset: int64 (id: 2);
+    start_offset: int64 (id: 3);
 
     // The end offset of the range.
     // -1 if the range is mutable. If the range is sealed, end_offset would be non-negative and `end_offset` is exclusive.
@@ -289,10 +293,10 @@ table Range {
     // range `[0, 100)` means it is already sealed and read-only, records indexed 0 to 99 can be retrieved from this range;
     // we may have empty, droppable sealed ranges with the form `[N, N)` and placement manager would delete them without hesitation,
     // as a result, clients should NOT cache these empty ones.
-    end_offset: int64 (id: 3);
+    end_offset: int64 (id: 4);
 
     // The collection of data-node that host this range.
-    replica_nodes: [DataNode] (id: 4);
+    replica_nodes: [DataNode] (id: 5);
 }
 
 // Seal action type.
@@ -321,14 +325,13 @@ table SealRangesRequest {
 
 table SealRangeEntry {
     type: SealType      (id: 0);
-    
-    range: RangeId      (id: 1, required);
-    
-    // If the seal-type is placement-manager, end is the final upper boundary of the range being sealed. 
-    end: int64 = -1     (id: 2);
-    
-    // If the seal-type is placement-manager, indicate whether a new range should be created, following completion of the seal action.
-    renew: bool         (id: 3);
+
+    // If the seal-type is placement-manager, end is the final upper boundary of the range being sealed.     
+    range: Range      (id: 1, required);
+        
+    // If the seal-type is placement-manager, indicate whether a new range should be created, 
+    // following completion of the seal action.
+    renew: bool         (id: 2);
 }
 
 table RangeId {
@@ -340,18 +343,18 @@ table SealRangesResponse {
     status: Status (id: 0, required);
 
     // The responses of seal ranges request
-    results: [SealRangesResult] (id: 1, required);
+    results: [SealRangeResult] (id: 1, required);
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
     throttle_time_ms: int32 (id: 2);
 }
 
-table SealRangesResult {
+table SealRangeResult {
     status: Status (id: 0, required);
 
     // Both the PM and the data node will handle the seal ranges request.
     // The data node returns the sealed range, while the PM returns the newly writable range.
-    range: Range (id: 1, required);
+    range: Range (id: 1);
 }
 
 // The sync ranges request is used to sync newly writable ranges to accelerate the availability of a newly created writable range.

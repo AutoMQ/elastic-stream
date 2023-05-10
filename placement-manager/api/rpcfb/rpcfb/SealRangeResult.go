@@ -6,61 +6,61 @@ import (
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-type SealRangesResultT struct {
+type SealRangeResultT struct {
 	Status *StatusT `json:"status"`
 	Range *RangeT `json:"range"`
 }
 
-func (t *SealRangesResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+func (t *SealRangeResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	statusOffset := t.Status.Pack(builder)
 	range_Offset := t.Range.Pack(builder)
-	SealRangesResultStart(builder)
-	SealRangesResultAddStatus(builder, statusOffset)
-	SealRangesResultAddRange(builder, range_Offset)
-	return SealRangesResultEnd(builder)
+	SealRangeResultStart(builder)
+	SealRangeResultAddStatus(builder, statusOffset)
+	SealRangeResultAddRange(builder, range_Offset)
+	return SealRangeResultEnd(builder)
 }
 
-func (rcv *SealRangesResult) UnPackTo(t *SealRangesResultT) {
+func (rcv *SealRangeResult) UnPackTo(t *SealRangeResultT) {
 	t.Status = rcv.Status(nil).UnPack()
 	t.Range = rcv.Range(nil).UnPack()
 }
 
-func (rcv *SealRangesResult) UnPack() *SealRangesResultT {
+func (rcv *SealRangeResult) UnPack() *SealRangeResultT {
 	if rcv == nil { return nil }
-	t := &SealRangesResultT{}
+	t := &SealRangeResultT{}
 	rcv.UnPackTo(t)
 	return t
 }
 
-type SealRangesResult struct {
+type SealRangeResult struct {
 	_tab flatbuffers.Table
 }
 
-func GetRootAsSealRangesResult(buf []byte, offset flatbuffers.UOffsetT) *SealRangesResult {
+func GetRootAsSealRangeResult(buf []byte, offset flatbuffers.UOffsetT) *SealRangeResult {
 	n := flatbuffers.GetUOffsetT(buf[offset:])
-	x := &SealRangesResult{}
+	x := &SealRangeResult{}
 	x.Init(buf, n+offset)
 	return x
 }
 
-func GetSizePrefixedRootAsSealRangesResult(buf []byte, offset flatbuffers.UOffsetT) *SealRangesResult {
+func GetSizePrefixedRootAsSealRangeResult(buf []byte, offset flatbuffers.UOffsetT) *SealRangeResult {
 	n := flatbuffers.GetUOffsetT(buf[offset+flatbuffers.SizeUint32:])
-	x := &SealRangesResult{}
+	x := &SealRangeResult{}
 	x.Init(buf, n+offset+flatbuffers.SizeUint32)
 	return x
 }
 
-func (rcv *SealRangesResult) Init(buf []byte, i flatbuffers.UOffsetT) {
+func (rcv *SealRangeResult) Init(buf []byte, i flatbuffers.UOffsetT) {
 	rcv._tab.Bytes = buf
 	rcv._tab.Pos = i
 }
 
-func (rcv *SealRangesResult) Table() flatbuffers.Table {
+func (rcv *SealRangeResult) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *SealRangesResult) Status(obj *Status) *Status {
+func (rcv *SealRangeResult) Status(obj *Status) *Status {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
@@ -73,7 +73,7 @@ func (rcv *SealRangesResult) Status(obj *Status) *Status {
 	return nil
 }
 
-func (rcv *SealRangesResult) Range(obj *Range) *Range {
+func (rcv *SealRangeResult) Range(obj *Range) *Range {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
@@ -86,15 +86,15 @@ func (rcv *SealRangesResult) Range(obj *Range) *Range {
 	return nil
 }
 
-func SealRangesResultStart(builder *flatbuffers.Builder) {
+func SealRangeResultStart(builder *flatbuffers.Builder) {
 	builder.StartObject(2)
 }
-func SealRangesResultAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
+func SealRangeResultAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
 }
-func SealRangesResultAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
+func SealRangeResultAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(range_), 0)
 }
-func SealRangesResultEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+func SealRangeResultEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }

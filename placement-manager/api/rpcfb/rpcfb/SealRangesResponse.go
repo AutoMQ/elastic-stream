@@ -8,7 +8,7 @@ import (
 
 type SealRangesResponseT struct {
 	Status *StatusT `json:"status"`
-	Results []*SealRangesResultT `json:"results"`
+	Results []*SealRangeResultT `json:"results"`
 	ThrottleTimeMs int32 `json:"throttle_time_ms"`
 }
 
@@ -38,9 +38,9 @@ func (t *SealRangesResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.UOf
 func (rcv *SealRangesResponse) UnPackTo(t *SealRangesResponseT) {
 	t.Status = rcv.Status(nil).UnPack()
 	resultsLength := rcv.ResultsLength()
-	t.Results = make([]*SealRangesResultT, resultsLength)
+	t.Results = make([]*SealRangeResultT, resultsLength)
 	for j := 0; j < resultsLength; j++ {
-		x := SealRangesResult{}
+		x := SealRangeResult{}
 		rcv.Results(&x, j)
 		t.Results[j] = x.UnPack()
 	}
@@ -94,7 +94,7 @@ func (rcv *SealRangesResponse) Status(obj *Status) *Status {
 	return nil
 }
 
-func (rcv *SealRangesResponse) Results(obj *SealRangesResult, j int) bool {
+func (rcv *SealRangesResponse) Results(obj *SealRangeResult, j int) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Vector(o)

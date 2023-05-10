@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use derivative::Derivative;
+use protocol::rpc::header::{DataNodeT, RangeT};
 
 use crate::data_node::DataNode;
 
@@ -20,6 +21,9 @@ pub trait Range {
 pub struct StreamRange {
     stream_id: i64,
 
+    epoch: u64,
+
+    /// Range index
     index: i32,
 
     /// The start slot index, inclusive.
@@ -34,30 +38,26 @@ pub struct StreamRange {
     /// List of data nodes, that all have identical records within the range.
     #[derivative(PartialEq = "ignore")]
     replica: Vec<DataNode>,
-
-    /// Node ID of the primary replica
-    primary: Option<i32>,
 }
 
 impl StreamRange {
-    pub fn new(stream_id: i64, index: i32, start: u64, limit: u64, end: Option<u64>) -> Self {
+    pub fn new(
+        stream_id: i64,
+        epoch: u64,
+        index: i32,
+        start: u64,
+        limit: u64,
+        end: Option<u64>,
+    ) -> Self {
         Self {
             stream_id,
+            epoch,
             index,
             start,
             limit,
             end,
             replica: vec![],
-            primary: None,
         }
-    }
-
-    pub fn set_primary(&mut self, node_id: i32) {
-        self.primary = Some(node_id);
-    }
-
-    pub fn primary(&self) -> Option<i32> {
-        self.primary
     }
 
     pub fn replica(&self) -> &Vec<DataNode> {
@@ -142,16 +142,65 @@ impl Display for StreamRange {
     }
 }
 
+impl From<&StreamRange> for RangeT {
+    fn from(value: &StreamRange) -> Self {
+        let mut range = RangeT::default();
+        range.stream_id = value.stream_id;
+        range.epoch = value.epoch as i64;
+        range.range_index = value.index;
+        range.start_offset = value.start as i64;
+        range.end_offset = match value.end {
+            None => -1,
+            Some(offset) => offset as i64,
+        };
+        let mut replica: Vec<DataNodeT> = vec![];
+        for node in &value.replica {
+            replica.push(node.into());
+        }
+        if replica.is_empty() {
+            range.replica_nodes = None;
+        } else {
+            range.replica_nodes = Some(replica);
+        }
+        range
+    }
+}
+
+impl From<&RangeT> for StreamRange {
+    fn from(value: &RangeT) -> Self {
+        let mut replica: Vec<DataNode> = vec![];
+        if let Some(nodes) = &value.replica_nodes {
+            for node in nodes {
+                replica.push(node.into());
+            }
+        }
+        Self {
+            stream_id: value.stream_id,
+            epoch: value.epoch as u64,
+            index: value.range_index,
+            start: value.start_offset as u64,
+            limit: match value.end_offset {
+                -1 => value.start_offset as u64,
+                offset => offset as u64,
+            },
+            end: match value.end_offset {
+                -1 => None,
+                offset => Some(offset as u64),
+            },
+            replica,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_take_slot() {
-        let mut range = StreamRange::new(0, 0, 0, 0, None);
+        let mut range = StreamRange::new(0, 0, 0, 0, 0, None);
         assert_eq!(range.is_sealed(), false);
         assert_eq!(range.len(), 0);
-        assert_eq!(range.primary(), None);
 
         range.set_limit(100);
         assert_eq!(100, range.len());
@@ -166,13 +215,13 @@ mod tests {
     #[test]
     fn test_contains() {
         // Test a sealed range that contains a given offset.
-        let range = StreamRange::new(0, 0, 0, 10, Some(10));
+        let range = StreamRange::new(0, 0, 0, 0, 10, Some(10));
         assert_eq!(range.contains(0), true);
         assert_eq!(range.contains(1), true);
         assert_eq!(range.contains(11), false);
 
         // Test a open range that contains a given offset.
-        let range = StreamRange::new(0, 0, 10, 20, None);
+        let range = StreamRange::new(0, 0, 0, 10, 20, None);
         assert_eq!(range.contains(0), false);
         assert_eq!(range.contains(11), true);
         assert_eq!(range.contains(21), true);

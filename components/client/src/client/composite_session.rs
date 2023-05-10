@@ -6,7 +6,7 @@ use model::{
     client_role::ClientRole,
     range::StreamRange,
     range_criteria::RangeCriteria,
-    request::{seal::SealRangeRequest, Request},
+    request::{seal::SealRangeEntry, Request},
     response::Response,
     PlacementManagerNode,
 };
@@ -408,7 +408,7 @@ impl CompositeSession {
     ///
     /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
     /// Final end value of the range will be resolved after MinCopy of data nodes responded.
-    pub(crate) async fn seal(&self, request: SealRangeRequest) -> Result<StreamRange, ClientError> {
+    pub(crate) async fn seal(&self, request: SealRangeEntry) -> Result<StreamRange, ClientError> {
         self.try_reconnect().await;
         // TODO: If the seal kind is PM, we need to pick the session/connection to the leader node.
         let session = self
@@ -420,11 +420,7 @@ impl CompositeSession {
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
         let request = Request::SealRange {
             timeout: self.config.client_io_timeout(),
-            kind: request.kind,
-            stream_id: request.stream_id as i64,
-            range: request.range_index,
-            end: request.end.map(|end| end as i64),
-            renew: request.renew,
+            entry: request,
         };
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
@@ -434,26 +430,12 @@ impl CompositeSession {
         }
 
         let response = rx.await.map_err(|_e| ClientError::ClientInternal)?;
-        if let Response::SealRange {
-            status,
-            stream_id,
-            range_index,
-            start_offset,
-            end_offset,
-        } = response
-        {
+        if let Response::SealRange { status, range } = response {
             if ErrorCode::OK != status.code {
                 warn!("Failed to seal range: {:?}", status);
                 return Err(ClientError::ServerInternal);
             }
-
-            Ok(StreamRange::new(
-                stream_id,
-                range_index,
-                start_offset as u64,
-                0,
-                end_offset.map(|end| end as u64),
-            ))
+            range.ok_or(ClientError::ClientInternal)
         } else {
             Err(ClientError::ClientInternal)
         }

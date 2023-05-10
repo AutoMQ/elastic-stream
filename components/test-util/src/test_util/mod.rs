@@ -10,7 +10,7 @@ use protocol::rpc::header::{
     DescribePlacementManagerClusterRequest, DescribePlacementManagerClusterResponseT, ErrorCode,
     HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
     ListRangesRequest, ListRangesResponseT, ListRangesResultT, PlacementManagerClusterT,
-    PlacementManagerNodeT, RangeT, StatusT,
+    PlacementManagerNodeT, RangeT, SealRangeResultT, SealRangesRequest, StatusT,
 };
 
 use tokio::sync::oneshot;
@@ -205,6 +205,18 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
+                                OperationCode::SealRanges => {
+                                    response_frame.operation_code = OperationCode::SealRanges;
+                                    if let Some(buf) = frame.header.as_ref() {
+                                        if let Ok(req) = flatbuffers::root::<SealRangesRequest>(buf)
+                                        {
+                                            serve_seal_ranges(&req, &mut response_frame);
+                                        } else {
+                                            error!("Failed to decode seal-ranges-request header");
+                                        }
+                                    }
+                                }
+
                                 _ => {
                                     warn!("Unsupported operation code: {}", frame.operation_code);
                                     unimplemented!("Unimplemented operation code");
@@ -242,6 +254,26 @@ pub async fn run_listener() -> u16 {
         info!("TestServer shut down OK");
     });
     rx.await.unwrap()
+}
+
+fn serve_seal_ranges(req: &SealRangesRequest, response_frame: &mut Frame) {
+    let request = req.unpack();
+    if let Some(entries) = request.entries {
+        info!("Seal ranges: {:?}", entries);
+        debug_assert_eq!(1, entries.len());
+        let entry = &entries[0];
+        let mut result = SealRangeResultT::default();
+        let mut status = StatusT::default();
+        status.code = ErrorCode::OK;
+        status.message = Some(String::from("OK"));
+        result.status = Box::new(status);
+        let mut range = RangeT::default();
+        range.stream_id = entry.range.stream_id;
+        range.range_index = entry.range.range_index;
+        result.range = Some(Box::new(range));
+    } else {
+        warn!("No ranges to seal");
+    }
 }
 
 fn allocate_id(request: &IdAllocationRequest, response_frame: &mut Frame) {

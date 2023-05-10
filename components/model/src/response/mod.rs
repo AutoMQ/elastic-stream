@@ -20,12 +20,9 @@ pub enum Response {
         status: Status,
         nodes: Option<Vec<PlacementManagerNode>>,
     },
-    
+
     SealRange {
         status: Status,
-        stream_id: i64,
-        range_index: i32,
-        start_offset: i64,
-        end_offset: Option<i64>,
+        range: Option<StreamRange>,
     },
 }

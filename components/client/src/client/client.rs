@@ -4,7 +4,7 @@ use log::{error, trace, warn};
 use model::{
     range::StreamRange,
     range_criteria::RangeCriteria,
-    request::seal::{self, SealRangeRequest},
+    request::seal::{self, SealRangeEntry},
 };
 use protocol::rpc::header::SealRangeEntryT;
 use std::{cell::UnsafeCell, rc::Rc, sync::Arc};
@@ -106,7 +106,7 @@ impl Client {
     pub async fn seal(
         &self,
         target: Option<&str>,
-        request: SealRangeRequest,
+        request: SealRangeEntry,
     ) -> Result<StreamRange, ClientError> {
         // Validate request
         match request.kind {
@@ -120,13 +120,13 @@ impl Client {
                     return Err(ClientError::BadRequest);
                 }
 
-                if request.end.is_some() {
+                if request.range.end().is_some() {
                     error!("SealRequest#end should be None while sealing against data nodes");
                     return Err(ClientError::BadRequest);
                 }
             }
             seal::Kind::PlacementManager => {
-                if request.end.is_none() {
+                if request.range.end().is_none() {
                     error!(
                         "SealRequest#end MUST be present while sealing against placement manager"
                     );
