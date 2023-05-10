@@ -29,12 +29,13 @@ const (
 // CreateStreamParam defines the parameters of creating a stream.
 type CreateStreamParam struct {
 	*rpcfb.StreamT
+	// TODO remove it
 	*rpcfb.RangeT
 }
 
 // Stream defines operations on stream.
 type Stream interface {
-	CreateStreams(ctx context.Context, params []*CreateStreamParam) ([]*rpcfb.CreateStreamResultT, error)
+	CreateStreams(ctx context.Context, params []*CreateStreamParam) ([]*rpcfb.StreamT, error)
 	DeleteStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error)
 	UpdateStreams(ctx context.Context, streams []*rpcfb.StreamT) ([]*rpcfb.StreamT, error)
 	GetStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error)
@@ -43,10 +44,10 @@ type Stream interface {
 }
 
 // CreateStreams creates new streams based on the given streams and returns them.
-func (e *Endpoint) CreateStreams(ctx context.Context, params []*CreateStreamParam) ([]*rpcfb.CreateStreamResultT, error) {
+func (e *Endpoint) CreateStreams(ctx context.Context, params []*CreateStreamParam) ([]*rpcfb.StreamT, error) {
 	logger := e.lg.With(traceutil.TraceLogField(ctx))
 
-	results := make([]*rpcfb.CreateStreamResultT, 0, len(params))
+	results := make([]*rpcfb.StreamT, 0, len(params))
 	kvs := make([]kv.KeyValue, 0, len(params)*5)
 	for _, param := range params {
 		kvs = append(kvs, kv.KeyValue{
@@ -63,10 +64,7 @@ func (e *Endpoint) CreateStreams(ctx context.Context, params []*CreateStreamPara
 				Value: nil,
 			})
 		}
-		results = append(results, &rpcfb.CreateStreamResultT{
-			Stream: param.StreamT,
-			Range:  param.RangeT,
-		})
+		results = append(results, param.StreamT)
 	}
 
 	prevKvs, err := e.BatchPut(ctx, kvs, true)

@@ -20,11 +20,6 @@ type Stream interface {
 	DescribeStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.DescribeStreamResultT, error)
 }
 
-var (
-	// ErrNotLeader is returned when the current node is not the leader.
-	ErrNotLeader = errors.New("not leader")
-)
-
 // CreateStreams creates streams and the first range in each stream in transaction.
 // It returns ErrNotEnoughDataNodes if there are not enough data nodes to create the streams.
 // It returns ErrNotLeader if the transaction failed.
@@ -61,16 +56,22 @@ func (c *RaftCluster) CreateStreams(ctx context.Context, streams []*rpcfb.Stream
 	}
 
 	logger.Info("start to create streams", zap.Uint64s("stream-ids", ids))
-	results, err := c.storage.CreateStreams(ctx, params)
-	logger.Info("finish creating streams", zap.Error(err))
-	if errors.Is(err, kv.ErrTxnFailed) {
-		err = ErrNotLeader
+	streams, err = c.storage.CreateStreams(ctx, params)
+	if err != nil {
+		if errors.Is(err, kv.ErrTxnFailed) {
+			return nil, ErrNotLeader
+		}
+		return nil, err
 	}
 
-	for _, result := range results {
-		c.fillDataNodesInfo(result.Range.ReplicaNodes)
+	results := make([]*rpcfb.CreateStreamResultT, len(streams))
+	for i, stream := range streams {
+		results[i] = &rpcfb.CreateStreamResultT{
+			Stream: stream,
+			Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK},
+		}
 	}
-	return results, err
+	return results, nil
 }
 
 // DeleteStreams deletes streams in transaction.
@@ -114,6 +115,7 @@ func (c *RaftCluster) DescribeStreams(ctx context.Context, streamIDs []int64) ([
 
 	logger.Info("start to describe streams", zap.Int64s("stream-ids", streamIDs))
 	streams, err := c.storage.GetStreams(ctx, streamIDs)
+	logger.Info("finish describing streams", zap.Error(err))
 	if err != nil {
 		if errors.Is(err, kv.ErrTxnFailed) {
 			return nil, ErrNotLeader
@@ -128,6 +130,5 @@ func (c *RaftCluster) DescribeStreams(ctx context.Context, streamIDs []int64) ([
 			Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK},
 		}
 	}
-	logger.Info("finish describing streams")
 	return results, nil
 }
