@@ -7,23 +7,23 @@ import (
 )
 
 type SealRangesResultT struct {
-	Range *RangeT `json:"range"`
 	Status *StatusT `json:"status"`
+	Range *RangeT `json:"range"`
 }
 
 func (t *SealRangesResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	range_Offset := t.Range.Pack(builder)
 	statusOffset := t.Status.Pack(builder)
+	range_Offset := t.Range.Pack(builder)
 	SealRangesResultStart(builder)
-	SealRangesResultAddRange(builder, range_Offset)
 	SealRangesResultAddStatus(builder, statusOffset)
+	SealRangesResultAddRange(builder, range_Offset)
 	return SealRangesResultEnd(builder)
 }
 
 func (rcv *SealRangesResult) UnPackTo(t *SealRangesResultT) {
-	t.Range = rcv.Range(nil).UnPack()
 	t.Status = rcv.Status(nil).UnPack()
+	t.Range = rcv.Range(nil).UnPack()
 }
 
 func (rcv *SealRangesResult) UnPack() *SealRangesResultT {
@@ -60,21 +60,8 @@ func (rcv *SealRangesResult) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *SealRangesResult) Range(obj *Range) *Range {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
-	if o != 0 {
-		x := rcv._tab.Indirect(o + rcv._tab.Pos)
-		if obj == nil {
-			obj = new(Range)
-		}
-		obj.Init(rcv._tab.Bytes, x)
-		return obj
-	}
-	return nil
-}
-
 func (rcv *SealRangesResult) Status(obj *Status) *Status {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -86,14 +73,27 @@ func (rcv *SealRangesResult) Status(obj *Status) *Status {
 	return nil
 }
 
+func (rcv *SealRangesResult) Range(obj *Range) *Range {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		x := rcv._tab.Indirect(o + rcv._tab.Pos)
+		if obj == nil {
+			obj = new(Range)
+		}
+		obj.Init(rcv._tab.Bytes, x)
+		return obj
+	}
+	return nil
+}
+
 func SealRangesResultStart(builder *flatbuffers.Builder) {
 	builder.StartObject(2)
 }
-func SealRangesResultAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(range_), 0)
-}
 func SealRangesResultAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(status), 0)
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
+}
+func SealRangesResultAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(range_), 0)
 }
 func SealRangesResultEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

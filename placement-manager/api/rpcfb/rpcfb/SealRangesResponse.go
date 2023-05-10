@@ -7,44 +7,44 @@ import (
 )
 
 type SealRangesResponseT struct {
-	ThrottleTimeMs int32 `json:"throttle_time_ms"`
-	SealResponses []*SealRangesResultT `json:"seal_responses"`
 	Status *StatusT `json:"status"`
+	Results []*SealRangesResultT `json:"results"`
+	ThrottleTimeMs int32 `json:"throttle_time_ms"`
 }
 
 func (t *SealRangesResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	sealResponsesOffset := flatbuffers.UOffsetT(0)
-	if t.SealResponses != nil {
-		sealResponsesLength := len(t.SealResponses)
-		sealResponsesOffsets := make([]flatbuffers.UOffsetT, sealResponsesLength)
-		for j := 0; j < sealResponsesLength; j++ {
-			sealResponsesOffsets[j] = t.SealResponses[j].Pack(builder)
-		}
-		SealRangesResponseStartSealResponsesVector(builder, sealResponsesLength)
-		for j := sealResponsesLength - 1; j >= 0; j-- {
-			builder.PrependUOffsetT(sealResponsesOffsets[j])
-		}
-		sealResponsesOffset = builder.EndVector(sealResponsesLength)
-	}
 	statusOffset := t.Status.Pack(builder)
+	resultsOffset := flatbuffers.UOffsetT(0)
+	if t.Results != nil {
+		resultsLength := len(t.Results)
+		resultsOffsets := make([]flatbuffers.UOffsetT, resultsLength)
+		for j := 0; j < resultsLength; j++ {
+			resultsOffsets[j] = t.Results[j].Pack(builder)
+		}
+		SealRangesResponseStartResultsVector(builder, resultsLength)
+		for j := resultsLength - 1; j >= 0; j-- {
+			builder.PrependUOffsetT(resultsOffsets[j])
+		}
+		resultsOffset = builder.EndVector(resultsLength)
+	}
 	SealRangesResponseStart(builder)
-	SealRangesResponseAddThrottleTimeMs(builder, t.ThrottleTimeMs)
-	SealRangesResponseAddSealResponses(builder, sealResponsesOffset)
 	SealRangesResponseAddStatus(builder, statusOffset)
+	SealRangesResponseAddResults(builder, resultsOffset)
+	SealRangesResponseAddThrottleTimeMs(builder, t.ThrottleTimeMs)
 	return SealRangesResponseEnd(builder)
 }
 
 func (rcv *SealRangesResponse) UnPackTo(t *SealRangesResponseT) {
-	t.ThrottleTimeMs = rcv.ThrottleTimeMs()
-	sealResponsesLength := rcv.SealResponsesLength()
-	t.SealResponses = make([]*SealRangesResultT, sealResponsesLength)
-	for j := 0; j < sealResponsesLength; j++ {
-		x := SealRangesResult{}
-		rcv.SealResponses(&x, j)
-		t.SealResponses[j] = x.UnPack()
-	}
 	t.Status = rcv.Status(nil).UnPack()
+	resultsLength := rcv.ResultsLength()
+	t.Results = make([]*SealRangesResultT, resultsLength)
+	for j := 0; j < resultsLength; j++ {
+		x := SealRangesResult{}
+		rcv.Results(&x, j)
+		t.Results[j] = x.UnPack()
+	}
+	t.ThrottleTimeMs = rcv.ThrottleTimeMs()
 }
 
 func (rcv *SealRangesResponse) UnPack() *SealRangesResponseT {
@@ -81,40 +81,8 @@ func (rcv *SealRangesResponse) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *SealRangesResponse) ThrottleTimeMs() int32 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
-	if o != 0 {
-		return rcv._tab.GetInt32(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *SealRangesResponse) MutateThrottleTimeMs(n int32) bool {
-	return rcv._tab.MutateInt32Slot(4, n)
-}
-
-func (rcv *SealRangesResponse) SealResponses(obj *SealRangesResult, j int) bool {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
-	if o != 0 {
-		x := rcv._tab.Vector(o)
-		x += flatbuffers.UOffsetT(j) * 4
-		x = rcv._tab.Indirect(x)
-		obj.Init(rcv._tab.Bytes, x)
-		return true
-	}
-	return false
-}
-
-func (rcv *SealRangesResponse) SealResponsesLength() int {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
-	if o != 0 {
-		return rcv._tab.VectorLen(o)
-	}
-	return 0
-}
-
 func (rcv *SealRangesResponse) Status(obj *Status) *Status {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -126,20 +94,52 @@ func (rcv *SealRangesResponse) Status(obj *Status) *Status {
 	return nil
 }
 
+func (rcv *SealRangesResponse) Results(obj *SealRangesResult, j int) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		x := rcv._tab.Vector(o)
+		x += flatbuffers.UOffsetT(j) * 4
+		x = rcv._tab.Indirect(x)
+		obj.Init(rcv._tab.Bytes, x)
+		return true
+	}
+	return false
+}
+
+func (rcv *SealRangesResponse) ResultsLength() int {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.VectorLen(o)
+	}
+	return 0
+}
+
+func (rcv *SealRangesResponse) ThrottleTimeMs() int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	if o != 0 {
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *SealRangesResponse) MutateThrottleTimeMs(n int32) bool {
+	return rcv._tab.MutateInt32Slot(8, n)
+}
+
 func SealRangesResponseStart(builder *flatbuffers.Builder) {
 	builder.StartObject(3)
 }
-func SealRangesResponseAddThrottleTimeMs(builder *flatbuffers.Builder, throttleTimeMs int32) {
-	builder.PrependInt32Slot(0, throttleTimeMs, 0)
+func SealRangesResponseAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
 }
-func SealRangesResponseAddSealResponses(builder *flatbuffers.Builder, sealResponses flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(sealResponses), 0)
+func SealRangesResponseAddResults(builder *flatbuffers.Builder, results flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(results), 0)
 }
-func SealRangesResponseStartSealResponsesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func SealRangesResponseStartResultsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
-func SealRangesResponseAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(status), 0)
+func SealRangesResponseAddThrottleTimeMs(builder *flatbuffers.Builder, throttleTimeMs int32) {
+	builder.PrependInt32Slot(2, throttleTimeMs, 0)
 }
 func SealRangesResponseEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

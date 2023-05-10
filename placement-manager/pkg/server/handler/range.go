@@ -45,17 +45,17 @@ func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.Sea
 	ctx := req.Context()
 
 	entries := typeutil.FilterZero[*rpcfb.SealRangeEntryT](req.Entries)
-	sealResponses := make([]*rpcfb.SealRangesResultT, 0, len(entries))
+	sealResults := make([]*rpcfb.SealRangesResultT, 0, len(entries))
 
 	for _, entry := range entries {
 		if entry.Type != rpcfb.SealTypePLACEMENT_MANAGER {
-			sealResponses = append(sealResponses, &rpcfb.SealRangesResultT{
+			sealResults = append(sealResults, &rpcfb.SealRangesResultT{
 				Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: fmt.Sprintf("invalid seal type: %s", entry.Type)},
 			})
 			continue
 		}
 		if entry.Range == nil {
-			sealResponses = append(sealResponses, &rpcfb.SealRangesResultT{
+			sealResults = append(sealResults, &rpcfb.SealRangesResultT{
 				Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "range is nil"},
 			})
 			continue
@@ -86,9 +86,9 @@ func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.Sea
 			result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
 		}
 
-		sealResponses = append(sealResponses, result)
+		sealResults = append(sealResults, result)
 	}
 
-	resp.SealResponses = sealResponses
+	resp.Results = sealResults
 	resp.OK()
 }
