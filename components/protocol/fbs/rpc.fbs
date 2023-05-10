@@ -68,8 +68,10 @@ enum ErrorCode : int16 {
 table Status {
     // The top-level error code, or 0 if there was no error.
     code: ErrorCode (id: 0);
+    
     // The error message, or omitted if there was no error.
     message: string (id: 1);
+
     // Additional information about the error, if any.
     // Its format depends on the specific `ErrorCode`.
     detail: [ubyte] (id: 2);
@@ -85,9 +87,11 @@ table PlacementManagerCluster {
 table PlacementManagerNode {
     // The name of the PM node.
     name: string (id: 0, required);
+
     // The advertise address of the PM node, for client traffic from outside.
     // The schema of the address is `host:port`, while host supports both domain name and IPv4/IPv6 address.
     advertise_addr: string (id: 1, required);
+
     is_leader: bool (id: 2);
 }
 
@@ -107,29 +111,36 @@ enum ClientRole : byte {
 table HeartbeatRequest {
     // The unique id of the client.
     client_id: string (id: 0);
+
     // The role of the client. The client role is used to determine the type of the client.
     client_role: ClientRole (id: 1);
+    
     // Optional, the node information of the data node. Empty if the client is an SDK client.
     data_node: DataNode (id: 2);
 }
 
 table HeartbeatResponse {
     client_id: string (id: 0);
+    
     client_role: ClientRole (id: 1);
+    
     data_node: DataNode (id: 2);
+    
     status: Status (id: 3, required);
 }
 
 // Request placement manager to allocate a unique ID. 
 table IdAllocationRequest {
     timeout_ms: int32 (id: 0);
+    
     host: string (id: 1);
 }
 
 // Unique ID allocation response
 table IdAllocationResponse {
-    id: int32 (id: 0);
-    status: Status (id: 1, required);
+    status: Status (id: 0, required);
+
+    id: int32 (id: 1);
 }
 
 // The append request is used to append records to the data node.
@@ -138,7 +149,7 @@ table AppendRequest {
     timeout_ms: int32 (id: 0);
 
     // A batch of append request entries.
-    entries: [AppendEntry] (id: 1);
+    entries: [AppendEntry] (id: 1, required);
 }
 
 // Offsets for the record batch.
@@ -230,7 +241,7 @@ table FetchResult {
 // Used to fetch the ranges from a specific data node or a specific stream list.
 // Regard this table as a union type.
 // Alway set one of the fields.
-table RangeCriteria {
+table ListRangeCriteria {
     // If non-negative, placement managers are expected to filter ranges assigned to the specified node.
     node_id: int32 = -1 (id: 0);
 
@@ -249,28 +260,21 @@ table DataNode {
 
 // The list streams request is used to list the ranges of a batch of streams.
 // Or it could list the ranges of all the streams in a specific data node.
-table ListRangesRequest {
+table ListRangeRequest {
     timeout_ms: int32 (id: 0);
 
     // The range criteria could be a data node or a list of streams.
-    range_criteria: [RangeCriteria] (id: 1, required);
+    criteria: ListRangeCriteria (id: 1, required);
 }
 
-table ListRangesResponse {
+table ListRangeResponse {
+    status: Status (id: 0, required);
+
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // The responses of list ranges request
-    list_responses: [ListRangesResult] (id: 1);
-    status: Status (id: 2, required);
-}
+    throttle_time_ms: int32 (id: 1);
 
-table ListRangesResult {
-    // The criteria that the returned ranges used.
-    // A criteria may be a data node or a stream id.
-    range_criteria: RangeCriteria (id: 0);
     // The list of ranges.
-    ranges: [Range] (id: 1);
-    status: Status (id: 2, required);
+    ranges: [Range] (id: 2, required);
 }
 
 table Range {
@@ -299,7 +303,22 @@ table Range {
     replica_nodes: [DataNode] (id: 5);
 }
 
-// Seal action type.
+table CreateRangeRequest {
+    timeout_ms: int32 (id: 0);
+
+    range: Range (id: 1, required);
+}
+
+table CreateRangeResponse {
+    status: Status (id: 0, required);
+
+    range: Range (id: 1);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 2);
+}
+
+// Seal target kinds.
 //
 // Replication layer SDK performs two kinds of seals: seal-data-node and seal-placement-manager.
 // The former one renders ranges on data-node immutable and blocks further writes. In the scenario of chasing
@@ -311,203 +330,120 @@ table Range {
 // After receiving at least MinCopy of data-node seal responses, replication layer SDK is safe to seal the range in placement manager
 // and potentially create a new range, replicas of which reside on a different set of data nodes. This achieves fast fault toleration
 // as well as overall low write latency.
-enum SealType : byte {
-    UNSPECIFIED = 0,
+enum SealKind : byte {
+    SEAL_KIND_UNSPECIFIED = 0,
     DATA_NODE = 1,
     PLACEMENT_MANAGER = 2,
 }
 
-table SealRangesRequest {
+table SealRangeRequest {
     timeout_ms: int32 (id: 0);
-    // The ranges to seal.
-    entries: [SealRangeEntry] (id: 1, required);
-}
 
-table SealRangeEntry {
-    type: SealType      (id: 0);
+    kind: SealKind    (id: 1);
 
     // If the seal-type is placement-manager, end is the final upper boundary of the range being sealed.     
-    range: Range      (id: 1, required);
-        
-    // If the seal-type is placement-manager, indicate whether a new range should be created, 
-    // following completion of the seal action.
-    renew: bool         (id: 2);
+    range: Range      (id: 2, required);
 }
 
-table RangeId {
-    stream_id: int64 = -1 (id: 0);
-    range_index: int32 = -1 (id: 1);
-}
-
-table SealRangesResponse {
-    status: Status (id: 0, required);
-
-    // The responses of seal ranges request
-    results: [SealRangeResult] (id: 1, required);
-
-    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 2);
-}
-
-table SealRangeResult {
+table SealRangeResponse {
     status: Status (id: 0, required);
 
     // Both the PM and the data node will handle the seal ranges request.
     // The data node returns the sealed range, while the PM returns the newly writable range.
     range: Range (id: 1);
-}
 
-// The sync ranges request is used to sync newly writable ranges to accelerate the availability of a newly created writable range.
-// Or, it could be used to assign a new replicas of a range to a new data node.
-table SyncRangesRequest {
-    timeout_ms: int32 (id: 0);
-    // The ranges to sync.
-    stream_ranges: [StreamRanges] (id: 1);
-}
-
-// Contains the ranges of a specific stream.
-table StreamRanges {
-    stream_id: int64 = -1 (id: 0);
-    ranges: [Range] (id: 1);
-}
-
-table SyncRangesResponse {
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // The responses of sync ranges request
-    sync_responses: [SyncRangesResult] (id: 1);
-    status: Status (id: 2, required);
-}
-
-table SyncRangesResult {
-    // The id of the stream
-    stream_id: int64 = -1 (id: 0);
-    // The array of ranges, returned by the sync ranges request.
-    ranges: [Range] (id: 1);
-    status: Status (id: 2, required);
-}
-
-// The describe ranges request is used to describe the ranges of a batch of streams.
-// Usually, the client will use this frame to get the newly end offset of the stream after the write operation.
-table DescribeRangesRequest {
-    timeout_ms: int32 (id: 0);
-    // The ranges to describe.
-    ranges: [RangeId] (id: 1);
-}
-
-table DescribeRangesResponse {
-    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // The responses of describe ranges request
-    describe_responses: [DescribeRangeResult] (id: 1);
-    status: Status (id: 2, required);
-}
-
-table DescribeRangeResult {
-    // The id of the stream
-    stream_id: int64 = -1 (id: 0);
-    range: Range (id: 1);
-    status: Status (id: 2, required);
+    throttle_time_ms: int32 (id: 2);
 }
 
 table Stream {
     // The id of the stream
     // Omitted if the stream is not created.
     stream_id: int64 = -1 (id: 0);
+
     // The number of replica of the stream.
-    replica_num: int8 (id: 1);
+    replica: int8 (id: 1);
+    
     // The time to live of records in the stream in milliseconds.
     retention_period_ms: int64 (id: 2);
 }
 
-// The create streams request is used to create a batch of streams.
+// The create stream request is used to create a batch of streams.
 // This frame with batch ability is very useful for importing metadata from other systems.
-table CreateStreamsRequest {
+table CreateStreamRequest {
     // The timeout in milliseconds to wait for the response.
     timeout_ms: int32 (id: 0);
+
     // A batch of streams to create.
-    streams: [Stream] (id: 1);
+    stream: Stream (id: 1, required);
 }
 
-table CreateStreamsResponse {
-    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // The responses of create streams request
-    create_responses: [CreateStreamResult] (id: 1);
-
+table CreateStreamResponse {
     // Flag status of the RPC.
-    status: Status (id: 2, required);
-}
+    status: Status (id: 0, required);
 
-table CreateStreamResult {
     // The created stream
-    stream: Stream (id: 0);
-    status: Status (id: 1, required);
+    stream: Stream (id: 1);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 2);
 }
 
 // The delete streams request is used to delete a batch of streams to PM or data node.
 // The PM will delete the stream metadata as well as the range info, while the data node only marks the stream as deleted to reject the new write requests timely.
-table DeleteStreamsRequest {
+table DeleteStreamRequest {
+
     // The timeout in milliseconds to wait for the response.
     timeout_ms: int32 (id: 0);
-    // The ids of the streams to delete.
-    streams: [Stream] (id: 1);
+
+    // The id of the stream to delete.
+    stream_id: int64 = -1 (id: 1);
 }
 
-table DeleteStreamsResponse {
-    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // The responses of delete streams request
-    delete_responses: [DeleteStreamResult] (id: 1);
-    status: Status (id: 2, required);
-}
+table DeleteStreamResponse {
+    status: Status (id: 0, required);
 
-table DeleteStreamResult {
     // The deleted stream, or omitted if the stream is not deleted.
-    deleted_stream: Stream (id: 0);
-    status: Status (id: 1, required);
+    stream: Stream (id: 1);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 2);
 }
 
-table UpdateStreamsRequest {
+table UpdateStreamRequest {
     // The timeout in milliseconds to wait for the response.
     timeout_ms: int32 (id: 0);
+
     // The streams to update.
-    streams: [Stream] (id: 1);
+    stream: Stream (id: 1);
 }
 
-table UpdateStreamsResponse {
+table UpdateStreamResponse {
+    status: Status (id: 0, required);
+
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // The responses of update streams request
-    update_responses: [UpdateStreamResult] (id: 1);
-    status: Status (id: 2, required);
-}
-
-table UpdateStreamResult {
+    throttle_time_ms: int32 (id: 1);
+    
     // The updated stream
-    stream: Stream (id: 0);
-    status: Status (id: 1, required);
+    stream: Stream (id: 2);
 }
 
-table DescribeStreamsRequest {
+table DescribeStreamRequest {
     // The timeout in milliseconds to wait for the response.
     timeout_ms: int32 (id: 0);
+
     // The ids of the streams to describe.
-    stream_ids: [int64] (id: 1);
+    stream_id: int64 (id: 1);
 }
 
-table DescribeStreamsResponse {
+table DescribeStreamResponse {
+    status: Status (id: 0, required);
+
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // The responses of describe streams request
-    describe_responses: [DescribeStreamResult] (id: 1);
-    status: Status (id: 2, required);
-}
+    throttle_time_ms: int32 (id: 1);
 
-table DescribeStreamResult {
     // The stream, returned by the describe streams request.
-    stream: Stream (id: 0);
-    status: Status (id: 1, required);
+    stream: Stream (id: 2);
 }
 
 // The trim streams request is used to trim a batch of streams to PM.
@@ -519,37 +455,31 @@ table DescribeStreamResult {
 // The data node will send the TRIM_STREAMS frame to the PM to trim the stream with a trim offset.
 // The PM will delete the ranges whose end offset is less than the trim offset
 // and shrink the ranges whose start offset is less than the trim offset.
-
-table TrimStreamsRequest {
+table TrimStreamRequest {
     // The timeout in milliseconds to wait for the response.
     timeout_ms: int32 (id: 0);
-    // The ids of the streams to trim.
-    trimmed_streams: [TrimmedStream] (id: 1);
-}
 
-table TrimmedStream {
     // The id of the stream
-    stream_id: int64 = -1 (id: 0);
+    stream_id: int64 = -1 (id: 1);
+
     // The current minimum offset of the stream.
     // All the records before this offset have be deleted.
-    trim_offset: int64 (id: 1);
+    min_offset: int64 (id: 2);
 }
 
 table TrimStreamsResponse {
+    status: Status (id: 0, required);
+
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 0);
-    // The responses of trim streams request
-    trim_responses: [TrimStreamResult] (id: 1);
-    status: Status (id: 2, required);
+    throttle_time_ms: int32 (id: 1);
+    
+    // The trimmed stream
+    stream: Stream (id: 2);
+
+    // The smallest range of the stream after a trim operation.
+    range: Range (id: 3);
 }
 
-table TrimStreamResult {
-    // The trimmed stream
-    trimmed_stream: Stream (id: 0);
-    // The smallest range of the stream after a trim operation.
-    range: Range (id: 1);
-    status: Status (id: 2, required);
-}
 
 table ReportMetricsRequest {
     data_node: DataNode (id: 0);
@@ -574,6 +504,7 @@ table ReportMetricsRequest {
 
 table ReportMetricsResponse {
     data_node: DataNode (id: 0);
+
     status: Status (id: 1, required);
 }
 
@@ -587,5 +518,6 @@ table DescribePlacementManagerClusterRequest {
 
 table DescribePlacementManagerClusterResponse {
     status: Status (id: 0, required);
+    
     cluster: PlacementManagerCluster (id: 1, required);
 }
