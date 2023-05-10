@@ -8,25 +8,21 @@ import (
 
 type CreateStreamResultT struct {
 	Stream *StreamT `json:"stream"`
-	Range *RangeT `json:"range"`
 	Status *StatusT `json:"status"`
 }
 
 func (t *CreateStreamResultT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	streamOffset := t.Stream.Pack(builder)
-	range_Offset := t.Range.Pack(builder)
 	statusOffset := t.Status.Pack(builder)
 	CreateStreamResultStart(builder)
 	CreateStreamResultAddStream(builder, streamOffset)
-	CreateStreamResultAddRange(builder, range_Offset)
 	CreateStreamResultAddStatus(builder, statusOffset)
 	return CreateStreamResultEnd(builder)
 }
 
 func (rcv *CreateStreamResult) UnPackTo(t *CreateStreamResultT) {
 	t.Stream = rcv.Stream(nil).UnPack()
-	t.Range = rcv.Range(nil).UnPack()
 	t.Status = rcv.Status(nil).UnPack()
 }
 
@@ -77,21 +73,8 @@ func (rcv *CreateStreamResult) Stream(obj *Stream) *Stream {
 	return nil
 }
 
-func (rcv *CreateStreamResult) Range(obj *Range) *Range {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
-	if o != 0 {
-		x := rcv._tab.Indirect(o + rcv._tab.Pos)
-		if obj == nil {
-			obj = new(Range)
-		}
-		obj.Init(rcv._tab.Bytes, x)
-		return obj
-	}
-	return nil
-}
-
 func (rcv *CreateStreamResult) Status(obj *Status) *Status {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -104,16 +87,13 @@ func (rcv *CreateStreamResult) Status(obj *Status) *Status {
 }
 
 func CreateStreamResultStart(builder *flatbuffers.Builder) {
-	builder.StartObject(3)
+	builder.StartObject(2)
 }
 func CreateStreamResultAddStream(builder *flatbuffers.Builder, stream flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(stream), 0)
 }
-func CreateStreamResultAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(range_), 0)
-}
 func CreateStreamResultAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(status), 0)
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(status), 0)
 }
 func CreateStreamResultEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

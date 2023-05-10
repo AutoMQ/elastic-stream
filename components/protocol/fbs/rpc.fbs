@@ -442,9 +442,7 @@ table CreateStreamsResponse {
 table CreateStreamResult {
     // The created stream
     stream: Stream (id: 0);
-    // The created range, which is the first range of the stream.
-    range: Range (id: 1);
-    status: Status (id: 2, required);
+    status: Status (id: 1, required);
 }
 
 // The delete streams request is used to delete a batch of streams to PM or data node.
