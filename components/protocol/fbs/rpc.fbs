@@ -133,13 +133,14 @@ table HeartbeatResponse {
 table IdAllocationRequest {
     timeout_ms: int32 (id: 0);
     
-    host: string (id: 1);
+    host: string (id: 1, required);
 }
 
 // Unique ID allocation response
 table IdAllocationResponse {
     status: Status (id: 0, required);
 
+    // Allocated node-id
     id: int32 (id: 1);
 }
 
@@ -163,7 +164,7 @@ table BatchOffset {
 
 table AppendEntry {
     // The stream range to append records into.
-    range: Range (id: 0);
+    range: Range (id: 0, required);
 
     offset: BatchOffset (id: 1, required);
 
@@ -206,7 +207,7 @@ table FetchRequest {
 
 table FetchEntry {
     // The stream range to fetch.
-    range: Range (id: 0);
+    range: Range (id: 0, required);
     
     // The offset to fetch from.
     fetch_offset: int64 (id: 1);
@@ -285,10 +286,10 @@ table Range {
     epoch: int64 = -1 (id: 1);
 
     // The index of the range in the stream.
-    range_index: int32 = -1 (id: 2);
+    index: int32 = -1 (id: 2);
 
     // The start offset of the range. Offset is 0-based index and follows left-boundary-inclusive and right-boundary-exclusive.
-    start_offset: int64 (id: 3);
+    start: int64 = -1 (id: 3);
 
     // The end offset of the range.
     // -1 if the range is mutable. If the range is sealed, end_offset would be non-negative and `end_offset` is exclusive.
@@ -297,10 +298,10 @@ table Range {
     // range `[0, 100)` means it is already sealed and read-only, records indexed 0 to 99 can be retrieved from this range;
     // we may have empty, droppable sealed ranges with the form `[N, N)` and placement manager would delete them without hesitation,
     // as a result, clients should NOT cache these empty ones.
-    end_offset: int64 (id: 4);
+    end: int64 = -1 (id: 4);
 
     // The collection of data-node that host this range.
-    replica_nodes: [DataNode] (id: 5);
+    nodes: [DataNode] (id: 5);
 }
 
 table CreateRangeRequest {
