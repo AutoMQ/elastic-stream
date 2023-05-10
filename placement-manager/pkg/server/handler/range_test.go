@@ -94,11 +94,10 @@ func TestSealRanges(t *testing.T) {
 	}{
 		{
 			name:    "normal case (seal a writable range; renew; last range is writable)",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}, End: 42, Renew: true},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{EndOffset: 42}, Renew: true},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{RangeIndex: 1},
-				End:   84,
+				Range: &rpcfb.RangeT{RangeIndex: 1, EndOffset: 84},
 				Renew: true,
 			},
 			want: want{
@@ -113,11 +112,10 @@ func TestSealRanges(t *testing.T) {
 
 		{
 			name:    "seal a writable range; renew; last range is writable",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}, Renew: true},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}, Renew: true},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{RangeIndex: 1},
-				End:   42,
+				Range: &rpcfb.RangeT{RangeIndex: 1, EndOffset: 42},
 				Renew: true,
 			},
 			want: want{
@@ -131,11 +129,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "seal a writable range; not renew; last range is writable",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}, Renew: true},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}, Renew: true},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{RangeIndex: 1},
-				End:   42,
+				Range: &rpcfb.RangeT{RangeIndex: 1, EndOffset: 42},
 			},
 			want: want{
 				ranges: []*rpcfb.RangeT{
@@ -147,11 +144,10 @@ func TestSealRanges(t *testing.T) {
 
 		{
 			name:    "seal a sealed range; renew; last range is writable",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}, Renew: true},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}, Renew: true},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{},
-				End:   42,
+				Range: &rpcfb.RangeT{EndOffset: 42},
 				Renew: true,
 			},
 			want: want{
@@ -166,11 +162,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "seal a sealed range; renew; last range is sealed",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{},
-				End:   42,
+				Range: &rpcfb.RangeT{EndOffset: 42},
 				Renew: true,
 			},
 			want: want{
@@ -185,11 +180,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "seal a sealed range; not renew; last range is writable",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}, Renew: true},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}, Renew: true},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{},
-				End:   42,
+				Range: &rpcfb.RangeT{EndOffset: 42},
 			},
 			want: want{
 				ranges: []*rpcfb.RangeT{
@@ -202,11 +196,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "seal a sealed range; not renew; last range is sealed",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{},
-				End:   42,
+				Range: &rpcfb.RangeT{EndOffset: 42},
 			},
 			want: want{
 				ranges: []*rpcfb.RangeT{
@@ -219,11 +212,10 @@ func TestSealRanges(t *testing.T) {
 
 		{
 			name:    "seal a non-exist range; renew; last range is writable",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}, Renew: true},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}, Renew: true},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{RangeIndex: 2},
-				End:   42,
+				Range: &rpcfb.RangeT{RangeIndex: 2, EndOffset: 42},
 				Renew: true,
 			},
 			want: want{
@@ -238,11 +230,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "seal a non-exist range; renew; last range is sealed",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{RangeIndex: 2},
-				End:   42,
+				Range: &rpcfb.RangeT{RangeIndex: 2, EndOffset: 42},
 				Renew: true,
 			},
 			want: want{
@@ -257,11 +248,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "seal a non-exist range; not renew; last range is writable",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}, Renew: true},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}, Renew: true},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{RangeIndex: 2},
-				End:   42,
+				Range: &rpcfb.RangeT{RangeIndex: 2, EndOffset: 42},
 			},
 			want: want{
 				ranges: []*rpcfb.RangeT{
@@ -274,11 +264,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "seal a non-exist range; not renew; last range is sealed",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{RangeIndex: 2},
-				End:   42,
+				Range: &rpcfb.RangeT{RangeIndex: 2, EndOffset: 42},
 			},
 			want: want{
 				ranges: []*rpcfb.RangeT{
@@ -291,11 +280,10 @@ func TestSealRanges(t *testing.T) {
 
 		{
 			name:    "invalid type",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypeDATA_NODE,
-				Range: &rpcfb.RangeIdT{},
-				End:   42,
+				Range: &rpcfb.RangeT{EndOffset: 42},
 				Renew: true,
 			},
 			want: want{
@@ -309,11 +297,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "stream not exist",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{}},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{StreamId: 1, RangeIndex: 1},
-				End:   42,
+				Range: &rpcfb.RangeT{StreamId: 1, RangeIndex: 1, EndOffset: 42},
 				Renew: true,
 			},
 			want: want{
@@ -327,11 +314,10 @@ func TestSealRanges(t *testing.T) {
 		},
 		{
 			name:    "invalid end offset",
-			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeIdT{}, End: 84, Renew: true},
+			preSeal: &rpcfb.SealRangeEntryT{Range: &rpcfb.RangeT{EndOffset: 84}, Renew: true},
 			seal: &rpcfb.SealRangeEntryT{
 				Type:  rpcfb.SealTypePLACEMENT_MANAGER,
-				Range: &rpcfb.RangeIdT{RangeIndex: 1},
-				End:   42,
+				Range: &rpcfb.RangeT{RangeIndex: 1, EndOffset: 42},
 				Renew: true,
 			},
 			want: want{
@@ -450,7 +436,7 @@ func preSealRange(tb testing.TB, h *Handler, entry *rpcfb.SealRangeEntryT) {
 		re.Equal(&rpcfb.RangeT{
 			StreamId:    entry.Range.StreamId,
 			RangeIndex:  entry.Range.RangeIndex + 1,
-			StartOffset: entry.End,
+			StartOffset: entry.Range.EndOffset,
 			EndOffset:   -1,
 		}, resp.Results[0].Range)
 	}

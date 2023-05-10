@@ -131,7 +131,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, entry *rpcfb.SealRangeEntry
 	var rerr error
 	switch {
 	case isWritable(lastRange) && entry.Range.RangeIndex == lastRange.RangeIndex:
-		sealedRange, err := c.sealRangeLocked(ctx, lastRange, entry.End)
+		sealedRange, err := c.sealRangeLocked(ctx, lastRange, entry.Range.EndOffset)
 		if err != nil {
 			return nil, err
 		}
