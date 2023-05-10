@@ -7,7 +7,11 @@ use model::{
     range_criteria::RangeCriteria,
     request::seal::{self, SealRangeEntry},
 };
-
+use observation::metrics::{
+    store_metrics::DataNodeStatistics,
+    sys_metrics::{DiskStatistics, MemoryStatistics},
+    uring_metrics::UringStatistics,
+};
 use std::{cell::UnsafeCell, rc::Rc, sync::Arc};
 use tokio::{sync::broadcast, time};
 
@@ -152,11 +156,44 @@ impl Client {
     pub async fn append(&self, target: &str, buf: Bytes) -> Result<(), ClientError> {
         unimplemented!()
     }
+    /// Report metrics to placement manager
+    ///
+    /// # Arguments
+    /// `target` - Placement manager access URL.
+    ///
+    /// # Returns
+    ///
+    pub async fn report_metrics(
+        &self,
+        target: &str,
+        uring_statistics: &UringStatistics,
+        data_node_statistics: &DataNodeStatistics,
+        disk_statistics: &DiskStatistics,
+        memory_statistics: &MemoryStatistics,
+    ) -> Result<(), ClientError> {
+        let session_manager = unsafe { &mut *self.session_manager.get() };
+        let composite_session = session_manager.get_composite_session(target).await?;
+        trace!("Report metrics to composite-channel={}", target);
+
+        composite_session
+            .report_metrics(
+                uring_statistics,
+                data_node_statistics,
+                disk_statistics,
+                memory_statistics,
+            )
+            .await
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use log::trace;
+    use observation::metrics::{
+        store_metrics::DataNodeStatistics,
+        sys_metrics::{DiskStatistics, MemoryStatistics},
+        uring_metrics::UringStatistics,
+    };
     use std::{error::Error, sync::Arc};
     use test_util::run_listener;
     use tokio::sync::broadcast;
@@ -260,6 +297,35 @@ mod tests {
             }
 
             Ok(())
+        })
+    }
+    #[test]
+    fn test_report_metrics() -> Result<(), ClientError> {
+        tokio_uring::start(async {
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener().await;
+            let mut config = config::Configuration::default();
+            config.placement_manager = format!("localhost:{}", port);
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.check_and_apply().unwrap();
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(Arc::clone(&config), tx);
+            let uring_statistics = UringStatistics::new();
+            let data_node_statistics = DataNodeStatistics::new();
+            let disk_statistics = DiskStatistics::new();
+            let memory_statistics = MemoryStatistics::new();
+            client
+                .report_metrics(
+                    &config.placement_manager,
+                    &uring_statistics,
+                    &data_node_statistics,
+                    &disk_statistics,
+                    &memory_statistics,
+                )
+                .await
         })
     }
 }

@@ -4,7 +4,7 @@ use crate::{client_role::ClientRole, data_node::DataNode, range_criteria::RangeC
 use bytes::{Bytes, BytesMut};
 use protocol::rpc::header::{
     DataNodeT, DescribePlacementManagerClusterRequestT, HeartbeatRequestT, IdAllocationRequestT,
-    ListRangeCriteria, ListRangeCriteriaT, ListRangeRequestT, RangeT, SealKind, SealRangeRequestT,
+    ListRangeCriteria, ListRangeCriteriaT, ListRangeRequestT, RangeT, SealKind, SealRangeRequestT, ReportMetricsRequestT,
 };
 use std::time::Duration;
 
@@ -35,6 +35,26 @@ pub enum Request {
     SealRange {
         timeout: Duration,
         entry: SealRangeEntry,
+    },
+    ReportMetrics {
+        data_node: DataNode,
+        disk_in_rate: i64,
+        disk_out_rate: i64,
+        disk_free_space: i64,
+        disk_unindexed_data_size: i64,
+        memory_used: i64,
+        uring_task_rate: i16,
+        uring_inflight_task_cnt: i16,
+        uring_pending_task_cnt: i32,
+        uring_task_avg_latency: i16,
+        network_append_rate: i16,
+        network_fetch_rate: i16,
+        network_failed_append_rate: i16,
+        network_failed_fetch_rate: i16,
+        network_append_avg_latency: i16,
+        network_fetch_avg_latency: i16,
+        range_missing_replica_cnt: i16,
+        range_active_cnt: i16,
     },
 }
 
@@ -107,6 +127,48 @@ impl From<&Request> for Bytes {
 
                 request.range = Box::new(range_t);
 
+                let request = request.pack(&mut builder);
+                builder.finish(request, None);
+            }
+            Request::ReportMetrics {
+                data_node,
+                disk_in_rate,
+                disk_out_rate,
+                disk_free_space,
+                disk_unindexed_data_size,
+                memory_used,
+                uring_task_rate,
+                uring_inflight_task_cnt,
+                uring_pending_task_cnt,
+                uring_task_avg_latency,
+                network_append_rate,
+                network_fetch_rate,
+                network_failed_append_rate,
+                network_failed_fetch_rate,
+                network_append_avg_latency,
+                network_fetch_avg_latency,
+                range_missing_replica_cnt,
+                range_active_cnt,
+            } => {
+                let mut request = ReportMetricsRequestT::default();
+                request.data_node = Some(Box::new(data_node.into()));
+                request.disk_in_rate = *disk_in_rate;
+                request.disk_out_rate = *disk_out_rate;
+                request.disk_free_space = *disk_free_space;
+                request.disk_unindexed_data_size = *disk_unindexed_data_size;
+                request.memory_used = *memory_used;
+                request.uring_task_rate = *uring_task_rate;
+                request.uring_inflight_task_cnt = *uring_inflight_task_cnt;
+                request.uring_pending_task_cnt = *uring_pending_task_cnt;
+                request.uring_task_avg_latency = *uring_task_avg_latency;
+                request.network_append_rate = *network_append_rate;
+                request.network_fetch_rate = *network_fetch_rate;
+                request.network_failed_append_rate = *network_failed_append_rate;
+                request.network_failed_fetch_rate = *network_failed_fetch_rate;
+                request.network_append_avg_latency = *network_append_avg_latency;
+                request.network_fetch_avg_latency = *network_fetch_avg_latency;
+                request.range_missing_replica_cnt = *range_missing_replica_cnt;
+                request.range_active_cnt = *range_active_cnt;
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }

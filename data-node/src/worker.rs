@@ -6,18 +6,22 @@ use std::{
     time::{Duration, Instant},
 };
 
-use client::Client;
-use log::{debug, error, info, warn};
-use store::ElasticStore;
-use tokio::sync::{broadcast, mpsc};
-use tokio_uring::net::TcpListener;
-use util::metrics::http_serve;
-
 use crate::{
     connection_tracker::ConnectionTracker,
     stream_manager::{fetcher::FetchRangeTask, StreamManager},
     worker_config::WorkerConfig,
 };
+use client::Client;
+use log::{debug, error, info, warn};
+use observation::metrics::{
+    store_metrics::DataNodeStatistics,
+    sys_metrics::{DiskStatistics, MemoryStatistics},
+    uring_metrics::UringStatistics,
+};
+use store::ElasticStore;
+use tokio::sync::{broadcast, mpsc};
+use tokio_uring::net::TcpListener;
+use util::metrics::http_serve;
 
 /// A server aggregates one or more `Worker`s and each `Worker` takes up a dedicated CPU
 /// processor, following the Thread-per-Core design paradigm.
@@ -94,9 +98,10 @@ impl Worker {
                     .expect("Failed to bootstrap stream ranges from placement managers");
 
                 if self.config.primary {
-                    tokio_uring::spawn(async {
-                        http_serve().await;
-                    });
+                    // tokio_uring::spawn(async {
+                    //     http_serve().await;
+                    // });
+                    self.report_metrics(shutdown.subscribe());
                 }
 
                 self.heartbeat(shutdown.subscribe());
@@ -109,7 +114,36 @@ impl Worker {
                 }
             });
     }
+    fn report_metrics(&self, mut shutdown_rx: broadcast::Receiver<()>) {
+        let client = Rc::clone(&self.client);
+        let config = Arc::clone(&self.config.server_config);
+        tokio_uring::spawn(async move {
+            // TODO: Modify it to client report metrics interval, instead of config.client_heartbeat_interval()
+            let mut interval = tokio::time::interval(config.client_heartbeat_interval());
+            let mut uring_statistics = UringStatistics::new();
+            let mut data_node_statistics = DataNodeStatistics::new();
+            let mut disk_statistics = DiskStatistics::new();
+            let mut memory_statistics = MemoryStatistics::new();
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        info!("Received shutdown signal. Stop accepting new connections.");
+                        break;
+                    }
+                    _ = interval.tick() => {
+                        uring_statistics.record();
+                        data_node_statistics.record();
+                        disk_statistics.record();
+                        memory_statistics.record();
+                        let _ = client
+                        .report_metrics(&config.placement_manager, &uring_statistics,&data_node_statistics, &disk_statistics, &memory_statistics)
+                        .await;
+                    }
 
+                }
+            }
+        });
+    }
     fn heartbeat(&self, mut shutdown_rx: broadcast::Receiver<()>) {
         let client = Rc::clone(&self.client);
         let config = Arc::clone(&self.config.server_config);

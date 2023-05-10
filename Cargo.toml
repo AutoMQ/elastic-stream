@@ -14,6 +14,7 @@ members = [
     "components/store",
     "components/util",
     "components/test-util",
+    "components/observation",
     "data-node",
     "sdks/rust"
 ]

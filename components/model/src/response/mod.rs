@@ -25,4 +25,7 @@ pub enum Response {
         status: Status,
         range: Option<StreamRange>,
     },
+    ReportMetrics {
+        status: Status,
+    },
 }

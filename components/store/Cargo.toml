@@ -33,6 +33,7 @@ derivative = { workspace = true }
 rocksdb = { workspace = true }
 lazy_static = {version = "1.4.0"}
 minstant = { workspace = true }
+observation = {path = "../observation"}
 
 [dev-dependencies]
 cargo-llvm-cov = { workspace = true }

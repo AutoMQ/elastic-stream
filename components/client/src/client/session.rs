@@ -2,10 +2,10 @@ use codec::{
     error::FrameError,
     frame::{Frame, OperationCode},
 };
-use model::{range::StreamRange, request::Request, response, PlacementManagerNode, Status};
+use model::{request::Request, response, PlacementManagerNode, Status};
 use protocol::rpc::header::{
     DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse, IdAllocationResponse,
-    ListRangeResponse, SealRangeResponse, SystemError,
+    ListRangeResponse, ReportMetricsResponse, SealRangeResponse, SystemError,
 };
 use transport::connection::Connection;
 
@@ -207,6 +207,12 @@ impl Session {
 
             Request::SealRange { .. } => {
                 frame.operation_code = OperationCode::SealRange;
+            }
+            Request::ReportMetrics { .. } => {
+                frame.operation_code = OperationCode::ReportMetrics;
+            }
+            Request::ReportMetrics { .. } => {
+                frame.operation_code = OperationCode::ReportMetrics;
             }
         };
 
@@ -454,7 +460,29 @@ impl Session {
         }
         resp
     }
+    fn handle_report_metrics_response(frame: &Frame) -> response::Response {
+        let mut resp = response::Response::ReportMetrics {
+            status: Status::ok(),
+        };
+        if let Some(ref buf) = frame.header {
+            match flatbuffers::root::<ReportMetricsResponse>(buf) {
+                Ok(reportmetrics) => {
+                    trace!("Received Report Metrics response: {:?}", reportmetrics);
+                    let hb = reportmetrics.unpack();
+                    let _status = hb.status;
+                    if let response::Response::ReportMetrics { ref mut status } = resp {
+                        *status = _status.as_ref().into();
+                    }
+                }
 
+                Err(e) => {
+                    println!("buf = {:?}", buf);
+                    error!("Failed to parse Report Metrics response header: {:?}", e);
+                }
+            }
+        }
+        resp
+    }
     fn handle_response(inflight: &mut HashMap<u32, InvocationContext>, frame: Frame) {
         let stream_id = frame.stream_id;
         trace!(
@@ -509,7 +537,7 @@ impl Session {
                         return;
                     }
                     OperationCode::TrimStream => todo!(),
-                    OperationCode::ReportMetrics => todo!(),
+                    OperationCode::ReportMetrics => Self::handle_report_metrics_response(&frame),
                     OperationCode::DescribePlacementManager => {
                         Self::handle_describe_placement_manager_response(&frame)
                     }

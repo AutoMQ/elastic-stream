@@ -3,16 +3,16 @@ use crate::index::driver::IndexDriver;
 use crate::index::record_handle::RecordHandle;
 use crate::io::buf::{AlignedBufReader, AlignedBufWriter};
 use crate::io::context::Context;
-use crate::io::metrics::{
-    COMPLETED_READ_IO, COMPLETED_WRITE_IO, INFLIGHT_IO, IO_DEPTH, PENDING_TASK, READ_BYTES_TOTAL,
-    READ_IO_LATENCY, WRITE_BYTES_TOTAL, WRITE_IO_LATENCY,
-};
 use crate::io::task::IoTask;
 use crate::io::task::WriteTask;
 use crate::io::wal::Wal;
 use crate::io::write_window::WriteWindow;
 use crate::AppendResult;
 use crate::BufSlice;
+use observation::metrics::uring_metrics::{
+    UringStatistics, COMPLETED_READ_IO, COMPLETED_WRITE_IO, INFLIGHT_IO, IO_DEPTH, PENDING_TASK,
+    READ_BYTES_TOTAL, READ_IO_LATENCY, WRITE_BYTES_TOTAL, WRITE_IO_LATENCY,
+};
 use std::io;
 
 use crossbeam::channel::{Receiver, Sender, TryRecvError};
@@ -952,19 +952,19 @@ impl IO {
                     // It's safe to convert tag ptr back to Box<Context> as the memory pointed by ptr
                     // is allocated by Box itself, hence, there will no alignment issue at all.
                     let mut context = unsafe { Box::from_raw(ptr) };
-
+                    let latency = context.start_time.elapsed();
                     match context.opcode {
                         opcode::Read::CODE => {
-                            READ_IO_LATENCY
-                                .observe(context.start_time.elapsed().as_micros() as f64);
+                            READ_IO_LATENCY.observe(latency.as_micros() as f64);
                             READ_BYTES_TOTAL.inc_by(context.buf.capacity as u64);
                             COMPLETED_READ_IO.inc();
+                            UringStatistics::observe_latency(latency.as_millis() as i16);
                         }
                         opcode::Write::CODE => {
-                            WRITE_IO_LATENCY
-                                .observe(context.start_time.elapsed().as_micros() as f64);
+                            WRITE_IO_LATENCY.observe(latency.as_micros() as f64);
                             WRITE_BYTES_TOTAL.inc_by(context.buf.capacity as u64);
                             COMPLETED_WRITE_IO.inc();
+                            UringStatistics::observe_latency(latency.as_millis() as i16);
                         }
                         _ => {}
                     }

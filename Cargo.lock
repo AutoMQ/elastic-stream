@@ -482,6 +482,7 @@ dependencies = [
  "log",
  "mockall",
  "model",
+ "observation",
  "ordinal",
  "protocol",
  "test-util",
@@ -789,6 +790,7 @@ dependencies = [
  "model",
  "num_cpus",
  "num_enum",
+ "observation",
  "pprof",
  "prometheus",
  "protocol",
@@ -1723,6 +1725,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntapi"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8a3895c6391c39d7fe7ebc444a87eb2991b2a0bc718fdabd071eec617fc68e4"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "num"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1847,6 +1858,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea86265d3d3dcb6a27fc51bd29a4bf387fae9d2986b823079d4986af253eb439"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "observation"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "log",
+ "procinfo",
+ "prometheus",
+ "sysinfo",
 ]
 
 [[package]]
@@ -2577,6 +2599,7 @@ dependencies = [
  "model",
  "nix",
  "num_enum",
+ "observation",
  "percentage",
  "prometheus",
  "protocol",
@@ -2664,6 +2687,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02f1dc6930a439cc5d154221b5387d153f8183529b07c19aca24ea31e0a167e1"
+dependencies = [
+ "cfg-if",
+ "core-foundation-sys",
+ "libc",
+ "ntapi",
+ "once_cell",
+ "rayon",
+ "winapi",
 ]
 
 [[package]]

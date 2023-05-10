@@ -23,6 +23,7 @@ ordinal = { workspace = true }
 tokio-uring = { workspace = true }
 tokio = { workspace = true }
 crossbeam = { workspace = true }
+observation = {path = "../observation"}
 
 [dev-dependencies]
 mockall = { workspace = true }

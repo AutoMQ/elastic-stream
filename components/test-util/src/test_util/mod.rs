@@ -10,8 +10,8 @@ use protocol::rpc::header::{
     DescribePlacementManagerClusterRequest, DescribePlacementManagerClusterResponseT, ErrorCode,
     HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
     ListRangesRequest, ListRangesResponseT, ListRangesResultT, PlacementManagerClusterT,
-    PlacementManagerNodeT, RangeT, SealRangeResultT, SealRangesRequest, SealRangesResponseT,
-    SealType, StatusT,
+    PlacementManagerNodeT, RangeT, ReportMetricsRequest, ReportMetricsResponseT, SealRangeResultT,
+    SealRangesRequest, SealRangesResponseT, SealType, StatusT,
 };
 
 use tokio::sync::oneshot;
@@ -110,6 +110,22 @@ fn serve_describe_placement_manager_cluster(
     frame.header = Some(Bytes::copy_from_slice(buf));
 }
 
+fn serve_report_metrics(request: &ReportMetricsRequest, frame: &mut Frame) {
+    debug!("{:?}", request);
+    frame.operation_code = OperationCode::ReportMetrics;
+    let mut response = ReportMetricsResponseT::default();
+    response.data_node = request.data_node().map(|dn| Box::new(dn.unpack()));
+    let mut status = StatusT::default();
+    status.code = ErrorCode::OK;
+    status.message = Some("OK".to_owned());
+    response.status = Box::new(status);
+    let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
+    let resp = response.pack(&mut builder);
+    builder.finish(resp, None);
+    let hdr = builder.finished_data();
+    let buf = Bytes::copy_from_slice(hdr);
+    frame.header = Some(buf);
+}
 /// Run a dummy listening server.
 /// Once it accepts a connection, it quits immediately.
 pub async fn run_listener() -> u16 {
@@ -217,7 +233,23 @@ pub async fn run_listener() -> u16 {
                                         }
                                     }
                                 }
-
+                                OperationCode::ReportMetrics => {
+                                    if let Some(buf) = &frame.header {
+                                        if let Ok(reportmetrics) =
+                                            flatbuffers::root::<ReportMetricsRequest>(buf)
+                                        {
+                                            trace!("Start to sleep...");
+                                            tokio::time::sleep(Duration::from_millis(500)).await;
+                                            trace!("ReportMetrics sleep completed");
+                                            serve_report_metrics(
+                                                &reportmetrics,
+                                                &mut response_frame,
+                                            );
+                                        } else {
+                                            error!("Failed to decode heartbeat request header");
+                                        }
+                                    }
+                                }
                                 _ => {
                                     warn!("Unsupported operation code: {}", frame.operation_code);
                                     unimplemented!("Unimplemented operation code");

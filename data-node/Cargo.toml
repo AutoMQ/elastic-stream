@@ -40,6 +40,7 @@ tokio = { workspace = true }
 util = {path = "../components/util"}
 lazy_static = {version = "1.4.0"}
 prometheus = {workspace = true}
+observation = {path = "../components/observation"}
 
 [dev-dependencies]
 mockall = { workspace = true }

@@ -6,14 +6,7 @@ use std::{
     thread::{Builder, JoinHandle},
 };
 
-use super::{
-    lock::Lock,
-    metrics::{
-        STORE_APPEND_BYTES_COUNT, STORE_APPEND_COUNT, STORE_APPEND_LATENCY_HISTOGRAM,
-        STORE_FAILED_APPEND_COUNT, STORE_FAILED_FETCH_COUNT, STORE_FETCH_BYTES_COUNT,
-        STORE_FETCH_COUNT, STORE_FETCH_LATENCY_HISTOGRAM,
-    },
-};
+use super::lock::Lock;
 use crate::{
     error::{AppendError, FetchError, StoreError},
     index::{driver::IndexDriver, MinOffset},
@@ -36,6 +29,11 @@ use crossbeam::channel::Sender;
 use futures::future::join_all;
 use log::{error, trace};
 use model::range::StreamRange;
+use observation::metrics::store_metrics::{
+    DataNodeStatistics, STORE_APPEND_BYTES_COUNT, STORE_APPEND_COUNT,
+    STORE_APPEND_LATENCY_HISTOGRAM, STORE_FAILED_APPEND_COUNT, STORE_FAILED_FETCH_COUNT,
+    STORE_FETCH_BYTES_COUNT, STORE_FETCH_COUNT, STORE_FETCH_LATENCY_HISTOGRAM,
+};
 use tokio::sync::{mpsc, oneshot};
 
 #[derive(Clone)]
@@ -216,7 +214,9 @@ impl Store for ElasticStore {
         self.do_append(request, sender);
         match receiver.await.map_err(|_e| AppendError::ChannelRecv) {
             Ok(res) => {
-                STORE_APPEND_LATENCY_HISTOGRAM.observe(now.elapsed().as_micros() as f64);
+                let latency = now.elapsed();
+                STORE_APPEND_LATENCY_HISTOGRAM.observe(latency.as_micros() as f64);
+                DataNodeStatistics::observe_append_latency(latency.as_millis() as i16);
                 STORE_APPEND_COUNT.inc();
                 STORE_APPEND_BYTES_COUNT.inc_by(len as u64);
                 res
@@ -293,7 +293,9 @@ impl Store for ElasticStore {
             final_result.sort_by(|a, b| a.wal_offset.cmp(&b.wal_offset));
 
             STORE_FETCH_COUNT.inc();
-            STORE_FETCH_LATENCY_HISTOGRAM.observe(now.elapsed().as_micros() as f64);
+            let latency = now.elapsed();
+            STORE_FETCH_LATENCY_HISTOGRAM.observe(latency.as_micros() as f64);
+            DataNodeStatistics::observe_fetch_latency(latency.as_millis() as i16);
             STORE_FETCH_BYTES_COUNT
                 .inc_by(final_result.iter().map(|re| re.total_len()).sum::<usize>() as u64);
             return Ok(FetchResult {

@@ -1,7 +1,6 @@
 mod block_cache;
 pub(crate) mod buf;
 mod context;
-mod metrics;
 pub(crate) mod record;
 mod segment;
 pub(crate) mod task;
