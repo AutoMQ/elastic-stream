@@ -47,9 +47,9 @@ type Endpoint struct {
 
 // NewEndpoint creates a new base storage endpoint with the given KV.
 // It should be embedded inside a storage backend.
-func NewEndpoint(kv2 kv.LogAble, logger *zap.Logger) *Endpoint {
+func NewEndpoint(kv2 kv.KV, logger *zap.Logger) *Endpoint {
 	return &Endpoint{
-		KV: kv.Logger{Kv: kv2},
+		KV: kv2,
 		lg: logger,
 	}
 }

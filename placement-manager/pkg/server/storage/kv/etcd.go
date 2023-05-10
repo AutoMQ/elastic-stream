@@ -20,6 +20,7 @@ import (
 
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/server/v3/embed"
 	"go.uber.org/zap"
 
 	"github.com/AutoMQ/placement-manager/pkg/util/etcdutil"
@@ -33,31 +34,45 @@ var (
 
 // Etcd is a kv based on etcd.
 type Etcd struct {
-	client     *clientv3.Client
 	rootPath   []byte
 	newTxnFunc func(ctx context.Context) clientv3.Txn // WARNING: do not call `If` on the returned txn.
+	maxTxnOps  uint
 
 	lg *zap.Logger
 }
 
+// EtcdParam is used to create a new etcd kv.
+type EtcdParam struct {
+	KV clientv3.KV
+	// rootPath is the prefix of all keys in etcd.
+	RootPath string
+	// cmpFunc is used to create a transaction. If cmpFunc is nil, the transaction will not have any condition.
+	CmpFunc func() clientv3.Cmp
+	// maxTxnOps is the max number of operations in a transaction. It is an etcd server configuration.
+	// If maxTxnOps is 0, it will use the default value (128).
+	MaxTxnOps uint
+}
+
 // NewEtcd creates a new etcd kv.
-// The rootPath is the prefix of all keys in etcd.
-// The cmpFunc is used to create a transaction.
-// If cmpFunc is nil, the transaction will not have any condition.
-func NewEtcd(client *clientv3.Client, rootPath string, lg *zap.Logger, cmpFunc func() clientv3.Cmp) *Etcd {
+func NewEtcd(param EtcdParam, lg *zap.Logger) *Etcd {
 	e := &Etcd{
-		client:   client,
-		rootPath: []byte(rootPath),
-		lg:       lg,
+		rootPath:  []byte(param.RootPath),
+		maxTxnOps: param.MaxTxnOps,
+		lg:        lg,
 	}
-	if cmpFunc != nil {
+
+	if e.maxTxnOps == 0 {
+		e.maxTxnOps = embed.DefaultMaxTxnOps
+	}
+
+	if param.CmpFunc != nil {
 		e.newTxnFunc = func(ctx context.Context) clientv3.Txn {
 			// cmpFunc should be evaluated lazily.
-			return etcdutil.NewTxn(ctx, client, lg.With(traceutil.TraceLogField(ctx))).If(cmpFunc())
+			return etcdutil.NewTxn(ctx, param.KV, lg.With(traceutil.TraceLogField(ctx))).If(param.CmpFunc())
 		}
 	} else {
 		e.newTxnFunc = func(ctx context.Context) clientv3.Txn {
-			return etcdutil.NewTxn(ctx, client, lg.With(traceutil.TraceLogField(ctx)))
+			return etcdutil.NewTxn(ctx, param.KV, lg.With(traceutil.TraceLogField(ctx)))
 		}
 	}
 	return e
@@ -127,7 +142,6 @@ func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) 
 	if len(r.StartKey) == 0 {
 		return nil, nil
 	}
-	logger := e.lg
 
 	startKey := e.addPrefix(r.StartKey)
 	endKey := e.addPrefix(r.EndKey)
@@ -139,20 +153,38 @@ func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) 
 	if desc {
 		opts = append(opts, clientv3.WithSort(clientv3.SortByKey, clientv3.SortDescend))
 	}
-	resp, err := etcdutil.Get(ctx, e.client, startKey, logger, opts...)
+
+	resp, err := e.newTxnFunc(ctx).Then(clientv3.OpGet(string(startKey), opts...)).Commit()
 	if err != nil {
 		return nil, errors.Wrap(err, "kv get by range")
 	}
+	if !resp.Succeeded {
+		return nil, errors.Wrap(ErrTxnFailed, "kv get by range")
+	}
 
-	kvs := make([]KeyValue, 0, len(resp.Kvs))
-	for _, kv := range resp.Kvs {
-		if !e.hasPrefix(kv.Key) {
+	cnt := 0
+	for _, resp := range resp.Responses {
+		rangeResp := resp.GetResponseRange()
+		if rangeResp == nil {
 			continue
 		}
-		kvs = append(kvs, KeyValue{
-			Key:   e.trimPrefix(kv.Key),
-			Value: kv.Value,
-		})
+		cnt += len(rangeResp.Kvs)
+	}
+	kvs := make([]KeyValue, 0, cnt)
+	for _, resp := range resp.Responses {
+		rangeResp := resp.GetResponseRange()
+		if rangeResp == nil {
+			continue
+		}
+		for _, kv := range rangeResp.Kvs {
+			if !e.hasPrefix(kv.Key) {
+				continue
+			}
+			kvs = append(kvs, KeyValue{
+				Key:   e.trimPrefix(kv.Key),
+				Value: kv.Value,
+			})
+		}
 	}
 	return kvs, nil
 }

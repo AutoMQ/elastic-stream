@@ -44,7 +44,7 @@ type EtcdAllocator struct {
 	base uint64
 	end  uint64
 
-	client  *clientv3.Client
+	kv      clientv3.KV
 	cmpFunc func() clientv3.Cmp
 	path    string
 	start   uint64
@@ -55,7 +55,7 @@ type EtcdAllocator struct {
 
 // EtcdAllocatorParam is the parameter for creating a new etcd allocator.
 type EtcdAllocatorParam struct {
-	Client   *clientv3.Client
+	KV       clientv3.KV
 	CmpFunc  func() clientv3.Cmp // CmpFunc is used to create a transaction. If CmpFunc is nil, the transaction will not have any additional condition.
 	RootPath string              // RootPath is the prefix of all keys in etcd.
 	Key      string              // Key is the unique key to identify the allocator.
@@ -66,7 +66,7 @@ type EtcdAllocatorParam struct {
 // NewEtcdAllocator creates a new etcd allocator.
 func NewEtcdAllocator(param *EtcdAllocatorParam, lg *zap.Logger) *EtcdAllocator {
 	e := &EtcdAllocator{
-		client:  param.Client,
+		kv:      param.KV,
 		cmpFunc: param.CmpFunc,
 		path:    strings.Join([]string{param.RootPath, _pathPrefix, param.Key}, _keySeparator),
 		start:   param.Start,
@@ -131,7 +131,7 @@ func (e *EtcdAllocator) AllocN(ctx context.Context, n int) ([]uint64, error) {
 func (e *EtcdAllocator) growLocked(ctx context.Context, growth uint64) error {
 	logger := e.lg.With(traceutil.TraceLogField(ctx))
 
-	kv, err := etcdutil.GetOne(ctx, e.client, []byte(e.path), logger)
+	kv, err := etcdutil.GetOne(ctx, e.kv, []byte(e.path), logger)
 	if err != nil {
 		return errors.Wrapf(err, "get key %s", e.path)
 	}
@@ -154,7 +154,7 @@ func (e *EtcdAllocator) growLocked(ctx context.Context, growth uint64) error {
 	end := prevEnd + growth
 
 	v := typeutil.Uint64ToBytes(end)
-	txn := etcdutil.NewTxn(ctx, e.client, logger).If(cmpList...).Then(clientv3.OpPut(e.path, string(v)))
+	txn := etcdutil.NewTxn(ctx, e.kv, logger).If(cmpList...).Then(clientv3.OpPut(e.path, string(v)))
 	resp, err := txn.Commit()
 	if err != nil {
 		return errors.Wrap(err, "update id")
@@ -178,7 +178,7 @@ func (e *EtcdAllocator) Reset(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	txn := etcdutil.NewTxn(ctx, e.client, logger)
+	txn := etcdutil.NewTxn(ctx, e.kv, logger)
 	v := typeutil.Uint64ToBytes(e.start)
 	if e.cmpFunc != nil {
 		txn = txn.If(e.cmpFunc())

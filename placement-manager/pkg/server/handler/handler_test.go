@@ -16,26 +16,28 @@ import (
 	"github.com/AutoMQ/placement-manager/pkg/server/id"
 	"github.com/AutoMQ/placement-manager/pkg/server/member"
 	"github.com/AutoMQ/placement-manager/pkg/server/storage"
+	"github.com/AutoMQ/placement-manager/pkg/server/storage/endpoint"
+	"github.com/AutoMQ/placement-manager/pkg/server/storage/kv"
 	"github.com/AutoMQ/placement-manager/pkg/util/testutil"
 )
 
 type mockServer struct {
-	c         *clientv3.Client
+	kv        clientv3.KV
 	sbpClient sbpClient.Client
 }
 
 func (m *mockServer) Storage() storage.Storage {
-	return storage.NewEtcd(
-		m.c,
-		"/test-server",
-		zap.NewNop(),
-		func() clientv3.Cmp { return clientv3.Compare(clientv3.CreateRevision("not-exist-key"), "=", 0) },
-	)
+	etcdKV := kv.NewEtcd(kv.EtcdParam{
+		KV:       m.kv,
+		RootPath: "/test-server",
+		CmpFunc:  func() clientv3.Cmp { return clientv3.Compare(clientv3.CreateRevision("not-exist-key"), "=", 0) },
+	}, zap.NewNop())
+	return endpoint.NewEndpoint(etcdKV, zap.NewNop())
 }
 
 func (m *mockServer) IDAllocator(key string, start, step uint64) id.Allocator {
 	return id.NewEtcdAllocator(&id.EtcdAllocatorParam{
-		Client:   m.c,
+		KV:       m.kv,
 		CmpFunc:  func() clientv3.Cmp { return clientv3.Compare(clientv3.CreateRevision("not-exist-key"), "=", 0) },
 		RootPath: "/test-server",
 		Key:      key,
@@ -91,7 +93,7 @@ func startSbpHandler(tb testing.TB, sbpClient sbpClient.Client, isLeader bool) (
 	_, client, closeFunc := testutil.StartEtcd(tb)
 
 	var server cluster.Server
-	server = &mockServer{c: client, sbpClient: sbpClient}
+	server = &mockServer{kv: client, sbpClient: sbpClient}
 	if !isLeader {
 		server = &mockServerNotLeader{server}
 	}

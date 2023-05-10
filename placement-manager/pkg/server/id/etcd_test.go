@@ -30,11 +30,11 @@ func TestEtcdAllocator_Alloc(t *testing.T) {
 	require.Less(t, end1, start2)
 }
 
-func testEtcdAlloc(t *testing.T, client *clientv3.Client) (start, end uint64) {
+func testEtcdAlloc(t *testing.T, kv clientv3.KV) (start, end uint64) {
 	re := require.New(t)
 
 	allocator := NewEtcdAllocator(&EtcdAllocatorParam{
-		Client:   client,
+		KV:       kv,
 		CmpFunc:  func() clientv3.Cmp { return clientv3.Compare(clientv3.CreateRevision("not-exist-key"), "=", 0) },
 		RootPath: "test-root",
 		Key:      "test-key",
@@ -76,11 +76,11 @@ func TestEtcdAllocator_AllocN(t *testing.T) {
 	require.Less(t, end1, start2)
 }
 
-func testEtcdAllocN(t *testing.T, client *clientv3.Client) (start, end uint64) {
+func testEtcdAllocN(t *testing.T, kv clientv3.KV) (start, end uint64) {
 	re := require.New(t)
 
 	allocator := NewEtcdAllocator(&EtcdAllocatorParam{
-		Client:   client,
+		KV:       kv,
 		CmpFunc:  func() clientv3.Cmp { return clientv3.Compare(clientv3.CreateRevision("not-exist-key"), "=", 0) },
 		RootPath: "test-root",
 		Key:      "test-key",
@@ -126,7 +126,7 @@ func TestEtcdAllocator_Reset(t *testing.T) {
 	defer closeFunc()
 
 	allocator := NewEtcdAllocator(&EtcdAllocatorParam{
-		Client:   client,
+		KV:       client,
 		CmpFunc:  func() clientv3.Cmp { return clientv3.Compare(clientv3.CreateRevision("not-exist-key"), "=", 0) },
 		RootPath: "test-root",
 		Key:      "test-key",

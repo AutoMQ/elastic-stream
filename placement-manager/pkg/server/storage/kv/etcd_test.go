@@ -88,7 +88,10 @@ func TestEtcd_Get(t *testing.T) {
 			_, client, closeFunc := testutil.StartEtcd(t)
 			defer closeFunc()
 
-			etcd := NewEtcd(client, "/test", zap.NewNop(), nil)
+			etcd := NewEtcd(EtcdParam{
+				KV:       client,
+				RootPath: "/test",
+			}, zap.NewNop())
 
 			// prepare
 			kv := client.KV
@@ -188,7 +191,11 @@ func TestEtcd_BatchGet(t *testing.T) {
 			_, client, closeFunc := testutil.StartEtcd(t)
 			defer closeFunc()
 
-			etcd := NewEtcd(client, "/test", zap.NewNop(), tt.fields.newCmpFunc)
+			etcd := NewEtcd(EtcdParam{
+				KV:       client,
+				RootPath: "/test",
+				CmpFunc:  tt.fields.newCmpFunc,
+			}, zap.NewNop())
 
 			// prepare
 			kv := client.KV
@@ -343,7 +350,10 @@ func TestEtcd_Put(t *testing.T) {
 			_, client, closeFunc := testutil.StartEtcd(t)
 			defer closeFunc()
 
-			etcd := NewEtcd(client, "/test", zap.NewNop(), nil)
+			etcd := NewEtcd(EtcdParam{
+				KV:       client,
+				RootPath: "/test",
+			}, zap.NewNop())
 
 			// prepare
 			kv := client.KV
@@ -578,7 +588,11 @@ func TestEtcd_BatchPut(t *testing.T) {
 			_, client, closeFunc := testutil.StartEtcd(t)
 			defer closeFunc()
 
-			etcd := NewEtcd(client, "/test", zap.NewNop(), tt.fields.newCmpFunc)
+			etcd := NewEtcd(EtcdParam{
+				KV:       client,
+				RootPath: "/test",
+				CmpFunc:  tt.fields.newCmpFunc,
+			}, zap.NewNop())
 
 			// prepare
 			kv := client.KV
@@ -694,7 +708,10 @@ func TestEtcd_Delete(t *testing.T) {
 			_, client, closeFunc := testutil.StartEtcd(t)
 			defer closeFunc()
 
-			etcd := NewEtcd(client, "/test", zap.NewNop(), nil)
+			etcd := NewEtcd(EtcdParam{
+				KV:       client,
+				RootPath: "/test",
+			}, zap.NewNop())
 
 			// prepare
 			kv := client.KV
@@ -855,7 +872,11 @@ func TestEtcd_BatchDelete(t *testing.T) {
 			_, client, closeFunc := testutil.StartEtcd(t)
 			defer closeFunc()
 
-			etcd := NewEtcd(client, "/test", zap.NewNop(), tt.fields.newCmpFunc)
+			etcd := NewEtcd(EtcdParam{
+				KV:       client,
+				RootPath: "/test",
+				CmpFunc:  tt.fields.newCmpFunc,
+			}, zap.NewNop())
 
 			// prepare
 			kv := client.KV

@@ -17,10 +17,10 @@ type Txn struct {
 }
 
 // NewTxn create a Txn.
-func NewTxn(ctx context.Context, client *clientv3.Client, lg *zap.Logger) clientv3.Txn {
+func NewTxn(ctx context.Context, kv clientv3.KV, lg *zap.Logger) clientv3.Txn {
 	tCtx, cancel := context.WithTimeout(ctx, DefaultRequestTimeout)
 	return &Txn{
-		Txn:    client.Txn(tCtx),
+		Txn:    kv.Txn(tCtx),
 		cancel: cancel,
 		lg:     lg,
 	}

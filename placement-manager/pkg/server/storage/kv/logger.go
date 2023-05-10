@@ -16,11 +16,11 @@ type LogAble interface {
 
 // Logger is a wrapper of KV that logs all operations.
 type Logger struct {
-	Kv LogAble
+	KV LogAble
 }
 
 func (l Logger) Get(ctx context.Context, k []byte) (v []byte, err error) {
-	v, err = l.Kv.Get(ctx, k)
+	v, err = l.KV.Get(ctx, k)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -31,7 +31,7 @@ func (l Logger) Get(ctx context.Context, k []byte) (v []byte, err error) {
 }
 
 func (l Logger) BatchGet(ctx context.Context, keys [][]byte) (kvs []KeyValue, err error) {
-	kvs, err = l.Kv.BatchGet(ctx, keys)
+	kvs, err = l.KV.BatchGet(ctx, keys)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -51,7 +51,7 @@ func (l Logger) BatchGet(ctx context.Context, keys [][]byte) (kvs []KeyValue, er
 }
 
 func (l Logger) GetByRange(ctx context.Context, r Range, limit int64, desc bool) (kvs []KeyValue, err error) {
-	kvs, err = l.Kv.GetByRange(ctx, r, limit, desc)
+	kvs, err = l.KV.GetByRange(ctx, r, limit, desc)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -71,7 +71,7 @@ func (l Logger) GetByRange(ctx context.Context, r Range, limit int64, desc bool)
 }
 
 func (l Logger) Put(ctx context.Context, k, v []byte, prevKV bool) (prevV []byte, err error) {
-	prevV, err = l.Kv.Put(ctx, k, v, prevKV)
+	prevV, err = l.KV.Put(ctx, k, v, prevKV)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -82,7 +82,7 @@ func (l Logger) Put(ctx context.Context, k, v []byte, prevKV bool) (prevV []byte
 }
 
 func (l Logger) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool) (prevKvs []KeyValue, err error) {
-	prevKvs, err = l.Kv.BatchPut(ctx, kvs, prevKV)
+	prevKvs, err = l.KV.BatchPut(ctx, kvs, prevKV)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -103,7 +103,7 @@ func (l Logger) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool) (prev
 }
 
 func (l Logger) Delete(ctx context.Context, k []byte, prevKV bool) (prevV []byte, err error) {
-	prevV, err = l.Kv.Delete(ctx, k, prevKV)
+	prevV, err = l.KV.Delete(ctx, k, prevKV)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -114,7 +114,7 @@ func (l Logger) Delete(ctx context.Context, k []byte, prevKV bool) (prevV []byte
 }
 
 func (l Logger) BatchDelete(ctx context.Context, ks [][]byte, prevKV bool) (prevKvs []KeyValue, err error) {
-	prevKvs, err = l.Kv.BatchDelete(ctx, ks, prevKV)
+	prevKvs, err = l.KV.BatchDelete(ctx, ks, prevKV)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -135,12 +135,12 @@ func (l Logger) BatchDelete(ctx context.Context, ks [][]byte, prevKV bool) (prev
 }
 
 func (l Logger) GetPrefixRangeEnd(prefix []byte) []byte {
-	return l.Kv.GetPrefixRangeEnd(prefix)
+	return l.KV.GetPrefixRangeEnd(prefix)
 }
 
 func (l Logger) logger() *zap.Logger {
-	if l.Kv.Logger() != nil {
-		return l.Kv.Logger()
+	if l.KV.Logger() != nil {
+		return l.KV.Logger()
 	}
 	return zap.NewNop()
 }

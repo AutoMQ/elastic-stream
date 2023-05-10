@@ -43,6 +43,8 @@ import (
 	"github.com/AutoMQ/placement-manager/pkg/server/id"
 	"github.com/AutoMQ/placement-manager/pkg/server/member"
 	"github.com/AutoMQ/placement-manager/pkg/server/storage"
+	"github.com/AutoMQ/placement-manager/pkg/server/storage/endpoint"
+	"github.com/AutoMQ/placement-manager/pkg/server/storage/kv"
 	"github.com/AutoMQ/placement-manager/pkg/util/etcdutil"
 	"github.com/AutoMQ/placement-manager/pkg/util/logutil"
 	"github.com/AutoMQ/placement-manager/pkg/util/randutil"
@@ -186,7 +188,13 @@ func (s *Server) startServer() error {
 	if err != nil {
 		return errors.Wrap(err, "init member")
 	}
-	s.storage = storage.NewEtcd(s.client, s.rootPath, logger, s.leaderCmp)
+	etcdKV := kv.Logger{KV: kv.NewEtcd(kv.EtcdParam{
+		KV:        s.client,
+		RootPath:  s.rootPath,
+		CmpFunc:   s.leaderCmp,
+		MaxTxnOps: s.cfg.Etcd.MaxTxnOps,
+	}, logger)}
+	s.storage = endpoint.NewEndpoint(etcdKV, logger)
 	s.cluster = cluster.NewRaftCluster(s.ctx, s.cfg.Cluster, logger)
 	s.sbpClient = sbpClient.NewClient(s.cfg.Sbp.Client, logger)
 
@@ -222,15 +230,15 @@ func (s *Server) initClusterID() error {
 	logger := s.lg
 
 	// query any existing ID in etcd
-	kv, err := etcdutil.GetOne(s.ctx, s.client, []byte(_clusterIDPath), logger)
+	keyValue, err := etcdutil.GetOne(s.ctx, s.client, []byte(_clusterIDPath), logger)
 	if err != nil {
 		logger.Error("failed to query cluster id", zap.String("cluster-id-path", _clusterIDPath), zap.Error(err))
 		return errors.Wrap(err, "get value from etcd")
 	}
 
 	// use an existed ID
-	if kv != nil {
-		s.clusterID, err = typeutil.BytesToUint64(kv.Value)
+	if keyValue != nil {
+		s.clusterID, err = typeutil.BytesToUint64(keyValue.Value)
 		logger.Info("use an existing cluster id", zap.Uint64("cluster-id", s.clusterID))
 		return errors.Wrap(err, "convert bytes to uint64")
 	}
@@ -401,7 +409,7 @@ func (s *Server) SbpClient() sbpClient.Client {
 
 func (s *Server) IDAllocator(key string, start, step uint64) id.Allocator {
 	return id.Logger{Allocator: id.NewEtcdAllocator(&id.EtcdAllocatorParam{
-		Client:   s.client,
+		KV:       s.client,
 		CmpFunc:  s.leaderCmp,
 		RootPath: s.rootPath,
 		Key:      key,
