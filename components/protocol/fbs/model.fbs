@@ -32,10 +32,3 @@ table KeyValue {
     key: string (id: 0);
     value: string (id: 1);
 }
-
-table RecordMeta {
-    offset_delta: int32 (id: 0);
-    timestamp_delta: int32 (id: 1);
-    headers: [KeyValue] (id: 2);
-    properties: [KeyValue] (id: 3);
-}
