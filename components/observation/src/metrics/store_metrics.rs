@@ -75,7 +75,7 @@ impl DataNodeStatistics {
             DATA_NODE_APPEND_OBSERVE_TIME.set(cur_observe_append_time);
         } else {
             let delta_observe_append_time = cur_observe_append_time - last_observe_append_time;
-            const ONE_MINUTE: f64 = 1000.0 * 5.0;
+            const ONE_MINUTE: f64 = 1000.0 * 60.0;
             let w = f64::exp(-(delta_observe_append_time as f64) / ONE_MINUTE);
             let last_avg_append_latency = DATA_NODE_APPEND_AVG_LATENCY.get();
             let cur_avg_append_latency = last_avg_append_latency * w + (1.0 - w) * latency as f64;
@@ -94,7 +94,7 @@ impl DataNodeStatistics {
             DATA_NODE_FETCH_OBSERVE_TIME.set(cur_observe_fetch_time);
         } else {
             let delta_observe_fetch_time = cur_observe_fetch_time - last_observe_fetch_time;
-            const ONE_MINUTE: f64 = 1000.0 * 5.0;
+            const ONE_MINUTE: f64 = 1000.0 * 60.0;
             let w = f64::exp(-(delta_observe_fetch_time as f64) / ONE_MINUTE);
             let last_avg_fetch_latency = DATA_NODE_FETCH_AVG_LATENCY.get();
             let cur_avg_fetch_latency = last_avg_fetch_latency * w + (1.0 - w) * latency as f64;

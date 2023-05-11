@@ -98,9 +98,9 @@ impl Worker {
                     .expect("Failed to bootstrap stream ranges from placement managers");
 
                 if self.config.primary {
-                    // tokio_uring::spawn(async {
-                    //     http_serve().await;
-                    // });
+                    tokio_uring::spawn(async {
+                        http_serve().await;
+                    });
                     self.report_metrics(shutdown.subscribe());
                 }
 

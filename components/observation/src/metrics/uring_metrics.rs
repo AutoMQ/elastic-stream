@@ -48,7 +48,7 @@ impl UringStatistics {
             URING_OBSERVE_TIME.set(cur_observe_time);
         } else {
             let delta_observe_time = cur_observe_time - last_observe_time;
-            const ONE_MINUTE: f64 = 1000.0 * 5.0;
+            const ONE_MINUTE: f64 = 1000.0 * 60.0;
             let w = f64::exp(-(delta_observe_time as f64) / ONE_MINUTE);
             let last_avg_latency = URING_AVG_LATENCY.get();
 
