@@ -147,9 +147,9 @@ impl From<&StreamRange> for RangeT {
         let mut range = RangeT::default();
         range.stream_id = value.stream_id;
         range.epoch = value.epoch as i64;
-        range.range_index = value.index;
-        range.start_offset = value.start as i64;
-        range.end_offset = match value.end {
+        range.index = value.index;
+        range.start = value.start as i64;
+        range.end = match value.end {
             None => -1,
             Some(offset) => offset as i64,
         };
@@ -158,9 +158,9 @@ impl From<&StreamRange> for RangeT {
             replica.push(node.into());
         }
         if replica.is_empty() {
-            range.replica_nodes = None;
+            range.nodes = None;
         } else {
-            range.replica_nodes = Some(replica);
+            range.nodes = Some(replica);
         }
         range
     }
@@ -169,7 +169,7 @@ impl From<&StreamRange> for RangeT {
 impl From<&RangeT> for StreamRange {
     fn from(value: &RangeT) -> Self {
         let mut replica: Vec<DataNode> = vec![];
-        if let Some(nodes) = &value.replica_nodes {
+        if let Some(nodes) = &value.nodes {
             for node in nodes {
                 replica.push(node.into());
             }
@@ -177,13 +177,13 @@ impl From<&RangeT> for StreamRange {
         Self {
             stream_id: value.stream_id,
             epoch: value.epoch as u64,
-            index: value.range_index,
-            start: value.start_offset as u64,
-            limit: match value.end_offset {
-                -1 => value.start_offset as u64,
+            index: value.index,
+            start: value.start as u64,
+            limit: match value.end {
+                -1 => value.start as u64,
                 offset => offset as u64,
             },
-            end: match value.end_offset {
+            end: match value.end {
                 -1 => None,
                 offset => Some(offset as u64),
             },

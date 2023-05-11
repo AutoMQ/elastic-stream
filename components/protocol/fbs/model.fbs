@@ -29,6 +29,6 @@ table RecordBatchMeta {
 }
 
 table KeyValue {
-    key: string (id: 0);
-    value: string (id: 1);
+    key: string (id: 0, required);
+    value: string (id: 1, required);
 }

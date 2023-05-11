@@ -50,4 +50,10 @@ pub enum DecodeError {
 
     #[error("The total length of record batch is not equal to the length of the data")]
     DataLengthMismatch,
+
+    #[error("The magic number of the record batch is invalid")]
+    InvalidMagic,
+
+    #[error("The format of the record batch is invalid")]
+    InvalidDataFormat,
 }

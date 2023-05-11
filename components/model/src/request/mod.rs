@@ -3,8 +3,8 @@ pub mod seal;
 use crate::{client_role::ClientRole, data_node::DataNode, range_criteria::RangeCriteria};
 use bytes::{Bytes, BytesMut};
 use protocol::rpc::header::{
-    DescribePlacementManagerClusterRequestT, HeartbeatRequestT, IdAllocationRequestT,
-    ListRangesRequestT, RangeCriteriaT, SealRangeEntryT, SealRangesRequestT, SealType,
+    DataNodeT, DescribePlacementManagerClusterRequestT, HeartbeatRequestT, IdAllocationRequestT,
+    ListRangeCriteria, ListRangeCriteriaT, ListRangeRequestT, RangeT, SealKind, SealRangeRequestT,
 };
 use std::time::Duration;
 
@@ -18,9 +18,9 @@ pub enum Request {
         data_node: Option<DataNode>,
     },
 
-    ListRanges {
+    ListRange {
         timeout: Duration,
-        criteria: Vec<RangeCriteria>,
+        criteria: RangeCriteria,
     },
 
     AllocateId {
@@ -56,32 +56,30 @@ impl From<&Request> for Bytes {
                 builder.finish(heartbeat, None);
             }
 
-            Request::ListRanges { timeout, criteria } => {
-                let list: Vec<_> = criteria
-                    .iter()
-                    .map(|c| {
-                        let mut criteria = RangeCriteriaT::default();
-                        match c {
-                            RangeCriteria::StreamId(stream_id) => {
-                                criteria.stream_id = *stream_id;
-                            }
-                            RangeCriteria::DataNode(node_id) => {
-                                criteria.node_id = *node_id;
-                            }
-                        };
-                        criteria
-                    })
-                    .collect();
-                let mut request = ListRangesRequestT::default();
+            Request::ListRange { timeout, criteria } => {
+                let mut criteria_t = ListRangeCriteriaT::default();
+                match criteria {
+                    RangeCriteria::StreamId(stream_id) => {
+                        criteria_t.stream_id = *stream_id;
+                    }
+                    RangeCriteria::DataNode(node_id) => {
+                        criteria_t.node_id = *node_id;
+                    }
+                };
+
+                let mut request = ListRangeRequestT::default();
                 request.timeout_ms = timeout.as_millis() as i32;
-                request.range_criteria = list;
+                request.criteria = Box::new(criteria_t);
+
+                // TODO: Fill more fields for ListRange request.
+
                 let req = request.pack(&mut builder);
                 builder.finish(req, None);
             }
 
             Request::AllocateId { timeout: _, host } => {
                 let mut request = IdAllocationRequestT::default();
-                request.host = Some(host.clone());
+                request.host = host.clone();
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }
@@ -94,20 +92,21 @@ impl From<&Request> for Bytes {
             }
 
             Request::SealRange { timeout, entry } => {
-                let mut request = SealRangesRequestT::default();
+                let mut request = SealRangeRequestT::default();
                 request.timeout_ms = timeout.as_millis() as i32;
-                let mut entry_t = SealRangeEntryT::default();
-                entry_t.type_ = match entry.kind {
-                    Kind::DataNode => SealType::DATA_NODE,
-                    Kind::PlacementManager => SealType::PLACEMENT_MANAGER,
-                    Kind::Unspecified => SealType::UNSPECIFIED,
-                };
-                let range_t = (&entry.range).into();
-                entry_t.range = Box::new(range_t);
-                entry_t.renew = entry.renew;
 
-                let entries = vec![entry_t];
-                request.entries = entries;
+                request.kind = match entry.kind {
+                    Kind::DataNode => SealKind::DATA_NODE,
+                    Kind::PlacementManager => SealKind::PLACEMENT_MANAGER,
+                    Kind::Unspecified => SealKind::UNSPECIFIED,
+                };
+
+                let mut range_t = RangeT::default();
+                range_t.stream_id = entry.range.stream_id() as i64;
+                range_t.index = entry.range.index() as i32;
+
+                request.range = Box::new(range_t);
+
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }
