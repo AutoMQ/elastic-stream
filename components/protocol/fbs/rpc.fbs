@@ -339,7 +339,6 @@ table SealRangeResponse {
     status: Status (id: 0, required);
 
     // Both the PM and the data node will handle the seal ranges request.
-    // The data node returns the sealed range, while the PM returns the newly writable range.
     range: Range (id: 1);
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
