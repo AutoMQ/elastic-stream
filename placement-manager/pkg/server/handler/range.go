@@ -8,87 +8,62 @@ import (
 	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/placement-manager/pkg/sbp/protocol"
 	"github.com/AutoMQ/placement-manager/pkg/server/cluster"
-	"github.com/AutoMQ/placement-manager/pkg/util/typeutil"
 )
 
-func (h *Handler) ListRanges(req *protocol.ListRangesRequest, resp *protocol.ListRangesResponse) {
+func (h *Handler) ListRange(req *protocol.ListRangeRequest, resp *protocol.ListRangeResponse) {
 	ctx := req.Context()
 
-	criteriaList := typeutil.FilterZero[*rpcfb.RangeCriteriaT](req.RangeCriteria)
-	listResponses := make([]*rpcfb.ListRangesResultT, 0, len(criteriaList))
-	for _, owner := range criteriaList {
-		ranges, err := h.c.ListRanges(ctx, owner)
-
-		result := &rpcfb.ListRangesResultT{
-			RangeCriteria: owner,
-		}
-		if err != nil {
-			switch {
-			case errors.Is(err, cluster.ErrNotLeader):
-				resp.Error(h.notLeaderError())
-				return
-			default:
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
-			}
-		} else {
-			result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
-			result.Ranges = ranges
-		}
-
-		listResponses = append(listResponses, result)
+	if req.Criteria == nil {
+		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "criteria is nil"})
+		return
 	}
-	resp.ListResponses = listResponses
+
+	ranges, err := h.c.ListRange(ctx, req.Criteria)
+	if err != nil {
+		switch {
+		case errors.Is(err, cluster.ErrNotLeader):
+			resp.Error(h.notLeaderError())
+		default:
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+		}
+		return
+	}
+
+	resp.Ranges = ranges
 	resp.OK()
 }
 
-func (h *Handler) SealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
+func (h *Handler) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealRangeResponse) {
 	ctx := req.Context()
 
-	entries := typeutil.FilterZero[*rpcfb.SealRangeEntryT](req.Entries)
-	sealResults := make([]*rpcfb.SealRangeResultT, 0, len(entries))
-
-	for _, entry := range entries {
-		if entry.Type != rpcfb.SealTypePLACEMENT_MANAGER {
-			sealResults = append(sealResults, &rpcfb.SealRangeResultT{
-				Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: fmt.Sprintf("invalid seal type: %s", entry.Type)},
-			})
-			continue
-		}
-		if entry.Range == nil {
-			sealResults = append(sealResults, &rpcfb.SealRangeResultT{
-				Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "range is nil"},
-			})
-			continue
-		}
-
-		writableRange, err := h.c.SealRange(ctx, entry)
-
-		result := &rpcfb.SealRangeResultT{
-			Range: writableRange,
-		}
-		if err != nil {
-			switch {
-			case errors.Is(err, cluster.ErrNotLeader):
-				resp.Error(h.notLeaderError())
-				return
-			case errors.Is(err, cluster.ErrRangeNotFound):
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_NOT_FOUND, Message: err.Error()}
-			case errors.Is(err, cluster.ErrRangeAlreadySealed):
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_ALREADY_SEALED, Message: err.Error()}
-			case errors.Is(err, cluster.ErrInvalidEndOffset):
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()}
-			case errors.Is(err, cluster.ErrNotEnoughDataNodes):
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()}
-			default:
-				result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()}
-			}
-		} else {
-			result.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
-		}
-
-		sealResults = append(sealResults, result)
+	if req.Kind != rpcfb.SealKindPLACEMENT_MANAGER {
+		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: fmt.Sprintf("invalid seal kind: %s", req.Kind)})
+		return
+	}
+	if req.Range == nil {
+		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "range is nil"})
+		return
 	}
 
-	resp.Results = sealResults
+	writableRange, err := h.c.SealRange(ctx, req.Range, false)
+	if err != nil {
+		switch {
+		case errors.Is(err, cluster.ErrNotLeader):
+			resp.Error(h.notLeaderError())
+		case errors.Is(err, cluster.ErrRangeNotFound):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_NOT_FOUND, Message: err.Error()})
+		case errors.Is(err, cluster.ErrRangeAlreadySealed):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_ALREADY_SEALED, Message: err.Error()})
+		case errors.Is(err, cluster.ErrInvalidEndOffset):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()})
+		case errors.Is(err, cluster.ErrNotEnoughDataNodes):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()})
+		default:
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+		}
+		return
+	}
+
+	resp.Range = writableRange
 	resp.OK()
 }

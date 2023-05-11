@@ -10,13 +10,13 @@ import (
 	"github.com/AutoMQ/placement-manager/pkg/util/fbutil"
 )
 
-func TestListRangesResponse_Marshal(t *testing.T) {
-	var mockListRangesResponse ListRangesResponse
-	_ = gofakeit.Struct(&mockListRangesResponse)
-	mockData := fbutil.Marshal(&mockListRangesResponse.ListRangesResponseT)
+func TestListRangeResponse_Marshal(t *testing.T) {
+	var mockListRangeResponse ListRangeResponse
+	_ = gofakeit.Struct(&mockListRangeResponse)
+	mockData := fbutil.Marshal(&mockListRangeResponse.ListRangeResponseT)
 	tests := []struct {
 		name    string
-		resp    ListRangesResponse
+		resp    ListRangeResponse
 		fmt     format.Format
 		want    []byte
 		wantErr bool
@@ -24,27 +24,27 @@ func TestListRangesResponse_Marshal(t *testing.T) {
 	}{
 		{
 			name: "FlatBuffer",
-			resp: mockListRangesResponse,
+			resp: mockListRangeResponse,
 			fmt:  format.FlatBuffer(),
 			want: mockData,
 		},
 		{
 			name:    "ProtoBuffer",
-			resp:    mockListRangesResponse,
+			resp:    mockListRangeResponse,
 			fmt:     format.ProtoBuffer(),
 			wantErr: true,
 			errMsg:  "unsupported format",
 		},
 		{
 			name:    "JSON",
-			resp:    mockListRangesResponse,
+			resp:    mockListRangeResponse,
 			fmt:     format.JSON(),
 			wantErr: true,
 			errMsg:  "unsupported format",
 		},
 		{
 			name:    "Unknown",
-			resp:    mockListRangesResponse,
+			resp:    mockListRangeResponse,
 			fmt:     format.NewFormat(0),
 			wantErr: true,
 			errMsg:  "unsupported format",

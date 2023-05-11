@@ -65,7 +65,7 @@ func (c *RaftCluster) AllocateID(ctx context.Context) (int32, error) {
 }
 
 // chooseDataNodes selects `cnt` number of data nodes from the available data nodes for a range.
-// Only DataNodeT.NodeId is filled in the returned ReplicaNodeT.
+// Only DataNodeT.NodeId is filled in the returned DataNodeT.
 // It returns ErrNotEnoughDataNodes if there are not enough data nodes to allocate.
 func (c *RaftCluster) chooseDataNodes(cnt int8) ([]*rpcfb.DataNodeT, error) {
 	if cnt <= 0 {
@@ -81,14 +81,14 @@ func (c *RaftCluster) chooseDataNodes(cnt int8) ([]*rpcfb.DataNodeT, error) {
 		return !nodes[i].LastActiveTime.Before(nodes[j].LastActiveTime)
 	})
 
-	replicaNodes := make([]*rpcfb.DataNodeT, 0, cnt)
+	chose := make([]*rpcfb.DataNodeT, 0, cnt)
 	for i := 0; i < int(cnt); i++ {
-		replicaNodes = append(replicaNodes, &rpcfb.DataNodeT{
+		chose = append(chose, &rpcfb.DataNodeT{
 			NodeId: nodes[i].NodeId,
 		})
 	}
 
-	return replicaNodes, nil
+	return chose, nil
 }
 
 func (c *RaftCluster) fillDataNodesInfo(nodes []*rpcfb.DataNodeT) {

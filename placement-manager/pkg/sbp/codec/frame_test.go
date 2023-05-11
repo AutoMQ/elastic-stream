@@ -48,7 +48,7 @@ func TestReadFrame(t *testing.T) {
 				0x53, 0x8D, 0x4D, 0x69, // payload checksum
 			},
 			want: &DataFrame{baseFrame{
-				OpCode:    operation.Operation{Code: operation.OpListRanges},
+				OpCode:    operation.Operation{Code: operation.OpListRange},
 				Flag:      3,
 				StreamID:  16909060,
 				HeaderFmt: format.FlatBuffer(),
@@ -267,7 +267,7 @@ func TestWriteFrame(t *testing.T) {
 		{
 			name: "normal case",
 			frame: DataFrame{baseFrame{
-				OpCode:    operation.Operation{Code: operation.OpListRanges},
+				OpCode:    operation.Operation{Code: operation.OpListRange},
 				Flag:      3,
 				StreamID:  16909060,
 				HeaderFmt: format.FlatBuffer(),

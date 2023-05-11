@@ -35,168 +35,107 @@ type CreateStreamParam struct {
 
 // Stream defines operations on stream.
 type Stream interface {
-	CreateStreams(ctx context.Context, params []*CreateStreamParam) ([]*rpcfb.StreamT, error)
-	DeleteStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error)
-	UpdateStreams(ctx context.Context, streams []*rpcfb.StreamT) ([]*rpcfb.StreamT, error)
+	CreateStream(ctx context.Context, param *CreateStreamParam) (*rpcfb.StreamT, error)
+	DeleteStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error)
+	UpdateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error)
 	GetStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error)
-	GetStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error)
 	ForEachStream(ctx context.Context, f func(stream *rpcfb.StreamT) error) error
 }
 
-// CreateStreams creates new streams based on the given streams and returns them.
-func (e *Endpoint) CreateStreams(ctx context.Context, params []*CreateStreamParam) ([]*rpcfb.StreamT, error) {
-	logger := e.lg.With(traceutil.TraceLogField(ctx))
+// CreateStream creates a new stream based on the given stream and returns it.
+func (e *Endpoint) CreateStream(ctx context.Context, param *CreateStreamParam) (*rpcfb.StreamT, error) {
+	logger := e.lg.With(zap.Int64("stream-id", param.StreamT.StreamId), traceutil.TraceLogField(ctx))
 
-	results := make([]*rpcfb.StreamT, 0, len(params))
-	kvs := make([]kv.KeyValue, 0, len(params)*5)
-	for _, param := range params {
+	kvs := make([]kv.KeyValue, 0, 5)
+	kvs = append(kvs, kv.KeyValue{
+		Key:   streamPath(param.StreamT.StreamId),
+		Value: fbutil.Marshal(param.StreamT),
+	})
+	kvs = append(kvs, kv.KeyValue{
+		Key:   rangePathInSteam(param.StreamT.StreamId, param.RangeT.Index),
+		Value: fbutil.Marshal(param.RangeT),
+	})
+	for _, node := range param.RangeT.Nodes {
 		kvs = append(kvs, kv.KeyValue{
-			Key:   streamPath(param.StreamT.StreamId),
-			Value: fbutil.Marshal(param.StreamT),
+			Key:   rangePathOnDataNode(node.NodeId, param.StreamT.StreamId, param.RangeT.Index),
+			Value: nil,
 		})
-		kvs = append(kvs, kv.KeyValue{
-			Key:   rangePathInSteam(param.StreamT.StreamId, param.RangeT.RangeIndex),
-			Value: fbutil.Marshal(param.RangeT),
-		})
-		for _, node := range param.RangeT.ReplicaNodes {
-			kvs = append(kvs, kv.KeyValue{
-				Key:   rangePathOnDataNode(node.NodeId, param.StreamT.StreamId, param.RangeT.RangeIndex),
-				Value: nil,
-			})
-		}
-		results = append(results, param.StreamT)
 	}
 
-	prevKvs, err := e.BatchPut(ctx, kvs, true, true)
+	prevKVs, err := e.BatchPut(ctx, kvs, true, true)
 	for _, keyValue := range kvs {
 		if keyValue.Value != nil {
 			mcache.Free(keyValue.Value)
 		}
 	}
 	if err != nil {
-		streamIDs := make([]int64, 0, len(params))
-		for _, param := range params {
-			streamIDs = append(streamIDs, param.StreamT.StreamId)
-		}
-		logger.Error("failed to save streams", zap.Int64s("stream-ids", streamIDs), zap.Error(err))
-		return nil, errors.Wrap(err, "save streams")
+		logger.Error("failed to save stream", zap.Error(err))
+		return nil, errors.Wrap(err, "save stream")
 	}
-	if len(prevKvs) != 0 {
-		existedStreamIDs := streamIDsFromPaths(prevKvs)
-		logger.Warn("streams already exist, will override them", zap.Int64s("existed-stream-ids", existedStreamIDs))
+	if len(prevKVs) != 0 {
+		existedStreamIDs := streamIDsFromPaths(prevKVs)
+		logger.Warn("stream already exist, will override it", zap.Int64s("existed-stream-id", existedStreamIDs))
 	}
 
-	return results, nil
+	return param.StreamT, nil
 }
 
-// DeleteStreams deletes the streams with the given stream ids and returns them.
-func (e *Endpoint) DeleteStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error) {
-	logger := e.lg.With(zap.Int64s("stream-ids", streamIDs), traceutil.TraceLogField(ctx))
+// DeleteStream deletes the stream with the given stream id and returns it.
+func (e *Endpoint) DeleteStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error) {
+	logger := e.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
 
-	streamPaths := make([][]byte, 0, len(streamIDs))
-	for _, streamID := range streamIDs {
-		streamPaths = append(streamPaths, streamPath(streamID))
-	}
-	prevKvs, err := e.BatchDelete(ctx, streamPaths, true, true)
+	prevV, err := e.Delete(ctx, streamPath(streamID), true)
 	if err != nil {
 		logger.Error("failed to delete stream", zap.Error(err))
 		return nil, errors.Wrap(err, "delete stream")
 	}
-	if len(prevKvs) < len(streamIDs) {
-		existedStreamIDs := streamIDsFromPaths(prevKvs)
-		logger.Warn("streams not found when delete streams", zap.Int64s("existed-stream-ids", existedStreamIDs))
+	if prevV == nil {
+		logger.Warn("stream not found when delete stream")
+		return nil, nil
 	}
 
-	streams := make([]*rpcfb.StreamT, 0, len(prevKvs))
-	for _, prevKv := range prevKvs {
-		streams = append(streams, rpcfb.GetRootAsStream(prevKv.Value, 0).UnPack())
-	}
-
-	return streams, nil
+	return rpcfb.GetRootAsStream(prevV, 0).UnPack(), nil
 }
 
-// UpdateStreams updates the streams with the given streams and returns them.
-func (e *Endpoint) UpdateStreams(ctx context.Context, streams []*rpcfb.StreamT) ([]*rpcfb.StreamT, error) {
-	logger := e.lg.With(traceutil.TraceLogField(ctx))
+// UpdateStream updates the stream with the given stream and returns it.
+func (e *Endpoint) UpdateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error) {
+	logger := e.lg.With(zap.Int64("stream-id", stream.StreamId), traceutil.TraceLogField(ctx))
 
-	kvs := make([]kv.KeyValue, 0, len(streams))
-	for _, stream := range streams {
-		if stream.StreamId < MinStreamID {
-			return nil, errors.Errorf("invalid stream id: %d < %d", stream.StreamId, MinStreamID)
-		}
-		streamInfo := fbutil.Marshal(stream)
-		kvs = append(kvs, kv.KeyValue{
-			Key:   streamPath(stream.StreamId),
-			Value: streamInfo,
-		})
+	if stream.StreamId < MinStreamID {
+		logger.Error("invalid stream id")
+		return nil, errors.Errorf("invalid stream id: %d < %d", stream.StreamId, MinStreamID)
 	}
 
-	prevKvs, err := e.BatchPut(ctx, kvs, true, true)
-	for _, keyValue := range kvs {
-		mcache.Free(keyValue.Value)
-	}
+	streamInfo := fbutil.Marshal(stream)
+	prevV, err := e.Put(ctx, streamPath(stream.StreamId), streamInfo, true)
+	mcache.Free(streamInfo)
 	if err != nil {
-		streamIDs := make([]int64, 0, len(streams))
-		for _, stream := range streams {
-			streamIDs = append(streamIDs, stream.StreamId)
-		}
-		logger.Error("failed to update stream", zap.Int64s("stream-ids", streamIDs), zap.Error(err))
+		logger.Error("failed to update stream", zap.Error(err))
 		return nil, errors.Wrap(err, "update stream")
 	}
-	if len(prevKvs) < len(streams) {
-		existedStreamIDs := streamIDsFromPaths(prevKvs)
-		streamIDs := make([]int64, 0, len(streams))
-		for _, stream := range streams {
-			streamIDs = append(streamIDs, stream.StreamId)
-		}
-		logger.Warn("streams not found when update streams, will create them", zap.Int64s("existed-stream-ids", existedStreamIDs), zap.Int64s("stream-ids", streamIDs))
+	if prevV == nil {
+		logger.Warn("stream not found when update stream, will create it")
+		return nil, nil
 	}
 
-	return streams, nil
+	return stream, nil
 }
 
 // GetStream gets the stream with the given stream id.
 func (e *Endpoint) GetStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error) {
-	streams, err := e.GetStreams(ctx, []int64{streamID})
+	logger := e.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
+
+	v, err := e.Get(ctx, streamPath(streamID))
 	if err != nil {
-		return nil, err
+		logger.Error("failed to get stream", zap.Error(err))
+		return nil, errors.Wrap(err, "get stream")
 	}
-	if len(streams) == 0 {
+	if v == nil {
+		logger.Warn("stream not found")
 		return nil, nil
 	}
 
-	return streams[0], nil
-}
-
-// GetStreams gets the streams with the given stream ids.
-func (e *Endpoint) GetStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error) {
-	logger := e.lg.With(traceutil.TraceLogField(ctx))
-
-	keys := make([][]byte, len(streamIDs))
-	for i, streamID := range streamIDs {
-		keys[i] = streamPath(streamID)
-	}
-
-	kvs, err := e.BatchGet(ctx, keys, false)
-	if err != nil {
-		logger.Error("failed to get streams", zap.Int64s("stream-ids", streamIDs), zap.Error(err))
-		return nil, errors.Wrap(err, "get streams")
-	}
-
-	streams := make([]*rpcfb.StreamT, 0, len(kvs))
-	for _, streamKV := range kvs {
-		if streamKV.Value == nil {
-			continue
-		}
-		streams = append(streams, rpcfb.GetRootAsStream(streamKV.Value, 0).UnPack())
-	}
-
-	if len(streams) < len(streamIDs) {
-		logger.Warn("some steams not found", zap.Int("expected-count", len(streamIDs)), zap.Int("got-count", len(streams)),
-			zap.Int64s("expected-stream-ids", streamIDs), zap.Int64s("got-stream-ids", streamIDsFromPaths(kvs)))
-	}
-
-	return streams, nil
+	return rpcfb.GetRootAsStream(v, 0).UnPack(), nil
 }
 
 // ForEachStream calls the given function for every stream in the storage.
@@ -249,10 +188,10 @@ func streamPath(streamID int64) []byte {
 	return res
 }
 
-func streamIDsFromPaths(prevKvs []kv.KeyValue) []int64 {
-	streamIDs := make([]int64, 0, len(prevKvs))
-	for _, prevKv := range prevKvs {
-		streamID, err := streamIDFromPath(prevKv.Key)
+func streamIDsFromPaths(prevKVs []kv.KeyValue) []int64 {
+	streamIDs := make([]int64, 0, len(prevKVs))
+	for _, prevKV := range prevKVs {
+		streamID, err := streamIDFromPath(prevKV.Key)
 		if err != nil {
 			continue
 		}

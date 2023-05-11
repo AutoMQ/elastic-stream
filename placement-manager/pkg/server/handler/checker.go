@@ -28,46 +28,46 @@ func (c Checker) AllocateID(req *protocol.IDAllocationRequest, resp *protocol.ID
 	c.Handler.AllocateID(req, resp)
 }
 
-func (c Checker) ListRanges(req *protocol.ListRangesRequest, resp *protocol.ListRangesResponse) {
+func (c Checker) ListRange(req *protocol.ListRangeRequest, resp *protocol.ListRangeResponse) {
 	if !c.Handler.Check(req, resp) {
 		return
 	}
-	c.Handler.ListRanges(req, resp)
+	c.Handler.ListRange(req, resp)
 }
 
-func (c Checker) SealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
+func (c Checker) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealRangeResponse) {
 	if !c.Handler.Check(req, resp) {
 		return
 	}
-	c.Handler.SealRanges(req, resp)
+	c.Handler.SealRange(req, resp)
 }
 
-func (c Checker) CreateStreams(req *protocol.CreateStreamsRequest, resp *protocol.CreateStreamsResponse) {
+func (c Checker) CreateStream(req *protocol.CreateStreamRequest, resp *protocol.CreateStreamResponse) {
 	if !c.Handler.Check(req, resp) {
 		return
 	}
-	c.Handler.CreateStreams(req, resp)
+	c.Handler.CreateStream(req, resp)
 }
 
-func (c Checker) DeleteStreams(req *protocol.DeleteStreamsRequest, resp *protocol.DeleteStreamsResponse) {
+func (c Checker) DeleteStream(req *protocol.DeleteStreamRequest, resp *protocol.DeleteStreamResponse) {
 	if !c.Handler.Check(req, resp) {
 		return
 	}
-	c.Handler.DeleteStreams(req, resp)
+	c.Handler.DeleteStream(req, resp)
 }
 
-func (c Checker) UpdateStreams(req *protocol.UpdateStreamsRequest, resp *protocol.UpdateStreamsResponse) {
+func (c Checker) UpdateStream(req *protocol.UpdateStreamRequest, resp *protocol.UpdateStreamResponse) {
 	if !c.Handler.Check(req, resp) {
 		return
 	}
-	c.Handler.UpdateStreams(req, resp)
+	c.Handler.UpdateStream(req, resp)
 }
 
-func (c Checker) DescribeStreams(req *protocol.DescribeStreamsRequest, resp *protocol.DescribeStreamsResponse) {
+func (c Checker) DescribeStream(req *protocol.DescribeStreamRequest, resp *protocol.DescribeStreamResponse) {
 	if !c.Handler.Check(req, resp) {
 		return
 	}
-	c.Handler.DescribeStreams(req, resp)
+	c.Handler.DescribeStream(req, resp)
 }
 
 func (c Checker) DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {

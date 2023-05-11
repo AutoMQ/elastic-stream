@@ -10,10 +10,10 @@ import (
 	"github.com/AutoMQ/placement-manager/pkg/util/fbutil"
 )
 
-func TestListRangesRequest_Unmarshal(t *testing.T) {
-	var mockListRangesRequest ListRangesRequest
-	_ = gofakeit.Struct(&mockListRangesRequest)
-	mockData := fbutil.Marshal(&mockListRangesRequest.ListRangesRequestT)
+func TestListRangeRequest_Unmarshal(t *testing.T) {
+	var mockListRangeRequest ListRangeRequest
+	_ = gofakeit.Struct(&mockListRangeRequest)
+	mockData := fbutil.Marshal(&mockListRangeRequest.ListRangeRequestT)
 
 	type args struct {
 		fmt  format.Format
@@ -22,7 +22,7 @@ func TestListRangesRequest_Unmarshal(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    ListRangesRequest
+		want    ListRangeRequest
 		wantErr bool
 		errMsg  string
 	}{
@@ -32,7 +32,7 @@ func TestListRangesRequest_Unmarshal(t *testing.T) {
 				fmt:  format.FlatBuffer(),
 				data: mockData,
 			},
-			want: mockListRangesRequest,
+			want: mockListRangeRequest,
 		},
 		{
 			name: "FlatBuffer in wrong format",
@@ -77,7 +77,7 @@ func TestListRangesRequest_Unmarshal(t *testing.T) {
 			t.Parallel()
 			re := require.New(t)
 
-			l := ListRangesRequest{}
+			l := ListRangeRequest{}
 			err := l.Unmarshal(tt.args.fmt, tt.args.data)
 			if tt.wantErr {
 				re.ErrorContains(err, tt.errMsg)

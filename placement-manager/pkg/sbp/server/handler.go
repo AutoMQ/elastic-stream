@@ -13,18 +13,18 @@ type Handler interface {
 	Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.HeartbeatResponse)
 	// AllocateID allocates a unique ID for data nodes.
 	AllocateID(req *protocol.IDAllocationRequest, resp *protocol.IDAllocationResponse)
-	// ListRanges lists the ranges of a batch of streams. Or it could list the ranges of all the streams in a specific data node.
-	ListRanges(req *protocol.ListRangesRequest, resp *protocol.ListRangesResponse)
-	// SealRanges seal ranges of a batch of streams
-	SealRanges(req *protocol.SealRangesRequest, resp *protocol.SealRangesResponse)
-	// CreateStreams creates a batch of streams.
-	CreateStreams(req *protocol.CreateStreamsRequest, resp *protocol.CreateStreamsResponse)
-	// DeleteStreams deletes a batch of streams.
-	DeleteStreams(req *protocol.DeleteStreamsRequest, resp *protocol.DeleteStreamsResponse)
-	// UpdateStreams updates a batch of streams.
-	UpdateStreams(req *protocol.UpdateStreamsRequest, resp *protocol.UpdateStreamsResponse)
-	// DescribeStreams describes a batch of streams.
-	DescribeStreams(req *protocol.DescribeStreamsRequest, resp *protocol.DescribeStreamsResponse)
+	// ListRange lists ranges either in a specified steam, a specified data node, or both.
+	ListRange(req *protocol.ListRangeRequest, resp *protocol.ListRangeResponse)
+	// SealRange seal the specified range.
+	SealRange(req *protocol.SealRangeRequest, resp *protocol.SealRangeResponse)
+	// CreateStream creates a stream.
+	CreateStream(req *protocol.CreateStreamRequest, resp *protocol.CreateStreamResponse)
+	// DeleteStream deletes the specified stream.
+	DeleteStream(req *protocol.DeleteStreamRequest, resp *protocol.DeleteStreamResponse)
+	// UpdateStream updates the specified stream.
+	UpdateStream(req *protocol.UpdateStreamRequest, resp *protocol.UpdateStreamResponse)
+	// DescribeStream describes the specified stream.
+	DescribeStream(req *protocol.DescribeStreamRequest, resp *protocol.DescribeStreamResponse)
 	// DescribePMCluster describes placement manager cluster membership.
 	DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse)
 }
@@ -45,46 +45,46 @@ var (
 				handler.AllocateID(req.(*protocol.IDAllocationRequest), resp.(*protocol.IDAllocationResponse))
 			},
 		},
-		{Code: operation.OpListRanges}: {
-			newReq:  func() protocol.InRequest { return &protocol.ListRangesRequest{} },
-			newResp: func() protocol.OutResponse { return &protocol.ListRangesResponse{} },
+		{Code: operation.OpListRange}: {
+			newReq:  func() protocol.InRequest { return &protocol.ListRangeRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.ListRangeResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
-				handler.ListRanges(req.(*protocol.ListRangesRequest), resp.(*protocol.ListRangesResponse))
+				handler.ListRange(req.(*protocol.ListRangeRequest), resp.(*protocol.ListRangeResponse))
 			},
 		},
-		{Code: operation.OpSealRanges}: {
-			newReq:  func() protocol.InRequest { return &protocol.SealRangesRequest{} },
-			newResp: func() protocol.OutResponse { return &protocol.SealRangesResponse{} },
+		{Code: operation.OpSealRange}: {
+			newReq:  func() protocol.InRequest { return &protocol.SealRangeRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.SealRangeResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
-				handler.SealRanges(req.(*protocol.SealRangesRequest), resp.(*protocol.SealRangesResponse))
+				handler.SealRange(req.(*protocol.SealRangeRequest), resp.(*protocol.SealRangeResponse))
 			},
 		},
-		{Code: operation.OpCreateStreams}: {
-			newReq:  func() protocol.InRequest { return &protocol.CreateStreamsRequest{} },
-			newResp: func() protocol.OutResponse { return &protocol.CreateStreamsResponse{} },
+		{Code: operation.OpCreateStream}: {
+			newReq:  func() protocol.InRequest { return &protocol.CreateStreamRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.CreateStreamResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
-				handler.CreateStreams(req.(*protocol.CreateStreamsRequest), resp.(*protocol.CreateStreamsResponse))
+				handler.CreateStream(req.(*protocol.CreateStreamRequest), resp.(*protocol.CreateStreamResponse))
 			},
 		},
-		{Code: operation.OpDeleteStreams}: {
-			newReq:  func() protocol.InRequest { return &protocol.DeleteStreamsRequest{} },
-			newResp: func() protocol.OutResponse { return &protocol.DeleteStreamsResponse{} },
+		{Code: operation.OpDeleteStream}: {
+			newReq:  func() protocol.InRequest { return &protocol.DeleteStreamRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.DeleteStreamResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
-				handler.DeleteStreams(req.(*protocol.DeleteStreamsRequest), resp.(*protocol.DeleteStreamsResponse))
+				handler.DeleteStream(req.(*protocol.DeleteStreamRequest), resp.(*protocol.DeleteStreamResponse))
 			},
 		},
-		{Code: operation.OpUpdateStreams}: {
-			newReq:  func() protocol.InRequest { return &protocol.UpdateStreamsRequest{} },
-			newResp: func() protocol.OutResponse { return &protocol.UpdateStreamsResponse{} },
+		{Code: operation.OpUpdateStream}: {
+			newReq:  func() protocol.InRequest { return &protocol.UpdateStreamRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.UpdateStreamResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
-				handler.UpdateStreams(req.(*protocol.UpdateStreamsRequest), resp.(*protocol.UpdateStreamsResponse))
+				handler.UpdateStream(req.(*protocol.UpdateStreamRequest), resp.(*protocol.UpdateStreamResponse))
 			},
 		},
-		{Code: operation.OpDescribeStreams}: {
-			newReq:  func() protocol.InRequest { return &protocol.DescribeStreamsRequest{} },
-			newResp: func() protocol.OutResponse { return &protocol.DescribeStreamsResponse{} },
+		{Code: operation.OpDescribeStream}: {
+			newReq:  func() protocol.InRequest { return &protocol.DescribeStreamRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.DescribeStreamResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
-				handler.DescribeStreams(req.(*protocol.DescribeStreamsRequest), resp.(*protocol.DescribeStreamsResponse))
+				handler.DescribeStream(req.(*protocol.DescribeStreamRequest), resp.(*protocol.DescribeStreamResponse))
 			},
 		},
 		{Code: operation.OpDescribePMCluster}: {

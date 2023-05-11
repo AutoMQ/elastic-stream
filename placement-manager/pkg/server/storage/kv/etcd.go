@@ -215,7 +215,7 @@ func (e *Etcd) Put(ctx context.Context, k, v []byte, prevKV bool) ([]byte, error
 		return nil, nil
 	}
 
-	prevKvs, err := e.BatchPut(ctx, []KeyValue{{Key: k, Value: v}}, prevKV, false)
+	prevKVs, err := e.BatchPut(ctx, []KeyValue{{Key: k, Value: v}}, prevKV, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "kv put")
 	}
@@ -224,7 +224,7 @@ func (e *Etcd) Put(ctx context.Context, k, v []byte, prevKV bool) ([]byte, error
 		return nil, nil
 	}
 
-	for _, kv := range prevKvs {
+	for _, kv := range prevKVs {
 		if bytes.Equal(kv.Key, k) {
 			return kv.Value, nil
 		}
@@ -243,9 +243,9 @@ func (e *Etcd) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn 
 		return nil, errors.Wrap(ErrTooManyTxnOps, "kv batch put")
 	}
 
-	var prevKvs []KeyValue
+	var prevKVs []KeyValue
 	if prevKV {
-		prevKvs = make([]KeyValue, 0, len(kvs))
+		prevKVs = make([]KeyValue, 0, len(kvs))
 	}
 
 	for i := 0; i < len(kvs); i += batchSize {
@@ -253,14 +253,14 @@ func (e *Etcd) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn 
 		if end > len(kvs) {
 			end = len(kvs)
 		}
-		batchKvs := kvs[i:end]
+		batchKVs := kvs[i:end]
 
-		ops := make([]clientv3.Op, 0, len(batchKvs))
+		ops := make([]clientv3.Op, 0, len(batchKVs))
 		var opts []clientv3.OpOption
 		if prevKV {
 			opts = append(opts, clientv3.WithPrevKV())
 		}
-		for _, kv := range batchKvs {
+		for _, kv := range batchKVs {
 			if len(kv.Key) == 0 {
 				continue
 			}
@@ -288,14 +288,14 @@ func (e *Etcd) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn 
 			if !e.hasPrefix(putResp.PrevKv.Key) {
 				continue
 			}
-			prevKvs = append(prevKvs, KeyValue{
+			prevKVs = append(prevKVs, KeyValue{
 				Key:   e.trimPrefix(putResp.PrevKv.Key),
 				Value: putResp.PrevKv.Value,
 			})
 		}
 	}
 
-	return prevKvs, nil
+	return prevKVs, nil
 }
 
 // Delete returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
@@ -304,7 +304,7 @@ func (e *Etcd) Delete(ctx context.Context, k []byte, prevKV bool) ([]byte, error
 		return nil, nil
 	}
 
-	prevKvs, err := e.BatchDelete(ctx, [][]byte{k}, prevKV, false)
+	prevKVs, err := e.BatchDelete(ctx, [][]byte{k}, prevKV, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "kv delete")
 	}
@@ -312,7 +312,7 @@ func (e *Etcd) Delete(ctx context.Context, k []byte, prevKV bool) ([]byte, error
 	if !prevKV {
 		return nil, nil
 	}
-	for _, kv := range prevKvs {
+	for _, kv := range prevKVs {
 		if bytes.Equal(kv.Key, k) {
 			return kv.Value, nil
 		}
@@ -331,9 +331,9 @@ func (e *Etcd) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inTx
 		return nil, errors.Wrap(ErrTooManyTxnOps, "kv batch delete")
 	}
 
-	var prevKvs []KeyValue
+	var prevKVs []KeyValue
 	if prevKV {
-		prevKvs = make([]KeyValue, 0, len(keys))
+		prevKVs = make([]KeyValue, 0, len(keys))
 	}
 
 	for i := 0; i < len(keys); i += batchSize {
@@ -374,7 +374,7 @@ func (e *Etcd) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inTx
 				if !e.hasPrefix(kv.Key) {
 					continue
 				}
-				prevKvs = append(prevKvs, KeyValue{
+				prevKVs = append(prevKVs, KeyValue{
 					Key:   e.trimPrefix(kv.Key),
 					Value: kv.Value,
 				})
@@ -382,7 +382,7 @@ func (e *Etcd) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inTx
 		}
 	}
 
-	return prevKvs, nil
+	return prevKVs, nil
 }
 
 func (e *Etcd) GetPrefixRangeEnd(p []byte) []byte {

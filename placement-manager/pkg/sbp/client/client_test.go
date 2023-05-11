@@ -91,27 +91,27 @@ func (b *baseHandler) AllocateID(_ *protocol.IDAllocationRequest, resp *protocol
 	resp.OK()
 }
 
-func (b *baseHandler) SealRanges(_ *protocol.SealRangesRequest, resp *protocol.SealRangesResponse) {
+func (b *baseHandler) SealRange(_ *protocol.SealRangeRequest, resp *protocol.SealRangeResponse) {
 	resp.OK()
 }
 
-func (b *baseHandler) ListRanges(_ *protocol.ListRangesRequest, resp *protocol.ListRangesResponse) {
+func (b *baseHandler) ListRange(_ *protocol.ListRangeRequest, resp *protocol.ListRangeResponse) {
 	resp.OK()
 }
 
-func (b *baseHandler) CreateStreams(_ *protocol.CreateStreamsRequest, resp *protocol.CreateStreamsResponse) {
+func (b *baseHandler) CreateStream(_ *protocol.CreateStreamRequest, resp *protocol.CreateStreamResponse) {
 	resp.OK()
 }
 
-func (b *baseHandler) DeleteStreams(_ *protocol.DeleteStreamsRequest, resp *protocol.DeleteStreamsResponse) {
+func (b *baseHandler) DeleteStream(_ *protocol.DeleteStreamRequest, resp *protocol.DeleteStreamResponse) {
 	resp.OK()
 }
 
-func (b *baseHandler) UpdateStreams(_ *protocol.UpdateStreamsRequest, resp *protocol.UpdateStreamsResponse) {
+func (b *baseHandler) UpdateStream(_ *protocol.UpdateStreamRequest, resp *protocol.UpdateStreamResponse) {
 	resp.OK()
 }
 
-func (b *baseHandler) DescribeStreams(_ *protocol.DescribeStreamsRequest, resp *protocol.DescribeStreamsResponse) {
+func (b *baseHandler) DescribeStream(_ *protocol.DescribeStreamRequest, resp *protocol.DescribeStreamResponse) {
 	resp.OK()
 }
 

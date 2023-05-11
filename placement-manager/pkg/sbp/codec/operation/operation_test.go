@@ -73,79 +73,63 @@ func TestNewOperation(t *testing.T) {
 			},
 		},
 		{
-			name:   "ListRanges",
-			fields: fields{code: OpListRanges},
+			name:   "ListRange",
+			fields: fields{code: OpListRange},
 			wants: wants{
-				s:    "ListRanges",
-				code: OpListRanges,
+				s:    "ListRange",
+				code: OpListRange,
 			},
 		},
 		{
-			name:   "SealRanges",
-			fields: fields{code: OpSealRanges},
+			name:   "SealRange",
+			fields: fields{code: OpSealRange},
 			wants: wants{
-				s:    "SealRanges",
-				code: OpSealRanges,
+				s:    "SealRange",
+				code: OpSealRange,
 			},
 		},
 		{
-			name:   "SyncRanges",
-			fields: fields{code: OpSyncRanges},
+			name:   "CreateStream",
+			fields: fields{code: OpCreateStream},
 			wants: wants{
-				s:    "SyncRanges",
-				code: OpSyncRanges,
+				s:    "CreateStream",
+				code: OpCreateStream,
 			},
 		},
 		{
-			name:   "DescribeRanges",
-			fields: fields{code: OpDescribeRanges},
+			name:   "DeleteStream",
+			fields: fields{code: OpDeleteStream},
 			wants: wants{
-				s:    "DescribeRanges",
-				code: OpDescribeRanges,
+				s:    "DeleteStream",
+				code: OpDeleteStream,
 			},
 		},
 		{
-			name:   "CreateStreams",
-			fields: fields{code: OpCreateStreams},
+			name:   "UpdateStream",
+			fields: fields{code: OpUpdateStream},
 			wants: wants{
-				s:    "CreateStreams",
-				code: OpCreateStreams,
+				s:    "UpdateStream",
+				code: OpUpdateStream,
 			},
 		},
 		{
-			name:   "DeleteStreams",
-			fields: fields{code: OpDeleteStreams},
+			name:   "DescribeStream",
+			fields: fields{code: OpDescribeStream},
 			wants: wants{
-				s:    "DeleteStreams",
-				code: OpDeleteStreams,
+				s:    "DescribeStream",
+				code: OpDescribeStream,
 			},
 		},
 		{
-			name:   "UpdateStreams",
-			fields: fields{code: OpUpdateStreams},
+			name:   "TrimStream",
+			fields: fields{code: OpTrimStream},
 			wants: wants{
-				s:    "UpdateStreams",
-				code: OpUpdateStreams,
+				s:    "TrimStream",
+				code: OpTrimStream,
 			},
 		},
 		{
-			name:   "DescribeStreams",
-			fields: fields{code: OpDescribeStreams},
-			wants: wants{
-				s:    "DescribeStreams",
-				code: OpDescribeStreams,
-			},
-		},
-		{
-			name:   "TrimStreams",
-			fields: fields{code: OpTrimStreams},
-			wants: wants{
-				s:    "TrimStreams",
-				code: OpTrimStreams,
-			},
-		},
-		{
-			name:   "ReadStreams",
+			name:   "ReportMetrics",
 			fields: fields{code: OpReportMetrics},
 			wants: wants{
 				s:    "ReportMetrics",

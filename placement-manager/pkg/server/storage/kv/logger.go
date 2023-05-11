@@ -83,8 +83,8 @@ func (l Logger) Put(ctx context.Context, k, v []byte, prevKV bool) (prevV []byte
 	return
 }
 
-func (l Logger) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn bool) (prevKvs []KeyValue, err error) {
-	prevKvs, err = l.KV.BatchPut(ctx, kvs, prevKV, inTxn)
+func (l Logger) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn bool) (prevKVs []KeyValue, err error) {
+	prevKVs, err = l.KV.BatchPut(ctx, kvs, prevKV, inTxn)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -97,7 +97,7 @@ func (l Logger) BatchPut(ctx context.Context, kvs []KeyValue, prevKV bool, inTxn
 		for i, kv := range kvs {
 			fields = append(fields, zap.ByteString(fmt.Sprintf("key-%d", i), kv.Key), zap.Binary(fmt.Sprintf("value-%d", i), kv.Value))
 		}
-		for i, kv := range prevKvs {
+		for i, kv := range prevKVs {
 			fields = append(fields, zap.ByteString(fmt.Sprintf("prev-key-%d", i), kv.Key), zap.Binary(fmt.Sprintf("prev-value-%d", i), kv.Value))
 		}
 		logger.Debug("kv batch put", fields...)
@@ -116,8 +116,8 @@ func (l Logger) Delete(ctx context.Context, k []byte, prevKV bool) (prevV []byte
 	return
 }
 
-func (l Logger) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inTxn bool) (prevKvs []KeyValue, err error) {
-	prevKvs, err = l.KV.BatchDelete(ctx, keys, prevKV, inTxn)
+func (l Logger) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inTxn bool) (prevKVs []KeyValue, err error) {
+	prevKVs, err = l.KV.BatchDelete(ctx, keys, prevKV, inTxn)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -130,7 +130,7 @@ func (l Logger) BatchDelete(ctx context.Context, keys [][]byte, prevKV bool, inT
 		for i, k := range keys {
 			fields = append(fields, zap.ByteString(fmt.Sprintf("key-%d", i), k))
 		}
-		for i, kv := range prevKvs {
+		for i, kv := range prevKVs {
 			fields = append(fields, zap.ByteString(fmt.Sprintf("prev-key-%d", i), kv.Key), zap.Binary(fmt.Sprintf("prev-value-%d", i), kv.Value))
 		}
 		logger.Debug("kv batch delete", fields...)

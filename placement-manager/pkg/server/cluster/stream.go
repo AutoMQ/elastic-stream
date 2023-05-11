@@ -13,50 +13,52 @@ import (
 	"github.com/AutoMQ/placement-manager/pkg/util/traceutil"
 )
 
+var (
+	ErrStreamNotFound = errors.New("stream not found")
+)
+
 type Stream interface {
-	CreateStreams(ctx context.Context, streams []*rpcfb.StreamT) ([]*rpcfb.CreateStreamResultT, error)
-	DeleteStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error)
-	UpdateStreams(ctx context.Context, streams []*rpcfb.StreamT) ([]*rpcfb.StreamT, error)
-	DescribeStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.DescribeStreamResultT, error)
+	CreateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error)
+	DeleteStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error)
+	UpdateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error)
+	DescribeStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error)
 }
 
-// CreateStreams creates streams and the first range in each stream in transaction.
-// It returns ErrNotEnoughDataNodes if there are not enough data nodes to create the streams.
-// It returns ErrNotLeader if the transaction failed.
-func (c *RaftCluster) CreateStreams(ctx context.Context, streams []*rpcfb.StreamT) ([]*rpcfb.CreateStreamResultT, error) {
-	logger := c.lg.With(zap.Int("stream-cnt", len(streams)), traceutil.TraceLogField(ctx))
+// CreateStream creates a stream and the first range in the stream.
+// It returns ErrNotEnoughDataNodes if there are not enough data nodes to create the stream.
+// It returns ErrNotLeader if the current PM node is not the leader.
+func (c *RaftCluster) CreateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error) {
+	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
-	ids, err := c.sAlloc.AllocN(ctx, len(streams))
+	sid, err := c.sAlloc.Alloc(ctx)
 	if err != nil {
-		logger.Error("failed to allocate stream ids", zap.Error(err))
+		logger.Error("failed to allocate a stream id", zap.Error(err))
 		if errors.Is(err, id.ErrTxnFailed) {
 			return nil, ErrNotLeader
 		}
 		return nil, err
 	}
 
-	params := make([]*endpoint.CreateStreamParam, 0, len(streams))
-	for i, stream := range streams {
-		stream.StreamId = int64(ids[i])
-		nodes, err := c.chooseDataNodes(stream.ReplicaNum)
-		if err != nil {
-			logger.Error("failed to choose data nodes", zap.Int64("stream-id", stream.StreamId), zap.Error(err))
-			return nil, err
-		}
-		params = append(params, &endpoint.CreateStreamParam{
-			StreamT: stream,
-			RangeT: &rpcfb.RangeT{
-				StreamId:     stream.StreamId,
-				RangeIndex:   0,
-				StartOffset:  0,
-				EndOffset:    _writableRangeEndOffset,
-				ReplicaNodes: nodes,
-			},
-		})
+	stream.StreamId = int64(sid)
+	logger = logger.With(zap.Int64("stream-id", stream.StreamId))
+	nodes, err := c.chooseDataNodes(stream.Replica)
+	if err != nil {
+		logger.Error("failed to choose data nodes", zap.Error(err))
+		return nil, err
+	}
+	param := &endpoint.CreateStreamParam{
+		StreamT: stream,
+		RangeT: &rpcfb.RangeT{
+			StreamId: stream.StreamId,
+			Index:    0,
+			Start:    0,
+			End:      _writableRangeEnd,
+			Nodes:    nodes,
+		},
 	}
 
-	logger.Info("start to create streams", zap.Uint64s("stream-ids", ids))
-	streams, err = c.storage.CreateStreams(ctx, params)
+	logger.Info("start to create stream")
+	stream, err = c.storage.CreateStream(ctx, param)
 	if err != nil {
 		if errors.Is(err, kv.ErrTxnFailed) {
 			return nil, ErrNotLeader
@@ -64,58 +66,39 @@ func (c *RaftCluster) CreateStreams(ctx context.Context, streams []*rpcfb.Stream
 		return nil, err
 	}
 
-	results := make([]*rpcfb.CreateStreamResultT, len(streams))
-	for i, stream := range streams {
-		results[i] = &rpcfb.CreateStreamResultT{
-			Stream: stream,
-			Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK},
+	return stream, nil
+}
+
+// DeleteStream deletes the stream.
+// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrStreamNotFound if the stream is not found.
+func (c *RaftCluster) DeleteStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error) {
+	logger := c.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
+
+	logger.Info("start to delete stream")
+	stream, err := c.storage.DeleteStream(ctx, streamID)
+	logger.Info("finish deleting stream", zap.Error(err))
+	if err != nil {
+		if errors.Is(err, kv.ErrTxnFailed) {
+			return nil, ErrNotLeader
 		}
+		return nil, err
 	}
-	return results, nil
+	if stream == nil {
+		return nil, errors.Wrapf(ErrStreamNotFound, "stream id %d", streamID)
+	}
+
+	return stream, nil
 }
 
-// DeleteStreams deletes streams in transaction.
-// It returns ErrNotLeader if the transaction failed.
-func (c *RaftCluster) DeleteStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.StreamT, error) {
-	logger := c.lg.With(zap.Int("stream-cnt", len(streamIDs)), traceutil.TraceLogField(ctx))
+// UpdateStream updates the stream.
+// It returns ErrNotLeader if the current PM node is not the leader.
+func (c *RaftCluster) UpdateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error) {
+	logger := c.lg.With(zap.Int64("stream-id", stream.StreamId), traceutil.TraceLogField(ctx))
 
-	logger.Info("start to delete streams", zap.Int64s("stream-ids", streamIDs))
-	streams, err := c.storage.DeleteStreams(ctx, streamIDs)
-	logger.Info("finish deleting streams", zap.Error(err))
-	if errors.Is(err, kv.ErrTxnFailed) {
-		err = ErrNotLeader
-	}
-
-	return streams, err
-}
-
-// UpdateStreams updates streams in transaction.
-// It returns ErrNotLeader if the transaction failed.
-func (c *RaftCluster) UpdateStreams(ctx context.Context, streams []*rpcfb.StreamT) ([]*rpcfb.StreamT, error) {
-	logger := c.lg.With(zap.Int("stream-cnt", len(streams)), traceutil.TraceLogField(ctx))
-
-	streamIDs := make([]int64, 0, len(streams))
-	for _, stream := range streams {
-		streamIDs = append(streamIDs, stream.StreamId)
-	}
-	logger.Info("start to update streams", zap.Int64s("stream-ids", streamIDs))
-	upStreams, err := c.storage.UpdateStreams(ctx, streams)
-	logger.Info("finish updating streams", zap.Error(err))
-	if errors.Is(err, kv.ErrTxnFailed) {
-		err = ErrNotLeader
-	}
-
-	return upStreams, err
-}
-
-// DescribeStreams describes streams.
-// It returns ErrNotLeader if the transaction failed.
-func (c *RaftCluster) DescribeStreams(ctx context.Context, streamIDs []int64) ([]*rpcfb.DescribeStreamResultT, error) {
-	logger := c.lg.With(zap.Int("stream-cnt", len(streamIDs)), traceutil.TraceLogField(ctx))
-
-	logger.Info("start to describe streams", zap.Int64s("stream-ids", streamIDs))
-	streams, err := c.storage.GetStreams(ctx, streamIDs)
-	logger.Info("finish describing streams", zap.Error(err))
+	logger.Info("start to update stream")
+	upStream, err := c.storage.UpdateStream(ctx, stream)
+	logger.Info("finish updating stream", zap.Error(err))
 	if err != nil {
 		if errors.Is(err, kv.ErrTxnFailed) {
 			return nil, ErrNotLeader
@@ -123,12 +106,27 @@ func (c *RaftCluster) DescribeStreams(ctx context.Context, streamIDs []int64) ([
 		return nil, err
 	}
 
-	results := make([]*rpcfb.DescribeStreamResultT, len(streams))
-	for i, stream := range streams {
-		results[i] = &rpcfb.DescribeStreamResultT{
-			Stream: stream,
-			Status: &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK},
+	return upStream, nil
+}
+
+// DescribeStream describes the stream.
+// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrStreamNotFound if the stream is not found.
+func (c *RaftCluster) DescribeStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error) {
+	logger := c.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
+
+	logger.Info("start to describe stream")
+	stream, err := c.storage.GetStream(ctx, streamID)
+	logger.Info("finish describing stream", zap.Error(err))
+	if err != nil {
+		if errors.Is(err, kv.ErrTxnFailed) {
+			return nil, ErrNotLeader
 		}
+		return nil, err
 	}
-	return results, nil
+	if stream == nil {
+		return nil, errors.Wrapf(ErrStreamNotFound, "stream id %d", streamID)
+	}
+
+	return stream, nil
 }

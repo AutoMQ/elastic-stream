@@ -120,129 +120,129 @@ func (ia *IDAllocationRequest) Timeout() int32 {
 	return ia.TimeoutMs
 }
 
-// ListRangesRequest is a request to operation.OpListRanges
-type ListRangesRequest struct {
+// ListRangeRequest is a request to operation.OpListRange
+type ListRangeRequest struct {
 	baseRequest
 	baseUnmarshaler
 
-	rpcfb.ListRangesRequestT
+	rpcfb.ListRangeRequestT
 }
 
-func (lr *ListRangesRequest) unmarshalFlatBuffer(data []byte) error {
-	lr.ListRangesRequestT = *rpcfb.GetRootAsListRangesRequest(data, 0).UnPack()
+func (lr *ListRangeRequest) unmarshalFlatBuffer(data []byte) error {
+	lr.ListRangeRequestT = *rpcfb.GetRootAsListRangeRequest(data, 0).UnPack()
 	return nil
 }
 
-func (lr *ListRangesRequest) Unmarshal(fmt format.Format, data []byte) error {
+func (lr *ListRangeRequest) Unmarshal(fmt format.Format, data []byte) error {
 	return unmarshal(lr, fmt, data)
 }
 
-func (lr *ListRangesRequest) Timeout() int32 {
+func (lr *ListRangeRequest) Timeout() int32 {
 	return lr.TimeoutMs
 }
 
-// SealRangesRequest is a request to operation.OpSealRanges
-type SealRangesRequest struct {
+// SealRangeRequest is a request to operation.OpSealRange
+type SealRangeRequest struct {
 	baseRequest
 	baseUnmarshaler
 
-	rpcfb.SealRangesRequestT
+	rpcfb.SealRangeRequestT
 }
 
-func (sr *SealRangesRequest) unmarshalFlatBuffer(data []byte) error {
-	sr.SealRangesRequestT = *rpcfb.GetRootAsSealRangesRequest(data, 0).UnPack()
+func (sr *SealRangeRequest) unmarshalFlatBuffer(data []byte) error {
+	sr.SealRangeRequestT = *rpcfb.GetRootAsSealRangeRequest(data, 0).UnPack()
 	return nil
 }
 
-func (sr *SealRangesRequest) Unmarshal(fmt format.Format, data []byte) error {
+func (sr *SealRangeRequest) Unmarshal(fmt format.Format, data []byte) error {
 	return unmarshal(sr, fmt, data)
 }
 
-func (sr *SealRangesRequest) Timeout() int32 {
+func (sr *SealRangeRequest) Timeout() int32 {
 	return sr.TimeoutMs
 }
 
-// CreateStreamsRequest is a request to operation.OpCreateStreams
-type CreateStreamsRequest struct {
+// CreateStreamRequest is a request to operation.OpCreateStream
+type CreateStreamRequest struct {
 	baseRequest
 	baseUnmarshaler
 
-	rpcfb.CreateStreamsRequestT
+	rpcfb.CreateStreamRequestT
 }
 
-func (cs *CreateStreamsRequest) unmarshalFlatBuffer(data []byte) error {
-	cs.CreateStreamsRequestT = *rpcfb.GetRootAsCreateStreamsRequest(data, 0).UnPack()
+func (cs *CreateStreamRequest) unmarshalFlatBuffer(data []byte) error {
+	cs.CreateStreamRequestT = *rpcfb.GetRootAsCreateStreamRequest(data, 0).UnPack()
 	return nil
 }
 
-func (cs *CreateStreamsRequest) Unmarshal(fmt format.Format, data []byte) error {
+func (cs *CreateStreamRequest) Unmarshal(fmt format.Format, data []byte) error {
 	return unmarshal(cs, fmt, data)
 }
 
-func (cs *CreateStreamsRequest) Timeout() int32 {
+func (cs *CreateStreamRequest) Timeout() int32 {
 	return cs.TimeoutMs
 }
 
-// DeleteStreamsRequest is a request to operation.OpDeleteStreams
-type DeleteStreamsRequest struct {
+// DeleteStreamRequest is a request to operation.OpDeleteStream
+type DeleteStreamRequest struct {
 	baseRequest
 	baseUnmarshaler
 
-	rpcfb.DeleteStreamsRequestT
+	rpcfb.DeleteStreamRequestT
 }
 
-func (ds *DeleteStreamsRequest) unmarshalFlatBuffer(data []byte) error {
-	ds.DeleteStreamsRequestT = *rpcfb.GetRootAsDeleteStreamsRequest(data, 0).UnPack()
+func (ds *DeleteStreamRequest) unmarshalFlatBuffer(data []byte) error {
+	ds.DeleteStreamRequestT = *rpcfb.GetRootAsDeleteStreamRequest(data, 0).UnPack()
 	return nil
 }
 
-func (ds *DeleteStreamsRequest) Unmarshal(fmt format.Format, data []byte) error {
+func (ds *DeleteStreamRequest) Unmarshal(fmt format.Format, data []byte) error {
 	return unmarshal(ds, fmt, data)
 }
 
-func (ds *DeleteStreamsRequest) Timeout() int32 {
+func (ds *DeleteStreamRequest) Timeout() int32 {
 	return ds.TimeoutMs
 }
 
-// UpdateStreamsRequest is a request to operation.OpUpdateStreams
-type UpdateStreamsRequest struct {
+// UpdateStreamRequest is a request to operation.OpUpdateStream
+type UpdateStreamRequest struct {
 	baseRequest
 	baseUnmarshaler
 
-	rpcfb.UpdateStreamsRequestT
+	rpcfb.UpdateStreamRequestT
 }
 
-func (us *UpdateStreamsRequest) unmarshalFlatBuffer(data []byte) error {
-	us.UpdateStreamsRequestT = *rpcfb.GetRootAsUpdateStreamsRequest(data, 0).UnPack()
+func (us *UpdateStreamRequest) unmarshalFlatBuffer(data []byte) error {
+	us.UpdateStreamRequestT = *rpcfb.GetRootAsUpdateStreamRequest(data, 0).UnPack()
 	return nil
 }
 
-func (us *UpdateStreamsRequest) Unmarshal(fmt format.Format, data []byte) error {
+func (us *UpdateStreamRequest) Unmarshal(fmt format.Format, data []byte) error {
 	return unmarshal(us, fmt, data)
 }
 
-func (us *UpdateStreamsRequest) Timeout() int32 {
+func (us *UpdateStreamRequest) Timeout() int32 {
 	return us.TimeoutMs
 }
 
-// DescribeStreamsRequest is a request to operation.OpDescribeStreams
-type DescribeStreamsRequest struct {
+// DescribeStreamRequest is a request to operation.OpDescribeStream
+type DescribeStreamRequest struct {
 	baseRequest
 	baseUnmarshaler
 
-	rpcfb.DescribeStreamsRequestT
+	rpcfb.DescribeStreamRequestT
 }
 
-func (ds *DescribeStreamsRequest) unmarshalFlatBuffer(data []byte) error {
-	ds.DescribeStreamsRequestT = *rpcfb.GetRootAsDescribeStreamsRequest(data, 0).UnPack()
+func (ds *DescribeStreamRequest) unmarshalFlatBuffer(data []byte) error {
+	ds.DescribeStreamRequestT = *rpcfb.GetRootAsDescribeStreamRequest(data, 0).UnPack()
 	return nil
 }
 
-func (ds *DescribeStreamsRequest) Unmarshal(fmt format.Format, data []byte) error {
+func (ds *DescribeStreamRequest) Unmarshal(fmt format.Format, data []byte) error {
 	return unmarshal(ds, fmt, data)
 }
 
-func (ds *DescribeStreamsRequest) Timeout() int32 {
+func (ds *DescribeStreamRequest) Timeout() int32 {
 	return ds.TimeoutMs
 }
 
