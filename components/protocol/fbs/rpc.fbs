@@ -321,7 +321,7 @@ table CreateRangeResponse {
 // and potentially create a new range, replicas of which reside on a different set of data nodes. This achieves fast fault toleration
 // as well as overall low write latency.
 enum SealKind : byte {
-    SEAL_KIND_UNSPECIFIED = 0,
+    UNSPECIFIED = 0,
     DATA_NODE = 1,
     PLACEMENT_MANAGER = 2,
 }
