@@ -1870,7 +1870,16 @@ mod tests {
             .blocking_recv()
             .map_err(|_| StoreError::Internal("Internal error".to_owned()))?;
 
-        let record_batch = RecordBatchBuilder::default().build()?;
+        let mut payload = BytesMut::with_capacity(1024);
+        payload.resize(1024, 65);
+
+        let record_batch = RecordBatchBuilder::default()
+            .with_stream_id(0)
+            .with_range_index(0)
+            .with_base_offset(0)
+            .with_last_offset_delta(1)
+            .with_payload(payload.freeze())
+            .build()?;
         let record_group = Into::<FlatRecordBatch>::into(record_batch);
         let (bufs, total) = record_group.encode();
         let mut buffer = BytesMut::new();
