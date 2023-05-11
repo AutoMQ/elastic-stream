@@ -1,4 +1,4 @@
-use crate::range::StreamRange;
+use crate::range::Range;
 use crate::PlacementManagerNode;
 use crate::Status;
 
@@ -9,7 +9,7 @@ pub enum Response {
     },
     ListRange {
         status: Status,
-        ranges: Option<Vec<StreamRange>>,
+        ranges: Option<Vec<Range>>,
     },
 
     AllocateId {
@@ -23,7 +23,7 @@ pub enum Response {
 
     SealRange {
         status: Status,
-        range: Option<StreamRange>,
+        range: Option<Range>,
     },
     ReportMetrics {
         status: Status,

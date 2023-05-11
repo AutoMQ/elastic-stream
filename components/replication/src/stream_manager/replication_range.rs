@@ -7,7 +7,7 @@ use std::{
 use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
-use model::range::StreamRange;
+use model::range::Range;
 
 use crate::ReplicationError;
 
@@ -15,7 +15,7 @@ use super::{replication_context::ReplicationContext, replicator::Replicator};
 
 #[derive(Debug)]
 pub(crate) struct ReplicationRange {
-    metadata: StreamRange,
+    metadata: Range,
 
     client: Weak<Client>,
 
@@ -26,7 +26,7 @@ pub(crate) struct ReplicationRange {
 }
 
 impl ReplicationRange {
-    pub(crate) fn new(metadata: StreamRange, client: Weak<Client>) -> Rc<Self> {
+    pub(crate) fn new(metadata: Range, client: Weak<Client>) -> Rc<Self> {
         let this = Self {
             metadata,
             client,

@@ -11,7 +11,7 @@ use std::{
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use log::{error, info, trace, warn};
-use model::range::{Range, StreamRange};
+use model::range::Range;
 use rocksdb::{
     BlockBasedOptions, ColumnFamilyDescriptor, DBCompressionType, FlushOptions, IteratorMode,
     Options, ReadOptions, WriteOptions, DB,
@@ -479,7 +479,7 @@ impl Indexer {
 }
 
 impl super::LocalRangeManager for Indexer {
-    fn list_by_stream(&self, stream_id: i64, tx: mpsc::UnboundedSender<StreamRange>) {
+    fn list_by_stream(&self, stream_id: i64, tx: mpsc::UnboundedSender<Range>) {
         let mut prefix = BytesMut::with_capacity(9);
         prefix.put_u8(RANGE_PREFIX);
         prefix.put_i64(stream_id);
@@ -510,14 +510,14 @@ impl super::LocalRangeManager for Indexer {
                         if v.len() == 8 {
                             let mut value_reader = Cursor::new(&v[..]);
                             let start = value_reader.get_u64();
-                            Some(StreamRange::new(stream_id, 0, id, start, 0, None))
+                            Some(Range::new(stream_id, 0, id, start, 0, None))
                         } else {
                             debug_assert_eq!(v.len(), 8 + 8);
                             let mut value_reader = Cursor::new(&v[..]);
                             let start = value_reader.get_u64();
                             let end = value_reader.get_u64();
                             debug_assert!(start <= end, "Range start <= end should hold");
-                            Some(StreamRange::new(stream_id, 0, id, start, end, Some(end)))
+                            Some(Range::new(stream_id, 0, id, start, end, Some(end)))
                         }
                     }
                 })
@@ -532,7 +532,7 @@ impl super::LocalRangeManager for Indexer {
         }
     }
 
-    fn list(&self, tx: mpsc::UnboundedSender<StreamRange>) {
+    fn list(&self, tx: mpsc::UnboundedSender<Range>) {
         let mut prefix = BytesMut::with_capacity(1);
         prefix.put_u8(RANGE_PREFIX);
 
@@ -561,13 +561,13 @@ impl super::LocalRangeManager for Indexer {
                         if v.len() == 8 {
                             let mut value_reader = Cursor::new(&v[..]);
                             let start = value_reader.get_u64();
-                            Some(StreamRange::new(_stream_id, 0, id, start, 0, None))
+                            Some(Range::new(_stream_id, 0, id, start, 0, None))
                         } else {
                             debug_assert_eq!(v.len(), 8 + 8);
                             let mut value_reader = Cursor::new(&v[..]);
                             let start = value_reader.get_u64();
                             let end = value_reader.get_u64();
-                            Some(StreamRange::new(_stream_id, 0, id, start, end, Some(end)))
+                            Some(Range::new(_stream_id, 0, id, start, end, Some(end)))
                         }
                     }
                 })
@@ -579,7 +579,7 @@ impl super::LocalRangeManager for Indexer {
         }
     }
 
-    fn seal(&self, stream_id: i64, range: &StreamRange) -> Result<(), StoreError> {
+    fn seal(&self, stream_id: i64, range: &Range) -> Result<(), StoreError> {
         debug_assert!(range.is_sealed(), "Range is not sealed yet");
         let end = range.end().ok_or(StoreError::Internal("".to_owned()))?;
         debug_assert!(end >= range.start(), "End of range cannot less than start");
@@ -606,7 +606,7 @@ impl super::LocalRangeManager for Indexer {
         }
     }
 
-    fn add(&self, stream_id: i64, range: &StreamRange) -> Result<(), StoreError> {
+    fn add(&self, stream_id: i64, range: &Range) -> Result<(), StoreError> {
         let mut key_buf = BytesMut::with_capacity(1 + 8 + 4);
         key_buf.put_u8(RANGE_PREFIX);
         key_buf.put_i64(stream_id);

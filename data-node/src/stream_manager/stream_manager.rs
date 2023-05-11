@@ -1,12 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use log::{error, info, trace, warn};
-use model::{
-    data_node::DataNode,
-    range::{Range, StreamRange},
-    stream::Stream,
-};
-use protocol::rpc::header::StreamT;
+use model::{data_node::DataNode, range::Range, stream::Stream};
 use store::{ElasticStore, Store};
 
 use crate::{error::ServiceError, stream_manager::append_window::AppendWindow};
@@ -254,7 +249,7 @@ impl StreamManager {
             range.start()
         );
         debug_assert_eq!(-1, range.end());
-        let mut stream_range = StreamRange::new(
+        let mut stream_range = Range::new(
             stream_id,
             0,
             range_index,
@@ -366,28 +361,6 @@ impl StreamManager {
         }
     }
 
-    pub(crate) async fn describe_range(
-        &mut self,
-        stream_id: i64,
-        range_id: i32,
-    ) -> Result<StreamRange, ServiceError> {
-        self.create_stream_if_missing(stream_id).await?;
-
-        if let Some(stream) = self.streams.get(&stream_id) {
-            if let Some(mut range) = stream.range(range_id) {
-                if let None = range.end() {
-                    if let Some(window) = self.windows.get(&stream_id) {
-                        range.set_limit(window.next);
-                    }
-                }
-                return Ok(range);
-            } else {
-                return Err(ServiceError::NotFound(format!("Range[index={}]", range_id)));
-            }
-        }
-        return Err(ServiceError::NotFound(format!("Stream[id={}]", stream_id)));
-    }
-
     /// Get a stream by id.
     ///
     /// # Arguments
@@ -410,7 +383,7 @@ impl StreamManager {
     ///
     /// # Note
     /// We need to update `limit` of the returning range if it is mutable.
-    pub fn stream_range_of(&self, stream_id: i64, offset: u64) -> Option<StreamRange> {
+    pub fn stream_range_of(&self, stream_id: i64, offset: u64) -> Option<Range> {
         if let Some(stream) = self.get_stream(stream_id) {
             return stream.range_of(offset).and_then(|mut range| {
                 if !range.is_sealed() {
@@ -435,8 +408,8 @@ mod tests {
     use tokio::sync::{mpsc, oneshot};
 
     use log::trace;
-    use model::{range::StreamRange, stream::Stream};
-    use protocol::rpc::header::{Range, RangeT};
+    use model::{range::Range, stream::Stream};
+    use protocol::rpc::header::RangeT;
     use store::ElasticStore;
 
     use crate::stream_manager::{append_window::AppendWindow, fetcher::Fetcher, StreamManager};
@@ -454,7 +427,7 @@ mod tests {
                         let ranges = (0..TOTAL)
                             .map(|i| {
                                 if i < TOTAL - 1 {
-                                    StreamRange::new(
+                                    Range::new(
                                         stream_id,
                                         0,
                                         i,
@@ -463,7 +436,7 @@ mod tests {
                                         Some(((i + 1) * 100) as u64),
                                     )
                                 } else {
-                                    StreamRange::new(stream_id, 0, i, (i * 100) as u64, 0, None)
+                                    Range::new(stream_id, 0, i, (i * 100) as u64, 0, None)
                                 }
                             })
                             .collect::<Vec<_>>();
@@ -510,12 +483,13 @@ mod tests {
             let mut range = RangeT::default();
             range.stream_id = stream_id;
             range.index = TOTAL - 1;
+            range.start = 0;
             range.end = -1;
             let mut builder = flatbuffers::FlatBufferBuilder::new();
             let range = range.pack(&mut builder);
             builder.finish(range, None);
             let data = builder.finished_data();
-            let range = flatbuffers::root::<Range>(data).unwrap();
+            let range = flatbuffers::root::<protocol::rpc::header::Range>(data).unwrap();
             let offset = stream_manager.alloc_record_batch_slots(range, 1).unwrap();
             stream_manager.ack(stream_id, offset).unwrap();
             let seal_offset = stream_manager.seal(stream_id, TOTAL - 1).await.unwrap();
@@ -525,52 +499,6 @@ mod tests {
         let _ = stop_tx.send(());
         let _ = handle.join();
 
-        Ok(())
-    }
-
-    #[test]
-    fn test_describe_range() -> Result<(), Box<dyn Error>> {
-        let store_path = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(store_path.as_path());
-        let (port_tx, port_rx) = oneshot::channel();
-        let (stop_tx, stop_rx) = oneshot::channel();
-        let handle = std::thread::spawn(move || {
-            tokio_uring::start(async {
-                let port = test_util::run_listener().await;
-                let _ = port_tx.send(port);
-                let _ = stop_rx.await;
-            });
-        });
-        let port = port_rx.blocking_recv()?;
-        let store = test_util::build_store(
-            format!("localhost:{}", port),
-            store_path.as_path().to_str().unwrap(),
-        );
-        let store = Rc::new(store);
-
-        tokio_uring::start(async {
-            let fetcher = create_fetcher().await;
-            let stream_id = 1;
-            let mut stream_manager = StreamManager::new(fetcher, store);
-            let mut range = RangeT::default();
-            range.stream_id = stream_id;
-            range.index = TOTAL - 1;
-            range.end = -1;
-            let mut builder = flatbuffers::FlatBufferBuilder::new();
-            let range = range.pack(&mut builder);
-            builder.finish(range, None);
-            let data = builder.finished_data();
-            let range = flatbuffers::root::<Range>(data).unwrap();
-            let offset = stream_manager.alloc_record_batch_slots(range, 1).unwrap();
-            stream_manager.ack(stream_id, offset).unwrap();
-            let range = stream_manager
-                .describe_range(stream_id, TOTAL - 1)
-                .await
-                .unwrap();
-            assert_eq!(offset + 1, range.limit());
-        });
-        let _ = stop_tx.send(());
-        let _ = handle.join();
         Ok(())
     }
 
@@ -598,8 +526,8 @@ mod tests {
         let (recovery_completion_tx, _recovery_completion_rx) = tokio::sync::oneshot::channel();
         let store = Rc::new(ElasticStore::new(config, recovery_completion_tx)?);
         let mut stream_manager = StreamManager::new(fetcher, store);
-        let range1 = StreamRange::new(0, 0, 0, 0, 10, Some(10));
-        let range2 = StreamRange::new(0, 0, 1, 10, 0, None);
+        let range1 = Range::new(0, 0, 0, 0, 10, Some(10));
+        let range2 = Range::new(0, 0, 1, 10, 0, None);
         let mut stream = Stream::default();
         stream.ranges = vec![range1, range2];
         stream_manager.streams.insert(0, stream);
@@ -608,7 +536,6 @@ mod tests {
 
         // Verify the sealed one
         {
-            use model::range::Range;
             let stream_range = stream_manager
                 .stream_range_of(0, 5)
                 .expect("Stream range should exist");

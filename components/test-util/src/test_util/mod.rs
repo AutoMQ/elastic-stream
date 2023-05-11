@@ -220,7 +220,7 @@ pub async fn run_listener() -> u16 {
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) = flatbuffers::root::<SealRangeRequest>(buf)
                                         {
-                                            serve_seal_ranges(&req, &mut response_frame);
+                                            serve_seal_range(&req, &mut response_frame);
                                         } else {
                                             error!("Failed to decode seal-ranges-request header");
                                         }
@@ -282,7 +282,7 @@ pub async fn run_listener() -> u16 {
     rx.await.unwrap()
 }
 
-fn serve_seal_ranges(req: &SealRangeRequest, response_frame: &mut Frame) {
+fn serve_seal_range(req: &SealRangeRequest, response_frame: &mut Frame) {
     let request = req.unpack();
 
     let mut response = SealRangeResponseT::default();

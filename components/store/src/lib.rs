@@ -29,7 +29,7 @@ pub mod util;
 
 use self::option::{ReadOptions, WriteOptions};
 use error::{AppendError, FetchError, StoreError};
-use model::range::StreamRange;
+use model::range::Range;
 
 pub mod cursor;
 pub mod option;
@@ -66,26 +66,22 @@ pub trait Store {
     /// List all stream ranges in the store
     ///
     /// if `filter` returns true, the range is kept in the final result vector; dropped otherwise.
-    async fn list<F>(&self, filter: F) -> Result<Vec<StreamRange>, StoreError>
+    async fn list<F>(&self, filter: F) -> Result<Vec<Range>, StoreError>
     where
-        F: Fn(&StreamRange) -> bool;
+        F: Fn(&Range) -> bool;
 
     /// List all ranges pertaining to the specified stream in the store
     ///
     /// if `filter` returns true, the range is kept in the final result vector; dropped otherwise.
-    async fn list_by_stream<F>(
-        &self,
-        stream_id: i64,
-        filter: F,
-    ) -> Result<Vec<StreamRange>, StoreError>
+    async fn list_by_stream<F>(&self, stream_id: i64, filter: F) -> Result<Vec<Range>, StoreError>
     where
-        F: Fn(&StreamRange) -> bool;
+        F: Fn(&Range) -> bool;
 
     /// Seal stream range in metadata column family after cross check with placement manager.
-    async fn seal(&self, range: StreamRange) -> Result<(), StoreError>;
+    async fn seal(&self, range: Range) -> Result<(), StoreError>;
 
     /// Create a stream range in metadata.
-    async fn create(&self, range: StreamRange) -> Result<(), StoreError>;
+    async fn create(&self, range: Range) -> Result<(), StoreError>;
 
     /// Max record offset in the store of the specified stream.
     fn max_record_offset(&self, stream_id: i64, range: u32) -> Result<Option<u64>, StoreError>;

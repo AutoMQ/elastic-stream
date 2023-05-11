@@ -2,10 +2,7 @@ use std::time::Duration;
 
 use protocol::rpc::header::StreamT;
 
-use crate::{
-    error::StreamError,
-    range::{Range, StreamRange},
-};
+use crate::{error::StreamError, range::Range};
 
 /// Stream is the basic storage unit in the system that store records in an append-only fashion.
 ///
@@ -23,11 +20,11 @@ pub struct Stream {
     pub retention_period: Duration,
 
     /// Ranges of the stream that are placed onto current data node.
-    pub ranges: Vec<StreamRange>,
+    pub ranges: Vec<Range>,
 }
 
 impl Stream {
-    pub fn push(&mut self, range: StreamRange) {
+    pub fn push(&mut self, range: Range) {
         self.ranges.push(range);
     }
 
@@ -63,11 +60,11 @@ impl Stream {
             .unwrap_or_default()
     }
 
-    pub fn last(&self) -> Option<&StreamRange> {
+    pub fn last(&self) -> Option<&Range> {
         self.ranges.last()
     }
 
-    pub fn range(&self, index: i32) -> Option<StreamRange> {
+    pub fn range(&self, index: i32) -> Option<Range> {
         self.ranges
             .iter()
             .try_find(|&range| Some(range.index() == index))
@@ -82,7 +79,7 @@ impl Stream {
     ///
     /// # Returns
     /// The range that contains the given offset, or None if not found.
-    pub fn range_of(&self, offset: u64) -> Option<StreamRange> {
+    pub fn range_of(&self, offset: u64) -> Option<Range> {
         self.ranges
             .iter()
             .try_find(|&range| Some(range.contains(offset)))
@@ -90,7 +87,7 @@ impl Stream {
             .cloned()
     }
 
-    pub fn refresh(&mut self, ranges: Vec<StreamRange>) {
+    pub fn refresh(&mut self, ranges: Vec<Range>) {
         let to_append = ranges
             .into_iter()
             .filter(|range| !self.ranges.iter().any(|r| range.index() == r.index()))
@@ -130,9 +127,9 @@ mod tests {
     fn test_sort_stream() {
         // Construct a stream with 3 ranges, and sort it.
         let mut stream: Stream = StreamT::default().into();
-        stream.push(StreamRange::new(0, 0, 1, 0, 0, None));
-        stream.push(StreamRange::new(0, 0, 0, 0, 0, None));
-        stream.push(StreamRange::new(0, 0, 2, 0, 0, None));
+        stream.push(Range::new(0, 0, 1, 0, 0, None));
+        stream.push(Range::new(0, 0, 0, 0, 0, None));
+        stream.push(Range::new(0, 0, 2, 0, 0, None));
         stream.sort();
 
         // Check the ranges are sorted by index.
@@ -145,9 +142,9 @@ mod tests {
     fn test_seal_stream() {
         // Construct a stream with 3 ranges, and seal the last range.
         let mut stream: Stream = StreamT::default().into();
-        stream.push(StreamRange::new(0, 0, 0, 0, 10, None));
-        stream.push(StreamRange::new(0, 0, 1, 10, 20, Some(20)));
-        stream.push(StreamRange::new(0, 0, 2, 20, 30, None));
+        stream.push(Range::new(0, 0, 0, 0, 10, None));
+        stream.push(Range::new(0, 0, 1, 10, 20, Some(20)));
+        stream.push(Range::new(0, 0, 2, 20, 30, None));
         stream.seal(0, 2).unwrap();
 
         // Check the last range is sealed.
@@ -161,7 +158,7 @@ mod tests {
 
         (0..10)
             .map(|i| {
-                let mut sr = StreamRange::new(0, 0, i, i as u64 * 10, (i as u64 + 1) * 10, None);
+                let mut sr = Range::new(0, 0, i, i as u64 * 10, (i as u64 + 1) * 10, None);
                 // Seal the range if it's not the last one.
                 if i != 9 {
                     let _ = sr.seal();

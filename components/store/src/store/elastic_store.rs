@@ -28,7 +28,7 @@ use core_affinity::CoreId;
 use crossbeam::channel::Sender;
 use futures::future::join_all;
 use log::{error, trace};
-use model::range::StreamRange;
+use model::range::Range;
 use observation::metrics::store_metrics::{
     DataNodeStatistics, STORE_APPEND_BYTES_COUNT, STORE_APPEND_COUNT,
     STORE_APPEND_LATENCY_HISTOGRAM, STORE_FAILED_APPEND_COUNT, STORE_FAILED_FETCH_COUNT,
@@ -318,9 +318,9 @@ impl Store for ElasticStore {
     ///
     /// This method involves communication between sync and async code, remember to read
     /// https://docs.rs/tokio/latest/tokio/sync/mpsc/index.html#communicating-between-sync-and-async-code
-    async fn list<F>(&self, filter: F) -> Result<Vec<StreamRange>, StoreError>
+    async fn list<F>(&self, filter: F) -> Result<Vec<Range>, StoreError>
     where
-        F: Fn(&StreamRange) -> bool,
+        F: Fn(&Range) -> bool,
     {
         let (tx, mut rx) = mpsc::unbounded_channel();
         self.indexer.list_ranges(tx);
@@ -338,13 +338,9 @@ impl Store for ElasticStore {
     ///
     /// Rationale of delegating this job to RocksDB threads is exactly same to `list` ranges of all streams served by
     /// this data node.
-    async fn list_by_stream<F>(
-        &self,
-        stream_id: i64,
-        filter: F,
-    ) -> Result<Vec<StreamRange>, StoreError>
+    async fn list_by_stream<F>(&self, stream_id: i64, filter: F) -> Result<Vec<Range>, StoreError>
     where
-        F: Fn(&StreamRange) -> bool,
+        F: Fn(&Range) -> bool,
     {
         let (tx, mut rx) = mpsc::unbounded_channel();
         self.indexer.list_ranges_by_stream(stream_id, tx);
@@ -358,7 +354,7 @@ impl Store for ElasticStore {
         Ok(ranges)
     }
 
-    async fn seal(&self, range: StreamRange) -> Result<(), StoreError> {
+    async fn seal(&self, range: Range) -> Result<(), StoreError> {
         let (tx, rx) = oneshot::channel();
         self.indexer.seal_range(range, tx);
         rx.await
@@ -366,7 +362,7 @@ impl Store for ElasticStore {
             .flatten()
     }
 
-    async fn create(&self, range: StreamRange) -> Result<(), StoreError> {
+    async fn create(&self, range: Range) -> Result<(), StoreError> {
         let (tx, rx) = oneshot::channel();
         self.indexer.create_range(range, tx);
         rx.await

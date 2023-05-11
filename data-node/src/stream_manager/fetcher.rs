@@ -1,6 +1,6 @@
 use client::Client;
 use log::{error, trace};
-use model::range::StreamRange;
+use model::range::Range;
 use std::rc::Rc;
 use tokio::sync::{mpsc, oneshot};
 
@@ -12,7 +12,7 @@ pub struct FetchRangeTask {
     pub stream_id: i64,
 
     /// Once the query completes, transfer results back to the caller through this oneshot channel.
-    pub tx: oneshot::Sender<Result<Vec<StreamRange>, ServiceError>>,
+    pub tx: oneshot::Sender<Result<Vec<Range>, ServiceError>>,
 }
 
 pub(crate) enum Fetcher {
@@ -29,7 +29,7 @@ pub(crate) enum Fetcher {
 }
 
 impl Fetcher {
-    pub(crate) async fn bootstrap(&mut self) -> Result<Vec<StreamRange>, ServiceError> {
+    pub(crate) async fn bootstrap(&mut self) -> Result<Vec<Range>, ServiceError> {
         if let Fetcher::PlacementClient { client } = self {
             return client
                 .list_range(None)
@@ -49,17 +49,14 @@ impl Fetcher {
     }
 
     /// TODO: filter out ranges that is not hosted in current data node.
-    pub(crate) async fn fetch(&mut self, stream_id: i64) -> Result<Vec<StreamRange>, ServiceError> {
+    pub(crate) async fn fetch(&mut self, stream_id: i64) -> Result<Vec<Range>, ServiceError> {
         match self {
             Fetcher::Channel { sender } => Self::fetch_from_peer_node(sender, stream_id).await,
             Fetcher::PlacementClient { client } => Self::fetch_by_client(client, stream_id).await,
         }
     }
 
-    async fn fetch_by_client(
-        client: &Client,
-        stream_id: i64,
-    ) -> Result<Vec<StreamRange>, ServiceError> {
+    async fn fetch_by_client(client: &Client, stream_id: i64) -> Result<Vec<Range>, ServiceError> {
         client
             .list_range(Some(stream_id))
             .await
@@ -76,7 +73,7 @@ impl Fetcher {
     async fn fetch_from_peer_node(
         sender: &mpsc::UnboundedSender<FetchRangeTask>,
         stream_id: i64,
-    ) -> Result<Vec<StreamRange>, ServiceError> {
+    ) -> Result<Vec<Range>, ServiceError> {
         let (tx, rx) = oneshot::channel();
         let task = FetchRangeTask { stream_id, tx };
         if let Err(e) = sender.send(task) {
@@ -97,7 +94,7 @@ impl Fetcher {
 pub(crate) mod tests {
     use std::error::Error;
 
-    use model::range::StreamRange;
+    use model::range::Range;
 
     use super::Fetcher;
 
@@ -117,7 +114,7 @@ pub(crate) mod tests {
                             let ranges = (0..TOTAL)
                                 .map(|i| {
                                     if i < TOTAL - 1 {
-                                        StreamRange::new(
+                                        Range::new(
                                             stream_id,
                                             0,
                                             i,
@@ -126,7 +123,7 @@ pub(crate) mod tests {
                                             Some(((i + 1) * 100) as u64),
                                         )
                                     } else {
-                                        StreamRange::new(stream_id, 0, i, (i * 100) as u64, 0, None)
+                                        Range::new(stream_id, 0, i, (i * 100) as u64, 0, None)
                                     }
                                 })
                                 .collect::<Vec<_>>();

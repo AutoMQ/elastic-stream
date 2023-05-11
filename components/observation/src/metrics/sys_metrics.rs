@@ -97,7 +97,7 @@ fn update_rate(old_metric: &mut i64, rate: &mut i64, cur_metric: i64, time_delta
 mod tests {
     use std::{
         fs::{self, File},
-        io::{BufWriter, Read, Write},
+        io::{BufWriter, Write},
         path::Path,
         time::Instant,
     };

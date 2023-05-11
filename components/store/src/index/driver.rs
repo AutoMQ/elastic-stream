@@ -7,7 +7,7 @@ use std::{
 use crate::{error::StoreError, index::LocalRangeManager};
 use crossbeam::channel::{self, Receiver, Select, Sender, TryRecvError};
 use log::{error, info};
-use model::range::StreamRange;
+use model::range::Range;
 use tokio::sync::{mpsc, oneshot};
 
 use super::{indexer::Indexer, record_handle::RecordHandle, MinOffset};
@@ -38,21 +38,21 @@ pub(crate) enum IndexCommand {
     },
 
     ListRange {
-        tx: mpsc::UnboundedSender<StreamRange>,
+        tx: mpsc::UnboundedSender<Range>,
     },
 
     ListRangeByStream {
         stream_id: i64,
-        tx: mpsc::UnboundedSender<StreamRange>,
+        tx: mpsc::UnboundedSender<Range>,
     },
 
     SealRange {
-        range: StreamRange,
+        range: Range,
         tx: oneshot::Sender<Result<(), StoreError>>,
     },
 
     CreateRange {
-        range: StreamRange,
+        range: Range,
         tx: oneshot::Sender<Result<(), StoreError>>,
     },
 }
@@ -114,17 +114,13 @@ impl IndexDriver {
         }
     }
 
-    pub(crate) fn list_ranges(&self, tx: mpsc::UnboundedSender<StreamRange>) {
+    pub(crate) fn list_ranges(&self, tx: mpsc::UnboundedSender<Range>) {
         if let Err(_e) = self.tx.send(IndexCommand::ListRange { tx }) {
             error!("Failed to send list range command");
         }
     }
 
-    pub(crate) fn list_ranges_by_stream(
-        &self,
-        stream_id: i64,
-        tx: mpsc::UnboundedSender<StreamRange>,
-    ) {
+    pub(crate) fn list_ranges_by_stream(&self, stream_id: i64, tx: mpsc::UnboundedSender<Range>) {
         if let Err(_e) = self
             .tx
             .send(IndexCommand::ListRangeByStream { stream_id, tx })
@@ -133,11 +129,7 @@ impl IndexDriver {
         }
     }
 
-    pub(crate) fn create_range(
-        &self,
-        range: StreamRange,
-        tx: oneshot::Sender<Result<(), StoreError>>,
-    ) {
+    pub(crate) fn create_range(&self, range: Range, tx: oneshot::Sender<Result<(), StoreError>>) {
         if let Err(e) = self.tx.send(IndexCommand::CreateRange { range, tx }) {
             error!("Failed to submit create range command");
             if let IndexCommand::CreateRange { tx, .. } = e.0 {
@@ -148,11 +140,7 @@ impl IndexDriver {
         }
     }
 
-    pub(crate) fn seal_range(
-        &self,
-        range: StreamRange,
-        tx: oneshot::Sender<Result<(), StoreError>>,
-    ) {
+    pub(crate) fn seal_range(&self, range: Range, tx: oneshot::Sender<Result<(), StoreError>>) {
         if let Err(e) = self.tx.send(IndexCommand::SealRange { range, tx }) {
             error!("Failed to submit create range command");
             if let IndexCommand::SealRange { tx, .. } = e.0 {

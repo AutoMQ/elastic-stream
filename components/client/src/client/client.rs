@@ -3,7 +3,7 @@ use crate::error::ClientError;
 use bytes::Bytes;
 use log::{error, trace, warn};
 use model::{
-    range::StreamRange,
+    range::Range,
     range_criteria::RangeCriteria,
     request::seal::{self, SealRangeEntry},
 };
@@ -52,10 +52,7 @@ impl Client {
             })
     }
 
-    pub async fn list_range(
-        &self,
-        stream_id: Option<i64>,
-    ) -> Result<Vec<StreamRange>, ClientError> {
+    pub async fn list_range(&self, stream_id: Option<i64>) -> Result<Vec<Range>, ClientError> {
         let criteria = if let Some(stream_id) = stream_id {
             trace!(
                 "list_range from {}, stream-id={}",
@@ -112,7 +109,7 @@ impl Client {
         &self,
         target: Option<&str>,
         request: SealRangeEntry,
-    ) -> Result<StreamRange, ClientError> {
+    ) -> Result<Range, ClientError> {
         // Validate request
         match request.kind {
             seal::Kind::Unspecified => {

@@ -4,7 +4,7 @@ use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
     client_role::ClientRole,
-    range::StreamRange,
+    range::Range,
     range_criteria::RangeCriteria,
     request::{seal::SealRangeEntry, Request},
     response::Response,
@@ -269,7 +269,7 @@ impl CompositeSession {
     pub(crate) async fn list_range(
         &self,
         criteria: RangeCriteria,
-    ) -> Result<Vec<StreamRange>, ClientError> {
+    ) -> Result<Vec<Range>, ClientError> {
         self.try_reconnect().await;
         // TODO: apply load-balancing among `self.sessions`.
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
@@ -413,7 +413,7 @@ impl CompositeSession {
     ///
     /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
     /// Final end value of the range will be resolved after MinCopy of data nodes responded.
-    pub(crate) async fn seal(&self, request: SealRangeEntry) -> Result<StreamRange, ClientError> {
+    pub(crate) async fn seal(&self, request: SealRangeEntry) -> Result<Range, ClientError> {
         self.try_reconnect().await;
         // TODO: If the seal kind is PM, we need to pick the session/connection to the leader node.
         let session = self

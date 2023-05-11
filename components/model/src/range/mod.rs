@@ -5,12 +5,6 @@ use protocol::rpc::header::{DataNodeT, RangeT};
 
 use crate::data_node::DataNode;
 
-pub trait Range {
-    fn is_sealed(&self) -> bool;
-
-    fn seal(&mut self) -> u64;
-}
-
 /// Representation of a stream range in form of `[start, end)` in which `start` is inclusive and `end` is exclusive.
 /// If `start` == `end`, there will be no valid records in the range.
 ///
@@ -18,7 +12,7 @@ pub trait Range {
 /// Once the range is sealed, it becomes immutable and its right boundary becomes fixed.
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Clone)]
-pub struct StreamRange {
+pub struct Range {
     stream_id: i64,
 
     epoch: u64,
@@ -40,7 +34,7 @@ pub struct StreamRange {
     replica: Vec<DataNode>,
 }
 
-impl StreamRange {
+impl Range {
     pub fn new(
         stream_id: i64,
         epoch: u64,
@@ -114,14 +108,12 @@ impl StreamRange {
             self.limit = limit;
         }
     }
-}
 
-impl Range for StreamRange {
-    fn is_sealed(&self) -> bool {
+    pub fn is_sealed(&self) -> bool {
         self.end.is_some()
     }
 
-    fn seal(&mut self) -> u64 {
+    pub fn seal(&mut self) -> u64 {
         match self.end {
             None => {
                 self.end = Some(self.limit);
@@ -132,7 +124,7 @@ impl Range for StreamRange {
     }
 }
 
-impl Display for StreamRange {
+impl Display for Range {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -142,8 +134,8 @@ impl Display for StreamRange {
     }
 }
 
-impl From<&StreamRange> for RangeT {
-    fn from(value: &StreamRange) -> Self {
+impl From<&Range> for RangeT {
+    fn from(value: &Range) -> Self {
         let mut range = RangeT::default();
         range.stream_id = value.stream_id;
         range.epoch = value.epoch as i64;
@@ -166,7 +158,7 @@ impl From<&StreamRange> for RangeT {
     }
 }
 
-impl From<&RangeT> for StreamRange {
+impl From<&RangeT> for Range {
     fn from(value: &RangeT) -> Self {
         let mut replica: Vec<DataNode> = vec![];
         if let Some(nodes) = &value.nodes {
@@ -198,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_take_slot() {
-        let mut range = StreamRange::new(0, 0, 0, 0, 0, None);
+        let mut range = Range::new(0, 0, 0, 0, 0, None);
         assert_eq!(range.is_sealed(), false);
         assert_eq!(range.len(), 0);
 
@@ -215,13 +207,13 @@ mod tests {
     #[test]
     fn test_contains() {
         // Test a sealed range that contains a given offset.
-        let range = StreamRange::new(0, 0, 0, 0, 10, Some(10));
+        let range = Range::new(0, 0, 0, 0, 10, Some(10));
         assert_eq!(range.contains(0), true);
         assert_eq!(range.contains(1), true);
         assert_eq!(range.contains(11), false);
 
         // Test a open range that contains a given offset.
-        let range = StreamRange::new(0, 0, 0, 10, 20, None);
+        let range = Range::new(0, 0, 0, 10, 20, None);
         assert_eq!(range.contains(0), false);
         assert_eq!(range.contains(11), true);
         assert_eq!(range.contains(21), true);

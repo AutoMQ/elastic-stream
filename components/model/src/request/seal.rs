@@ -1,6 +1,6 @@
 use protocol::rpc::header::RangeT;
 
-use crate::range::StreamRange;
+use crate::range::Range;
 
 #[derive(Debug, Clone)]
 pub enum Kind {
@@ -12,6 +12,6 @@ pub enum Kind {
 #[derive(Debug, Clone)]
 pub struct SealRangeEntry {
     pub kind: Kind,
-    pub range: StreamRange,
+    pub range: Range,
     pub renew: bool,
 }
