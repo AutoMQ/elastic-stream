@@ -8,7 +8,7 @@ import (
 
 type AppendResponseT struct {
 	Status *StatusT `json:"status"`
-	Results []*AppendResultT `json:"results"`
+	Results []*AppendEntryResultT `json:"results"`
 	ThrottleTimeMs int32 `json:"throttle_time_ms"`
 }
 
@@ -38,9 +38,9 @@ func (t *AppendResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffset
 func (rcv *AppendResponse) UnPackTo(t *AppendResponseT) {
 	t.Status = rcv.Status(nil).UnPack()
 	resultsLength := rcv.ResultsLength()
-	t.Results = make([]*AppendResultT, resultsLength)
+	t.Results = make([]*AppendEntryResultT, resultsLength)
 	for j := 0; j < resultsLength; j++ {
-		x := AppendResult{}
+		x := AppendEntryResult{}
 		rcv.Results(&x, j)
 		t.Results[j] = x.UnPack()
 	}
@@ -94,7 +94,7 @@ func (rcv *AppendResponse) Status(obj *Status) *Status {
 	return nil
 }
 
-func (rcv *AppendResponse) Results(obj *AppendResult, j int) bool {
+func (rcv *AppendResponse) Results(obj *AppendEntryResult, j int) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Vector(o)

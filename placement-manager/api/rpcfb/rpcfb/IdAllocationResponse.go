@@ -7,22 +7,22 @@ import (
 )
 
 type IdAllocationResponseT struct {
-	Id int32 `json:"id"`
 	Status *StatusT `json:"status"`
+	Id int32 `json:"id"`
 }
 
 func (t *IdAllocationResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	statusOffset := t.Status.Pack(builder)
 	IdAllocationResponseStart(builder)
-	IdAllocationResponseAddId(builder, t.Id)
 	IdAllocationResponseAddStatus(builder, statusOffset)
+	IdAllocationResponseAddId(builder, t.Id)
 	return IdAllocationResponseEnd(builder)
 }
 
 func (rcv *IdAllocationResponse) UnPackTo(t *IdAllocationResponseT) {
-	t.Id = rcv.Id()
 	t.Status = rcv.Status(nil).UnPack()
+	t.Id = rcv.Id()
 }
 
 func (rcv *IdAllocationResponse) UnPack() *IdAllocationResponseT {
@@ -59,20 +59,8 @@ func (rcv *IdAllocationResponse) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *IdAllocationResponse) Id() int32 {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
-	if o != 0 {
-		return rcv._tab.GetInt32(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *IdAllocationResponse) MutateId(n int32) bool {
-	return rcv._tab.MutateInt32Slot(4, n)
-}
-
 func (rcv *IdAllocationResponse) Status(obj *Status) *Status {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -84,14 +72,26 @@ func (rcv *IdAllocationResponse) Status(obj *Status) *Status {
 	return nil
 }
 
+func (rcv *IdAllocationResponse) Id() int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *IdAllocationResponse) MutateId(n int32) bool {
+	return rcv._tab.MutateInt32Slot(6, n)
+}
+
 func IdAllocationResponseStart(builder *flatbuffers.Builder) {
 	builder.StartObject(2)
 }
-func IdAllocationResponseAddId(builder *flatbuffers.Builder, id int32) {
-	builder.PrependInt32Slot(0, id, 0)
-}
 func IdAllocationResponseAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(status), 0)
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
+}
+func IdAllocationResponseAddId(builder *flatbuffers.Builder, id int32) {
+	builder.PrependInt32Slot(1, id, 0)
 }
 func IdAllocationResponseEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
