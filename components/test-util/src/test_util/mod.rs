@@ -9,9 +9,9 @@ use log::{debug, error, info, trace, warn};
 use protocol::rpc::header::{
     DescribePlacementManagerClusterRequest, DescribePlacementManagerClusterResponseT, ErrorCode,
     HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
-    ListRangesRequest, ListRangesResponseT, ListRangesResultT, PlacementManagerClusterT,
-    PlacementManagerNodeT, RangeT, ReportMetricsRequest, ReportMetricsResponseT, SealRangeResultT,
-    SealRangesRequest, SealRangesResponseT, SealType, StatusT,
+    ListRangeRequest, ListRangeResponseT, PlacementManagerClusterT, PlacementManagerNodeT, RangeT,
+    ReportMetricsRequest, ReportMetricsResponseT, SealKind, SealRangeRequest, SealRangeResponseT,
+    StatusT,
 };
 
 use tokio::sync::oneshot;
@@ -39,34 +39,27 @@ fn serve_heartbeat(request: &HeartbeatRequest, frame: &mut Frame) {
     frame.header = Some(buf);
 }
 
-fn serve_list_ranges(request: &ListRangesRequest, frame: &mut Frame) {
+fn serve_list_ranges(request: &ListRangeRequest, frame: &mut Frame) {
     trace!("Received a list-ranges request: {:?}", request);
     let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
-    let mut resp = ListRangesResponseT::default();
+    let mut resp = ListRangeResponseT::default();
 
-    {
-        let mut result = ListRangesResultT::default();
+    let mut status = StatusT::default();
+    status.code = ErrorCode::OK;
+    status.message = Some(String::from("OK"));
+    resp.status = Box::new(status);
 
-        let mut status = StatusT::default();
-        status.code = ErrorCode::OK;
-        status.message = Some(String::from("OK"));
-        result.status = Box::new(status);
-
-        let ranges = (0..10)
-            .map(|i| {
-                let mut range = RangeT::default();
-                range.stream_id = 0;
-                range.range_index = i as i32;
-                range.start_offset = i * 100;
-                range.end_offset = (i + 1) * 100;
-                range
-            })
-            .collect::<Vec<_>>();
-
-        result.ranges = Some(ranges);
-        resp.list_responses = Some(vec![result]);
-    }
-
+    let ranges = (0..10)
+        .map(|i| {
+            let mut range = RangeT::default();
+            range.stream_id = 0;
+            range.index = i as i32;
+            range.start = i * 100;
+            range.end = (i + 1) * 100;
+            range
+        })
+        .collect::<Vec<_>>();
+    resp.ranges = ranges;
     let resp = resp.pack(&mut builder);
     builder.finish(resp, None);
     let buf = builder.finished_data();
@@ -173,7 +166,7 @@ pub async fn run_listener() -> u16 {
                                 OperationCode::ListRange => {
                                     response_frame.operation_code = OperationCode::ListRange;
                                     if let Some(buf) = frame.header.as_ref() {
-                                        if let Ok(req) = flatbuffers::root::<ListRangesRequest>(buf)
+                                        if let Ok(req) = flatbuffers::root::<ListRangeRequest>(buf)
                                         {
                                             serve_list_ranges(&&req, &mut response_frame);
                                         } else {
@@ -225,7 +218,7 @@ pub async fn run_listener() -> u16 {
                                 OperationCode::SealRange => {
                                     response_frame.operation_code = OperationCode::SealRange;
                                     if let Some(buf) = frame.header.as_ref() {
-                                        if let Ok(req) = flatbuffers::root::<SealRangesRequest>(buf)
+                                        if let Ok(req) = flatbuffers::root::<SealRangeRequest>(buf)
                                         {
                                             serve_seal_ranges(&req, &mut response_frame);
                                         } else {
@@ -289,68 +282,39 @@ pub async fn run_listener() -> u16 {
     rx.await.unwrap()
 }
 
-fn serve_seal_ranges(req: &SealRangesRequest, response_frame: &mut Frame) {
+fn serve_seal_ranges(req: &SealRangeRequest, response_frame: &mut Frame) {
     let request = req.unpack();
 
-    let mut response = SealRangesResponseT::default();
+    let mut response = SealRangeResponseT::default();
     let mut status_ok = StatusT::default();
     status_ok.code = ErrorCode::OK;
     status_ok.message = Some(String::from("OK"));
     response.status = Box::new(status_ok.clone());
 
-    if !request.entries.is_empty() {
-        for entry in &request.entries {
-            let mut result = SealRangeResultT::default();
-            result.status = Box::new(status_ok.clone());
-            match entry.type_ {
-                SealType::DATA_NODE => {
-                    if entry.range.end_offset != -1 {
-                        let mut status_bad_request = StatusT::default();
-                        status_bad_request.code = ErrorCode::BAD_REQUEST;
-                        status_bad_request.message = Some(String::from(
-                            "end-offset should be -1 in case of data-node seal",
-                        ));
-                        result.status = Box::new(status_bad_request);
-                        response.results.push(result);
-                        continue;
-                    }
-                }
+    match request.kind {
+        SealKind::DATA_NODE => {}
 
-                SealType::PLACEMENT_MANAGER => {
-                    if entry.range.end_offset < 0 {
-                        let mut status_bad_request = StatusT::default();
-                        status_bad_request.code = ErrorCode::BAD_REQUEST;
-                        status_bad_request.message = Some(String::from(
-                            "end-offset should be non-negative in case of placement manager seal",
-                        ));
-                        result.status = Box::new(status_bad_request);
-                        response.results.push(result);
-                        continue;
-                    }
-                }
-
-                _ => {
-                    let mut status_bad_request = StatusT::default();
-                    status_bad_request.code = ErrorCode::BAD_REQUEST;
-                    status_bad_request.message = Some(String::from("Unsupported seal type"));
-                    result.status = Box::new(status_bad_request);
-                    response.results.push(result);
-                    continue;
-                }
-            };
-            let mut range = entry.range.clone();
-            range.end_offset = 100;
-            result.range = Some(range);
-            response.results.push(result);
+        SealKind::PLACEMENT_MANAGER => {
+            if request.range.end < 0 {
+                let mut status_bad_request = StatusT::default();
+                status_bad_request.code = ErrorCode::BAD_REQUEST;
+                status_bad_request.message = Some(String::from(
+                    "end-offset should be non-negative in case of placement manager seal",
+                ));
+                response.status = Box::new(status_bad_request);
+            }
         }
-    } else {
-        let mut status_bad_request = StatusT::default();
-        status_bad_request.code = ErrorCode::BAD_REQUEST;
-        status_bad_request.message = Some(String::from(
-            "Seal ranges request should contain at least one range",
-        ));
-        response.status = Box::new(status_bad_request);
-    }
+
+        _ => {
+            let mut status_bad_request = StatusT::default();
+            status_bad_request.code = ErrorCode::BAD_REQUEST;
+            status_bad_request.message = Some(String::from("Unsupported seal type"));
+            response.status = Box::new(status_bad_request);
+        }
+    };
+    let mut range = request.range.clone();
+    range.end = 100;
+    response.range = Some(range);
 
     let mut builder = flatbuffers::FlatBufferBuilder::new();
     let resp = response.pack(&mut builder);
@@ -362,11 +326,7 @@ fn serve_seal_ranges(req: &SealRangesRequest, response_frame: &mut Frame) {
 
 fn allocate_id(request: &IdAllocationRequest, response_frame: &mut Frame) {
     let request = request.unpack();
-    if let Some(ref host) = request.host {
-        info!("Allocate ID for host={:?}", host);
-    } else {
-        warn!("Host for which to allocate ID is unknown");
-    }
+    info!("Allocate ID for host={:?}", request.host);
 
     let mut builder = flatbuffers::FlatBufferBuilder::new();
     let mut response = IdAllocationResponseT::default();

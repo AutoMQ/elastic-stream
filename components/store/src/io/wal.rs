@@ -206,7 +206,7 @@ impl Wal {
 
             // Index the record group
             match FlatRecordBatch::init_from_buf(&mut buf.clone().freeze()) {
-                Ok(batch) => match flatbuffers::root::<RecordBatchMeta>(&batch.batch_meta[..]) {
+                Ok(batch) => match flatbuffers::root::<RecordBatchMeta>(&batch.metadata[..]) {
                     Ok(metadata) => {
                         let stream_id = metadata.stream_id();
                         let range = metadata.range_index() as u32;

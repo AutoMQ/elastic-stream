@@ -13,17 +13,17 @@ use crate::{
 /// stream are distributed among data-nodes.
 ///
 /// `Stream` on a specific data-node only cares about ranges that are located on it.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Stream {
     /// Stream ID, unique within the cluster.
-    stream_id: i64,
+    pub stream_id: i64,
 
-    replica: u8,
+    pub replica: u8,
 
-    retention_period: Duration,
+    pub retention_period: Duration,
 
     /// Ranges of the stream that are placed onto current data node.
-    ranges: Vec<StreamRange>,
+    pub ranges: Vec<StreamRange>,
 }
 
 impl Stream {

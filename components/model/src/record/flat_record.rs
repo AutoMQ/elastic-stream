@@ -1,8 +1,4 @@
-use std::str::FromStr;
-
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-
-use chrono::Utc;
 use flatbuffers::FlatBufferBuilder;
 use protocol::flat_model::records::RecordBatchMeta;
 
@@ -34,20 +30,20 @@ pub const RECORD_BATCH_PREFIX_LEN: usize = 1 + 4;
 #[derive(Debug, Default)]
 pub struct FlatRecordBatch {
     pub magic: Option<i8>,
-    pub batch_meta: Bytes,
-    pub batch_payload: Bytes,
+    pub metadata: Bytes,
+    pub payload: Bytes,
 }
 
 impl FlatRecordBatch {
     /// Converts a RecordBatch to a FlatRecordBatch.
-    pub fn init_from_struct(record_batch: RecordBatch) -> Self {
+    fn init_from_struct(record_batch: RecordBatch) -> Self {
         // Build up a serialized buffer for the specific record_batch.
         // Initialize it with a capacity of 1024 bytes.
         let mut fbb = FlatBufferBuilder::with_capacity(1024);
 
         // Serialize the meta of RecordBatch to the FlatBuffer
         // The returned value is an offset used to track the location of this serialized data.
-        let meta_offset = record_batch.batch_meta.pack(&mut fbb);
+        let meta_offset = record_batch.metadata.pack(&mut fbb);
 
         // Serialize the root of the object, without providing a file identifier.
         fbb.finish(meta_offset, None);
@@ -55,8 +51,8 @@ impl FlatRecordBatch {
 
         FlatRecordBatch {
             magic: Some(RecordMagic::Magic0 as i8),
-            batch_meta: Bytes::copy_from_slice(meta_buf),
-            batch_payload: record_batch.batch_payload,
+            metadata: Bytes::copy_from_slice(meta_buf),
+            payload: record_batch.payload,
         }
     }
 
@@ -101,8 +97,8 @@ impl FlatRecordBatch {
 
         Ok(FlatRecordBatch {
             magic: Some(magic),
-            batch_meta,
-            batch_payload,
+            metadata: batch_meta,
+            payload: batch_payload,
         })
     }
 
@@ -115,7 +111,7 @@ impl FlatRecordBatch {
         let mut bytes_vec = Vec::new();
 
         // The total length of encoded flat records.
-        let meta_len = self.batch_meta.len();
+        let meta_len = self.metadata.len();
         let mut total_len = RECORD_BATCH_PREFIX_LEN;
 
         let mut batch_prefix = BytesMut::with_capacity(total_len);
@@ -126,32 +122,38 @@ impl FlatRecordBatch {
         bytes_vec.insert(0, batch_prefix.freeze());
 
         // Push the meta buffer to the bytes_vec.
-        bytes_vec.push(self.batch_meta);
+        bytes_vec.push(self.metadata);
         total_len += meta_len;
 
         // Push the payload length to the bytes_vec.
         let mut payload_len_buf = BytesMut::with_capacity(4);
-        payload_len_buf.put_i32(self.batch_payload.len() as i32);
+        payload_len_buf.put_i32(self.payload.len() as i32);
         bytes_vec.push(payload_len_buf.freeze());
         total_len += 4;
 
         // Push the payload to the bytes_vec.
-        total_len += self.batch_payload.len();
-        bytes_vec.push(self.batch_payload);
+        total_len += self.payload.len();
+        bytes_vec.push(self.payload);
 
         (bytes_vec, total_len as i32)
     }
 
     pub fn decode(self) -> Result<RecordBatch, DecodeError> {
-        let batch_meta = root_as_record_batch_meta(&self.batch_meta.as_ref())
+        let batch_meta = root_as_record_batch_meta(&self.metadata.as_ref())
             .map_err(|_| DecodeError::InvalidDataFormat)?;
 
         let batch_meta_t = batch_meta.unpack();
 
         Ok(RecordBatch {
-            batch_meta: batch_meta_t,
-            batch_payload: self.batch_payload,
+            metadata: batch_meta_t,
+            payload: self.payload,
         })
+    }
+}
+
+impl From<RecordBatch> for FlatRecordBatch {
+    fn from(record_batch: RecordBatch) -> Self {
+        FlatRecordBatch::init_from_struct(record_batch)
     }
 }
 
@@ -185,7 +187,7 @@ mod tests {
             .with_range_index(0)
             .with_base_offset(1024)
             .with_last_offset_delta(10)
-            .with_batch_payload(Bytes::from("hello world"))
+            .with_payload(Bytes::from("hello world"))
             .with_property("key".to_string(), "value".to_string())
             .build()
             .unwrap();
@@ -211,11 +213,11 @@ mod tests {
 
         assert_eq!(record_batch.stream_id(), stream_id);
         assert_eq!(record_batch.range_index(), 0);
-        assert_eq!(record_batch.batch_meta.base_offset, 1024);
-        assert_eq!(record_batch.batch_meta.last_offset_delta, 10);
-        assert_eq!(record_batch.batch_payload, Bytes::from("hello world"));
+        assert_eq!(record_batch.metadata.base_offset, 1024);
+        assert_eq!(record_batch.metadata.last_offset_delta, 10);
+        assert_eq!(record_batch.payload, Bytes::from("hello world"));
 
-        let properties = record_batch.batch_meta.properties.take();
+        let properties = record_batch.metadata.properties.take();
         assert!(properties.is_some());
 
         let properties = properties.unwrap();

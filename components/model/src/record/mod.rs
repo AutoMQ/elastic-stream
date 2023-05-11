@@ -7,17 +7,14 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct RecordBatch {
-    batch_meta: RecordBatchMetaT,
-    batch_payload: Bytes,
+    metadata: RecordBatchMetaT,
+    payload: Bytes,
 }
 
 impl RecordBatch {
     /// Create a new record batch with the given meta and payload.
-    fn new(batch_meta: RecordBatchMetaT, batch_payload: Bytes) -> Self {
-        Self {
-            batch_meta,
-            batch_payload,
-        }
+    fn new(metadata: RecordBatchMetaT, payload: Bytes) -> Self {
+        Self { metadata, payload }
     }
 
     /// New a builder to build a record batch.
@@ -27,24 +24,24 @@ impl RecordBatch {
 
     /// Return the stream id of the record batch.
     pub fn stream_id(&self) -> i64 {
-        self.batch_meta.stream_id
+        self.metadata.stream_id
     }
 
     /// Return the range index of the record batch.
     pub fn range_index(&self) -> i32 {
-        self.batch_meta.range_index
+        self.metadata.range_index
     }
 
     pub fn base_timestamp(&self) -> i64 {
-        self.batch_meta.base_timestamp
+        self.metadata.base_timestamp
     }
 
     pub fn base_offset(&self) -> i64 {
-        self.batch_meta.base_offset
+        self.metadata.base_offset
     }
 
     pub fn payload(&self) -> Bytes {
-        self.batch_payload.clone()
+        self.payload.clone()
     }
 }
 
@@ -57,7 +54,7 @@ pub struct RecordBatchBuilder {
     last_offset_delta: Option<i32>,
     base_timestamp: Option<i64>,
     properties: Option<HashMap<String, String>>,
-    batch_payload: Option<Bytes>,
+    payload: Option<Bytes>,
 }
 
 impl RecordBatchBuilder {
@@ -98,8 +95,8 @@ impl RecordBatchBuilder {
         self
     }
 
-    pub fn with_batch_payload(mut self, batch_payload: Bytes) -> Self {
-        self.batch_payload = Some(batch_payload);
+    pub fn with_payload(mut self, payload: Bytes) -> Self {
+        self.payload = Some(payload);
         self
     }
 
@@ -110,9 +107,7 @@ impl RecordBatchBuilder {
         let last_offset_delta = self
             .last_offset_delta
             .ok_or(RecordError::RequiredFieldMissing)?;
-        let batch_payload = self
-            .batch_payload
-            .ok_or(RecordError::RequiredFieldMissing)?;
+        let payload = self.payload.ok_or(RecordError::RequiredFieldMissing)?;
 
         // Convert properties to flatbuffers table
         let properties = self.properties.and_then(|map| {
@@ -126,19 +121,16 @@ impl RecordBatchBuilder {
             Some(vec)
         });
 
-        let mut batch_meta = RecordBatchMetaT::default();
-        batch_meta.stream_id = stream_id;
-        batch_meta.range_index = range_index;
-        batch_meta.flags = self.flags.unwrap_or(0);
-        batch_meta.base_offset = base_offset;
-        batch_meta.last_offset_delta = last_offset_delta;
-        batch_meta.base_timestamp = self.base_timestamp.unwrap_or(Utc::now().timestamp());
-        batch_meta.properties = properties;
+        let mut metadata = RecordBatchMetaT::default();
+        metadata.stream_id = stream_id;
+        metadata.range_index = range_index;
+        metadata.flags = self.flags.unwrap_or(0);
+        metadata.base_offset = base_offset;
+        metadata.last_offset_delta = last_offset_delta;
+        metadata.base_timestamp = self.base_timestamp.unwrap_or(Utc::now().timestamp());
+        metadata.properties = properties;
 
-        Ok(RecordBatch {
-            batch_meta,
-            batch_payload,
-        })
+        Ok(RecordBatch { metadata, payload })
     }
 }
 
@@ -154,13 +146,13 @@ mod tests {
             .with_range_index(0)
             .with_base_offset(1024)
             .with_last_offset_delta(10)
-            .with_batch_payload(Bytes::from("test"));
+            .with_payload(Bytes::from("test"));
         let record_batch = builder.build().unwrap();
 
         assert_eq!(record_batch.stream_id(), 1);
         assert_eq!(record_batch.range_index(), 0);
-        assert_eq!(record_batch.batch_meta.base_offset, 1024);
-        assert_eq!(record_batch.batch_meta.last_offset_delta, 10);
-        assert_eq!(record_batch.batch_payload, Bytes::from("test"));
+        assert_eq!(record_batch.metadata.base_offset, 1024);
+        assert_eq!(record_batch.metadata.last_offset_delta, 10);
+        assert_eq!(record_batch.payload, Bytes::from("test"));
     }
 }

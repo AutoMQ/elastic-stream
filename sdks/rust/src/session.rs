@@ -225,7 +225,7 @@ mod tests {
         match Session::new(&target).await {
             Ok(mut session) => {
                 info!("Session connected");
-                let streams = session
+                let stream = session
                     .create_stream(
                         1,
                         Duration::from_secs(60 * 60 * 24 * 3),
@@ -233,7 +233,8 @@ mod tests {
                     )
                     .await
                     .unwrap();
-                assert_eq!(1, streams.len());
+                assert_eq!(1, stream.replica);
+                assert_eq!(60 * 60 * 24 * 3, stream.retention_period.as_secs());
             }
             Err(e) => {
                 error!("Failed to create session: {:?}", e);

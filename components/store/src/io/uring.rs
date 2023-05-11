@@ -1498,7 +1498,8 @@ mod tests {
     use bytes::BytesMut;
     use crossbeam::channel::Sender;
     use log::trace;
-    use model::flat_record::FlatRecordBatch;
+    use model::record::flat_record::FlatRecordBatch;
+    use model::record::RecordBatchBuilder;
     use std::cell::RefCell;
     use std::error::Error;
     use std::io;
@@ -1868,7 +1869,9 @@ mod tests {
         let sender = rx
             .blocking_recv()
             .map_err(|_| StoreError::Internal("Internal error".to_owned()))?;
-        let record_group = FlatRecordBatch::dummy();
+
+        let record_batch = RecordBatchBuilder::default().build()?;
+        let record_group = Into::<FlatRecordBatch>::into(record_batch);
         let (bufs, total) = record_group.encode();
         let mut buffer = BytesMut::new();
         for buf in &bufs {

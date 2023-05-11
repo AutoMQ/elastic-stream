@@ -157,7 +157,7 @@ table AppendRequest {
     //
     // Layout of AppendEntry
     // +-------------------+-------------------+-------------------+------------------------------------------+
-    // |  Magic Code(4B)   |  Meta Len(4B)     |       Meta        |  Payload Len(4B) | Record Batch Payload  |
+    // |  Magic Code(1B)   |  Meta Len(4B)     |       Meta        |  Payload Len(4B) | Record Batch Payload  |
     // +-------------------+-------------------+-------------------+------------------------------------------+
 }
 

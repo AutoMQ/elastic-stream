@@ -6,6 +6,7 @@ use model::{
     range::{Range, StreamRange},
     stream::Stream,
 };
+use protocol::rpc::header::StreamT;
 use store::{ElasticStore, Store};
 
 use crate::{error::ServiceError, stream_manager::append_window::AppendWindow};
@@ -53,10 +54,11 @@ impl StreamManager {
         let ranges = self.fetcher.bootstrap().await?;
 
         for range in ranges {
-            let stream = self
-                .streams
-                .entry(range.stream_id())
-                .or_insert(Stream::with_id(range.stream_id()));
+            let stream = self.streams.entry(range.stream_id()).or_insert_with(|| {
+                let mut stream = Stream::default();
+                stream.stream_id = range.stream_id();
+                stream
+            });
             stream.push(range);
         }
 
@@ -129,7 +131,8 @@ impl StreamManager {
         // TODO: https://doc.rust-lang.org/std/intrinsics/fn.unlikely.html
         if !self.streams.contains_key(&stream_id) {
             trace!("About to fetch ranges for stream[id={}]", stream_id);
-            let mut stream = Stream::with_id(stream_id);
+            let mut stream = Stream::default();
+            stream.stream_id = stream_id;
             let node_id = self.store.id();
             self.fetcher
                 .fetch(stream_id)
@@ -214,10 +217,11 @@ impl StreamManager {
             return Ok(start_slot);
         }
 
-        let stream = self
-            .streams
-            .entry(stream_id)
-            .or_insert_with(|| Stream::with_id(stream_id));
+        let stream = self.streams.entry(stream_id).or_insert_with(|| {
+            let mut stream = Stream::default();
+            stream.stream_id = stream_id;
+            stream
+        });
 
         if let Some(range) = stream.last() {
             if range.index() > range_index {
@@ -505,8 +509,8 @@ mod tests {
             let mut stream_manager = StreamManager::new(fetcher, store);
             let mut range = RangeT::default();
             range.stream_id = stream_id;
-            range.range_index = TOTAL - 1;
-            range.end_offset = -1;
+            range.index = TOTAL - 1;
+            range.end = -1;
             let mut builder = flatbuffers::FlatBufferBuilder::new();
             let range = range.pack(&mut builder);
             builder.finish(range, None);
@@ -550,8 +554,8 @@ mod tests {
             let mut stream_manager = StreamManager::new(fetcher, store);
             let mut range = RangeT::default();
             range.stream_id = stream_id;
-            range.range_index = TOTAL - 1;
-            range.end_offset = -1;
+            range.index = TOTAL - 1;
+            range.end = -1;
             let mut builder = flatbuffers::FlatBufferBuilder::new();
             let range = range.pack(&mut builder);
             builder.finish(range, None);
@@ -596,7 +600,8 @@ mod tests {
         let mut stream_manager = StreamManager::new(fetcher, store);
         let range1 = StreamRange::new(0, 0, 0, 0, 10, Some(10));
         let range2 = StreamRange::new(0, 0, 1, 10, 0, None);
-        let stream = Stream::new(0, vec![range1, range2]);
+        let mut stream = Stream::default();
+        stream.ranges = vec![range1, range2];
         stream_manager.streams.insert(0, stream);
         let append_window = AppendWindow::new(0, 100);
         stream_manager.windows.insert(0, append_window);
