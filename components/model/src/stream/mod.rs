@@ -99,6 +99,7 @@ impl Stream {
     }
 }
 
+/// Converter from `StreamT` to `Stream`.
 impl From<StreamT> for Stream {
     fn from(stream: StreamT) -> Self {
         Self {
@@ -107,6 +108,17 @@ impl From<StreamT> for Stream {
             retention_period: Duration::from_millis(stream.retention_period_ms as u64),
             ranges: vec![],
         }
+    }
+}
+
+/// Converter from `&Stream` to `StreamT`.
+impl From<&Stream> for StreamT {
+    fn from(stream: &Stream) -> Self {
+        let mut stream_t = StreamT::default();
+        stream_t.stream_id = stream.stream_id;
+        stream_t.replica = stream.replica as i8;
+        stream_t.retention_period_ms = stream.retention_period.as_millis() as i64;
+        stream_t
     }
 }
 
