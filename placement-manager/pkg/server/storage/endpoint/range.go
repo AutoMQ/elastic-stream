@@ -146,8 +146,8 @@ func (e *Endpoint) GetLastRange(ctx context.Context, streamID int64) (*rpcfb.Ran
 		return nil, err
 	}
 	if len(kvs) < 1 {
-		logger.Error("failed to get last range: stream not found")
-		return nil, errors.Errorf("stream not found: %d", streamID)
+		logger.Info("no range in stream")
+		return nil, nil
 	}
 
 	return rpcfb.GetRootAsRange(kvs[0].Value, 0).UnPack(), nil

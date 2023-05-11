@@ -25,7 +25,7 @@ type DataNode interface {
 }
 
 // Heartbeat updates DataNode's last active time, and save it to storage if its info changed.
-// It returns ErrNotLeader if the transaction failed.
+// It returns ErrNotLeader if the current PM node is not the leader.
 func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) error {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
@@ -48,7 +48,7 @@ func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) erro
 }
 
 // AllocateID allocates a data node id from the id allocator.
-// It returns ErrNotLeader if the transaction failed.
+// It returns ErrNotLeader if the current PM node is not the leader.
 func (c *RaftCluster) AllocateID(ctx context.Context) (int32, error) {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 

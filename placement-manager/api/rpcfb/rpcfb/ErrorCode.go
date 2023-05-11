@@ -27,6 +27,7 @@ const (
 	ErrorCodeOFFSET_OVERFLOW               ErrorCode = 1461
 	ErrorCodeRANGE_NOT_FOUND               ErrorCode = 1462
 	ErrorCodeOFFSET_OUT_OF_RANGE_BOUNDS    ErrorCode = 1463
+	ErrorCodeCREATE_RANGE_BEFORE_SEAL      ErrorCode = 1470
 	ErrorCodeUNKNOWN_OPERATION             ErrorCode = 1499
 	ErrorCodePM_INTERNAL_SERVER_ERROR      ErrorCode = 1500
 	ErrorCodePM_NOT_IMPLEMENTED            ErrorCode = 1501
@@ -58,6 +59,7 @@ var EnumNamesErrorCode = map[ErrorCode]string{
 	ErrorCodeOFFSET_OVERFLOW:               "OFFSET_OVERFLOW",
 	ErrorCodeRANGE_NOT_FOUND:               "RANGE_NOT_FOUND",
 	ErrorCodeOFFSET_OUT_OF_RANGE_BOUNDS:    "OFFSET_OUT_OF_RANGE_BOUNDS",
+	ErrorCodeCREATE_RANGE_BEFORE_SEAL:      "CREATE_RANGE_BEFORE_SEAL",
 	ErrorCodeUNKNOWN_OPERATION:             "UNKNOWN_OPERATION",
 	ErrorCodePM_INTERNAL_SERVER_ERROR:      "PM_INTERNAL_SERVER_ERROR",
 	ErrorCodePM_NOT_IMPLEMENTED:            "PM_NOT_IMPLEMENTED",
@@ -89,6 +91,7 @@ var EnumValuesErrorCode = map[string]ErrorCode{
 	"OFFSET_OVERFLOW":               ErrorCodeOFFSET_OVERFLOW,
 	"RANGE_NOT_FOUND":               ErrorCodeRANGE_NOT_FOUND,
 	"OFFSET_OUT_OF_RANGE_BOUNDS":    ErrorCodeOFFSET_OUT_OF_RANGE_BOUNDS,
+	"CREATE_RANGE_BEFORE_SEAL":      ErrorCodeCREATE_RANGE_BEFORE_SEAL,
 	"UNKNOWN_OPERATION":             ErrorCodeUNKNOWN_OPERATION,
 	"PM_INTERNAL_SERVER_ERROR":      ErrorCodePM_INTERNAL_SERVER_ERROR,
 	"PM_NOT_IMPLEMENTED":            ErrorCodePM_NOT_IMPLEMENTED,

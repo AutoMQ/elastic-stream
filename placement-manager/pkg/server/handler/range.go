@@ -45,16 +45,49 @@ func (h *Handler) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealR
 		return
 	}
 
-	writableRange, err := h.c.SealRange(ctx, req.Range, false)
+	r, err := h.c.SealRange(ctx, req.Range)
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
 			resp.Error(h.notLeaderError())
+		case errors.Is(err, cluster.ErrStreamNotFound):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeNOT_FOUND, Message: err.Error()})
 		case errors.Is(err, cluster.ErrRangeNotFound):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_NOT_FOUND, Message: err.Error()})
 		case errors.Is(err, cluster.ErrRangeAlreadySealed):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_ALREADY_SEALED, Message: err.Error()})
 		case errors.Is(err, cluster.ErrInvalidEndOffset):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()})
+		default:
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+		}
+		return
+	}
+
+	resp.Range = r
+	resp.OK()
+}
+
+func (h *Handler) CreateRange(req *protocol.CreateRangeRequest, resp *protocol.CreateRangeResponse) {
+	ctx := req.Context()
+
+	if req.Range == nil {
+		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "range is nil"})
+		return
+	}
+
+	r, err := h.c.CreateRange(ctx, req.Range)
+	if err != nil {
+		switch {
+		case errors.Is(err, cluster.ErrNotLeader):
+			resp.Error(h.notLeaderError())
+		case errors.Is(err, cluster.ErrStreamNotFound):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeNOT_FOUND, Message: err.Error()})
+		case errors.Is(err, cluster.ErrInvalidRangeIndex):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()})
+		case errors.Is(err, cluster.ErrCreateBeforeSeal):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeCREATE_RANGE_BEFORE_SEAL, Message: err.Error()})
+		case errors.Is(err, cluster.ErrInvalidStartOffset):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()})
 		case errors.Is(err, cluster.ErrNotEnoughDataNodes):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()})
@@ -64,12 +97,6 @@ func (h *Handler) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealR
 		return
 	}
 
-	resp.Range = writableRange
+	resp.Range = r
 	resp.OK()
-}
-
-func (h *Handler) CreateRange(req *protocol.CreateRangeRequest, resp *protocol.CreateRangeResponse) {
-	// TODO
-	_ = req
-	_ = resp
 }
