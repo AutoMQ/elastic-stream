@@ -11,10 +11,16 @@ pub(crate) struct InvocationContext {
 }
 
 impl InvocationContext {
-    pub(crate) fn new(request: request::Request, response_observer: oneshot::Sender<response::Response>) -> Self {
+    pub(crate) fn new(
+        request: request::Request,
+        response_observer: oneshot::Sender<response::Response>,
+    ) -> Self {
         let cell = OnceCell::new();
         let _ = cell.set(response_observer);
-        Self { request, response_observer: cell }
+        Self {
+            request,
+            response_observer: cell,
+        }
     }
 
     pub(crate) fn request(&self) -> &request::Request {
@@ -22,7 +28,9 @@ impl InvocationContext {
     }
 
     pub(crate) fn is_closed(&self) -> bool {
-        self.response_observer.get().map_or(true, |tx| tx.is_closed())
+        self.response_observer
+            .get()
+            .map_or(true, |tx| tx.is_closed())
     }
 
     pub(crate) fn write_response(&mut self, response: response::Response) {

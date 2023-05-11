@@ -268,9 +268,9 @@ impl CompositeSession {
         self.try_reconnect().await;
         // TODO: apply load-balancing among `self.sessions`.
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
-            let request = Request::ListRanges {
+            let request = Request::ListRange {
                 timeout: self.config.client_io_timeout(),
-                criteria: vec![criteria],
+                criteria: criteria,
             };
             let (tx, rx) = oneshot::channel();
             if let Err(_ctx) = session.write(request, tx).await {

@@ -108,7 +108,7 @@ impl Session {
             }
         }
 
-        let mut frame = Frame::new(OperationCode::CreateStreams);
+        let mut frame = Frame::new(OperationCode::CreateStream);
         frame.stream_id = stream_id;
 
         let mut create_stream_request = CreateStreamsRequestT::default();

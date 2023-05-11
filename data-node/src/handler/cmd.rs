@@ -24,7 +24,7 @@ pub(crate) enum Command<'a> {
 impl<'a> Command<'a> {
     pub fn from_frame(frame: &Frame) -> Result<Command, ErrorCode> {
         match frame.operation_code {
-            OperationCode::DescribeRanges => {
+            OperationCode::DescribeRange => {
                 Ok(Command::DescribeRange(DescribeRange::parse_frame(frame)?))
             }
 
@@ -42,16 +42,16 @@ impl<'a> Command<'a> {
 
             OperationCode::Fetch => Ok(Command::Fetch(Fetch::parse_frame(frame)?)),
 
-            OperationCode::ListRanges => todo!(),
+            OperationCode::ListRange => todo!(),
 
-            OperationCode::SealRanges => Ok(Command::SealRange(SealRange::parse_frame(frame)?)),
+            OperationCode::SealRange => Ok(Command::SealRange(SealRange::parse_frame(frame)?)),
 
-            OperationCode::SyncRanges => todo!(),
-            OperationCode::CreateStreams => todo!(),
-            OperationCode::DeleteStreams => todo!(),
-            OperationCode::UpdateStreams => todo!(),
-            OperationCode::DescribeStreams => todo!(),
-            OperationCode::TrimStreams => todo!(),
+            OperationCode::SyncRange => todo!(),
+            OperationCode::CreateStream => todo!(),
+            OperationCode::DeleteStream => todo!(),
+            OperationCode::UpdateStream => todo!(),
+            OperationCode::DescribeStream => todo!(),
+            OperationCode::TrimStream => todo!(),
             OperationCode::ReportMetrics => todo!(),
             OperationCode::DescribePlacementManager => {
                 todo!()

@@ -367,27 +367,27 @@ pub enum OperationCode {
     // 0x2000 ~ 0x2FFF is reserved for range management
 
     // List ranges from the PM of a batch of streams.
-    ListRanges = 0x2001,
+    ListRange = 0x2001,
     // Request seal ranges of a batch of streams.
     // The PM will provide the `SEAL_AND_NEW` semantic while Data Node only provide the `SEAL` semantic.
-    SealRanges = 0x2002,
+    SealRange = 0x2002,
     // Syncs newly writable ranges to a data node to accelerate the availability of a newly created writable range.
-    SyncRanges = 0x2003,
+    SyncRange = 0x2003,
     // Describe the details of a batch of ranges, mainly used to get the max offset of the current writable range.
-    DescribeRanges = 0x2004,
+    DescribeRange = 0x2004,
 
     // 0x3000 ~ 0x3FFF is reserved for stream management
 
     // Create a batch of streams.
-    CreateStreams = 0x3001,
+    CreateStream = 0x3001,
     // Delete a batch of streams.
-    DeleteStreams = 0x3002,
+    DeleteStream = 0x3002,
     // Update a batch of streams.
-    UpdateStreams = 0x3003,
+    UpdateStream = 0x3003,
     // Describe the details of a batch of streams.
-    DescribeStreams = 0x3004,
+    DescribeStream = 0x3004,
     // Trim the min offset of a batch of streams.
-    TrimStreams = 0x3005,
+    TrimStream = 0x3005,
 
     // 0x4000 ~ 0x4FFF is reserved for observability
 

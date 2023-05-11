@@ -154,8 +154,8 @@ pub async fn run_listener() -> u16 {
                                         }
                                     }
                                 }
-                                OperationCode::ListRanges => {
-                                    response_frame.operation_code = OperationCode::ListRanges;
+                                OperationCode::ListRange => {
+                                    response_frame.operation_code = OperationCode::ListRange;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) = flatbuffers::root::<ListRangesRequest>(buf)
                                         {
@@ -206,8 +206,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::SealRanges => {
-                                    response_frame.operation_code = OperationCode::SealRanges;
+                                OperationCode::SealRange => {
+                                    response_frame.operation_code = OperationCode::SealRange;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) = flatbuffers::root::<SealRangesRequest>(buf)
                                         {

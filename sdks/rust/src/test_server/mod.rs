@@ -115,8 +115,8 @@ pub async fn run_listener() -> u16 {
                                         }
                                     }
                                 }
-                                OperationCode::ListRanges => {
-                                    response_frame.operation_code = OperationCode::ListRanges;
+                                OperationCode::ListRange => {
+                                    response_frame.operation_code = OperationCode::ListRange;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) = flatbuffers::root::<ListRangesRequest>(buf)
                                         {
@@ -127,8 +127,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::CreateStreams => {
-                                    response_frame.operation_code = OperationCode::CreateStreams;
+                                OperationCode::CreateStream => {
+                                    response_frame.operation_code = OperationCode::CreateStream;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) =
                                             flatbuffers::root::<CreateStreamsRequest>(buf)

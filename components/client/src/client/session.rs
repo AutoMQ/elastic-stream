@@ -5,7 +5,7 @@ use codec::{
 use model::{range::StreamRange, request::Request, response, PlacementManagerNode, Status};
 use protocol::rpc::header::{
     DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse, IdAllocationResponse,
-    ListRangesResponse, SealRangesResponse, SystemErrorResponse,
+    ListRangeResponse, SealRangeResponse, SystemError,
 };
 use transport::connection::Connection;
 
@@ -193,8 +193,8 @@ impl Session {
                 frame.operation_code = OperationCode::Heartbeat;
             }
 
-            Request::ListRanges { .. } => {
-                frame.operation_code = OperationCode::ListRanges;
+            Request::ListRange { .. } => {
+                frame.operation_code = OperationCode::ListRange;
             }
 
             Request::AllocateId { .. } => {
@@ -206,7 +206,7 @@ impl Session {
             }
 
             Request::SealRange { .. } => {
-                frame.operation_code = OperationCode::SealRanges;
+                frame.operation_code = OperationCode::SealRange;
             }
         };
 
@@ -269,14 +269,11 @@ impl Session {
             ranges: None,
         };
         if let Some(ref buf) = frame.header {
-            if let Ok(list_ranges) = flatbuffers::root::<ListRangesResponse>(buf) {
+            if let Ok(list_ranges) = flatbuffers::root::<ListRangeResponse>(buf) {
                 let _ranges = list_ranges
                     .unpack()
-                    .list_responses
+                    .ranges
                     .iter()
-                    .flat_map(|result| result.iter())
-                    .flat_map(|res| res.ranges.as_ref())
-                    .flat_map(|e| e.iter())
                     .map(Into::into)
                     .collect::<Vec<_>>();
                 if let response::Response::ListRange { ranges, .. } = &mut response {
@@ -295,7 +292,7 @@ impl Session {
 
         if frame.system_error() {
             if let Some(ref buf) = frame.header {
-                match flatbuffers::root::<SystemErrorResponse>(buf) {
+                match flatbuffers::root::<SystemError>(buf) {
                     Ok(error_response) => {
                         let response = error_response.unpack();
                         // Update status
@@ -307,7 +304,7 @@ impl Session {
                     Err(e) => {
                         // Deserialize error
                         warn!(
-                            "Failed to decode `SystemErrorResponse` using FlatBuffers. Cause: {}",
+                            "Failed to decode `SystemError` using FlatBuffers. Cause: {}",
                             e
                         );
                     }
@@ -353,7 +350,7 @@ impl Session {
 
         if frame.system_error() {
             if let Some(ref buf) = frame.header {
-                match flatbuffers::root::<SystemErrorResponse>(buf) {
+                match flatbuffers::root::<SystemError>(buf) {
                     Ok(response) => {
                         let response = response.unpack();
                         // Update status
@@ -367,7 +364,7 @@ impl Session {
                     Err(e) => {
                         // Deserialize error
                         warn!(
-                            "Failed to decode `SystemErrorResponse` using FlatBuffers. Cause: {}",
+                            "Failed to decode `SystemError` using FlatBuffers. Cause: {}",
                             e
                         );
                     }
@@ -413,7 +410,7 @@ impl Session {
 
         if frame.system_error() {
             if let Some(ref buf) = frame.header {
-                match flatbuffers::root::<SystemErrorResponse>(buf) {
+                match flatbuffers::root::<SystemError>(buf) {
                     Ok(response) => {
                         let response = response.unpack();
                         // Update status
@@ -424,14 +421,14 @@ impl Session {
                     Err(e) => {
                         // Deserialize error
                         warn!(
-                            "Failed to decode `SystemErrorResponse` using FlatBuffers. Cause: {}",
+                            "Failed to decode `SystemError` using FlatBuffers. Cause: {}",
                             e
                         );
                     }
                 }
             }
         } else if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<SealRangesResponse>(buf) {
+            match flatbuffers::root::<SealRangeResponse>(buf) {
                 Ok(response) => {
                     let response = response.unpack();
                     if let response::Response::SealRange {
@@ -441,13 +438,7 @@ impl Session {
                     {
                         if response.status.code == ErrorCode::OK {
                             *status = Status::ok();
-                            debug_assert_eq!(
-                                response.results.len(),
-                                1,
-                                "SealRangesResponse should have exactly one result"
-                            );
-                            let result = &response.results[0];
-                            *range = result.range.clone().map(|range| range.as_ref().into());
+                            *range = response.range.clone().map(|range| range.as_ref().into());
                         } else {
                             *status = response.status.as_ref().into();
                         }
@@ -476,7 +467,7 @@ impl Session {
             Some(mut ctx) => {
                 let response = match frame.operation_code {
                     OperationCode::Heartbeat => Self::handle_heartbeat_response(&frame),
-                    OperationCode::ListRanges => Self::handle_list_ranges_response(&frame),
+                    OperationCode::ListRange => Self::handle_list_ranges_response(&frame),
                     OperationCode::Unknown => {
                         warn!("Received an unknown operation code");
                         return;
@@ -492,32 +483,32 @@ impl Session {
                         warn!("Received an unexpected `Fetch` response");
                         return;
                     }
-                    OperationCode::SealRanges => Self::handle_seal_ranges_response(&frame, &ctx),
-                    OperationCode::SyncRanges => {
+                    OperationCode::SealRange => Self::handle_seal_ranges_response(&frame, &ctx),
+                    OperationCode::SyncRange => {
                         warn!("Received an unexpected `SyncRanges` response");
                         return;
                     }
-                    OperationCode::DescribeRanges => {
+                    OperationCode::DescribeRange => {
                         warn!("Received an unexpected `DescribeRanges` response");
                         return;
                     }
-                    OperationCode::CreateStreams => {
+                    OperationCode::CreateStream => {
                         warn!("Received an unexpected `CreateStreams` response");
                         return;
                     }
-                    OperationCode::DeleteStreams => {
+                    OperationCode::DeleteStream => {
                         warn!("Received an unexpected `DeleteStreams` response");
                         return;
                     }
-                    OperationCode::UpdateStreams => {
+                    OperationCode::UpdateStream => {
                         warn!("Received an unexpected `UpdateStreams` response");
                         return;
                     }
-                    OperationCode::DescribeStreams => {
+                    OperationCode::DescribeStream => {
                         warn!("Received an unexpected `DescribeStreams` response");
                         return;
                     }
-                    OperationCode::TrimStreams => todo!(),
+                    OperationCode::TrimStream => todo!(),
                     OperationCode::ReportMetrics => todo!(),
                     OperationCode::DescribePlacementManager => {
                         Self::handle_describe_placement_manager_response(&frame)

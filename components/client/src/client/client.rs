@@ -6,7 +6,7 @@ use model::{
     range_criteria::RangeCriteria,
     request::seal::{self, SealRangeEntry},
 };
-use protocol::rpc::header::SealRangeEntryT;
+
 use std::{cell::UnsafeCell, rc::Rc, sync::Arc};
 use tokio::{sync::broadcast, time};
 
