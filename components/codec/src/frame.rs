@@ -373,8 +373,6 @@ pub enum OperationCode {
     SealRange = 0x2002,
     // Syncs newly writable ranges to a data node to accelerate the availability of a newly created writable range.
     SyncRange = 0x2003,
-    // Describe the details of a batch of ranges, mainly used to get the max offset of the current writable range.
-    DescribeRange = 0x2004,
 
     // 0x3000 ~ 0x3FFF is reserved for stream management
 

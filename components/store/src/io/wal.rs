@@ -14,7 +14,7 @@ use crate::{
 
 use io_uring::{opcode, squeue, types};
 use log::{debug, error, info, trace, warn};
-use model::flat_record::FlatRecordBatch;
+use model::record::flat_record::FlatRecordBatch;
 use percentage::Percentage;
 use protocol::flat_model::records::RecordBatchMeta;
 
@@ -205,31 +205,26 @@ impl Wal {
             }
 
             // Index the record group
-            match FlatRecordBatch::init_from_buf(buf.clone().freeze()) {
-                Ok(batch) => {
-                    let offset = batch
-                        .base_offset
-                        .expect("RecordBatch should have valid base_offset")
-                        as u64;
-                    match flatbuffers::root::<RecordBatchMeta>(&batch.meta_buffer[..]) {
-                        Ok(metadata) => {
-                            let stream_id = metadata.stream_id();
-                            let range = metadata.range_index() as u32;
-                            let handle = RecordHandle {
-                                wal_offset: segment.wal_offset + file_pos - len as u64 - 8,
-                                len: len as u32 + 8,
-                                hash: 0,
-                            };
-                            trace!("Index RecordBatch[stream-id={}, range={}, base-offset={}, wal-offset={}, len={}]",
+            match FlatRecordBatch::init_from_buf(&mut buf.clone().freeze()) {
+                Ok(batch) => match flatbuffers::root::<RecordBatchMeta>(&batch.batch_meta[..]) {
+                    Ok(metadata) => {
+                        let stream_id = metadata.stream_id();
+                        let range = metadata.range_index() as u32;
+                        let offset = metadata.base_offset();
+                        let handle = RecordHandle {
+                            wal_offset: segment.wal_offset + file_pos - len as u64 - 8,
+                            len: len as u32 + 8,
+                            hash: 0,
+                        };
+                        trace!("Index RecordBatch[stream-id={}, range={}, base-offset={}, wal-offset={}, len={}]",
                              stream_id, range, offset, handle.wal_offset, handle.len);
-                            indexer.index(stream_id, range, offset, handle);
-                        }
-                        Err(e) => {
-                            error!("Failed to deserialize RecordBatchMeta. Cause: {:?}", e);
-                            panic!("Failed to deserialize RecordBatchMeta");
-                        }
+                        indexer.index(stream_id, range, offset as u64, handle);
                     }
-                }
+                    Err(e) => {
+                        error!("Failed to deserialize RecordBatchMeta. Cause: {:?}", e);
+                        panic!("Failed to deserialize RecordBatchMeta");
+                    }
+                },
                 Err(e) => {
                     error!("Failed to decode FlatRecordBatch. Cause: {}", e);
                     panic!("Failed to decode FlatRecordBatch");

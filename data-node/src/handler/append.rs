@@ -5,9 +5,9 @@ use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
 use log::{error, trace, warn};
-use model::flat_record::FlatRecordBatch;
+use model::record::flat_record::FlatRecordBatch;
 use protocol::rpc::header::{
-    AppendRequest, AppendResponseArgs, AppendResultArgs, ErrorCode, StatusArgs,
+    AppendEntryResultArgs, AppendRequest, AppendResponseArgs, ErrorCode, StatusArgs,
 };
 use std::{cell::RefCell, rc::Rc};
 use store::{
@@ -26,8 +26,15 @@ pub(crate) struct Append<'a> {
     /// The append request already parsed by flatbuffers
     append_request: AppendRequest<'a>,
 
-    /// The payload may contains multiple record batches,
-    /// the length of each batch is stored in append_request
+    // Layout of the request payload
+    // +-------------------+-------------------+-------------------+-------------------+
+    // |  AppendEntry 1    |  AppendEntry 2    |  AppendEntry 3    |        ...        |
+    // +-------------------+-------------------+-------------------+-------------------+
+    //
+    // Layout of AppendEntry
+    // +-------------------+-------------------+-------------------+------------------------------------------+
+    // |  Magic Code(4B)   |  Meta Len(4B)     |       Meta        |  Payload Len(4B) | Record Batch Payload  |
+    // +-------------------+-------------------+-------------------+------------------------------------------+
     payload: Bytes,
 }
 
@@ -134,11 +141,11 @@ impl<'a> Append<'a> {
                                 e
                             );
                         }
-                        let args = AppendResultArgs {
+                        let args = AppendEntryResultArgs {
                             timestamp_ms: Utc::now().timestamp(),
                             status: Some(ok_status),
                         };
-                        protocol::rpc::header::AppendResult::create(&mut builder, &args)
+                        protocol::rpc::header::AppendEntryResult::create(&mut builder, &args)
                     }
                     Err(e) => {
                         // TODO: what to do with the offset on failure?
@@ -158,11 +165,11 @@ impl<'a> Append<'a> {
                             },
                         );
 
-                        let args = AppendResultArgs {
+                        let args = AppendEntryResultArgs {
                             timestamp_ms: 0,
                             status: Some(status),
                         };
-                        protocol::rpc::header::AppendResult::create(&mut builder, &args)
+                        protocol::rpc::header::AppendEntryResult::create(&mut builder, &args)
                     }
                 }
             })
@@ -187,104 +194,30 @@ impl<'a> Append<'a> {
         &self,
         stream_manager: &Rc<RefCell<StreamManager>>,
     ) -> Result<Vec<AppendRecordRequest>, ErrorCode> {
+        let mut append_requests: Vec<AppendRecordRequest> = Vec::new();
         let mut payload = self.payload.clone();
-        let mut err_code = ErrorCode::OK;
-        let mut manager = stream_manager.borrow_mut();
+        while !self.payload.is_empty() {
+            let record_batch = FlatRecordBatch::init_from_buf(&mut payload).map_err(|e| {
+                error!("Failed to decode record batch from payload. Cause: {:?}", e);
+                ErrorCode::BAD_REQUEST
+            })?;
 
-        // Iterate over the append requests and append each record batch
-        let to_store_requests: Vec<_> = self
-            .append_request
-            .entries()
-            .iter()
-            .flatten()
-            .map_while(|record_batch| {
-                let range = match record_batch.range() {
-                    Some(range) => range,
-                    None => {
-                        error!("Required `range` field is missing from `AppendRequest`");
-                        err_code = ErrorCode::BAD_REQUEST;
-                        return None;
-                    }
-                };
+            let record_batch = record_batch.decode().map_err(|e| {
+                error!("Failed to decode record batch from payload. Cause: {:?}", e);
+                ErrorCode::BAD_REQUEST
+            })?;
 
-                let batch_len = record_batch.payload_length();
+            let request = AppendRecordRequest {
+                stream_id: record_batch.stream_id(),
+                range: record_batch.range_index(),
+                offset: record_batch.base_offset(),
+                buffer: record_batch.payload(),
+            };
 
-                // the current data node owns the newly writable range of the stream
-
-                // Split the current batch payload from the whole payload
-                if payload.len() < batch_len as usize {
-                    warn!("Invalid record batch length");
-                    err_code = ErrorCode::BAD_REQUEST;
-                    return None;
-                }
-
-                // Decode the record batch
-                let payload_b = payload.split_to(batch_len as usize);
-                let decode_batch = FlatRecordBatch::init_from_buf(payload_b.clone());
-
-                match decode_batch {
-                    Ok(decode_batch) => {
-                        // Fetch the offset for the current stream
-                        let offset_r =
-                            manager.alloc_record_batch_slots(range, decode_batch.records.len());
-
-                        // Set the error code if the offset allocation failed
-                        if let Err(e) = offset_r {
-                            warn!("Failed to allocate offset: {:?}", e);
-                            err_code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
-                            return None;
-                        }
-
-                        let offset = offset_r.unwrap_or_default() as i64;
-
-                        // Rewrite the offset in the record batch directly,
-                        // since the rust flatbuffers doesn't support update the value so far.
-                        unsafe {
-                            let offset_ptr =
-                                payload_b.as_ptr().add(model::flat_record::BASE_OFFSET_POS);
-                            let offset_ptr = offset_ptr as *mut i64;
-
-                            // Serialized buffer uses big-endian for integrals. Reading / writing must respect
-                            // endianness.
-                            cfg_if::cfg_if! {
-                                 if #[cfg(target_endian = "little")] {
-                                    std::ptr::write_unaligned(offset_ptr, offset.to_be());
-                                } else {
-                                    std::ptr::write_unaligned(offset_ptr, offset);
-                                }
-                            };
-                        }
-
-                        #[cfg(feature = "paranoid")]
-                        {
-                            let frb = FlatRecordBatch::init_from_buf(payload_b.clone()).unwrap();
-                            debug_assert_eq!(
-                                offset,
-                                frb.base_offset.unwrap(),
-                                "Base-offset written by unsafe modification is incorrect"
-                            );
-                        }
-
-                        let to_store = AppendRecordRequest {
-                            stream_id: range.stream_id(),
-                            range: range.range_index(),
-                            offset: offset as i64,
-                            buffer: payload_b,
-                        };
-                        Some(to_store)
-                    }
-                    Err(e) => {
-                        warn!("Failed to decode record batch: {:?}", e);
-                        err_code = ErrorCode::BAD_REQUEST;
-                        return None;
-                    }
-                }
-            })
-            .collect();
-        if err_code != ErrorCode::OK {
-            return Err(err_code);
+            append_requests.push(request);
         }
-        Ok(to_store_requests)
+
+        Ok(append_requests)
     }
 
     fn convert_store_error(&self, err: &AppendError) -> (ErrorCode, Option<String>) {

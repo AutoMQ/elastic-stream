@@ -38,6 +38,14 @@ impl RecordBatch {
     pub fn base_timestamp(&self) -> i64 {
         self.batch_meta.base_timestamp
     }
+
+    pub fn base_offset(&self) -> i64 {
+        self.batch_meta.base_offset
+    }
+
+    pub fn payload(&self) -> Bytes {
+        self.batch_payload.clone()
+    }
 }
 
 #[derive(Debug, Default)]

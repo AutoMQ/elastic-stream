@@ -167,11 +167,8 @@ impl<'a> Fetch<'a> {
             .iter()
             .flatten()
             .map(|req| {
-                // Retrieve stream id from req.range, return error if it's a bad request
-                let stream_id = match req.range().and_then(|r| Some(r.stream_id())) {
-                    Some(stream_id) => stream_id,
-                    None => return Err(FetchError::BadRequest),
-                };
+                // Retrieve stream id from req.range
+                let stream_id = req.range().stream_id();
 
                 // If the stream-range exists and contains the requested offset, build the read options
                 if let Some(range) = stream_manager

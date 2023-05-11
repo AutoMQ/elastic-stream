@@ -201,12 +201,12 @@ impl StreamManager {
         trace!(
             "Allocate record slots in batch for stream={}, range-index={}, batch-size={}",
             range.stream_id(),
-            range.range_index(),
+            range.index(),
             batch_size
         );
 
         let stream_id = range.stream_id();
-        let range_index = range.range_index();
+        let range_index = range.index();
 
         if let Some(window) = self.windows.get_mut(&stream_id) {
             debug_assert_eq!(range_index, window.range_index);
@@ -247,18 +247,18 @@ impl StreamManager {
         info!(
             "Stream={} has a new range=[{}, -1)",
             stream_id,
-            range.start_offset()
+            range.start()
         );
-        debug_assert_eq!(-1, range.end_offset());
+        debug_assert_eq!(-1, range.end());
         let mut stream_range = StreamRange::new(
             stream_id,
             0,
             range_index,
-            range.start_offset() as u64,
-            range.start_offset() as u64,
+            range.start() as u64,
+            range.start() as u64,
             None,
         );
-        range.replica_nodes().iter().flatten().for_each(|node| {
+        range.nodes().iter().flatten().for_each(|node| {
             let data_node = DataNode {
                 node_id: node.node_id(),
                 advertise_address: node.advertise_addr().to_owned(),
@@ -266,7 +266,7 @@ impl StreamManager {
             stream_range.replica_mut().push(data_node);
         });
 
-        let mut append_window = AppendWindow::new(range_index, range.start_offset() as u64);
+        let mut append_window = AppendWindow::new(range_index, range.start() as u64);
         let offset = append_window.alloc_batch_slots(batch_size);
         stream.push(stream_range);
         self.windows.insert(stream_id, append_window);

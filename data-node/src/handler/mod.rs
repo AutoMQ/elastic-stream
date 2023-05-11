@@ -4,7 +4,6 @@
 
 mod append;
 mod cmd;
-mod describe_range;
 mod fetch;
 mod go_away;
 mod heartbeat;

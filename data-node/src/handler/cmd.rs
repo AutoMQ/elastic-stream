@@ -7,14 +7,13 @@ use store::ElasticStore;
 use crate::stream_manager::StreamManager;
 
 use super::{
-    append::Append, describe_range::DescribeRange, fetch::Fetch, heartbeat::Heartbeat, ping::Ping,
+    append::Append, fetch::Fetch, heartbeat::Heartbeat, ping::Ping,
     seal_range::SealRange,
 };
 
 #[derive(Debug)]
 pub(crate) enum Command<'a> {
     Append(Append<'a>),
-    DescribeRange(DescribeRange<'a>),
     Fetch(Fetch<'a>),
     SealRange(SealRange<'a>),
     Ping(Ping<'a>),
@@ -24,10 +23,6 @@ pub(crate) enum Command<'a> {
 impl<'a> Command<'a> {
     pub fn from_frame(frame: &Frame) -> Result<Command, ErrorCode> {
         match frame.operation_code {
-            OperationCode::DescribeRange => {
-                Ok(Command::DescribeRange(DescribeRange::parse_frame(frame)?))
-            }
-
             OperationCode::Unknown => todo!(),
 
             OperationCode::Ping => Ok(Command::Ping(Ping::new(frame))),
@@ -67,7 +62,6 @@ impl<'a> Command<'a> {
     ) {
         match self {
             Command::Append(cmd) => cmd.apply(store, stream_manager, response).await,
-            Command::DescribeRange(cmd) => cmd.apply(store, stream_manager, response).await,
             Command::Fetch(cmd) => cmd.apply(store, stream_manager, response).await,
             Command::Heartbeat(cmd) => cmd.apply(store, stream_manager, response).await,
             Command::Ping(cmd) => cmd.apply(store, stream_manager, response).await,

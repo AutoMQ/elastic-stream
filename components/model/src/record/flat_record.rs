@@ -61,7 +61,7 @@ impl FlatRecordBatch {
     }
 
     /// Inits a FlatRecordBatch from a buffer of bytes received from storage or network layer.
-    pub fn init_from_buf(mut buf: Bytes) -> Result<Self, DecodeError> {
+    pub fn init_from_buf(buf: &mut Bytes) -> Result<Self, DecodeError> {
         if buf.len() < RECORD_BATCH_PREFIX_LEN {
             return Err(DecodeError::DataLengthMismatch);
         }
@@ -206,7 +206,7 @@ mod tests {
         assert_eq!(total_len, 0);
 
         // Decode the above bytes to FlatRecordBatch
-        let flat_batch = FlatRecordBatch::init_from_buf(bytes_mute.freeze()).unwrap();
+        let flat_batch = FlatRecordBatch::init_from_buf(&mut bytes_mute.freeze()).unwrap();
         let mut record_batch = flat_batch.decode().unwrap();
 
         assert_eq!(record_batch.stream_id(), stream_id);
@@ -230,7 +230,7 @@ mod tests {
         bytes_mut.put_i32(1024); // Length
         bytes_mut.put_i32(10); // Data
 
-        let result = FlatRecordBatch::init_from_buf(bytes_mut.freeze());
+        let result = FlatRecordBatch::init_from_buf(&mut bytes_mut.freeze());
         assert_eq!(result.is_err(), true);
     }
 }

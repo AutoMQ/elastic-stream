@@ -516,10 +516,6 @@ impl Session {
                         warn!("Received an unexpected `SyncRanges` response");
                         return;
                     }
-                    OperationCode::DescribeRange => {
-                        warn!("Received an unexpected `DescribeRanges` response");
-                        return;
-                    }
                     OperationCode::CreateStream => {
                         warn!("Received an unexpected `CreateStreams` response");
                         return;
