@@ -16,8 +16,9 @@ const (
 	OpAppend uint16 = 0x1001
 	OpFetch  uint16 = 0x1002
 
-	OpListRange uint16 = 0x2001
-	OpSealRange uint16 = 0x2002
+	OpListRange   uint16 = 0x2001
+	OpSealRange   uint16 = 0x2002
+	OpCreateRange uint16 = 0x2003
 
 	OpCreateStream   uint16 = 0x3001
 	OpDeleteStream   uint16 = 0x3002
@@ -63,6 +64,8 @@ func (o Operation) String() string {
 		return "ListRange"
 	case OpSealRange:
 		return "SealRange"
+	case OpCreateRange:
+		return "CreateRange"
 	case OpCreateStream:
 		return "CreateStream"
 	case OpDeleteStream:

@@ -42,6 +42,13 @@ func (c Checker) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealRa
 	c.Handler.SealRange(req, resp)
 }
 
+func (c Checker) CreateRange(req *protocol.CreateRangeRequest, resp *protocol.CreateRangeResponse) {
+	if !c.Handler.Check(req, resp) {
+		return
+	}
+	c.Handler.CreateRange(req, resp)
+}
+
 func (c Checker) CreateStream(req *protocol.CreateStreamRequest, resp *protocol.CreateStreamResponse) {
 	if !c.Handler.Check(req, resp) {
 		return

@@ -194,6 +194,30 @@ func (sr *SealRangeResponse) OK() {
 	sr.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
 }
 
+// CreateRangeResponse is a response to operation.OpCreateRange
+type CreateRangeResponse struct {
+	baseMarshaller
+	singleResponse
+
+	rpcfb.CreateRangeResponseT
+}
+
+func (cr *CreateRangeResponse) marshalFlatBuffer() ([]byte, error) {
+	return fbutil.Marshal(&cr.CreateRangeResponseT), nil
+}
+
+func (cr *CreateRangeResponse) Marshal(fmt format.Format) ([]byte, error) {
+	return marshal(cr, fmt)
+}
+
+func (cr *CreateRangeResponse) Error(status *rpcfb.StatusT) {
+	cr.Status = status
+}
+
+func (cr *CreateRangeResponse) OK() {
+	cr.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
+}
+
 // CreateStreamResponse is a response to operation.OpCreateStream
 type CreateStreamResponse struct {
 	baseMarshaller

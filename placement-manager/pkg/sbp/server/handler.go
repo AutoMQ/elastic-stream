@@ -15,8 +15,10 @@ type Handler interface {
 	AllocateID(req *protocol.IDAllocationRequest, resp *protocol.IDAllocationResponse)
 	// ListRange lists ranges either in a specified steam, a specified data node, or both.
 	ListRange(req *protocol.ListRangeRequest, resp *protocol.ListRangeResponse)
-	// SealRange seal the specified range.
+	// SealRange seals the specified range.
 	SealRange(req *protocol.SealRangeRequest, resp *protocol.SealRangeResponse)
+	// CreateRange creates the specified range.
+	CreateRange(req *protocol.CreateRangeRequest, resp *protocol.CreateRangeResponse)
 	// CreateStream creates a stream.
 	CreateStream(req *protocol.CreateStreamRequest, resp *protocol.CreateStreamResponse)
 	// DeleteStream deletes the specified stream.
@@ -57,6 +59,13 @@ var (
 			newResp: func() protocol.OutResponse { return &protocol.SealRangeResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
 				handler.SealRange(req.(*protocol.SealRangeRequest), resp.(*protocol.SealRangeResponse))
+			},
+		},
+		{Code: operation.OpCreateRange}: {
+			newReq:  func() protocol.InRequest { return &protocol.CreateRangeRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.CreateRangeResponse{} },
+			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
+				handler.CreateRange(req.(*protocol.CreateRangeRequest), resp.(*protocol.CreateRangeResponse))
 			},
 		},
 		{Code: operation.OpCreateStream}: {

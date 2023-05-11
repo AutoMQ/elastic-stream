@@ -95,6 +95,10 @@ func (b *baseHandler) SealRange(_ *protocol.SealRangeRequest, resp *protocol.Sea
 	resp.OK()
 }
 
+func (b *baseHandler) CreateRange(_ *protocol.CreateRangeRequest, resp *protocol.CreateRangeResponse) {
+	resp.OK()
+}
+
 func (b *baseHandler) ListRange(_ *protocol.ListRangeRequest, resp *protocol.ListRangeResponse) {
 	resp.OK()
 }

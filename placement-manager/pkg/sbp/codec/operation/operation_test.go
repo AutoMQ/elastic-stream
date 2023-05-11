@@ -89,6 +89,14 @@ func TestNewOperation(t *testing.T) {
 			},
 		},
 		{
+			name:   "CreateRange",
+			fields: fields{code: OpCreateRange},
+			wants: wants{
+				s:    "CreateRange",
+				code: OpCreateRange,
+			},
+		},
+		{
 			name:   "CreateStream",
 			fields: fields{code: OpCreateStream},
 			wants: wants{

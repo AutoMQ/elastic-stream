@@ -67,3 +67,9 @@ func (h *Handler) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealR
 	resp.Range = writableRange
 	resp.OK()
 }
+
+func (h *Handler) CreateRange(req *protocol.CreateRangeRequest, resp *protocol.CreateRangeResponse) {
+	// TODO
+	_ = req
+	_ = resp
+}

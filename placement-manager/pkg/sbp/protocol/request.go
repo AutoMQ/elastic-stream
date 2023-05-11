@@ -162,6 +162,27 @@ func (sr *SealRangeRequest) Timeout() int32 {
 	return sr.TimeoutMs
 }
 
+// CreateRangeRequest is a request to operation.OpCreateRange
+type CreateRangeRequest struct {
+	baseRequest
+	baseUnmarshaler
+
+	rpcfb.CreateRangeRequestT
+}
+
+func (cr *CreateRangeRequest) unmarshalFlatBuffer(data []byte) error {
+	cr.CreateRangeRequestT = *rpcfb.GetRootAsCreateRangeRequest(data, 0).UnPack()
+	return nil
+}
+
+func (cr *CreateRangeRequest) Unmarshal(fmt format.Format, data []byte) error {
+	return unmarshal(cr, fmt, data)
+}
+
+func (cr *CreateRangeRequest) Timeout() int32 {
+	return cr.TimeoutMs
+}
+
 // CreateStreamRequest is a request to operation.OpCreateStream
 type CreateStreamRequest struct {
 	baseRequest
