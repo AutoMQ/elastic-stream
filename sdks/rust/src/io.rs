@@ -32,8 +32,7 @@ impl IO {
                                         Duration::from_secs(3),
                                         Duration::from_secs(1),
                                     )
-                                    .await
-                                    .map(|mut v| v.pop());
+                                    .await;
                                 let _ = tx.send(res);
                             });
                         }

@@ -7,9 +7,8 @@ use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
 use log::{debug, error, info, trace, warn};
 use protocol::rpc::header::{
-    CreateStreamResultT, CreateStreamsRequest, CreateStreamsResponseT, ErrorCode, HeartbeatRequest,
-    HeartbeatResponseT, ListRangesRequest, ListRangesResponseT, ListRangesResultT, RangeT, StatusT,
-    StreamT,
+    CreateStreamRequest, CreateStreamResponseT, ErrorCode, HeartbeatRequest, HeartbeatResponseT,
+    ListRangeRequest, ListRangeResponseT, RangeT, StatusT, StreamT,
 };
 
 use tokio::{net::TcpListener, sync::oneshot};
@@ -37,33 +36,28 @@ fn serve_heartbeat(request: &HeartbeatRequest, frame: &mut Frame) {
     frame.header = Some(buf);
 }
 
-fn serve_list_ranges(request: &ListRangesRequest, frame: &mut Frame) {
+fn serve_list_ranges(request: &ListRangeRequest, frame: &mut Frame) {
     trace!("Received a list-ranges request: {:?}", request);
     let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
-    let mut resp = ListRangesResponseT::default();
+    let mut resp = ListRangeResponseT::default();
 
-    {
-        let mut result = ListRangesResultT::default();
+    let mut status = StatusT::default();
+    status.code = ErrorCode::OK;
+    status.message = Some(String::from("OK"));
+    resp.status = Box::new(status);
 
-        let mut status = StatusT::default();
-        status.code = ErrorCode::OK;
-        status.message = Some(String::from("OK"));
-        result.status = Box::new(status);
+    let ranges = (0..10)
+        .map(|i| {
+            let mut range = RangeT::default();
+            range.stream_id = 0;
+            range.index = i as i32;
+            range.start = i * 100;
+            range.end = (i + 1) * 100;
+            range
+        })
+        .collect::<Vec<_>>();
 
-        let ranges = (0..10)
-            .map(|i| {
-                let mut range = RangeT::default();
-                range.stream_id = 0;
-                range.range_index = i as i32;
-                range.start_offset = i * 100;
-                range.end_offset = (i + 1) * 100;
-                range
-            })
-            .collect::<Vec<_>>();
-
-        result.ranges = Some(ranges);
-        resp.list_responses = Some(vec![result]);
-    }
+    resp.ranges = ranges;
 
     let resp = resp.pack(&mut builder);
     builder.finish(resp, None);
@@ -118,7 +112,7 @@ pub async fn run_listener() -> u16 {
                                 OperationCode::ListRange => {
                                     response_frame.operation_code = OperationCode::ListRange;
                                     if let Some(buf) = frame.header.as_ref() {
-                                        if let Ok(req) = flatbuffers::root::<ListRangesRequest>(buf)
+                                        if let Ok(req) = flatbuffers::root::<ListRangeRequest>(buf)
                                         {
                                             serve_list_ranges(&req, &mut response_frame);
                                         } else {
@@ -131,7 +125,7 @@ pub async fn run_listener() -> u16 {
                                     response_frame.operation_code = OperationCode::CreateStream;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) =
-                                            flatbuffers::root::<CreateStreamsRequest>(buf)
+                                            flatbuffers::root::<CreateStreamRequest>(buf)
                                         {
                                             // Wait 100ms such that we can unit test timeout
                                             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -183,34 +177,14 @@ pub async fn run_listener() -> u16 {
     rx.await.unwrap()
 }
 
-fn serve_create_streams(req: &CreateStreamsRequest, response_frame: &mut Frame) {
+fn serve_create_streams(req: &CreateStreamRequest, response_frame: &mut Frame) {
     trace!("CreateStreams {:?}", req);
 
     let request = req.unpack();
 
     let mut builder = flatbuffers::FlatBufferBuilder::new();
-    let mut response = CreateStreamsResponseT::default();
+    let mut response = CreateStreamResponseT::default();
 
-    let results = request
-        .streams
-        .into_iter()
-        .flat_map(|stream| stream.into_iter())
-        .enumerate()
-        .map(|(id, mut stream)| {
-            stream.stream_id = id as i64;
-
-            let mut result = CreateStreamResultT::default();
-            result.stream = Some(Box::new(stream));
-            let mut status = StatusT::default();
-            status.code = ErrorCode::OK;
-            status.message = Some(String::from("OK"));
-            result.status = Box::new(status);
-
-            result
-        })
-        .collect();
-
-    response.create_responses = Some(results);
     let mut status = StatusT::default();
     status.code = ErrorCode::OK;
     status.message = Some("OK".to_owned());
@@ -218,6 +192,8 @@ fn serve_create_streams(req: &CreateStreamsRequest, response_frame: &mut Frame) 
 
     let mut stream = StreamT::default();
     stream.stream_id = 1;
+    response.stream = Some(Box::new(stream));
+
     let response = response.pack(&mut builder);
     builder.finish(response, None);
     let data = builder.finished_data();

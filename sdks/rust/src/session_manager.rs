@@ -35,7 +35,7 @@ impl SessionManager {
         })
     }
 
-    pub(crate) async fn create_stream(&self) -> Result<Option<Stream>, ClientError> {
+    pub(crate) async fn create_stream(&self) -> Result<Stream, ClientError> {
         let (sender, receiver) = oneshot::channel();
         let command = Command::CreateStream {
             target: String::new(),

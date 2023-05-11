@@ -12,8 +12,8 @@ use codec::frame::{Frame, OperationCode};
 use log::{error, info, trace, warn};
 use model::stream::Stream;
 use protocol::rpc::header::{
-    CreateStreamsRequestT, CreateStreamsResponse, ErrorCode, PlacementManagerCluster, StreamT,
-    SystemErrorResponse,
+    CreateStreamRequestT, CreateStreamResponse, ErrorCode, PlacementManagerCluster, StreamT,
+    SystemError,
 };
 use tokio::{net::TcpStream, sync::oneshot};
 
@@ -99,7 +99,7 @@ impl Session {
         replica: i8,
         retention_period: Duration,
         timeout: Duration,
-    ) -> Result<Vec<Stream>, ClientError> {
+    ) -> Result<Stream, ClientError> {
         let stream_id = STREAM_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
         {
@@ -111,11 +111,11 @@ impl Session {
         let mut frame = Frame::new(OperationCode::CreateStream);
         frame.stream_id = stream_id;
 
-        let mut create_stream_request = CreateStreamsRequestT::default();
+        let mut create_stream_request = CreateStreamRequestT::default();
         let mut stream = StreamT::default();
-        stream.replica_num = replica;
+        stream.replica = replica;
         stream.retention_period_ms = retention_period.as_millis() as i64;
-        create_stream_request.streams = Some(vec![stream]);
+        create_stream_request.stream = Box::new(stream);
 
         let mut builder = flatbuffers::FlatBufferBuilder::new();
         let req = create_stream_request.pack(&mut builder);
@@ -135,7 +135,7 @@ impl Session {
         // Check if RPC is OK
         if frame.system_error() {
             if let Some(ref buf) = frame.header {
-                let response = flatbuffers::root::<SystemErrorResponse>(buf)?;
+                let response = flatbuffers::root::<SystemError>(buf)?;
                 let response = response.unpack();
                 return Err(ClientError::Internal(response.status.as_ref().into()));
             } else {
@@ -147,7 +147,7 @@ impl Session {
 
         // Parse create streams response
         if let Some(ref buf) = frame.header {
-            let response = flatbuffers::root::<CreateStreamsResponse>(buf)?;
+            let response = flatbuffers::root::<CreateStreamResponse>(buf)?;
             trace!("CreateStreamsResponse: {:?}", response);
             let response = response.unpack();
             let status = response.status;
@@ -187,17 +187,9 @@ impl Session {
                 }
             }
 
-            if let Some(results) = response.create_responses {
-                trace!("CreateStreamsResults: {:?}", results);
-                let streams = results
-                    .into_iter()
-                    .filter(|result| result.status.code == ErrorCode::OK && result.stream.is_some())
-                    .map(|result| {
-                        let created = result.stream.expect("Stream should be present");
-                        Stream::with_id(created.stream_id)
-                    })
-                    .collect::<Vec<_>>();
-                return Ok(streams);
+            if let Some(stream) = response.stream {
+                trace!("Created stream: {:?}", stream);
+                return Ok(Into::<Stream>::into(*stream));
             }
         }
         Err(ClientError::UnexpectedResponse("Bad response".to_owned()))

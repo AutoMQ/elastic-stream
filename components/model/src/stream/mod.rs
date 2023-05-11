@@ -1,3 +1,7 @@
+use std::time::Duration;
+
+use protocol::rpc::header::StreamT;
+
 use crate::{
     error::StreamError,
     range::{Range, StreamRange},
@@ -9,23 +13,20 @@ use crate::{
 /// stream are distributed among data-nodes.
 ///
 /// `Stream` on a specific data-node only cares about ranges that are located on it.
+#[derive(Debug)]
 pub struct Stream {
     /// Stream ID, unique within the cluster.
-    id: i64,
+    stream_id: i64,
+
+    replica: u8,
+
+    retention_period: Duration,
 
     /// Ranges of the stream that are placed onto current data node.
     ranges: Vec<StreamRange>,
 }
 
 impl Stream {
-    pub fn new(id: i64, ranges: Vec<StreamRange>) -> Self {
-        Self { id, ranges }
-    }
-
-    pub fn with_id(id: i64) -> Self {
-        Self { id, ranges: vec![] }
-    }
-
     pub fn push(&mut self, range: StreamRange) {
         self.ranges.push(range);
     }
@@ -98,6 +99,17 @@ impl Stream {
     }
 }
 
+impl From<StreamT> for Stream {
+    fn from(stream: StreamT) -> Self {
+        Self {
+            stream_id: stream.stream_id,
+            replica: stream.replica as u8,
+            retention_period: Duration::from_millis(stream.retention_period_ms as u64),
+            ranges: vec![],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,7 +117,7 @@ mod tests {
     #[test]
     fn test_sort_stream() {
         // Construct a stream with 3 ranges, and sort it.
-        let mut stream = Stream::with_id(0);
+        let mut stream: Stream = StreamT::default().into();
         stream.push(StreamRange::new(0, 0, 1, 0, 0, None));
         stream.push(StreamRange::new(0, 0, 0, 0, 0, None));
         stream.push(StreamRange::new(0, 0, 2, 0, 0, None));
@@ -120,7 +132,7 @@ mod tests {
     #[test]
     fn test_seal_stream() {
         // Construct a stream with 3 ranges, and seal the last range.
-        let mut stream = Stream::with_id(0);
+        let mut stream: Stream = StreamT::default().into();
         stream.push(StreamRange::new(0, 0, 0, 0, 10, None));
         stream.push(StreamRange::new(0, 0, 1, 10, 20, Some(20)));
         stream.push(StreamRange::new(0, 0, 2, 20, 30, None));
@@ -133,7 +145,7 @@ mod tests {
     #[test]
     fn test_query_from_stream() {
         // Construct a complete stream through a iterator.
-        let mut stream = Stream::with_id(0);
+        let mut stream: Stream = StreamT::default().into();
 
         (0..10)
             .map(|i| {

@@ -7,7 +7,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn create_stream(&self) -> Result<Option<Stream>, ClientError> {
+    pub async fn create_stream(&self) -> Result<Stream, ClientError> {
         self.session_manager.create_stream().await
     }
 }
