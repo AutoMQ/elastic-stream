@@ -149,27 +149,16 @@ table AppendRequest {
     // The timeout to await a response in milliseconds.
     timeout_ms: int32 (id: 0);
 
-    // A batch of append request entries.
-    entries: [AppendEntry] (id: 1, required);
-}
-
-// Offsets for the record batch.
-table BatchOffset {
-    // Base offset of the batch.
-    offset: int64 (id: 0);
-
-    // Quantity of the records contained in the batch.
-    len: int32 (id: 1);
-}
-
-table AppendEntry {
-    // The stream range to append records into.
-    range: Range (id: 0, required);
-
-    offset: BatchOffset (id: 1, required);
-
-    // The payload length of this record batch to append
-    payload_length: int32 (id: 2);
+    // Other fields are serialized in the payload.
+    // Layout of the payload
+    // +-------------------+-------------------+-------------------+-------------------+
+    // |  AppendEntry 1    |  AppendEntry 2    |  AppendEntry 3    |        ...        |
+    // +-------------------+-------------------+-------------------+-------------------+
+    //
+    // Layout of AppendEntry
+    // +-------------------+-------------------+-------------------+-------------------+
+    // |  Magic Code       |  Meta Len         |       Meta        |      Payload      |
+    // +-------------------+-------------------+-------------------+-------------------+
 }
 
 table AppendResponse {
@@ -177,13 +166,13 @@ table AppendResponse {
     status: Status (id: 0, required);
 
     // A batch of append responses.
-    results: [AppendResult] (id: 1);
+    results: [AppendEntryResult] (id: 1);
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
     throttle_time_ms: int32 (id: 2);
 }
 
-table AppendResult {
+table AppendEntryResult {
     // Status for the AppendEntry
     status: Status (id: 0, required);
 
