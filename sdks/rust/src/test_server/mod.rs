@@ -129,7 +129,7 @@ pub async fn run_listener() -> u16 {
                                         {
                                             // Wait 100ms such that we can unit test timeout
                                             tokio::time::sleep(Duration::from_millis(100)).await;
-                                            serve_create_streams(&req, &mut response_frame);
+                                            serve_create_stream(&req, &mut response_frame);
                                         } else {
                                             error!(
                                                 "Failed to decode create-streams request header"
@@ -177,7 +177,7 @@ pub async fn run_listener() -> u16 {
     rx.await.unwrap()
 }
 
-fn serve_create_streams(req: &CreateStreamRequest, response_frame: &mut Frame) {
+fn serve_create_stream(req: &CreateStreamRequest, response_frame: &mut Frame) {
     trace!("CreateStreams {:?}", req);
 
     let request = req.unpack();
@@ -192,6 +192,8 @@ fn serve_create_streams(req: &CreateStreamRequest, response_frame: &mut Frame) {
 
     let mut stream = StreamT::default();
     stream.stream_id = 1;
+    stream.replica = request.stream.replica;
+    stream.retention_period_ms = request.stream.retention_period_ms;
     response.stream = Some(Box::new(stream));
 
     let response = response.pack(&mut builder);
