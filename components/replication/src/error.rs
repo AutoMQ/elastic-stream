@@ -7,4 +7,10 @@ pub enum ReplicationError {
 
     #[error("Internal client error")]
     Internal,
+
+    #[error("Range is already sealed")]
+    AlreadySealed,
+
+    #[error("Precondition required")]
+    PreconditionRequired,
 }

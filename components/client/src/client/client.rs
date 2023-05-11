@@ -1,5 +1,6 @@
 use super::session_manager::SessionManager;
 use crate::error::ClientError;
+use bytes::Bytes;
 use log::{error, trace, warn};
 use model::{
     range::StreamRange,
@@ -146,6 +147,10 @@ impl Client {
             Some(addr) => session_manager.get_composite_session(addr).await?,
         };
         composite_session.seal(request).await
+    }
+
+    pub async fn append(&self, target: &str, buf: Bytes) -> Result<(), ClientError> {
+        unimplemented!()
     }
 }
 

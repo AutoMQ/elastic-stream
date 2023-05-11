@@ -13,3 +13,5 @@ log = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
+itertools = { workspace = true }
+bytes = { workspace = true }

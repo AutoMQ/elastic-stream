@@ -1,15 +1,15 @@
 use crate::ReplicationError;
 
 use super::{replication_range::ReplicationRange, window::Window};
+use bytes::Bytes;
 use client::Client;
 use log::error;
-use model::range::Range;
-use std::rc::Weak;
+use std::rc::{Rc, Weak};
 
 pub(crate) struct ReplicationStream {
     id: i64,
     window: Option<Window>,
-    ranges: Vec<ReplicationRange>,
+    ranges: Vec<Rc<ReplicationRange>>,
     client: Weak<Client>,
 }
 
@@ -27,7 +27,7 @@ impl ReplicationStream {
         self.ranges
             .iter()
             .last()
-            .map(|range| !range.metadata.is_sealed())
+            .map(|range| !range.is_sealed())
             .unwrap_or(false)
     }
 
@@ -41,9 +41,7 @@ impl ReplicationStream {
                 ReplicationError::Internal
             })?
             .into_iter()
-            .map(|stream_range| ReplicationRange {
-                metadata: stream_range,
-            })
+            .map(|metadata| ReplicationRange::new(metadata, self.client.clone()))
             .collect();
         if self.is_open() {
             // TODO: seal data nodes that are backing up the last mutable range.
@@ -55,5 +53,16 @@ impl ReplicationStream {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn append(&self, payload: Bytes) -> Result<(), ReplicationError> {
+        if let Some(range) = self.ranges.iter().last() {
+            if range.is_sealed() {
+                return Err(ReplicationError::AlreadySealed);
+            }
+            range.append(payload)
+        } else {
+            Err(ReplicationError::PreconditionRequired)
+        }
     }
 }

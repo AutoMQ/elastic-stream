@@ -1,3 +1,5 @@
+#![feature(btree_drain_filter)]
+
 pub mod error;
 mod request;
 pub mod stream_client;
