@@ -409,6 +409,7 @@ mod tests {
 
     #[test]
     fn test_append() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         tokio_uring::start(async move {
             #[allow(unused_variables)]
             let port = 2378;
@@ -442,13 +443,10 @@ mod tests {
                     .with_payload(payload.clone())
                     .build()?;
                 let flat_batch = Into::<FlatRecordBatch>::into(batch);
-                let (slices, len) = flat_batch.encode();
-                buf.put_i32(len);
-                for slice in slices {
-                    buf.extend_from_slice(&slice);
-                }
+                buf.put_i32(flat_batch.metadata.len() as i32);
+                buf.extend_from_slice(&flat_batch.metadata);
                 buf.put_i32(PAYLOAD_LENGTH as i32);
-                buf.extend_from_slice(&payload);
+                buf.extend_from_slice(&flat_batch.payload);
             }
 
             let response = client
