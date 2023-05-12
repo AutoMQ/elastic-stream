@@ -1,5 +1,6 @@
 use super::{invocation_context::InvocationContext, lb_policy::LbPolicy, session::Session};
 use crate::error::ClientError;
+use bytes::Bytes;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
@@ -547,6 +548,45 @@ impl CompositeSession {
             shutdown.clone(),
         ))
     }
+
+    pub(crate) async fn append(&self, buf: Bytes) -> Result<(), ClientError> {
+        self.try_reconnect().await;
+        let session = self
+            .sessions
+            .borrow()
+            .iter()
+            .next()
+            .map(|(_addr, session)| session.clone())
+            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+
+        let request = Request::Append {
+            timeout: self.config.client_io_timeout(),
+            buf,
+        };
+
+        let (tx, rx) = oneshot::channel();
+        if let Err(ctx) = session.write(request, tx).await {
+            let request = ctx.request();
+            error!("Failed to seal range {request:?}");
+            return Err(ClientError::ClientInternal);
+        }
+
+        let response = rx.await.map_err(|_e| ClientError::ClientInternal)?;
+        if let Response::Append {
+            status,
+            entries: results,
+        } = response
+        {
+            if ErrorCode::OK != status.code {
+                warn!("Failed to append: {:?}", status);
+                return Err(ClientError::ServerInternal);
+            }
+            Ok(())
+        } else {
+            Err(ClientError::ClientInternal)
+        }
+    }
+
     pub(crate) async fn report_metrics(
         &self,
         uring_statistics: &UringStatistics,

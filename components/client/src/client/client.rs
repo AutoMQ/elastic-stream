@@ -146,9 +146,11 @@ impl Client {
         composite_session.seal(request).await
     }
 
+    /// Append data to a range.
     pub async fn append(&self, target: &str, buf: Bytes) -> Result<(), ClientError> {
         unimplemented!()
     }
+
     /// Report metrics to placement manager
     ///
     /// # Arguments

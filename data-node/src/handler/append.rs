@@ -7,7 +7,7 @@ use futures::future::join_all;
 use log::{error, trace, warn};
 use model::record::flat_record::FlatRecordBatch;
 use protocol::rpc::header::{
-    AppendEntryResultArgs, AppendRequest, AppendResponseArgs, ErrorCode, StatusArgs,
+    AppendResultEntryArgs, AppendRequest, AppendResponseArgs, ErrorCode, StatusArgs,
 };
 use std::{cell::RefCell, rc::Rc};
 use store::{
@@ -141,11 +141,11 @@ impl<'a> Append<'a> {
                                 e
                             );
                         }
-                        let args = AppendEntryResultArgs {
+                        let args = AppendResultEntryArgs {
                             timestamp_ms: Utc::now().timestamp(),
                             status: Some(ok_status),
                         };
-                        protocol::rpc::header::AppendEntryResult::create(&mut builder, &args)
+                        protocol::rpc::header::AppendResultEntry::create(&mut builder, &args)
                     }
                     Err(e) => {
                         // TODO: what to do with the offset on failure?
@@ -165,11 +165,11 @@ impl<'a> Append<'a> {
                             },
                         );
 
-                        let args = AppendEntryResultArgs {
+                        let args = AppendResultEntryArgs {
                             timestamp_ms: 0,
                             status: Some(status),
                         };
-                        protocol::rpc::header::AppendEntryResult::create(&mut builder, &args)
+                        protocol::rpc::header::AppendResultEntry::create(&mut builder, &args)
                     }
                 }
             })
@@ -179,7 +179,7 @@ impl<'a> Append<'a> {
 
         let res_args = AppendResponseArgs {
             throttle_time_ms: 0,
-            results: Some(append_results_fb),
+            entries: Some(append_results_fb),
             status: Some(ok_status),
         };
 

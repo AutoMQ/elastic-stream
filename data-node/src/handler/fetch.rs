@@ -5,7 +5,7 @@ use flatbuffers::FlatBufferBuilder;
 use futures::Future;
 use log::warn;
 use protocol::rpc::header::{
-    ErrorCode, FetchRequest, FetchResponseArgs, FetchResultArgs, StatusArgs,
+    ErrorCode, FetchRequest, FetchResponseArgs, FetchResultEntryArgs, StatusArgs,
 };
 use std::{cell::RefCell, pin::Pin, rc::Rc};
 use store::{error::FetchError, option::ReadOptions, ElasticStore, FetchResult, Store};
@@ -85,13 +85,13 @@ impl<'a> Fetch<'a> {
             .into_iter()
             .map(|res| match res {
                 Ok(fetch_result) => {
-                    let fetch_result_args = FetchResultArgs {
+                    let fetch_result_args = FetchResultEntryArgs {
                         stream_id: fetch_result.stream_id,
                         batch_count: fetch_result.results.len() as i32,
                         status: Some(ok_status),
                     };
                     payloads.push(fetch_result.results);
-                    protocol::rpc::header::FetchResult::create(&mut builder, &fetch_result_args)
+                    protocol::rpc::header::FetchResultEntry::create(&mut builder, &fetch_result_args)
                 }
                 Err(e) => {
                     warn!("Failed to fetch from store. Cause: {:?}", e);
@@ -109,12 +109,12 @@ impl<'a> Fetch<'a> {
                             detail: None,
                         },
                     );
-                    let fetch_result_args = FetchResultArgs {
+                    let fetch_result_args = FetchResultEntryArgs {
                         stream_id: 0,
                         batch_count: 0,
                         status: Some(status),
                     };
-                    protocol::rpc::header::FetchResult::create(&mut builder, &fetch_result_args)
+                    protocol::rpc::header::FetchResultEntry::create(&mut builder, &fetch_result_args)
                 }
             })
             .collect();
@@ -122,7 +122,7 @@ impl<'a> Fetch<'a> {
         let fetch_results_fb = builder.create_vector(&fetch_results);
         let res_args = FetchResponseArgs {
             throttle_time_ms: 0,
-            results: Some(fetch_results_fb),
+            entries: Some(fetch_results_fb),
             status: Some(ok_status),
         };
         let res_offset = protocol::rpc::header::FetchResponse::create(&mut builder, &res_args);

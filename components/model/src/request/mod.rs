@@ -3,8 +3,8 @@ pub mod seal;
 use crate::{client_role::ClientRole, data_node::DataNode, range_criteria::RangeCriteria};
 use bytes::{Bytes, BytesMut};
 use protocol::rpc::header::{
-    DescribePlacementManagerClusterRequestT, HeartbeatRequestT, IdAllocationRequestT,
-    ListRangeCriteriaT, ListRangeRequestT, RangeT, ReportMetricsRequestT, SealKind,
+    AppendRequestT, DescribePlacementManagerClusterRequestT, HeartbeatRequestT,
+    IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT, ReportMetricsRequestT,
     SealRangeRequestT,
 };
 use std::time::Duration;
@@ -37,6 +37,12 @@ pub enum Request {
         timeout: Duration,
         request: SealRange,
     },
+
+    Append {
+        timeout: Duration,
+        buf: Bytes,
+    },
+
     ReportMetrics {
         data_node: DataNode,
         disk_in_rate: i64,
@@ -129,6 +135,13 @@ impl From<&Request> for Bytes {
                 req.range = Box::new(range_t);
 
                 let request = req.pack(&mut builder);
+                builder.finish(request, None);
+            }
+
+            Request::Append { timeout, buf: _ } => {
+                let mut request = AppendRequestT::default();
+                request.timeout_ms = timeout.as_millis() as i32;
+                let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }
 

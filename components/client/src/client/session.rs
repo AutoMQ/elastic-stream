@@ -2,10 +2,15 @@ use codec::{
     error::FrameError,
     frame::{Frame, OperationCode},
 };
-use model::{request::Request, response, PlacementManagerNode, Status};
+use model::{
+    payload::Payload,
+    request::Request,
+    response::{self, append::AppendResultEntry},
+    PlacementManagerNode, Status,
+};
 use protocol::rpc::header::{
-    DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse, IdAllocationResponse,
-    ListRangeResponse, ReportMetricsResponse, SealRangeResponse, SystemError,
+    AppendResponse, DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse,
+    IdAllocationResponse, ListRangeResponse, ReportMetricsResponse, SealRangeResponse, SystemError,
 };
 use transport::connection::Connection;
 
@@ -188,7 +193,7 @@ impl Session {
         frame.header = Some((&request).into());
 
         // Set operation code
-        match request {
+        match &request {
             Request::Heartbeat { .. } => {
                 frame.operation_code = OperationCode::Heartbeat;
             }
@@ -208,9 +213,12 @@ impl Session {
             Request::SealRange { .. } => {
                 frame.operation_code = OperationCode::SealRange;
             }
-            Request::ReportMetrics { .. } => {
-                frame.operation_code = OperationCode::ReportMetrics;
+
+            Request::Append { buf, .. } => {
+                frame.operation_code = OperationCode::Append;
+                frame.payload = Some(vec![buf.clone()]);
             }
+
             Request::ReportMetrics { .. } => {
                 frame.operation_code = OperationCode::ReportMetrics;
             }
@@ -460,6 +468,7 @@ impl Session {
         }
         resp
     }
+
     fn handle_report_metrics_response(frame: &Frame) -> response::Response {
         let mut resp = response::Response::ReportMetrics {
             status: Status::ok(),
@@ -483,6 +492,84 @@ impl Session {
         }
         resp
     }
+
+    fn handle_append_response(frame: &Frame, ctx: &InvocationContext) -> response::Response {
+        let mut resp = response::Response::Append {
+            status: Status::decode(),
+            entries: vec![],
+        };
+
+        if frame.system_error() {
+            if let Some(ref buf) = frame.header {
+                match flatbuffers::root::<SystemError>(buf) {
+                    Ok(system_error) => {
+                        let system_error = system_error.unpack();
+                        // Update status
+                        if let response::Response::Append { ref mut status, .. } = resp {
+                            *status = system_error.status.as_ref().into();
+                        }
+                    }
+                    Err(e) => {
+                        // Deserialize error
+                        warn!(
+                            "Failed to decode `SystemError` using FlatBuffers. Cause: {}",
+                            e
+                        );
+                    }
+                }
+            }
+        } else if let Some(ref buf) = frame.header {
+            match flatbuffers::root::<AppendResponse>(buf) {
+                Ok(response) => {
+                    let response = response.unpack();
+                    if let response::Response::Append {
+                        ref mut status,
+                        entries: ref mut results,
+                    } = resp
+                    {
+                        if response.status.code == ErrorCode::OK {
+                            *status = Status::ok();
+
+                            let append_entries = if let Request::Append { buf, .. } = ctx.request()
+                            {
+                                Payload::parse_append_entries(buf)
+                            } else {
+                                unreachable!()
+                            };
+
+                            if let Some(items) = response.entries {
+                                debug_assert_eq!(
+                                    append_entries.len(),
+                                    items.len(),
+                                    "Each append-entry should have a corresponding result."
+                                );
+                                *results = items
+                                    .into_iter()
+                                    .map(Into::<AppendResultEntry>::into)
+                                    .zip(append_entries.into_iter())
+                                    .map(|(mut result, entry)| {
+                                        result.entry = entry;
+                                        result
+                                    })
+                                    .collect();
+                            }
+                        } else {
+                            *status = response.status.as_ref().into();
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to decode AppendResponse using FlatBuffers. Cause: {}",
+                        e
+                    );
+                }
+            }
+        }
+
+        resp
+    }
+
     fn handle_response(inflight: &mut HashMap<u32, InvocationContext>, frame: Frame) {
         let stream_id = frame.stream_id;
         trace!(
@@ -495,45 +582,58 @@ impl Session {
             Some(mut ctx) => {
                 let response = match frame.operation_code {
                     OperationCode::Heartbeat => Self::handle_heartbeat_response(&frame),
+
                     OperationCode::ListRange => Self::handle_list_ranges_response(&frame),
+
                     OperationCode::Unknown => {
                         warn!("Received an unknown operation code");
                         return;
                     }
+
                     OperationCode::Ping => todo!(),
+
                     OperationCode::GoAway => todo!(),
+
                     OperationCode::AllocateId => Self::handle_allocate_id_response(&frame),
-                    OperationCode::Append => {
-                        warn!("Received an unexpected `Append` response");
-                        return;
-                    }
+
+                    OperationCode::Append => Self::handle_append_response(&frame, &ctx),
+
                     OperationCode::Fetch => {
                         warn!("Received an unexpected `Fetch` response");
                         return;
                     }
+
                     OperationCode::SealRange => Self::handle_seal_range_response(&frame, &ctx),
+
                     OperationCode::SyncRange => {
                         warn!("Received an unexpected `SyncRanges` response");
                         return;
                     }
+
                     OperationCode::CreateStream => {
                         warn!("Received an unexpected `CreateStreams` response");
                         return;
                     }
+
                     OperationCode::DeleteStream => {
                         warn!("Received an unexpected `DeleteStreams` response");
                         return;
                     }
+
                     OperationCode::UpdateStream => {
                         warn!("Received an unexpected `UpdateStreams` response");
                         return;
                     }
+
                     OperationCode::DescribeStream => {
                         warn!("Received an unexpected `DescribeStreams` response");
                         return;
                     }
+
                     OperationCode::TrimStream => todo!(),
+
                     OperationCode::ReportMetrics => Self::handle_report_metrics_response(&frame),
+
                     OperationCode::DescribePlacementManager => {
                         Self::handle_describe_placement_manager_response(&frame)
                     }

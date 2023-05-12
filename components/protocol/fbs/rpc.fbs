@@ -172,13 +172,13 @@ table AppendResponse {
     status: Status (id: 0, required);
 
     // A batch of append responses.
-    results: [AppendEntryResult] (id: 1);
+    entries: [AppendResultEntry] (id: 1);
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
     throttle_time_ms: int32 (id: 2);
 }
 
-table AppendEntryResult {
+table AppendResultEntry {
     // Status for the AppendEntry
     status: Status (id: 0, required);
 
@@ -214,14 +214,14 @@ table FetchEntry {
 table FetchResponse {
     status: Status (id: 0, required);
 
-    // A batch of `FetchResult`.
-    results: [FetchResult] (id: 1);
+    // A batch of `FetchResultEntry`.
+    entries: [FetchResultEntry] (id: 1);
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
     throttle_time_ms: int32 (id: 2);
 }
 
-table FetchResult {
+table FetchResultEntry {
     status: Status (id: 0, required);
 
     // The id of the stream
