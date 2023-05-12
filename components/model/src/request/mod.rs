@@ -3,7 +3,7 @@ pub mod seal;
 use crate::{client_role::ClientRole, data_node::DataNode, range_criteria::RangeCriteria};
 use bytes::{Bytes, BytesMut};
 use protocol::rpc::header::{
-    AppendRequestT, DescribePlacementManagerClusterRequestT, HeartbeatRequestT,
+    AppendRequestT, DataNodeMetricsT, DescribePlacementManagerClusterRequestT, HeartbeatRequestT,
     IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT, ReportMetricsRequestT,
     SealRangeRequestT,
 };
@@ -165,25 +165,29 @@ impl From<&Request> for Bytes {
                 range_missing_replica_cnt,
                 range_active_cnt,
             } => {
+                let mut metrics = DataNodeMetricsT::default();
+                metrics.disk_in_rate = *disk_in_rate;
+                metrics.disk_out_rate = *disk_out_rate;
+                metrics.disk_free_space = *disk_free_space;
+                metrics.disk_unindexed_data_size = *disk_unindexed_data_size;
+                metrics.memory_used = *memory_used;
+                metrics.uring_task_rate = *uring_task_rate;
+                metrics.uring_inflight_task_cnt = *uring_inflight_task_cnt;
+                metrics.uring_pending_task_cnt = *uring_pending_task_cnt;
+                metrics.uring_task_avg_latency = *uring_task_avg_latency;
+                metrics.network_append_rate = *network_append_rate;
+                metrics.network_fetch_rate = *network_fetch_rate;
+                metrics.network_failed_append_rate = *network_failed_append_rate;
+                metrics.network_failed_fetch_rate = *network_failed_fetch_rate;
+                metrics.network_append_avg_latency = *network_append_avg_latency;
+                metrics.network_fetch_avg_latency = *network_fetch_avg_latency;
+                metrics.range_missing_replica_cnt = *range_missing_replica_cnt;
+                metrics.range_active_cnt = *range_active_cnt;
+
                 let mut request = ReportMetricsRequestT::default();
                 request.data_node = Some(Box::new(data_node.into()));
-                request.disk_in_rate = *disk_in_rate;
-                request.disk_out_rate = *disk_out_rate;
-                request.disk_free_space = *disk_free_space;
-                request.disk_unindexed_data_size = *disk_unindexed_data_size;
-                request.memory_used = *memory_used;
-                request.uring_task_rate = *uring_task_rate;
-                request.uring_inflight_task_cnt = *uring_inflight_task_cnt;
-                request.uring_pending_task_cnt = *uring_pending_task_cnt;
-                request.uring_task_avg_latency = *uring_task_avg_latency;
-                request.network_append_rate = *network_append_rate;
-                request.network_fetch_rate = *network_fetch_rate;
-                request.network_failed_append_rate = *network_failed_append_rate;
-                request.network_failed_fetch_rate = *network_failed_fetch_rate;
-                request.network_append_avg_latency = *network_append_avg_latency;
-                request.network_fetch_avg_latency = *network_fetch_avg_latency;
-                request.range_missing_replica_cnt = *range_missing_replica_cnt;
-                request.range_active_cnt = *range_active_cnt;
+                request.metrics = Some(Box::new(metrics));
+
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }
