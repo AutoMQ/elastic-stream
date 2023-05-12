@@ -39,6 +39,10 @@ enum ErrorCode : int16 {
     OFFSET_OUT_OF_RANGE_BOUNDS = 1463,
     // Try to create a new range when the last range in the stream is not sealed.
     CREATE_RANGE_BEFORE_SEAL = 1470,
+    // Try to seal a range with an epoch which is smaller than the current range's epoch.
+    // or
+    // Try to create a new range with an epoch that is smaller than the previous range's epoch.
+    EXPIRED_RANGE_EPOCH = 1471,
     // The operation is not supported.
     UNKNOWN_OPERATION = 1499,
 

@@ -58,6 +58,8 @@ func (h *Handler) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealR
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeRANGE_ALREADY_SEALED, Message: err.Error()})
 		case errors.Is(err, cluster.ErrInvalidEndOffset):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()})
+		case errors.Is(err, cluster.ErrExpiredRangeEpoch):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH, Message: err.Error()})
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
@@ -91,6 +93,8 @@ func (h *Handler) CreateRange(req *protocol.CreateRangeRequest, resp *protocol.C
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()})
 		case errors.Is(err, cluster.ErrNotEnoughDataNodes):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()})
+		case errors.Is(err, cluster.ErrExpiredRangeEpoch):
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH, Message: err.Error()})
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}

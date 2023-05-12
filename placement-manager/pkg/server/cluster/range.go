@@ -19,6 +19,8 @@ const (
 var (
 	// ErrRangeNotFound is returned when the specified range is not found.
 	ErrRangeNotFound = errors.New("range not found")
+	// ErrExpiredRangeEpoch is returned when the range epoch is invalid.
+	ErrExpiredRangeEpoch = errors.New("expired range epoch")
 
 	// ErrRangeAlreadySealed is returned when the specified range is already sealed.
 	ErrRangeAlreadySealed = errors.New("range already sealed")
@@ -121,6 +123,7 @@ func (c *RaftCluster) listRangeOnDataNode(ctx context.Context, dataNodeID int32)
 // It returns ErrRangeNotFound if the range does not exist.
 // It returns ErrRangeAlreadySealed if the range is already sealed.
 // It returns ErrInvalidEndOffset if the end offset is invalid.
+// It returns ErrExpiredRangeEpoch if the range epoch is invalid.
 func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.RangeT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", r.StreamId), zap.Int32("range-index", r.Index), traceutil.TraceLogField(ctx))
 	lastRange, err := c.getLastRange(ctx, r.StreamId)
@@ -149,6 +152,11 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 		return nil, errors.Wrapf(ErrInvalidEndOffset, "invalid end offset %d (< start offset %d) for range %d in stream %d",
 			r.End, lastRange.Start, lastRange.Index, lastRange.StreamId)
 	}
+	if r.Epoch < lastRange.Epoch {
+		logger.Error("invalid epoch", zap.Int64("epoch", r.Epoch), zap.Int64("last-epoch", lastRange.Epoch))
+		return nil, errors.Wrapf(ErrExpiredRangeEpoch, "invalid epoch %d (< last epoch %d) for range %d in stream %d",
+			r.Epoch, lastRange.Epoch, lastRange.Index, lastRange.StreamId)
+	}
 
 	mu := c.sealMu(r.StreamId)
 	select {
@@ -160,7 +168,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 		<-mu
 	}()
 
-	sealedRange, err := c.sealRangeLocked(ctx, lastRange, r.End)
+	sealedRange, err := c.sealRangeLocked(ctx, lastRange, r.End, r.Epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -174,6 +182,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 // It returns ErrCreateBeforeSeal if the last range is not sealed.
 // It returns ErrInvalidStartOffset if the start offset is invalid.
 // It returns ErrNotEnoughDataNodes if there are not enough data nodes to allocate.
+// It returns ErrExpiredRangeEpoch if the range epoch is invalid.
 func (c *RaftCluster) CreateRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.RangeT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", r.StreamId), zap.Int32("range-index", r.Index), traceutil.TraceLogField(ctx))
 	lastRange, err := c.getLastRange(ctx, r.StreamId)
@@ -201,6 +210,11 @@ func (c *RaftCluster) CreateRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.
 		// The range start is not continuous.
 		logger.Error("invalid range start", zap.Int64("start", r.Start), zap.Int64("end", lastRange.End))
 		return nil, errors.Wrapf(ErrInvalidStartOffset, "invalid range start %d (should be %d) for range %d in stream %d", r.Start, lastRange.End, r.Index, r.StreamId)
+	}
+	if r.Epoch < lastRange.Epoch {
+		// The range epoch is invalid.
+		logger.Error("invalid range epoch", zap.Int64("epoch", r.Epoch), zap.Int64("last-epoch", lastRange.Epoch))
+		return nil, errors.Wrapf(ErrExpiredRangeEpoch, "invalid range epoch %d (should be > %d) for range %d in stream %d", r.Epoch, lastRange.Epoch, r.Index, r.StreamId)
 	}
 
 	mu := c.sealMu(r.StreamId)
@@ -256,11 +270,12 @@ func (c *RaftCluster) sealMu(streamID int64) chan struct{} {
 // sealRangeLocked seals a range and saves it to the storage.
 // It returns the sealed range if the range is sealed successfully.
 // It should be called with the stream lock held.
-func (c *RaftCluster) sealRangeLocked(ctx context.Context, lastRange *rpcfb.RangeT, end int64) (*rpcfb.RangeT, error) {
+func (c *RaftCluster) sealRangeLocked(ctx context.Context, lastRange *rpcfb.RangeT, end int64, epoch int64) (*rpcfb.RangeT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", lastRange.StreamId), zap.Int32("range-index", lastRange.Index), zap.Int64("end", end), traceutil.TraceLogField(ctx))
 
 	sealedRange := &rpcfb.RangeT{
 		StreamId: lastRange.StreamId,
+		Epoch:    epoch,
 		Index:    lastRange.Index,
 		Start:    lastRange.Start,
 		End:      end,
@@ -296,6 +311,7 @@ func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT
 
 	nr := &rpcfb.RangeT{
 		StreamId: newRange.StreamId,
+		Epoch:    newRange.Epoch,
 		Index:    newRange.Index,
 		Start:    newRange.Start,
 		End:      _writableRangeEnd,
