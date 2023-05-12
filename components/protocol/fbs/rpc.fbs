@@ -478,23 +478,28 @@ table TrimStreamsResponse {
 
 table ReportMetricsRequest {
     data_node: DataNode (id: 0);
-    disk_in_rate: int64 (id: 1);
-    disk_out_rate: int64 (id: 2);
-    disk_free_space: int64 (id: 3);
-    disk_unindexed_data_size: int64 (id: 4);
-    memory_used: int64 (id: 5);
-    uring_task_rate: int16 (id: 6);
-    uring_inflight_task_cnt: int16 (id: 7);
-    uring_pending_task_cnt: int32 (id: 8);
-    uring_task_avg_latency: int16 (id: 9);
-    network_append_rate: int16 (id: 10);
-    network_fetch_rate: int16 (id: 11);
-    network_failed_append_rate: int16 (id: 12);
-    network_failed_fetch_rate: int16 (id: 13);
-    network_append_avg_latency: int16 (id: 14);
-    network_fetch_avg_latency: int16 (id: 15);
-    range_missing_replica_cnt: int16 (id: 16);
-    range_active_cnt: int16 (id: 17);
+
+    metrics: DataNodeMetrics (id: 1);
+}
+
+table DataNodeMetrics {
+    disk_in_rate: int64 (id: 0);
+    disk_out_rate: int64 (id: 1);
+    disk_free_space: int64 (id: 2);
+    disk_unindexed_data_size: int64 (id: 3);
+    memory_used: int64 (id: 4);
+    uring_task_rate: int16 (id: 5);
+    uring_inflight_task_cnt: int16 (id: 6);
+    uring_pending_task_cnt: int32 (id: 7);
+    uring_task_avg_latency: int16 (id: 8);
+    network_append_rate: int16 (id: 9);
+    network_fetch_rate: int16 (id: 10);
+    network_failed_append_rate: int16 (id: 11);
+    network_failed_fetch_rate: int16 (id: 12);
+    network_append_avg_latency: int16 (id: 13);
+    network_fetch_avg_latency: int16 (id: 14);
+    range_missing_replica_cnt: int16 (id: 15);
+    range_active_cnt: int16 (id: 16);
 }
 
 table ReportMetricsResponse {
