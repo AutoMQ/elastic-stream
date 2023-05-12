@@ -5,7 +5,7 @@ use log::{error, trace, warn};
 use model::{
     range::Range,
     range_criteria::RangeCriteria,
-    request::seal::{self, SealRangeEntry},
+    request::seal::{self, SealRange},
 };
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
@@ -108,7 +108,7 @@ impl Client {
     pub async fn seal(
         &self,
         target: Option<&str>,
-        request: SealRangeEntry,
+        request: SealRange,
     ) -> Result<Range, ClientError> {
         // Validate request
         match request.kind {
@@ -118,19 +118,14 @@ impl Client {
             }
             seal::Kind::DataNode => {
                 if target.is_none() {
-                    error!("Target is required while sealing against data nodes");
-                    return Err(ClientError::BadRequest);
-                }
-
-                if request.range.end().is_some() {
-                    error!("SealRequest#end should be None while sealing against data nodes");
+                    error!("Target is required while seal range against data nodes");
                     return Err(ClientError::BadRequest);
                 }
             }
             seal::Kind::PlacementManager => {
                 if request.range.end().is_none() {
                     error!(
-                        "SealRequest#end MUST be present while sealing against placement manager"
+                        "SealRange.range.end MUST be present while seal against placement manager"
                     );
                     return Err(ClientError::BadRequest);
                 }

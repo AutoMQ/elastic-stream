@@ -10,7 +10,7 @@ pub enum Kind {
 }
 
 #[derive(Debug, Clone)]
-pub struct SealRangeEntry {
+pub struct SealRange {
     pub kind: Kind,
     pub range: Range,
     pub renew: bool,

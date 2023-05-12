@@ -6,7 +6,7 @@ use model::{
     client_role::ClientRole,
     range::Range,
     range_criteria::RangeCriteria,
-    request::{seal::SealRangeEntry, Request},
+    request::{seal::SealRange, Request},
     response::Response,
     PlacementManagerNode,
 };
@@ -413,7 +413,7 @@ impl CompositeSession {
     ///
     /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
     /// Final end value of the range will be resolved after MinCopy of data nodes responded.
-    pub(crate) async fn seal(&self, request: SealRangeEntry) -> Result<Range, ClientError> {
+    pub(crate) async fn seal(&self, request: SealRange) -> Result<Range, ClientError> {
         self.try_reconnect().await;
         // TODO: If the seal kind is PM, we need to pick the session/connection to the leader node.
         let session = self
@@ -425,7 +425,7 @@ impl CompositeSession {
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
         let request = Request::SealRange {
             timeout: self.config.client_io_timeout(),
-            entry: request,
+            request,
         };
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {

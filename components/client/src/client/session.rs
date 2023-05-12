@@ -408,7 +408,7 @@ impl Session {
         resp
     }
 
-    fn handle_seal_ranges_response(frame: &Frame, _ctx: &InvocationContext) -> response::Response {
+    fn handle_seal_range_response(frame: &Frame, _ctx: &InvocationContext) -> response::Response {
         let mut resp = response::Response::SealRange {
             status: Status::decode(),
             range: None,
@@ -466,9 +466,9 @@ impl Session {
         };
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<ReportMetricsResponse>(buf) {
-                Ok(reportmetrics) => {
-                    trace!("Received Report Metrics response: {:?}", reportmetrics);
-                    let hb = reportmetrics.unpack();
+                Ok(report_metrics) => {
+                    trace!("Received Report Metrics response: {:?}", report_metrics);
+                    let hb = report_metrics.unpack();
                     let _status = hb.status;
                     if let response::Response::ReportMetrics { ref mut status } = resp {
                         *status = _status.as_ref().into();
@@ -511,7 +511,7 @@ impl Session {
                         warn!("Received an unexpected `Fetch` response");
                         return;
                     }
-                    OperationCode::SealRange => Self::handle_seal_ranges_response(&frame, &ctx),
+                    OperationCode::SealRange => Self::handle_seal_range_response(&frame, &ctx),
                     OperationCode::SyncRange => {
                         warn!("Received an unexpected `SyncRanges` response");
                         return;
