@@ -122,15 +122,17 @@ impl From<&Stream> for StreamT {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use super::*;
 
     #[test]
     fn test_sort_stream() {
         // Construct a stream with 3 ranges, and sort it.
         let mut stream: Stream = StreamT::default().into();
-        stream.push(Range::new(0, 0, 1, 0, None));
+        stream.push(Range::new(0, 1, 0, 0, None));
         stream.push(Range::new(0, 0, 0, 0, None));
-        stream.push(Range::new(0, 0, 2, 0, None));
+        stream.push(Range::new(0, 2, 0, 0, None));
         stream.sort();
 
         // Check the ranges are sorted by index.
@@ -140,16 +142,17 @@ mod tests {
     }
 
     #[test]
-    fn test_seal_stream() {
+    fn test_seal_stream() -> Result<(), Box<dyn Error>> {
         // Construct a stream with 3 ranges, and seal the last range.
         let mut stream: Stream = StreamT::default().into();
         stream.push(Range::new(0, 0, 0, 0, None));
-        stream.push(Range::new(0, 0, 1, 10, Some(20)));
-        stream.push(Range::new(0, 0, 2, 20, None));
-        stream.seal(0, 2).unwrap();
+        stream.push(Range::new(0, 1, 0, 10, Some(20)));
+        stream.push(Range::new(0, 2, 0, 20, None));
+        stream.seal(0, 2)?;
 
         // Check the last range is sealed.
         assert_eq!(stream.ranges.last().unwrap().is_sealed(), true);
+        Ok(())
     }
 
     #[test]
@@ -159,7 +162,7 @@ mod tests {
 
         (0..10)
             .map(|i| {
-                let mut sr = Range::new(0, 0, i, i as u64 * 10, None);
+                let mut sr = Range::new(0, i, 0, i as u64 * 10, None);
                 // Seal the range if it's not the last one.
                 if i != 9 {
                     let _ = sr.seal((i as u64 + 1) * 10);
