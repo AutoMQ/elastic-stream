@@ -267,6 +267,27 @@ func (ds *DescribeStreamRequest) Timeout() int32 {
 	return ds.TimeoutMs
 }
 
+// ReportMetricsRequest is a request to operation.OpReportMetrics
+type ReportMetricsRequest struct {
+	baseRequest
+	baseUnmarshaler
+
+	rpcfb.ReportMetricsRequestT
+}
+
+func (rm *ReportMetricsRequest) unmarshalFlatBuffer(data []byte) error {
+	rm.ReportMetricsRequestT = *rpcfb.GetRootAsReportMetricsRequest(data, 0).UnPack()
+	return nil
+}
+
+func (rm *ReportMetricsRequest) Unmarshal(fmt format.Format, data []byte) error {
+	return unmarshal(rm, fmt, data)
+}
+
+func (rm *ReportMetricsRequest) Timeout() int32 {
+	return 0
+}
+
 // DescribePMClusterRequest is a request to operation.OpDescribePMCluster
 type DescribePMClusterRequest struct {
 	baseRequest

@@ -314,6 +314,30 @@ func (ds *DescribeStreamResponse) OK() {
 	ds.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
 }
 
+// ReportMetricsResponse is a response to operation.OpReportMetrics
+type ReportMetricsResponse struct {
+	baseMarshaller
+	singleResponse
+
+	rpcfb.ReportMetricsResponseT
+}
+
+func (rm *ReportMetricsResponse) marshalFlatBuffer() ([]byte, error) {
+	return fbutil.Marshal(&rm.ReportMetricsResponseT), nil
+}
+
+func (rm *ReportMetricsResponse) Marshal(fmt format.Format) ([]byte, error) {
+	return marshal(rm, fmt)
+}
+
+func (rm *ReportMetricsResponse) Error(status *rpcfb.StatusT) {
+	rm.Status = status
+}
+
+func (rm *ReportMetricsResponse) OK() {
+	rm.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
+}
+
 // DescribePMClusterResponse is a response to operation.OpDescribePMCluster
 type DescribePMClusterResponse struct {
 	baseMarshaller

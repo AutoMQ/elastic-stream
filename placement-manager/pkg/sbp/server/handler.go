@@ -26,6 +26,8 @@ type Handler interface {
 	UpdateStream(req *protocol.UpdateStreamRequest, resp *protocol.UpdateStreamResponse)
 	// DescribeStream describes the specified stream.
 	DescribeStream(req *protocol.DescribeStreamRequest, resp *protocol.DescribeStreamResponse)
+	// ReportMetrics reports metrics to placement manager.
+	ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse)
 	// DescribePMCluster describes placement manager cluster membership.
 	DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse)
 }
@@ -93,6 +95,13 @@ var (
 			newResp: func() protocol.OutResponse { return &protocol.DescribeStreamResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
 				handler.DescribeStream(req.(*protocol.DescribeStreamRequest), resp.(*protocol.DescribeStreamResponse))
+			},
+		},
+		{Code: operation.OpReportMetrics}: {
+			newReq:  func() protocol.InRequest { return &protocol.ReportMetricsRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.ReportMetricsResponse{} },
+			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
+				handler.ReportMetrics(req.(*protocol.ReportMetricsRequest), resp.(*protocol.ReportMetricsResponse))
 			},
 		},
 		{Code: operation.OpDescribePMCluster}: {

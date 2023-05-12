@@ -119,6 +119,10 @@ func (b *baseHandler) DescribeStream(_ *protocol.DescribeStreamRequest, resp *pr
 	resp.OK()
 }
 
+func (b *baseHandler) ReportMetrics(_ *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse) {
+	resp.OK()
+}
+
 func (b *baseHandler) DescribePMCluster(_ *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
 	resp.OK()
 }

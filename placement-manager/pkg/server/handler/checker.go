@@ -77,6 +77,13 @@ func (c Checker) DescribeStream(req *protocol.DescribeStreamRequest, resp *proto
 	c.Handler.DescribeStream(req, resp)
 }
 
+func (c Checker) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse) {
+	if !c.Handler.Check(req, resp) {
+		return
+	}
+	c.Handler.ReportMetrics(req, resp)
+}
+
 func (c Checker) DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
 	if !c.Handler.Check(req, resp) {
 		return
