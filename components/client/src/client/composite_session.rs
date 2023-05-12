@@ -5,6 +5,7 @@ use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
     client_role::ClientRole,
+    payload::Payload,
     range::Range,
     range_criteria::RangeCriteria,
     request::{seal::SealRange, Request},
@@ -567,7 +568,13 @@ impl CompositeSession {
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
             let request = ctx.request();
-            error!("Failed to seal range {request:?}");
+            if let Request::Append { buf, .. } = request {
+                if let Ok(entries) = Payload::parse_append_entries(buf) {
+                    error!("Failed to append entries {entries:?}");
+                } else {
+                    error!("Failed to decode append request payload");
+                }
+            }
             return Err(ClientError::ClientInternal);
         }
 
