@@ -153,7 +153,12 @@ impl Client {
     ) -> Result<Vec<AppendResultEntry>, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager.get_composite_session(target).await?;
-        session.append(buf).await
+        let future = session.append(buf);
+        time::timeout(self.config.client_io_timeout(), future)
+            .await
+            .map_err(|e| ClientError::RpcTimeout {
+                timeout: self.config.client_io_timeout(),
+            })?
     }
 
     /// Report metrics to placement manager
