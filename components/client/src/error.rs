@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use protocol::rpc::header::ErrorCode;
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
@@ -27,6 +28,9 @@ pub enum ClientError {
 
     #[error("Channel `{0}` is half closed")]
     ChannelClosing(String),
+
+    #[error("Append records failed with error code: `{0:?}`")]
+    Append(ErrorCode),
 
     #[error("Server internal error")]
     ServerInternal,

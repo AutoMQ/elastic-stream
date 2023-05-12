@@ -8,7 +8,7 @@ use model::{
     range::Range,
     range_criteria::RangeCriteria,
     request::{seal::SealRange, Request},
-    response::Response,
+    response::{append::AppendResultEntry, Response},
     PlacementManagerNode,
 };
 use observation::metrics::{
@@ -549,7 +549,7 @@ impl CompositeSession {
         ))
     }
 
-    pub(crate) async fn append(&self, buf: Bytes) -> Result<(), ClientError> {
+    pub(crate) async fn append(&self, buf: Bytes) -> Result<Vec<AppendResultEntry>, ClientError> {
         self.try_reconnect().await;
         let session = self
             .sessions
@@ -572,16 +572,12 @@ impl CompositeSession {
         }
 
         let response = rx.await.map_err(|_e| ClientError::ClientInternal)?;
-        if let Response::Append {
-            status,
-            entries: results,
-        } = response
-        {
+        if let Response::Append { status, entries } = response {
             if ErrorCode::OK != status.code {
                 warn!("Failed to append: {:?}", status);
-                return Err(ClientError::ServerInternal);
+                return Err(ClientError::Append(status.code));
             }
-            Ok(())
+            Ok(entries)
         } else {
             Err(ClientError::ClientInternal)
         }
