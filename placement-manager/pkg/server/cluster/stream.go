@@ -8,7 +8,6 @@ import (
 
 	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/placement-manager/pkg/server/id"
-	"github.com/AutoMQ/placement-manager/pkg/server/storage/endpoint"
 	"github.com/AutoMQ/placement-manager/pkg/server/storage/kv"
 	"github.com/AutoMQ/placement-manager/pkg/util/traceutil"
 )
@@ -24,8 +23,7 @@ type Stream interface {
 	DescribeStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error)
 }
 
-// CreateStream creates a stream and the first range in the stream.
-// It returns ErrNotEnoughDataNodes if there are not enough data nodes to create the stream.
+// CreateStream creates a stream.
 // It returns ErrNotLeader if the current PM node is not the leader.
 func (c *RaftCluster) CreateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error) {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
@@ -38,27 +36,11 @@ func (c *RaftCluster) CreateStream(ctx context.Context, stream *rpcfb.StreamT) (
 		}
 		return nil, err
 	}
-
 	stream.StreamId = int64(sid)
 	logger = logger.With(zap.Int64("stream-id", stream.StreamId))
-	nodes, err := c.chooseDataNodes(stream.Replica)
-	if err != nil {
-		logger.Error("failed to choose data nodes", zap.Error(err))
-		return nil, err
-	}
-	param := &endpoint.CreateStreamParam{
-		StreamT: stream,
-		RangeT: &rpcfb.RangeT{
-			StreamId: stream.StreamId,
-			Index:    0,
-			Start:    0,
-			End:      _writableRangeEnd,
-			Nodes:    nodes,
-		},
-	}
 
 	logger.Info("start to create stream")
-	stream, err = c.storage.CreateStream(ctx, param)
+	stream, err = c.storage.CreateStream(ctx, stream)
 	logger.Info("finish creating stream", zap.Error(err))
 	if err != nil {
 		if errors.Is(err, kv.ErrTxnFailed) {

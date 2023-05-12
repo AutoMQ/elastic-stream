@@ -19,8 +19,6 @@ func (h *Handler) CreateStream(req *protocol.CreateStreamRequest, resp *protocol
 	stream, err := h.c.CreateStream(ctx, req.Stream)
 	if err != nil {
 		switch {
-		case errors.Is(err, cluster.ErrNotEnoughDataNodes):
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()})
 		case errors.Is(err, cluster.ErrNotLeader):
 			resp.Error(h.notLeaderError())
 		default:

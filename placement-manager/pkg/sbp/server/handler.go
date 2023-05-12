@@ -7,7 +7,6 @@ import (
 )
 
 // Handler responds to a request
-// TODO support streaming
 type Handler interface {
 	// Heartbeat handles heartbeat requests.
 	Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.HeartbeatResponse)

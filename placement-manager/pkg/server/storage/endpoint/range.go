@@ -57,16 +57,27 @@ type Range interface {
 func (e *Endpoint) CreateRange(ctx context.Context, rangeT *rpcfb.RangeT) error {
 	logger := e.lg.With(zap.Int64("stream-id", rangeT.StreamId), zap.Int32("range-index", rangeT.Index), traceutil.TraceLogField(ctx))
 
-	key := rangePathInSteam(rangeT.StreamId, rangeT.Index)
-	value := fbutil.Marshal(rangeT)
+	kvs := make([]kv.KeyValue, 0, 1+len(rangeT.Nodes))
+	r := fbutil.Marshal(rangeT)
+	kvs = append(kvs, kv.KeyValue{
+		Key:   rangePathInSteam(rangeT.StreamId, rangeT.Index),
+		Value: r,
+	})
+	for _, node := range rangeT.Nodes {
+		kvs = append(kvs, kv.KeyValue{
+			Key:   rangePathOnDataNode(node.NodeId, rangeT.StreamId, rangeT.Index),
+			Value: nil,
+		})
+	}
 
-	prevValue, err := e.Put(ctx, key, value, true)
-	mcache.Free(value)
+	prevKVs, err := e.BatchPut(ctx, kvs, true, true)
+	mcache.Free(r)
+
 	if err != nil {
 		logger.Error("failed to create range", zap.Error(err))
 		return errors.Wrap(err, "create range")
 	}
-	if prevValue != nil {
+	if len(prevKVs) != 0 {
 		logger.Warn("range already exists when create range")
 		return nil
 	}
