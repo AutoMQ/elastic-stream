@@ -1,6 +1,7 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use flatbuffers::FlatBufferBuilder;
 use protocol::flat_model::records::RecordBatchMeta;
+use std::io::Cursor;
 
 use crate::{error::DecodeError, RecordBatch};
 
@@ -60,15 +61,13 @@ impl FlatRecordBatch {
 
     /// Inits a FlatRecordBatch from a buffer of bytes received from storage or network layer.
     pub fn init_from_buf(buf: &mut Bytes) -> Result<Self, DecodeError> {
-        if buf.len() < RECORD_BATCH_PREFIX_LEN {
+        let mut cursor = Cursor::new(&buf[..]);
+        if cursor.remaining() < RECORD_BATCH_PREFIX_LEN {
             return Err(DecodeError::DataLengthMismatch);
         }
-        // Backup the buffer for the slice operation.
-        let buf_for_slice = buf.slice(0..);
-        let mut cur_ptr = 0;
 
         // Read the magic
-        let magic = buf.get_i8();
+        let magic = cursor.get_i8();
 
         // We only support the Magic0 for now.
         if magic != RecordMagic::Magic0 as i8 {
@@ -76,25 +75,25 @@ impl FlatRecordBatch {
         }
 
         // Read the meta from the given buf
-        let meta_len = buf.get_i32();
+        let meta_len = cursor.get_i32();
 
-        cur_ptr += RECORD_BATCH_PREFIX_LEN;
-        if buf.len() < meta_len as usize {
+        if cursor.remaining() < meta_len as usize + 4 {
             return Err(DecodeError::DataLengthMismatch);
         }
+
         // Read the meta buffer
-        let batch_meta = buf_for_slice.slice(cur_ptr..(cur_ptr + meta_len as usize));
-        buf.advance(meta_len as usize);
-        cur_ptr += meta_len as usize;
+        let remaining = cursor.remaining_slice();
+        let batch_meta = Bytes::copy_from_slice(&remaining[..(meta_len as usize)]);
+        cursor.advance(meta_len as usize);
 
         // Read the payload from the given buf
-        let payload_len = buf.get_i32();
-        if buf.len() != payload_len as usize {
+        let payload_len = cursor.get_i32();
+        if cursor.remaining() != payload_len as usize {
             return Err(DecodeError::DataLengthMismatch);
         }
 
-        let batch_payload = buf_for_slice.slice(cur_ptr..(cur_ptr + payload_len as usize));
-        buf.advance(payload_len as usize);
+        let batch_payload = Bytes::copy_from_slice(cursor.remaining_slice());
+        cursor.advance(payload_len as usize);
 
         Ok(FlatRecordBatch {
             magic: Some(magic),
