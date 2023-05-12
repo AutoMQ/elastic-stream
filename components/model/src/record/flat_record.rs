@@ -74,31 +74,26 @@ impl FlatRecordBatch {
             return Err(DecodeError::InvalidMagic);
         }
 
-        // Read the meta from the given buf
+        // Read the metadata length from the given buf
         let meta_len = cursor.get_i32();
-
         if cursor.remaining() < meta_len as usize + 4 {
             return Err(DecodeError::DataLengthMismatch);
         }
-
-        // Read the meta buffer
-        let remaining = cursor.remaining_slice();
-        let batch_meta = Bytes::copy_from_slice(&remaining[..(meta_len as usize)]);
         cursor.advance(meta_len as usize);
 
-        // Read the payload from the given buf
+        // Read the payload length from the given buf
         let payload_len = cursor.get_i32();
         if cursor.remaining() != payload_len as usize {
             return Err(DecodeError::DataLengthMismatch);
         }
 
-        let batch_payload = Bytes::copy_from_slice(cursor.remaining_slice());
-        cursor.advance(payload_len as usize);
+        let metadata = buf.slice((1 + 4)..(1 + 4 + meta_len as usize));
+        let payload = buf.slice((RECORD_BATCH_PREFIX_LEN + meta_len as usize)..);
 
         Ok(FlatRecordBatch {
             magic: Some(magic),
-            metadata: batch_meta,
-            payload: batch_payload,
+            metadata,
+            payload,
         })
     }
 
