@@ -1,3 +1,4 @@
+use flatbuffers::InvalidFlatbuffer;
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
@@ -25,8 +26,10 @@ pub enum StreamError {
 pub enum RecordError {
     #[error("Required record field is missing")]
     RequiredFieldMissing,
+
     #[error("The stream id of the record does not match the stream id of the record batch")]
     StreamIdMismatch,
+
     #[error("Parse header for record error")]
     ParseHeader,
 }
@@ -56,4 +59,7 @@ pub enum DecodeError {
 
     #[error("The format of the record batch is invalid")]
     InvalidDataFormat,
+
+    #[error("Failed to parse append request payload")]
+    Flatbuffer(#[from] InvalidFlatbuffer),
 }

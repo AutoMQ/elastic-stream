@@ -4,7 +4,9 @@ use protocol::flat_model::records::RecordBatchMeta;
 
 use crate::{error::DecodeError, RecordBatch};
 
-enum RecordMagic {
+#[derive(Debug)]
+#[repr(i8)]
+pub enum RecordMagic {
     Magic0 = 0x22, // The first version of the record batch format.
 }
 

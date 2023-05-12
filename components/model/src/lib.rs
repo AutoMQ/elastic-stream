@@ -1,4 +1,5 @@
 #![feature(try_find)]
+#![feature(cursor_remaining)]
 
 pub mod client_role;
 pub mod data_node;

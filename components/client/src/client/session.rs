@@ -532,7 +532,16 @@ impl Session {
 
                             let append_entries = if let Request::Append { buf, .. } = ctx.request()
                             {
-                                Payload::parse_append_entries(buf)
+                                match Payload::parse_append_entries(buf) {
+                                    Ok(entries) => entries,
+                                    Err(_e) => {
+                                        error!("Failed to parse append entries from request payload: {:?}", _e);
+                                        *status = Status::bad_request(
+                                            "Request payload corrupted.".to_owned(),
+                                        );
+                                        return resp;
+                                    }
+                                }
                             } else {
                                 unreachable!()
                             };
