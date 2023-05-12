@@ -32,6 +32,41 @@ type DataNode struct {
 	Metrics        *rpcfb.DataNodeMetricsT
 }
 
+// Score returns the score of the data node.
+func (n *DataNode) Score() (score int) {
+	// TODO more intelligent score
+	if n.Metrics == nil {
+		return
+	}
+
+	const (
+		KB = 1024
+		MB = 1024 * KB
+		GB = 1024 * MB
+	)
+
+	score += 10000
+	score -= int(10 * n.Metrics.DiskInRate / (100 * MB))
+	score -= int(10 * n.Metrics.DiskOutRate / (100 * MB))
+	score += int(10 * n.Metrics.DiskFreeSpace / (50 * GB))
+	score -= int(10 * n.Metrics.DiskUnindexedDataSize / (100 * MB))
+	score -= int(10 * n.Metrics.MemoryUsed / (1 * GB))
+	score -= int(10 * n.Metrics.UringTaskRate / 1024)
+	score -= int(10 * n.Metrics.UringInflightTaskCnt / 128)
+	score -= int(10 * n.Metrics.UringPendingTaskCnt / 1024)
+	score -= int(10 * n.Metrics.UringTaskAvgLatency / 10)
+	score -= int(10 * n.Metrics.NetworkAppendRate / 256)
+	score -= int(10 * n.Metrics.NetworkFetchRate / 256)
+	score -= int(10 * n.Metrics.NetworkFailedAppendRate / 1)
+	score -= int(10 * n.Metrics.NetworkFailedFetchRate / 1)
+	score -= int(10 * n.Metrics.NetworkAppendAvgLatency / 1)
+	score -= int(10 * n.Metrics.NetworkAppendAvgLatency / 1)
+	score -= int(10 * n.Metrics.RangeMissingReplicaCnt / 2)
+	score -= int(10 * n.Metrics.RangeActiveCnt / 10)
+
+	return
+}
+
 // SaveDataNode saves a data node to the cache.
 // It returns true if the data node is new or its info is updated.
 // If its info is updated, the old value is returned.
@@ -71,6 +106,9 @@ func (c *Cache) ActiveDataNodes(timeout time.Duration) []*DataNode {
 	nodes := make([]*DataNode, 0)
 	c.dataNodes.IterCb(func(_ int32, node *DataNode) {
 		if node.LastActiveTime.IsZero() || time.Since(node.LastActiveTime) > timeout {
+			return
+		}
+		if node.Metrics != nil && node.Metrics.DiskFreeSpace == 0 {
 			return
 		}
 		nodes = append(nodes, node)

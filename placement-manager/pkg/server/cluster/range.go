@@ -306,7 +306,7 @@ func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT
 		return nil, errors.Wrapf(ErrStreamNotFound, "stream %d not found", newRange.StreamId)
 	}
 
-	nodes, err := c.chooseDataNodes(stream.Replica)
+	nodes, err := c.chooseDataNodes(int(stream.Replica))
 	if err != nil {
 		logger.Error("failed to choose data nodes", zap.Error(err))
 		return nil, err
