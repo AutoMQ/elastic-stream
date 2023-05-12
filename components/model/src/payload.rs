@@ -39,15 +39,14 @@ impl Payload {
                 return Err(DecodeError::InvalidMagic);
             }
 
-            let metadata_len = cursor.get_i32();
-            if cursor.remaining() <= metadata_len as usize {
+            let metadata_len = cursor.get_i32() as usize;
+            if cursor.remaining() <= metadata_len {
                 return Err(DecodeError::DataLengthMismatch);
             }
 
             let remaining = cursor.remaining_slice();
             // Partial decode via Flatbuffers
-            let metadata =
-                flatbuffers::root::<RecordBatchMeta>(&remaining[..metadata_len as usize])?;
+            let metadata = flatbuffers::root::<RecordBatchMeta>(&remaining[..metadata_len])?;
 
             let mut entry = AppendEntry::default();
             entry.stream_id = metadata.stream_id() as u64;
@@ -57,15 +56,15 @@ impl Payload {
             entries.push(entry);
 
             // Advance record batch metadata
-            cursor.advance(metadata_len as usize);
+            cursor.advance(metadata_len);
 
-            let payload_len = cursor.get_i32();
-            if cursor.remaining() < payload_len as usize {
+            let payload_len = cursor.get_i32() as usize;
+            if cursor.remaining() < payload_len {
                 return Err(DecodeError::DataLengthMismatch);
             }
 
             // Skip record batch payload
-            cursor.advance(payload_len as usize);
+            cursor.advance(payload_len);
         }
 
         Ok(entries)
