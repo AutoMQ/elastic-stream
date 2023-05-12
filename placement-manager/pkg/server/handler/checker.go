@@ -78,9 +78,7 @@ func (c Checker) DescribeStream(req *protocol.DescribeStreamRequest, resp *proto
 }
 
 func (c Checker) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse) {
-	if !c.Handler.Check(req, resp) {
-		return
-	}
+	// all pm nodes will handle report metrics request, so we don't need to check leader here.
 	c.Handler.ReportMetrics(req, resp)
 }
 

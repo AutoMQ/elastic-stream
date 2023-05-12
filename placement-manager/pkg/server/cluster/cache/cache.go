@@ -29,6 +29,7 @@ func (c *Cache) Reset() {
 type DataNode struct {
 	rpcfb.DataNodeT
 	LastActiveTime time.Time
+	Metrics        *rpcfb.DataNodeMetricsT
 }
 
 // SaveDataNode saves a data node to the cache.
@@ -43,6 +44,9 @@ func (c *Cache) SaveDataNode(node *DataNode) (updated bool, old rpcfb.DataNodeT)
 				old = valueInMap.DataNodeT
 			}
 			valueInMap.LastActiveTime = newValue.LastActiveTime
+			if newValue.Metrics != nil {
+				valueInMap.Metrics = newValue.Metrics
+			}
 			return valueInMap
 		}
 		updated = true

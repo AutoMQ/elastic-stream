@@ -54,8 +54,28 @@ func (h *Handler) AllocateID(req *protocol.IDAllocationRequest, resp *protocol.I
 }
 
 func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse) {
-	// TODO
-	_ = req
+	ctx := req.Context()
+	resp.DataNode = req.DataNode
+
+	if req.DataNode == nil {
+		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "data node is nil"})
+		return
+	}
+	if req.Metrics == nil {
+		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "metrics is nil"})
+		return
+	}
+
+	err := h.c.Metrics(ctx, req.DataNode, req.Metrics)
+	if err != nil {
+		switch {
+		case errors.Is(err, cluster.ErrNotLeader):
+			resp.Error(h.notLeaderError())
+		default:
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+		}
+		return
+	}
 	resp.OK()
 }
 

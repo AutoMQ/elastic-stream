@@ -22,6 +22,7 @@ var (
 type DataNode interface {
 	Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) error
 	AllocateID(ctx context.Context) (int32, error)
+	Metrics(ctx context.Context, node *rpcfb.DataNodeT, metrics *rpcfb.DataNodeMetricsT) error
 }
 
 // Heartbeat updates DataNode's last active time, and save it to storage if its info changed.
@@ -62,6 +63,31 @@ func (c *RaftCluster) AllocateID(ctx context.Context) (int32, error) {
 	}
 
 	return int32(id), nil
+}
+
+// Metrics receives metrics from data nodes.
+// It returns ErrNotLeader if the current PM node is not the leader.
+func (c *RaftCluster) Metrics(ctx context.Context, node *rpcfb.DataNodeT, metrics *rpcfb.DataNodeMetricsT) error {
+	logger := c.lg.With(traceutil.TraceLogField(ctx))
+
+	updated, old := c.cache.SaveDataNode(&cache.DataNode{
+		DataNodeT:      *node,
+		LastActiveTime: time.Now(),
+		Metrics:        metrics,
+	})
+	if updated && c.IsLeader() {
+		logger.Info("data node updated when reporting metrics, start to save it", zap.Any("new", node), zap.Any("old", old))
+		_, err := c.storage.SaveDataNode(ctx, node)
+		logger.Info("finish saving data node", zap.Int32("node-id", node.NodeId), zap.Error(err))
+		if err != nil {
+			if errors.Is(err, kv.ErrTxnFailed) {
+				return ErrNotLeader
+			}
+			return err
+		}
+	}
+
+	return nil
 }
 
 // chooseDataNodes selects `cnt` number of data nodes from the available data nodes for a range.
