@@ -14,8 +14,8 @@ pub enum RecordMagic {
 /// Relative offset of `BaseOffset` within `RecordBatch`.
 pub const BASE_OFFSET_POS: usize = 1;
 
-// The length of the record batch prefix, which is the magic byte and the meta length.
-pub const RECORD_BATCH_PREFIX_LEN: usize = 1 + 4 + 4;
+// The minimum length of the record batch, which at least includes the magic byte, the metadata length and payload length.
+pub const MIN_RECORD_BATCH_LEN: usize = 1 + 4 + 4;
 
 /// FlatRecordBatch is a flattened version of RecordBatch that is used for serialization.
 /// As the storage and network layout, the schema of FlatRecordBatch with magic 0 is given below:
@@ -62,7 +62,7 @@ impl FlatRecordBatch {
     /// Inits a FlatRecordBatch from a buffer of bytes received from storage or network layer.
     pub fn init_from_buf(buf: &mut Bytes) -> Result<Self, DecodeError> {
         let mut cursor = Cursor::new(&buf[..]);
-        if cursor.remaining() < RECORD_BATCH_PREFIX_LEN {
+        if cursor.remaining() < MIN_RECORD_BATCH_LEN {
             return Err(DecodeError::DataLengthMismatch);
         }
 
@@ -75,20 +75,26 @@ impl FlatRecordBatch {
         }
 
         // Read the metadata length from the given buf
-        let meta_len = cursor.get_i32();
-        if cursor.remaining() < meta_len as usize + 4 {
+        let metadata_len = cursor.get_i32() as usize;
+        if cursor.remaining() < metadata_len + 4 {
             return Err(DecodeError::DataLengthMismatch);
         }
-        cursor.advance(meta_len as usize);
+        cursor.advance(metadata_len as usize);
 
         // Read the payload length from the given buf
-        let payload_len = cursor.get_i32();
-        if cursor.remaining() != payload_len as usize {
+        let payload_len = cursor.get_i32() as usize;
+        if cursor.remaining() != payload_len {
             return Err(DecodeError::DataLengthMismatch);
         }
 
-        let metadata = buf.slice((1 + 4)..(1 + 4 + meta_len as usize));
-        let payload = buf.slice((RECORD_BATCH_PREFIX_LEN + meta_len as usize)..);
+        // Slice metadata
+        let metadata_from =  1 /* magic-code */ + 4 /* metadata length field */;
+        let metadata_to = 1 /* magic-code */ + 4 /* metadata length field */ + metadata_len;
+        let metadata = buf.slice(metadata_from..metadata_to);
+
+        // Slice payload
+        let payload_offset = 1 /* magic-code */ + 4 /* metadata length field */ + metadata_len + 4 /* payload length field */;
+        let payload = buf.slice(payload_offset..);
 
         Ok(FlatRecordBatch {
             magic: Some(magic),
@@ -107,7 +113,7 @@ impl FlatRecordBatch {
 
         // The total length of encoded flat records.
         let meta_len = self.metadata.len();
-        let mut total_len = RECORD_BATCH_PREFIX_LEN;
+        let mut total_len = MIN_RECORD_BATCH_LEN;
 
         let mut batch_prefix = BytesMut::with_capacity(total_len);
         batch_prefix.put_i8(self.magic.unwrap_or(RecordMagic::Magic0 as i8));
