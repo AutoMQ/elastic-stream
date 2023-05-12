@@ -298,7 +298,15 @@ func (c *RaftCluster) sealRangeLocked(ctx context.Context, lastRange *rpcfb.Rang
 func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT) (*rpcfb.RangeT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", newRange.StreamId), zap.Int32("range-index", newRange.Index), zap.Int64("start", newRange.Start), traceutil.TraceLogField(ctx))
 
-	nodes, err := c.chooseDataNodes(int8(len(newRange.Nodes)))
+	stream, err := c.storage.GetStream(ctx, newRange.StreamId)
+	if err != nil {
+		return nil, err
+	}
+	if stream == nil {
+		return nil, errors.Wrapf(ErrStreamNotFound, "stream %d not found", newRange.StreamId)
+	}
+
+	nodes, err := c.chooseDataNodes(stream.Replica)
 	if err != nil {
 		logger.Error("failed to choose data nodes", zap.Error(err))
 		return nil, err

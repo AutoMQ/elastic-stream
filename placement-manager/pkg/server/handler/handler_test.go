@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.uber.org/goleak"
 	"go.uber.org/zap"
 
 	sbpClient "github.com/AutoMQ/placement-manager/pkg/sbp/client"
@@ -20,6 +21,10 @@ import (
 	"github.com/AutoMQ/placement-manager/pkg/server/storage/kv"
 	"github.com/AutoMQ/placement-manager/pkg/util/testutil"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 type mockServer struct {
 	kv        clientv3.KV
