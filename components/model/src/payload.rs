@@ -13,6 +13,15 @@ impl Payload {
         unimplemented!()
     }
 
+    /// Parse AppendRequest payload for nested append entries.
+    ///
+    /// # Arguments
+    ///
+    /// `payload` - AppendRequest payload.
+    ///
+    /// # Returns
+    /// `Vec<AppendEntry>` - A vector of append entries.
+    /// `DecodeError` - Error if the request payload is malformed.
     pub fn parse_append_entries(payload: &Bytes) -> Result<Vec<AppendEntry>, DecodeError> {
         let mut cursor = Cursor::new(&payload[..]);
         let mut entries = Vec::new();
