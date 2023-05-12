@@ -59,6 +59,7 @@ func (c *RaftCluster) CreateStream(ctx context.Context, stream *rpcfb.StreamT) (
 
 	logger.Info("start to create stream")
 	stream, err = c.storage.CreateStream(ctx, param)
+	logger.Info("finish creating stream", zap.Error(err))
 	if err != nil {
 		if errors.Is(err, kv.ErrTxnFailed) {
 			return nil, ErrNotLeader
