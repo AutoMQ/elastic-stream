@@ -199,7 +199,7 @@ func (c *RaftCluster) CreateRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.
 	if isWritable(lastRange) {
 		// The last range is writable.
 		logger.Error("create range before sealing the last range", zap.Int32("last-range-index", lastRange.Index))
-		return nil, errors.Wrapf(ErrCreateBeforeSeal, "create range before sealing the last range %d in stream %d", lastRange.Index, r.StreamId)
+		return nil, errors.Wrapf(ErrCreateBeforeSeal, "create range %d before sealing the last range %d in stream %d", r.Index, lastRange.Index, r.StreamId)
 	}
 	if r.Index != lastRange.Index+1 {
 		// The range index is not continuous.

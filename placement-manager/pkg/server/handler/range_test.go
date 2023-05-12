@@ -96,13 +96,29 @@ func TestHandler_ListRange(t *testing.T) {
 	}
 }
 
+type preRange struct {
+	index int32
+	start int64
+	end   int64
+}
+
+func prepareRanges(t *testing.T, h *Handler, streamID int64, ranges []preRange) {
+	re := require.New(t)
+	for _, r := range ranges {
+		var rr *rpcfb.RangeT
+		if r.end == -1 {
+			rr = preNewRange(t, h, streamID, false)
+		} else {
+			rr = preNewRange(t, h, streamID, true, r.end-r.start)
+		}
+		re.Equal(r.index, rr.Index)
+		re.Equal(r.start, rr.Start)
+		re.Equal(r.end, rr.End)
+	}
+}
+
 func TestSealRange(t *testing.T) {
 	var nodes = []*rpcfb.DataNodeT{{NodeId: 0}, {NodeId: 1}, {NodeId: 2}}
-	type preRange struct {
-		index int32
-		start int64
-		end   int64
-	}
 	type args struct {
 		kind     rpcfb.SealKind
 		epoch    int64
@@ -265,19 +281,9 @@ func TestSealRange(t *testing.T) {
 			preHeartbeats(t, h, 0, 1, 2)
 			streamIDs := preCreateStreams(t, h, 3, 1)
 			re.Equal([]int64{0}, streamIDs)
-			for _, r := range tt.prepare {
-				var rr *rpcfb.RangeT
-				if r.end == -1 {
-					rr = preNewRange(t, h, 0, false)
-				} else {
-					rr = preNewRange(t, h, 0, true, r.end-r.start)
-				}
-				re.Equal(r.index, rr.Index)
-				re.Equal(r.start, rr.Start)
-				re.Equal(r.end, rr.End)
-			}
+			prepareRanges(t, h, 0, tt.prepare)
 
-			// seal ranges
+			// seal range
 			req := &protocol.SealRangeRequest{SealRangeRequestT: rpcfb.SealRangeRequestT{
 				Kind:  tt.args.kind,
 				Range: &rpcfb.RangeT{Epoch: tt.args.epoch, StreamId: tt.args.streamID, Index: tt.args.index, End: tt.args.end},
@@ -285,7 +291,180 @@ func TestSealRange(t *testing.T) {
 			resp := &protocol.SealRangeResponse{}
 			h.SealRange(req, resp)
 
-			// check seal response
+			// check response
+			if tt.want.wantErr {
+				re.Equal(tt.want.errCode, resp.Status.Code)
+				re.Contains(resp.Status.Message, tt.want.errMsg)
+			} else {
+				re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code, resp.Status.Message)
+				fmtNodes(resp.Range)
+				re.Equal(tt.want.returned, resp.Range)
+			}
+
+			// list ranges
+			lReq := &protocol.ListRangeRequest{ListRangeRequestT: rpcfb.ListRangeRequestT{
+				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: 0, NodeId: -1},
+			}}
+			lResp := &protocol.ListRangeResponse{}
+			h.ListRange(lReq, lResp)
+			re.Equal(rpcfb.ErrorCodeOK, lResp.Status.Code, lResp.Status.Message)
+
+			// check list range response
+			for _, r := range lResp.Ranges {
+				fmtNodes(r)
+			}
+			re.Equal(tt.want.after, lResp.Ranges)
+		})
+	}
+}
+
+func TestHandler_CreateRange(t *testing.T) {
+	var nodes = []*rpcfb.DataNodeT{{NodeId: 0}, {NodeId: 1}, {NodeId: 2}}
+	type args struct {
+		epoch    int64
+		streamID int64
+		index    int32
+		start    int64
+	}
+	type want struct {
+		returned *rpcfb.RangeT
+		wantErr  bool
+		errCode  rpcfb.ErrorCode
+		errMsg   string
+		after    []*rpcfb.RangeT
+	}
+	tests := []struct {
+		name    string
+		prepare []preRange
+		args    args
+		want    want
+	}{
+		{
+			name: "normal case",
+			prepare: []preRange{
+				{end: 42},
+			},
+			args: args{epoch: 2, index: 1, start: 42},
+			want: want{
+				returned: &rpcfb.RangeT{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+				after: []*rpcfb.RangeT{
+					{Epoch: 1, End: 42, Nodes: nodes},
+					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+				},
+			},
+		},
+		{
+			name:    "create the first range",
+			prepare: []preRange{},
+			args:    args{},
+			want: want{
+				returned: &rpcfb.RangeT{End: -1, Nodes: nodes},
+				after: []*rpcfb.RangeT{
+					{End: -1, Nodes: nodes},
+				},
+			},
+		},
+		{
+			name: "stream not exist",
+			prepare: []preRange{
+				{end: 42},
+			},
+			args: args{epoch: 2, streamID: 1, index: 1, start: 42},
+			want: want{
+				wantErr: true,
+				errCode: rpcfb.ErrorCodeNOT_FOUND,
+				errMsg:  "stream 1 not found",
+				after: []*rpcfb.RangeT{
+					{Epoch: 1, End: 42, Nodes: nodes},
+				},
+			},
+		},
+		{
+			name: "create before seal",
+			prepare: []preRange{
+				{end: 42},
+				{index: 1, start: 42, end: -1},
+			},
+			args: args{epoch: 3, index: 2, start: 84},
+			want: want{
+				wantErr: true,
+				errCode: rpcfb.ErrorCodeCREATE_RANGE_BEFORE_SEAL,
+				errMsg:  "create range 2 before sealing the last range 1 in stream 0",
+				after: []*rpcfb.RangeT{
+					{Epoch: 1, End: 42, Nodes: nodes},
+					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+				},
+			},
+		},
+		{
+			name: "invalid range index",
+			prepare: []preRange{
+				{end: 42},
+			},
+			args: args{epoch: 2, index: 2, start: 42},
+			want: want{
+				wantErr: true,
+				errCode: rpcfb.ErrorCodeBAD_REQUEST,
+				errMsg:  "invalid range index 2 (should be 1) in stream 0",
+				after: []*rpcfb.RangeT{
+					{Epoch: 1, End: 42, Nodes: nodes},
+				},
+			},
+		},
+		{
+			name: "invalid start offset",
+			prepare: []preRange{
+				{end: 42},
+			},
+			args: args{epoch: 2, index: 1, start: 84},
+			want: want{
+				wantErr: true,
+				errCode: rpcfb.ErrorCodeBAD_REQUEST,
+				errMsg:  "invalid range start 84 (should be 42) for range 1 in stream 0",
+				after: []*rpcfb.RangeT{
+					{Epoch: 1, End: 42, Nodes: nodes},
+				},
+			},
+		},
+		{
+			name: "expired epoch",
+			prepare: []preRange{
+				{end: 42},
+			},
+			args: args{epoch: 0, index: 1, start: 42},
+			want: want{
+				wantErr: true,
+				errCode: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH,
+				errMsg:  "invalid range epoch 0 (less than 1) for range 1 in stream 0",
+				after: []*rpcfb.RangeT{
+					{Epoch: 1, End: 42, Nodes: nodes},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			re := require.New(t)
+
+			h, closeFunc := startSbpHandler(t, nil, true)
+			defer closeFunc()
+
+			// prepare
+			preHeartbeats(t, h, 0, 1, 2)
+			streamIDs := preCreateStreams(t, h, 3, 1)
+			re.Equal([]int64{0}, streamIDs)
+			prepareRanges(t, h, 0, tt.prepare)
+
+			// create range
+			req := &protocol.CreateRangeRequest{CreateRangeRequestT: rpcfb.CreateRangeRequestT{
+				Range: &rpcfb.RangeT{Epoch: tt.args.epoch, StreamId: tt.args.streamID, Index: tt.args.index, Start: tt.args.start},
+			}}
+			resp := &protocol.CreateRangeResponse{}
+			h.CreateRange(req, resp)
+
+			// check response
 			if tt.want.wantErr {
 				re.Equal(tt.want.errCode, resp.Status.Code)
 				re.Contains(resp.Status.Message, tt.want.errMsg)
