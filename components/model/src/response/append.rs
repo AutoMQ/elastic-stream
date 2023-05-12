@@ -5,10 +5,10 @@ use crate::Status;
 
 #[derive(Debug, Clone, Default)]
 pub struct AppendEntry {
-    stream_id: u64,
-    index: u32,
-    offset: u64,
-    len: u32,
+    pub stream_id: u64,
+    pub index: u32,
+    pub offset: u64,
+    pub len: u32,
 }
 
 #[derive(Debug, Clone)]

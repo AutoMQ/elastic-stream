@@ -8,41 +8,41 @@ import (
 
 type AppendResponseT struct {
 	Status *StatusT `json:"status"`
-	Results []*AppendEntryResultT `json:"results"`
+	Entries []*AppendResultEntryT `json:"entries"`
 	ThrottleTimeMs int32 `json:"throttle_time_ms"`
 }
 
 func (t *AppendResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	statusOffset := t.Status.Pack(builder)
-	resultsOffset := flatbuffers.UOffsetT(0)
-	if t.Results != nil {
-		resultsLength := len(t.Results)
-		resultsOffsets := make([]flatbuffers.UOffsetT, resultsLength)
-		for j := 0; j < resultsLength; j++ {
-			resultsOffsets[j] = t.Results[j].Pack(builder)
+	entriesOffset := flatbuffers.UOffsetT(0)
+	if t.Entries != nil {
+		entriesLength := len(t.Entries)
+		entriesOffsets := make([]flatbuffers.UOffsetT, entriesLength)
+		for j := 0; j < entriesLength; j++ {
+			entriesOffsets[j] = t.Entries[j].Pack(builder)
 		}
-		AppendResponseStartResultsVector(builder, resultsLength)
-		for j := resultsLength - 1; j >= 0; j-- {
-			builder.PrependUOffsetT(resultsOffsets[j])
+		AppendResponseStartEntriesVector(builder, entriesLength)
+		for j := entriesLength - 1; j >= 0; j-- {
+			builder.PrependUOffsetT(entriesOffsets[j])
 		}
-		resultsOffset = builder.EndVector(resultsLength)
+		entriesOffset = builder.EndVector(entriesLength)
 	}
 	AppendResponseStart(builder)
 	AppendResponseAddStatus(builder, statusOffset)
-	AppendResponseAddResults(builder, resultsOffset)
+	AppendResponseAddEntries(builder, entriesOffset)
 	AppendResponseAddThrottleTimeMs(builder, t.ThrottleTimeMs)
 	return AppendResponseEnd(builder)
 }
 
 func (rcv *AppendResponse) UnPackTo(t *AppendResponseT) {
 	t.Status = rcv.Status(nil).UnPack()
-	resultsLength := rcv.ResultsLength()
-	t.Results = make([]*AppendEntryResultT, resultsLength)
-	for j := 0; j < resultsLength; j++ {
-		x := AppendEntryResult{}
-		rcv.Results(&x, j)
-		t.Results[j] = x.UnPack()
+	entriesLength := rcv.EntriesLength()
+	t.Entries = make([]*AppendResultEntryT, entriesLength)
+	for j := 0; j < entriesLength; j++ {
+		x := AppendResultEntry{}
+		rcv.Entries(&x, j)
+		t.Entries[j] = x.UnPack()
 	}
 	t.ThrottleTimeMs = rcv.ThrottleTimeMs()
 }
@@ -94,7 +94,7 @@ func (rcv *AppendResponse) Status(obj *Status) *Status {
 	return nil
 }
 
-func (rcv *AppendResponse) Results(obj *AppendEntryResult, j int) bool {
+func (rcv *AppendResponse) Entries(obj *AppendResultEntry, j int) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Vector(o)
@@ -106,7 +106,7 @@ func (rcv *AppendResponse) Results(obj *AppendEntryResult, j int) bool {
 	return false
 }
 
-func (rcv *AppendResponse) ResultsLength() int {
+func (rcv *AppendResponse) EntriesLength() int {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
@@ -132,10 +132,10 @@ func AppendResponseStart(builder *flatbuffers.Builder) {
 func AppendResponseAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
 }
-func AppendResponseAddResults(builder *flatbuffers.Builder, results flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(results), 0)
+func AppendResponseAddEntries(builder *flatbuffers.Builder, entries flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(entries), 0)
 }
-func AppendResponseStartResultsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func AppendResponseStartEntriesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
 func AppendResponseAddThrottleTimeMs(builder *flatbuffers.Builder, throttleTimeMs int32) {
