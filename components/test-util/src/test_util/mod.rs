@@ -1,17 +1,18 @@
 //! Util functions for tests.
 //!
 
-use std::time::Duration;
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
 use log::{debug, error, info, trace, warn};
+use model::payload::Payload;
 use protocol::rpc::header::{
-    DescribePlacementManagerClusterRequest, DescribePlacementManagerClusterResponseT, ErrorCode,
-    HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
-    ListRangeRequest, ListRangeResponseT, PlacementManagerClusterT, PlacementManagerNodeT, RangeT,
-    ReportMetricsRequest, ReportMetricsResponseT, SealKind, SealRangeRequest, SealRangeResponseT,
-    StatusT,
+    AppendRequest, AppendResponseT, AppendResultEntryT, DescribePlacementManagerClusterRequest,
+    DescribePlacementManagerClusterResponseT, ErrorCode, HeartbeatRequest, HeartbeatResponseT,
+    IdAllocationRequest, IdAllocationResponseT, ListRangeRequest, ListRangeResponseT,
+    PlacementManagerClusterT, PlacementManagerNodeT, RangeT, ReportMetricsRequest,
+    ReportMetricsResponseT, SealKind, SealRangeRequest, SealRangeResponseT, StatusT,
 };
 
 use tokio::sync::oneshot;
@@ -163,6 +164,7 @@ pub async fn run_listener() -> u16 {
                                         }
                                     }
                                 }
+
                                 OperationCode::ListRange => {
                                     response_frame.operation_code = OperationCode::ListRange;
                                     if let Some(buf) = frame.header.as_ref() {
@@ -226,7 +228,9 @@ pub async fn run_listener() -> u16 {
                                         }
                                     }
                                 }
+
                                 OperationCode::ReportMetrics => {
+                                    response_frame.operation_code = OperationCode::ReportMetrics;
                                     if let Some(buf) = &frame.header {
                                         if let Ok(reportmetrics) =
                                             flatbuffers::root::<ReportMetricsRequest>(buf)
@@ -243,6 +247,12 @@ pub async fn run_listener() -> u16 {
                                         }
                                     }
                                 }
+
+                                OperationCode::Append => {
+                                    response_frame.operation_code = OperationCode::Append;
+                                    serve_append(frame.payload, &mut response_frame);
+                                }
+
                                 _ => {
                                     warn!("Unsupported operation code: {}", frame.operation_code);
                                     unimplemented!("Unimplemented operation code");
@@ -280,6 +290,41 @@ pub async fn run_listener() -> u16 {
         info!("TestServer shut down OK");
     });
     rx.await.unwrap()
+}
+
+fn serve_append(payload: Option<Vec<Bytes>>, response_frame: &mut Frame) {
+    let mut response = AppendResponseT::default();
+    let mut status_ok = StatusT::default();
+    status_ok.code = ErrorCode::OK;
+    status_ok.message = Some(String::from("OK"));
+    response.status = Box::new(status_ok.clone());
+
+    let mut entries = vec![];
+
+    if let Some(payloads) = payload {
+        for payload in payloads {
+            if let Ok(append_entries) = Payload::parse_append_entries(&payload) {
+                for entry in &append_entries {
+                    info!("Append entry: {:?}", entry);
+                    let mut append_result_entry = AppendResultEntryT::default();
+                    append_result_entry.status = Box::new(status_ok.clone());
+                    append_result_entry.timestamp_ms = std::time::SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as i64;
+                    entries.push(append_result_entry);
+                }
+            }
+        }
+    }
+    response.entries = Some(entries);
+    response.throttle_time_ms = 0;
+
+    let mut builder = flatbuffers::FlatBufferBuilder::new();
+    let response = response.pack(&mut builder);
+    builder.finish(response, None);
+    let data = builder.finished_data();
+    response_frame.header = Some(Bytes::copy_from_slice(data));
 }
 
 fn serve_seal_range(req: &SealRangeRequest, response_frame: &mut Frame) {
