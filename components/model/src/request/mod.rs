@@ -9,7 +9,7 @@ use protocol::rpc::header::{
 };
 use std::time::Duration;
 
-use self::seal::{Kind, SealRange};
+use self::seal::SealRange;
 
 #[derive(Debug, Clone)]
 pub enum Request {
@@ -112,26 +112,23 @@ impl From<&Request> for Bytes {
                 builder.finish(request, None);
             }
 
-            Request::SealRange {
-                timeout,
-                request: entry,
-            } => {
-                let mut request = SealRangeRequestT::default();
-                request.timeout_ms = timeout.as_millis() as i32;
-
-                request.kind = match entry.kind {
-                    Kind::DataNode => SealKind::DATA_NODE,
-                    Kind::PlacementManager => SealKind::PLACEMENT_MANAGER,
-                    Kind::Unspecified => SealKind::UNSPECIFIED,
+            Request::SealRange { timeout, request } => {
+                let mut req = SealRangeRequestT::default();
+                req.timeout_ms = timeout.as_millis() as i32;
+                req.kind = request.kind;
+                let mut range_t = RangeT::default();
+                range_t.stream_id = request.range.stream_id() as i64;
+                range_t.index = request.range.index() as i32;
+                range_t.epoch = request.range.epoch() as i64;
+                range_t.start = request.range.start() as i64;
+                range_t.end = match request.range.end() {
+                    Some(offset) => offset as i64,
+                    None => -1,
                 };
 
-                let mut range_t = RangeT::default();
-                range_t.stream_id = entry.range.stream_id() as i64;
-                range_t.index = entry.range.index() as i32;
+                req.range = Box::new(range_t);
 
-                request.range = Box::new(range_t);
-
-                let request = request.pack(&mut builder);
+                let request = req.pack(&mut builder);
                 builder.finish(request, None);
             }
 

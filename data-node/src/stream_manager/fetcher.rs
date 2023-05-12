@@ -116,14 +116,13 @@ pub(crate) mod tests {
                                     if i < TOTAL - 1 {
                                         Range::new(
                                             stream_id,
-                                            0,
                                             i,
+                                            0,
                                             (i * 100) as u64,
-                                            ((i + 1) * 100) as u64,
                                             Some(((i + 1) * 100) as u64),
                                         )
                                     } else {
-                                        Range::new(stream_id, 0, i, (i * 100) as u64, 0, None)
+                                        Range::new(stream_id, i, 0, (i * 100) as u64, None)
                                     }
                                 })
                                 .collect::<Vec<_>>();

@@ -12,6 +12,7 @@ use observation::metrics::{
     sys_metrics::{DiskStatistics, MemoryStatistics},
     uring_metrics::UringStatistics,
 };
+use protocol::rpc::header::SealKind;
 use std::{cell::UnsafeCell, rc::Rc, sync::Arc};
 use tokio::{sync::broadcast, time};
 
@@ -112,23 +113,23 @@ impl Client {
     ) -> Result<Range, ClientError> {
         // Validate request
         match request.kind {
-            seal::Kind::Unspecified => {
-                error!("Seal request kind must specify");
-                return Err(ClientError::BadRequest);
-            }
-            seal::Kind::DataNode => {
+            SealKind::DATA_NODE => {
                 if target.is_none() {
                     error!("Target is required while seal range against data nodes");
                     return Err(ClientError::BadRequest);
                 }
             }
-            seal::Kind::PlacementManager => {
+            SealKind::PLACEMENT_MANAGER => {
                 if request.range.end().is_none() {
                     error!(
                         "SealRange.range.end MUST be present while seal against placement manager"
                     );
                     return Err(ClientError::BadRequest);
                 }
+            }
+            _ => {
+                error!("Seal request kind must specify");
+                return Err(ClientError::BadRequest);
             }
         }
 
@@ -181,11 +182,13 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use log::trace;
+    use model::{range::Range, request::seal::SealRange};
     use observation::metrics::{
         store_metrics::DataNodeStatistics,
         sys_metrics::{DiskStatistics, MemoryStatistics},
         uring_metrics::UringStatistics,
     };
+    use protocol::rpc::header::SealKind;
     use std::{error::Error, sync::Arc};
     use test_util::run_listener;
     use tokio::sync::broadcast;
@@ -291,6 +294,103 @@ mod tests {
             Ok(())
         })
     }
+
+    /// Test seal data node without end. This RPC is used when the single writer takes over a stream from a failed writer.
+    #[test]
+    fn test_seal_data_node() -> Result<(), ClientError> {
+        test_util::try_init_log();
+        tokio_uring::start(async move {
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener().await;
+            let mut config = config::Configuration::default();
+            config.placement_manager = format!("localhost:{}", port);
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.check_and_apply().unwrap();
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(Arc::clone(&config), tx);
+            let request = SealRange {
+                kind: SealKind::DATA_NODE,
+                range: Range::new(0, 0, 0, 0, None),
+            };
+            let range = client
+                .seal(Some(&config.placement_manager), request)
+                .await?;
+            assert_eq!(0, range.stream_id());
+            assert_eq!(0, range.index());
+            assert_eq!(0, range.epoch());
+            assert_eq!(0, range.start());
+            assert_eq!(Some(100), range.end());
+            Ok(())
+        })
+    }
+
+    /// Test seal data node with end. This RPC is used when the single writer takes over a stream from a graceful closed writer.
+    #[test]
+    fn test_seal_data_node_with_end() -> Result<(), ClientError> {
+        test_util::try_init_log();
+        tokio_uring::start(async move {
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener().await;
+            let mut config = config::Configuration::default();
+            config.placement_manager = format!("localhost:{}", port);
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.check_and_apply().unwrap();
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(Arc::clone(&config), tx);
+            let request = SealRange {
+                kind: SealKind::DATA_NODE,
+                range: Range::new(0, 0, 0, 0, Some(1)),
+            };
+            let range = client
+                .seal(Some(&config.placement_manager), request)
+                .await?;
+            assert_eq!(0, range.stream_id());
+            assert_eq!(0, range.index());
+            assert_eq!(0, range.epoch());
+            assert_eq!(0, range.start());
+            assert_eq!(Some(1), range.end());
+            Ok(())
+        })
+    }
+
+    /// Test seal placement manager.
+    #[test]
+    fn test_seal_placement_manager() -> Result<(), ClientError> {
+        test_util::try_init_log();
+        tokio_uring::start(async move {
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener().await;
+            let mut config = config::Configuration::default();
+            config.placement_manager = format!("localhost:{}", port);
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.check_and_apply().unwrap();
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(Arc::clone(&config), tx);
+            let request = SealRange {
+                kind: SealKind::PLACEMENT_MANAGER,
+                range: Range::new(0, 0, 0, 0, Some(1)),
+            };
+            let range = client
+                .seal(Some(&config.placement_manager), request)
+                .await?;
+            assert_eq!(0, range.stream_id());
+            assert_eq!(0, range.index());
+            assert_eq!(0, range.epoch());
+            assert_eq!(0, range.start());
+            assert_eq!(Some(1), range.end());
+            Ok(())
+        })
+    }
+
     #[test]
     fn test_report_metrics() -> Result<(), ClientError> {
         tokio_uring::start(async {

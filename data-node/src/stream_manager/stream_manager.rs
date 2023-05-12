@@ -249,14 +249,7 @@ impl StreamManager {
             range.start()
         );
         debug_assert_eq!(-1, range.end());
-        let mut stream_range = Range::new(
-            stream_id,
-            0,
-            range_index,
-            range.start() as u64,
-            range.start() as u64,
-            None,
-        );
+        let mut stream_range = Range::new(stream_id, range_index, 0, range.start() as u64, None);
         range.nodes().iter().flatten().for_each(|node| {
             let data_node = DataNode {
                 node_id: node.node_id(),
@@ -385,18 +378,7 @@ impl StreamManager {
     /// We need to update `limit` of the returning range if it is mutable.
     pub fn stream_range_of(&self, stream_id: i64, offset: u64) -> Option<Range> {
         if let Some(stream) = self.get_stream(stream_id) {
-            return stream.range_of(offset).and_then(|mut range| {
-                if !range.is_sealed() {
-                    if let Some(window) = self.windows.get(&stream_id) {
-                        // TODO: use window.commit when replica is implemented.
-                        // range.set_limit(window.commit)
-                        range.set_limit(window.next);
-                    } else {
-                        error!("Window should be present");
-                    }
-                }
-                Some(range)
-            });
+            return stream.range_of(offset).and_then(|range| Some(range));
         }
         None
     }
@@ -429,14 +411,13 @@ mod tests {
                                 if i < TOTAL - 1 {
                                     Range::new(
                                         stream_id,
-                                        0,
                                         i,
+                                        0,
                                         (i * 100) as u64,
-                                        ((i + 1) * 100) as u64,
                                         Some(((i + 1) * 100) as u64),
                                     )
                                 } else {
-                                    Range::new(stream_id, 0, i, (i * 100) as u64, 0, None)
+                                    Range::new(stream_id, i, 0, (i * 100) as u64, None)
                                 }
                             })
                             .collect::<Vec<_>>();
@@ -526,8 +507,8 @@ mod tests {
         let (recovery_completion_tx, _recovery_completion_rx) = tokio::sync::oneshot::channel();
         let store = Rc::new(ElasticStore::new(config, recovery_completion_tx)?);
         let mut stream_manager = StreamManager::new(fetcher, store);
-        let range1 = Range::new(0, 0, 0, 0, 10, Some(10));
-        let range2 = Range::new(0, 0, 1, 10, 0, None);
+        let range1 = Range::new(0, 0, 0, 0, Some(10));
+        let range2 = Range::new(0, 0, 1, 10, None);
         let mut stream = Stream::default();
         stream.ranges = vec![range1, range2];
         stream_manager.streams.insert(0, stream);
@@ -541,7 +522,6 @@ mod tests {
                 .expect("Stream range should exist");
             assert!(stream_range.is_sealed());
             assert_eq!(Some(10), stream_range.end());
-            assert_eq!(10, stream_range.limit());
             assert_eq!(0, stream_range.start());
             assert_eq!(0, stream_range.stream_id());
         }
@@ -550,7 +530,6 @@ mod tests {
             .stream_range_of(0, 30)
             .expect("Stream range should exist");
         assert_eq!(10, stream_range.start());
-        assert_eq!(100, stream_range.limit());
         assert_eq!(None, stream_range.end());
         Ok(())
     }

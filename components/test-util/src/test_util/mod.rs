@@ -284,6 +284,7 @@ pub async fn run_listener() -> u16 {
 
 fn serve_seal_range(req: &SealRangeRequest, response_frame: &mut Frame) {
     let request = req.unpack();
+    info!("SealRangeRequest: {request:?}");
 
     let mut response = SealRangeResponseT::default();
     let mut status_ok = StatusT::default();
@@ -312,8 +313,12 @@ fn serve_seal_range(req: &SealRangeRequest, response_frame: &mut Frame) {
             response.status = Box::new(status_bad_request);
         }
     };
+
     let mut range = request.range.clone();
-    range.end = 100;
+    if request.range.end < 0 {
+        range.end = request.range.start + 100;
+    }
+
     response.range = Some(range);
 
     let mut builder = flatbuffers::FlatBufferBuilder::new();

@@ -510,14 +510,14 @@ impl super::LocalRangeManager for Indexer {
                         if v.len() == 8 {
                             let mut value_reader = Cursor::new(&v[..]);
                             let start = value_reader.get_u64();
-                            Some(Range::new(stream_id, 0, id, start, 0, None))
+                            Some(Range::new(stream_id, id, 0, start, None))
                         } else {
                             debug_assert_eq!(v.len(), 8 + 8);
                             let mut value_reader = Cursor::new(&v[..]);
                             let start = value_reader.get_u64();
                             let end = value_reader.get_u64();
                             debug_assert!(start <= end, "Range start <= end should hold");
-                            Some(Range::new(stream_id, 0, id, start, end, Some(end)))
+                            Some(Range::new(stream_id, id, 0, start, Some(end)))
                         }
                     }
                 })
@@ -561,13 +561,13 @@ impl super::LocalRangeManager for Indexer {
                         if v.len() == 8 {
                             let mut value_reader = Cursor::new(&v[..]);
                             let start = value_reader.get_u64();
-                            Some(Range::new(_stream_id, 0, id, start, 0, None))
+                            Some(Range::new(_stream_id, id, 0, start, None))
                         } else {
                             debug_assert_eq!(v.len(), 8 + 8);
                             let mut value_reader = Cursor::new(&v[..]);
                             let start = value_reader.get_u64();
                             let end = value_reader.get_u64();
-                            Some(Range::new(_stream_id, 0, id, start, end, Some(end)))
+                            Some(Range::new(_stream_id, id, 0, start, Some(end)))
                         }
                     }
                 })

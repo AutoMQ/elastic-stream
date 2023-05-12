@@ -39,8 +39,9 @@ impl Stream {
                 if range.is_sealed() {
                     return Err(StreamError::AlreadySealed);
                 }
-                range.set_limit(committed);
-                Ok(range.seal())
+                range
+                    .seal(committed)
+                    .map_err(|_e| StreamError::AlreadySealed)
             } else {
                 Err(StreamError::RangeIndexMismatch {
                     target: range_index,
@@ -127,9 +128,9 @@ mod tests {
     fn test_sort_stream() {
         // Construct a stream with 3 ranges, and sort it.
         let mut stream: Stream = StreamT::default().into();
-        stream.push(Range::new(0, 0, 1, 0, 0, None));
-        stream.push(Range::new(0, 0, 0, 0, 0, None));
-        stream.push(Range::new(0, 0, 2, 0, 0, None));
+        stream.push(Range::new(0, 0, 1, 0, None));
+        stream.push(Range::new(0, 0, 0, 0, None));
+        stream.push(Range::new(0, 0, 2, 0, None));
         stream.sort();
 
         // Check the ranges are sorted by index.
@@ -142,9 +143,9 @@ mod tests {
     fn test_seal_stream() {
         // Construct a stream with 3 ranges, and seal the last range.
         let mut stream: Stream = StreamT::default().into();
-        stream.push(Range::new(0, 0, 0, 0, 10, None));
-        stream.push(Range::new(0, 0, 1, 10, 20, Some(20)));
-        stream.push(Range::new(0, 0, 2, 20, 30, None));
+        stream.push(Range::new(0, 0, 0, 0, None));
+        stream.push(Range::new(0, 0, 1, 10, Some(20)));
+        stream.push(Range::new(0, 0, 2, 20, None));
         stream.seal(0, 2).unwrap();
 
         // Check the last range is sealed.
@@ -158,10 +159,10 @@ mod tests {
 
         (0..10)
             .map(|i| {
-                let mut sr = Range::new(0, 0, i, i as u64 * 10, (i as u64 + 1) * 10, None);
+                let mut sr = Range::new(0, 0, i, i as u64 * 10, None);
                 // Seal the range if it's not the last one.
                 if i != 9 {
-                    let _ = sr.seal();
+                    let _ = sr.seal((i as u64 + 1) * 10);
                 }
                 sr
             })
@@ -176,7 +177,6 @@ mod tests {
 
         // Test the range method
         assert_eq!(stream.range(5).unwrap().start(), 50);
-        assert_eq!(stream.range(5).unwrap().limit(), 60);
         assert_eq!(stream.range(5).unwrap().is_sealed(), true);
     }
 }

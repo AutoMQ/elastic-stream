@@ -158,6 +158,7 @@ impl<'a> Fetch<'a> {
         response.payload = Some(payloads);
     }
 
+    /// TODO: this method is out of sync with new replication protocol.
     fn build_store_requests(
         &self,
         stream_manager: Rc<RefCell<StreamManager>>,
@@ -178,9 +179,8 @@ impl<'a> Fetch<'a> {
                     let max_offset = match range.end() {
                         // For a sealed range, the upper bound is the end offset(exclusive)
                         Some(end) => Some(end as i64),
-                        // For a non-sealed range, the upper bound is the limit offset(exclusive)
-                        // Please note that the stream manager only updates the limit offset after a successful replication
-                        None => Some(range.limit() as i64),
+                        // TODO: offset should have been filled in the client side.
+                        None => Some(0),
                     };
                     return Ok(ReadOptions {
                         stream_id: stream_id,

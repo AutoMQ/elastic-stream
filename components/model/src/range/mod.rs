@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use derivative::Derivative;
 use protocol::rpc::header::{DataNodeT, RangeT};
 
-use crate::data_node::DataNode;
+use crate::{data_node::DataNode, error::RangeError};
 
 /// Representation of a stream range in form of `[start, end)` in which `start` is inclusive and `end` is exclusive.
 /// If `start` == `end`, there will be no valid records in the range.
@@ -23,9 +23,6 @@ pub struct Range {
     /// The start slot index, inclusive.
     start: u64,
 
-    /// TODO: remove this field.
-    limit: u64,
-
     /// The end of the range, exclusive
     end: Option<u64>,
 
@@ -35,20 +32,12 @@ pub struct Range {
 }
 
 impl Range {
-    pub fn new(
-        stream_id: i64,
-        epoch: u64,
-        index: i32,
-        start: u64,
-        limit: u64,
-        end: Option<u64>,
-    ) -> Self {
+    pub fn new(stream_id: i64, index: i32, epoch: u64, start: u64, end: Option<u64>) -> Self {
         Self {
             stream_id,
-            epoch,
             index,
+            epoch,
             start,
-            limit,
             end,
             replica: vec![],
         }
@@ -74,18 +63,16 @@ impl Range {
         }
     }
 
-    /// Length of the range.
-    /// That is, number of records in the stream range.
-    pub fn len(&self) -> u64 {
-        self.limit - self.start
-    }
-
     pub fn stream_id(&self) -> i64 {
         self.stream_id
     }
 
     pub fn index(&self) -> i32 {
         self.index
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn start(&self) -> u64 {
@@ -96,30 +83,17 @@ impl Range {
         self.end
     }
 
-    pub fn limit(&self) -> u64 {
-        self.limit
-    }
-
-    /// Update `limit` of the range. Slots within `[start, limit)` shall hold valid records.
-    ///
-    /// if a range is immutable, it's not allowed to change its `limit`.
-    pub fn set_limit(&mut self, limit: u64) {
-        if self.end().is_none() {
-            self.limit = limit;
-        }
-    }
-
     pub fn is_sealed(&self) -> bool {
         self.end.is_some()
     }
 
-    pub fn seal(&mut self) -> u64 {
+    pub fn seal(&mut self, end: u64) -> Result<u64, RangeError> {
         match self.end {
             None => {
-                self.end = Some(self.limit);
-                self.limit
+                self.end = Some(end);
+                Ok(end)
             }
-            Some(offset) => offset,
+            Some(offset) => Err(RangeError::AlreadySealed(offset)),
         }
     }
 }
@@ -128,8 +102,8 @@ impl Display for Range {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{{stream-id={}, index={}}}=[{}, {}, {:?})",
-            self.stream_id, self.index, self.start, self.limit, self.end
+            "{{stream-id={}, index={}}}=[{}, {:?})",
+            self.stream_id, self.index, self.start, self.end
         )
     }
 }
@@ -171,10 +145,6 @@ impl From<&RangeT> for Range {
             epoch: value.epoch as u64,
             index: value.index,
             start: value.start as u64,
-            limit: match value.end {
-                -1 => value.start as u64,
-                offset => offset as u64,
-            },
             end: match value.end {
                 -1 => None,
                 offset => Some(offset as u64),
@@ -190,16 +160,14 @@ mod tests {
 
     #[test]
     fn test_take_slot() {
-        let mut range = Range::new(0, 0, 0, 0, 0, None);
+        let mut range = Range::new(0, 0, 0, 0, None);
         assert_eq!(range.is_sealed(), false);
-        assert_eq!(range.len(), 0);
-
-        range.set_limit(100);
-        assert_eq!(100, range.len());
-        assert_eq!(100, range.seal());
 
         // Double seal should return the same offset.
-        assert_eq!(100, range.seal());
+        assert_eq!(Ok(100), range.seal(100));
+        assert_eq!(range.is_sealed(), true);
+
+        assert_eq!(Err(RangeError::AlreadySealed(100)), range.seal(101));
 
         assert_eq!(range.is_sealed(), true);
     }
@@ -207,13 +175,13 @@ mod tests {
     #[test]
     fn test_contains() {
         // Test a sealed range that contains a given offset.
-        let range = Range::new(0, 0, 0, 0, 10, Some(10));
+        let range = Range::new(0, 0, 0, 0, Some(10));
         assert_eq!(range.contains(0), true);
         assert_eq!(range.contains(1), true);
         assert_eq!(range.contains(11), false);
 
         // Test a open range that contains a given offset.
-        let range = Range::new(0, 0, 0, 10, 20, None);
+        let range = Range::new(0, 0, 0, 10, None);
         assert_eq!(range.contains(0), false);
         assert_eq!(range.contains(11), true);
         assert_eq!(range.contains(21), true);
