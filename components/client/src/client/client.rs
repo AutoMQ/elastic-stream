@@ -423,26 +423,39 @@ mod tests {
             let client = Client::new(Arc::clone(&config), tx);
             let stream_id = 0;
             let index = 0;
-            let epoch = 0;
 
-            let mut payload = BytesMut::with_capacity(1024);
-            payload.resize(1024, 65);
+            const BATCH: i64 = 100;
+            const PAYLOAD_LENGTH: usize = 1024;
+
+            let mut payload = BytesMut::with_capacity(PAYLOAD_LENGTH);
+            payload.resize(PAYLOAD_LENGTH, 65);
             let payload = payload.freeze();
 
             let mut buf = BytesMut::new();
-            for i in 0..100 {
+            for i in 0..BATCH {
                 buf.put_i8(RecordMagic::Magic0 as i8);
-                let batch: FlatRecordBatch = RecordBatchBuilder::default()
+                let batch = RecordBatchBuilder::default()
                     .with_stream_id(stream_id)
                     .with_base_offset(i * 10)
                     .with_last_offset_delta(10)
                     .with_range_index(index)
                     .with_payload(payload.clone())
-                    .build()?
-                    .into()?;
-                let entry = batch.encode();
+                    .build()?;
+                let flat_batch = Into::<FlatRecordBatch>::into(batch);
+                let (slices, len) = flat_batch.encode();
+                buf.put_i32(len);
+                for slice in slices {
+                    buf.extend_from_slice(&slice);
+                }
+                buf.put_i32(PAYLOAD_LENGTH as i32);
+                buf.extend_from_slice(&payload);
             }
 
+            let response = client
+                .append(&config.placement_manager, buf.freeze())
+                .await?;
+
+            assert_eq!(response.len(), BATCH as usize);
             Ok(())
         })
     }
