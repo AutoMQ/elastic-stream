@@ -14,7 +14,7 @@ pub enum RecordMagic {
 pub const BASE_OFFSET_POS: usize = 1;
 
 // The length of the record batch prefix, which is the magic byte and the meta length.
-pub const RECORD_BATCH_PREFIX_LEN: usize = 1 + 4;
+pub const RECORD_BATCH_PREFIX_LEN: usize = 1 + 4 + 4;
 
 /// FlatRecordBatch is a flattened version of RecordBatch that is used for serialization.
 /// As the storage and network layout, the schema of FlatRecordBatch with magic 0 is given below:
@@ -92,7 +92,6 @@ impl FlatRecordBatch {
         if buf.len() != payload_len as usize {
             return Err(DecodeError::DataLengthMismatch);
         }
-        cur_ptr += 4;
 
         let batch_payload = buf_for_slice.slice(cur_ptr..(cur_ptr + payload_len as usize));
         buf.advance(payload_len as usize);
@@ -117,7 +116,7 @@ impl FlatRecordBatch {
         let mut total_len = RECORD_BATCH_PREFIX_LEN;
 
         let mut batch_prefix = BytesMut::with_capacity(total_len);
-        batch_prefix.put_i8(self.magic.unwrap_or(0));
+        batch_prefix.put_i8(self.magic.unwrap_or(RecordMagic::Magic0 as i8));
         batch_prefix.put_i32(meta_len as i32);
 
         // Insert the prefix to the first element of the bytes_vec.
@@ -131,7 +130,6 @@ impl FlatRecordBatch {
         let mut payload_len_buf = BytesMut::with_capacity(4);
         payload_len_buf.put_i32(self.payload.len() as i32);
         bytes_vec.push(payload_len_buf.freeze());
-        total_len += 4;
 
         // Push the payload to the bytes_vec.
         total_len += self.payload.len();

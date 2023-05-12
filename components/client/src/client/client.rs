@@ -194,6 +194,7 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use bytes::{BufMut, BytesMut};
+    use core::slice;
     use log::trace;
     use model::{
         range::Range,
@@ -439,7 +440,6 @@ mod tests {
 
             let mut buf = BytesMut::new();
             for i in 0..BATCH {
-                buf.put_i8(RecordMagic::Magic0 as i8);
                 let batch = RecordBatchBuilder::default()
                     .with_stream_id(stream_id)
                     .with_base_offset(i * 10)
@@ -448,10 +448,14 @@ mod tests {
                     .with_payload(payload.clone())
                     .build()?;
                 let flat_batch = Into::<FlatRecordBatch>::into(batch);
-                buf.put_i32(flat_batch.metadata.len() as i32);
-                buf.extend_from_slice(&flat_batch.metadata);
-                buf.put_i32(PAYLOAD_LENGTH as i32);
-                buf.extend_from_slice(&flat_batch.payload);
+                let (slices, total) = flat_batch.encode();
+                assert_eq!(
+                    total as usize,
+                    slices.iter().map(|s| s.len()).sum::<usize>()
+                );
+                for slice in &slices {
+                    buf.extend_from_slice(slice);
+                }
             }
 
             let response = client
