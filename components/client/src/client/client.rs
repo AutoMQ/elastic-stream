@@ -188,8 +188,17 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use bytes::{BufMut, BytesMut};
     use log::trace;
-    use model::{range::Range, request::seal::SealRange};
+    use model::{
+        range::Range,
+        record::{
+            flat_record::{FlatRecordBatch, RecordMagic},
+            RecordBatchBuilder,
+        },
+        request::seal::SealRange,
+        RecordBatch,
+    };
     use observation::metrics::{
         store_metrics::DataNodeStatistics,
         sys_metrics::{DiskStatistics, MemoryStatistics},
@@ -394,6 +403,46 @@ mod tests {
             assert_eq!(0, range.epoch());
             assert_eq!(0, range.start());
             assert_eq!(Some(1), range.end());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_append() -> Result<(), Box<dyn Error>> {
+        tokio_uring::start(async move {
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener().await;
+            let mut config = config::Configuration::default();
+            config.placement_manager = format!("localhost:{}", port);
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.check_and_apply().unwrap();
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(Arc::clone(&config), tx);
+            let stream_id = 0;
+            let index = 0;
+            let epoch = 0;
+
+            let mut payload = BytesMut::with_capacity(1024);
+            payload.resize(1024, 65);
+            let payload = payload.freeze();
+
+            let mut buf = BytesMut::new();
+            for i in 0..100 {
+                buf.put_i8(RecordMagic::Magic0 as i8);
+                let batch: FlatRecordBatch = RecordBatchBuilder::default()
+                    .with_stream_id(stream_id)
+                    .with_base_offset(i * 10)
+                    .with_last_offset_delta(10)
+                    .with_range_index(index)
+                    .with_payload(payload.clone())
+                    .build()?
+                    .into()?;
+                let entry = batch.encode();
+            }
+
             Ok(())
         })
     }
