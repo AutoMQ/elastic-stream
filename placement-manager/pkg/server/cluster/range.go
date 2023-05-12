@@ -145,16 +145,16 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 	if r.Index < lastRange.Index || !isWritable(lastRange) {
 		// Range already sealed.
 		logger.Error("range already sealed", zap.Int32("last-range-index", lastRange.Index))
-		return nil, ErrRangeAlreadySealed
+		return nil, errors.Wrapf(ErrRangeAlreadySealed, "range %d already sealed in stream %d", r.Index, r.StreamId)
 	}
 	if r.End < lastRange.Start {
 		logger.Error("invalid end offset", zap.Int64("end", r.End), zap.Int64("start", lastRange.Start))
-		return nil, errors.Wrapf(ErrInvalidEndOffset, "invalid end offset %d (< start offset %d) for range %d in stream %d",
+		return nil, errors.Wrapf(ErrInvalidEndOffset, "invalid end offset %d (less than start offset %d) for range %d in stream %d",
 			r.End, lastRange.Start, lastRange.Index, lastRange.StreamId)
 	}
 	if r.Epoch < lastRange.Epoch {
 		logger.Error("invalid epoch", zap.Int64("epoch", r.Epoch), zap.Int64("last-epoch", lastRange.Epoch))
-		return nil, errors.Wrapf(ErrExpiredRangeEpoch, "invalid epoch %d (< last epoch %d) for range %d in stream %d",
+		return nil, errors.Wrapf(ErrExpiredRangeEpoch, "invalid epoch %d (less than %d) for range %d in stream %d",
 			r.Epoch, lastRange.Epoch, lastRange.Index, lastRange.StreamId)
 	}
 
@@ -214,7 +214,7 @@ func (c *RaftCluster) CreateRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.
 	if r.Epoch < lastRange.Epoch {
 		// The range epoch is invalid.
 		logger.Error("invalid range epoch", zap.Int64("epoch", r.Epoch), zap.Int64("last-epoch", lastRange.Epoch))
-		return nil, errors.Wrapf(ErrExpiredRangeEpoch, "invalid range epoch %d (should be > %d) for range %d in stream %d", r.Epoch, lastRange.Epoch, r.Index, r.StreamId)
+		return nil, errors.Wrapf(ErrExpiredRangeEpoch, "invalid range epoch %d (less than %d) for range %d in stream %d", r.Epoch, lastRange.Epoch, r.Index, r.StreamId)
 	}
 
 	mu := c.sealMu(r.StreamId)
