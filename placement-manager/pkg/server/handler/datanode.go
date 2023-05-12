@@ -52,3 +52,14 @@ func (h *Handler) AllocateID(req *protocol.IDAllocationRequest, resp *protocol.I
 	logger.Info("allocate id", zap.String("host", req.Host), zap.Int32("allocated-id", id))
 	resp.OK()
 }
+
+func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse) {
+	// TODO
+	_ = req
+	resp.OK()
+}
+
+func (h *Handler) DescribePMCluster(_ *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
+	resp.Cluster = h.pmCluster()
+	resp.OK()
+}
