@@ -1,23 +1,21 @@
-use super::{invocation_context::InvocationContext, lb_policy::LbPolicy, session::Session};
-use crate::error::ClientError;
+use super::{lb_policy::LbPolicy, session::Session};
+use crate::{
+    error::ClientError, invocation_context::InvocationContext, request::RequestExtension,
+    response::ResponseExtension,
+};
 use bytes::Bytes;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
-    client_role::ClientRole,
-    payload::Payload,
-    range::Range,
-    range_criteria::RangeCriteria,
-    request::{seal::SealRange, Request},
-    response::{append::AppendResultEntry, Response},
-    PlacementManagerNode,
+    client_role::ClientRole, payload::Payload, range::Range, range_criteria::RangeCriteria,
+    AppendResultEntry, PlacementManagerNode,
 };
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
     sys_metrics::{DiskStatistics, MemoryStatistics},
     uring_metrics::UringStatistics,
 };
-use protocol::rpc::header::ErrorCode;
+use protocol::rpc::header::SealKind;
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -32,6 +30,8 @@ use tokio::{
     time::{self, timeout},
 };
 use tokio_uring::net::TcpStream;
+
+use crate::{request::Request, response::Response};
 
 pub(crate) struct CompositeSession {
     target: String,
@@ -182,10 +182,13 @@ impl CompositeSession {
         let now = Instant::now();
         *self.heartbeat_instant.borrow_mut() = now;
 
-        let request = Request::Heartbeat {
-            client_id: self.config.client.client_id.clone(),
-            role: ClientRole::DataNode,
-            data_node: Some(self.config.server.data_node()),
+        let request = Request {
+            timeout: self.config.client_io_timeout(),
+            extension: RequestExtension::Heartbeat {
+                client_id: self.config.client.client_id.clone(),
+                role: ClientRole::DataNode,
+                data_node: Some(self.config.server.data_node()),
+            },
         };
 
         let mut receivers = vec![];
@@ -208,15 +211,13 @@ impl CompositeSession {
         for item in res {
             match item {
                 Ok(response) => {
-                    if let Response::Heartbeat { status } = response {
-                        if status.code != ErrorCode::OK {
-                            error!(
-                                "Failed to maintain heartbeat to {}. Status-Message: `{}`",
-                                self.target, status.message
-                            );
-                            // TODO: refine error handling
-                            return Err(ClientError::ServerInternal);
-                        }
+                    if !response.ok() {
+                        error!(
+                            "Failed to maintain heartbeat to {}. Status-Message: `{}`",
+                            self.target, response.status.message
+                        );
+                        // TODO: refine error handling
+                        return Err(ClientError::ServerInternal);
                     }
                 }
                 Err(_e) => {}
@@ -228,13 +229,15 @@ impl CompositeSession {
     pub(crate) async fn allocate_id(
         &self,
         host: &str,
-        timeout: Duration,
+        timeout: Option<Duration>,
     ) -> Result<i32, ClientError> {
         self.try_reconnect().await;
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
-            let request = Request::AllocateId {
-                timeout: self.config.client_io_timeout(),
-                host: host.to_owned(),
+            let request = Request {
+                timeout: timeout.unwrap_or(self.config.client_io_timeout()),
+                extension: RequestExtension::AllocateId {
+                    host: host.to_owned(),
+                },
             };
             let (tx, rx) = oneshot::channel();
             if let Err(e) = session.write(request, tx).await {
@@ -245,27 +248,64 @@ impl CompositeSession {
                 return Err(ClientError::ConnectionRefused(self.target.to_owned()));
             }
 
-            if let Response::AllocateId { status, id } = rx.await.map_err(|e| {
+            let response = rx.await.map_err(|e| {
                 error!(
                     "Internal error while allocating ID from {}. Cause: {:?}",
                     self.target, e
                 );
                 ClientError::ClientInternal
-            })? {
-                if status.code != ErrorCode::OK {
-                    error!(
-                        "Failed to allocate ID from {}. Status-Message: `{}`",
-                        self.target, status.message
-                    );
-                    // TODO: refine error handling
-                    return Err(ClientError::ServerInternal);
-                }
+            })?;
 
+            if !response.ok() {
+                error!(
+                    "Failed to allocate ID from {}. Status-Message: `{}`",
+                    self.target, response.status.message
+                );
+                // TODO: refine error handling
+                return Err(ClientError::ServerInternal);
+            }
+
+            if let Some(ResponseExtension::AllocateId { id }) = response.extension {
                 return Ok(id);
+            } else {
+                unreachable!();
             }
         }
 
         Err(ClientError::ClientInternal)
+    }
+
+    /// Create the specified range to the target: placement manager or data node.
+    ///
+    /// If the target is placement manager, we need to select the session to the primary node;
+    pub(crate) async fn create_range(&self, range: Range) -> Result<(), ClientError> {
+        self.try_reconnect().await;
+
+        // TODO: If we are creating range on placement manager, we need to select the session to the primary node.
+        let session = self
+            .sessions
+            .borrow()
+            .iter()
+            .next()
+            .map(|(_addr, session)| session.clone())
+            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+
+        let (tx, rx) = oneshot::channel();
+
+        let request = Request {
+            timeout: self.config.client_io_timeout(),
+            extension: RequestExtension::CreateRange { range: range },
+        };
+
+        if let Err(ctx) = session.write(request, tx).await {
+            error!(
+                "Failed to send create-range request to {}. Cause: {:?}",
+                self.target, ctx
+            );
+            return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+        }
+
+        Ok(())
     }
 
     pub(crate) async fn list_range(
@@ -275,9 +315,9 @@ impl CompositeSession {
         self.try_reconnect().await;
         // TODO: apply load-balancing among `self.sessions`.
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
-            let request = Request::ListRange {
+            let request = Request {
                 timeout: self.config.client_io_timeout(),
-                criteria: criteria,
+                extension: RequestExtension::ListRange { criteria: criteria },
             };
             let (tx, rx) = oneshot::channel();
             if let Err(_ctx) = session.write(request, tx).await {
@@ -285,23 +325,27 @@ impl CompositeSession {
                 return Err(ClientError::ClientInternal);
             }
 
-            if let Response::ListRange { status, ranges } = rx.await.map_err(|e| {
+            let response = rx.await.map_err(|e| {
                 error!(
                     "Internal client error when listing ranges from {}. Cause: {:?}",
                     self.target, e
                 );
                 ClientError::ClientInternal
-            })? {
-                if status.code != ErrorCode::OK {
-                    error!(
-                        "Failed to list-ranges from {}. Status-Message: `{}`",
-                        self.target, status.message
-                    );
-                    // TODO: refine error handling
-                    return Err(ClientError::ServerInternal);
-                }
+            })?;
 
-                return Ok(ranges.unwrap_or_default());
+            if !response.ok() {
+                error!(
+                    "Failed to list-ranges from {}. Status-Message: `{}`",
+                    self.target, response.status.message
+                );
+                // TODO: refine error handling
+                return Err(ClientError::ServerInternal);
+            }
+
+            if let Some(ResponseExtension::ListRange { ranges }) = response.extension {
+                return ranges.ok_or(ClientError::ClientInternal);
+            } else {
+                unreachable!();
             }
         }
         Err(ClientError::ClientInternal)
@@ -336,7 +380,10 @@ impl CompositeSession {
 
         let (mut tx, rx) = oneshot::channel();
         let data_node = self.config.server.data_node();
-        let request = Request::DescribePlacementManager { data_node };
+        let request = Request {
+            timeout: self.config.client_io_timeout(),
+            extension: RequestExtension::DescribePlacementManager { data_node },
+        };
 
         let mut request_sent = false;
         'outer: loop {
@@ -383,16 +430,21 @@ impl CompositeSession {
         match time::timeout(self.config.client_connect_timeout(), rx).await {
             Ok(response) => match response {
                 Ok(response) => {
-                    if let Response::DescribePlacementManager { status, nodes } = response {
-                        if ErrorCode::OK == status.code {
+                    if !response.ok() {
+                        warn!(
+                            "Failed to describe placement manager cluster: {:?}",
+                            response.status
+                        );
+                        Err(ClientError::ServerInternal)
+                    } else {
+                        if let Some(ResponseExtension::DescribePlacementManager { nodes }) =
+                            response.extension
+                        {
                             trace!("Received placement manager cluster {:?}", nodes);
                             Ok(nodes)
                         } else {
-                            warn!("Failed to describe placement manager cluster: {:?}", status);
-                            Err(ClientError::ServerInternal)
+                            Err(ClientError::ClientInternal)
                         }
-                    } else {
-                        Err(ClientError::ClientInternal)
                     }
                 }
                 Err(_e) => Err(ClientError::ClientInternal),
@@ -415,7 +467,7 @@ impl CompositeSession {
     ///
     /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
     /// Final end value of the range will be resolved after MinCopy of data nodes responded.
-    pub(crate) async fn seal(&self, request: SealRange) -> Result<Range, ClientError> {
+    pub(crate) async fn seal(&self, kind: SealKind, range: Range) -> Result<Range, ClientError> {
         self.try_reconnect().await;
         // TODO: If the seal kind is PM, we need to pick the session/connection to the leader node.
         let session = self
@@ -425,9 +477,9 @@ impl CompositeSession {
             .next()
             .map(|(_addr, session)| session.clone())
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
-        let request = Request::SealRange {
+        let request = Request {
             timeout: self.config.client_io_timeout(),
-            request,
+            extension: RequestExtension::SealRange { kind, range },
         };
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
@@ -437,11 +489,13 @@ impl CompositeSession {
         }
 
         let response = rx.await.map_err(|_e| ClientError::ClientInternal)?;
-        if let Response::SealRange { status, range } = response {
-            if ErrorCode::OK != status.code {
-                warn!("Failed to seal range: {:?}", status);
-                return Err(ClientError::ServerInternal);
-            }
+        if !response.ok() {
+            warn!("Failed to seal range: {:?}", response.status);
+            return Err(ClientError::ServerInternal);
+        }
+
+        if let Some(ResponseExtension::SealRange { range }) = response.extension {
+            trace!("Sealed range {:?}", range);
             range.ok_or(ClientError::ClientInternal)
         } else {
             Err(ClientError::ClientInternal)
@@ -560,15 +614,15 @@ impl CompositeSession {
             .map(|(_addr, session)| session.clone())
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
 
-        let request = Request::Append {
+        let request = Request {
             timeout: self.config.client_io_timeout(),
-            buf,
+            extension: RequestExtension::Append { buf },
         };
 
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
             let request = ctx.request();
-            if let Request::Append { buf, .. } = request {
+            if let RequestExtension::Append { ref buf, .. } = request.extension {
                 if let Ok(entries) = Payload::parse_append_entries(buf) {
                     error!("Failed to append entries {entries:?}");
                 } else {
@@ -579,11 +633,13 @@ impl CompositeSession {
         }
 
         let response = rx.await.map_err(|_e| ClientError::ClientInternal)?;
-        if let Response::Append { status, entries } = response {
-            if ErrorCode::OK != status.code {
-                warn!("Failed to append: {:?}", status);
-                return Err(ClientError::Append(status.code));
-            }
+        if !response.ok() {
+            warn!("Failed to append: {:?}", response.status);
+            return Err(ClientError::ServerInternal);
+        }
+
+        if let Some(ResponseExtension::Append { entries }) = response.extension {
+            trace!("Append entries {:?}", entries);
             Ok(entries)
         } else {
             Err(ClientError::ClientInternal)
@@ -599,7 +655,7 @@ impl CompositeSession {
     ) -> Result<(), ClientError> {
         self.try_reconnect().await;
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
-            let request = Request::ReportMetrics {
+            let extension = RequestExtension::ReportMetrics {
                 data_node: self.config.server.data_node(),
                 disk_in_rate: disk_statistics.get_disk_in_rate(),
                 disk_out_rate: disk_statistics.get_disk_out_rate(),
@@ -619,6 +675,10 @@ impl CompositeSession {
                 range_missing_replica_cnt: 0,
                 range_active_cnt: 0,
             };
+            let request = Request {
+                timeout: self.config.client_io_timeout(),
+                extension,
+            };
             let (tx, rx) = oneshot::channel();
             if let Err(e) = session.write(request, tx).await {
                 error!(
@@ -628,23 +688,23 @@ impl CompositeSession {
                 return Err(ClientError::ConnectionRefused(self.target.to_owned()));
             }
 
-            if let Response::ReportMetrics { status } = rx.await.map_err(|e| {
+            let response = rx.await.map_err(|e| {
                 error!(
                     "Internal error while report metrics to  {}. Cause: {:?}",
                     self.target, e
                 );
                 ClientError::ClientInternal
-            })? {
-                if status.code != ErrorCode::OK {
-                    error!(
-                        "Failed to report metrics to {}. Status-Message: `{}`",
-                        self.target, status.message
-                    );
-                    return Err(ClientError::ServerInternal);
-                }
+            })?;
 
-                return Ok(());
+            if !response.ok() {
+                error!(
+                    "Failed to report metrics to {}. Status-Message: `{}`",
+                    self.target, response.status.message
+                );
+                return Err(ClientError::ServerInternal);
             }
+
+            return Ok(());
         }
 
         Err(ClientError::ClientInternal)

@@ -1,11 +1,10 @@
 use super::session_manager::SessionManager;
+
 use crate::error::ClientError;
+
 use bytes::Bytes;
 use log::{error, trace, warn};
-use model::{
-    range::Range, range_criteria::RangeCriteria, request::seal::SealRange,
-    response::append::AppendResultEntry,
-};
+use model::{range::Range, range_criteria::RangeCriteria, AppendResultEntry};
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
     sys_metrics::{DiskStatistics, MemoryStatistics},
@@ -36,7 +35,7 @@ impl Client {
         let session = session_manager
             .get_composite_session(&self.config.placement_manager)
             .await?;
-        let future = session.allocate_id(host, self.config.client_io_timeout());
+        let future = session.allocate_id(host, None);
         time::timeout(self.config.client_io_timeout(), future)
             .await
             .map_err(|e| {
@@ -105,13 +104,30 @@ impl Client {
         composite_session.heartbeat().await
     }
 
+    pub async fn create_range(&self, target: &str, range: Range) -> Result<(), ClientError> {
+        let session_manager = unsafe { &mut *self.session_manager.get() };
+        let composite_session = session_manager.get_composite_session(target).await?;
+        trace!("Create range to composite-channel={}", target);
+
+        let future = composite_session.create_range(range);
+        time::timeout(self.config.client_io_timeout(), future)
+            .await
+            .map_err(|e| {
+                error!("Timeout when create range. {}", e);
+                ClientError::RpcTimeout {
+                    timeout: self.config.client_io_timeout(),
+                }
+            })?
+    }
+
     pub async fn seal(
         &self,
         target: Option<&str>,
-        request: SealRange,
+        kind: SealKind,
+        range: Range,
     ) -> Result<Range, ClientError> {
         // Validate request
-        match request.kind {
+        match kind {
             SealKind::DATA_NODE => {
                 if target.is_none() {
                     error!("Target is required while seal range against data nodes");
@@ -119,7 +135,7 @@ impl Client {
                 }
             }
             SealKind::PLACEMENT_MANAGER => {
-                if request.range.end().is_none() {
+                if range.end().is_none() {
                     error!(
                         "SealRange.range.end MUST be present while seal against placement manager"
                     );
@@ -142,7 +158,7 @@ impl Client {
 
             Some(addr) => session_manager.get_composite_session(addr).await?,
         };
-        composite_session.seal(request).await
+        composite_session.seal(kind, range).await
     }
 
     /// Append data to a range.
@@ -193,17 +209,11 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use bytes::{BufMut, BytesMut};
-    use core::slice;
+    use bytes::BytesMut;
     use log::trace;
     use model::{
         range::Range,
-        record::{
-            flat_record::{FlatRecordBatch, RecordMagic},
-            RecordBatchBuilder,
-        },
-        request::seal::SealRange,
-        RecordBatch,
+        record::{flat_record::FlatRecordBatch, RecordBatchBuilder},
     };
     use observation::metrics::{
         store_metrics::DataNodeStatistics,
@@ -333,12 +343,9 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx);
-            let request = SealRange {
-                kind: SealKind::DATA_NODE,
-                range: Range::new(0, 0, 0, 0, None),
-            };
+            let range = Range::new(0, 0, 0, 0, None);
             let range = client
-                .seal(Some(&config.placement_manager), request)
+                .seal(Some(&config.placement_manager), SealKind::DATA_NODE, range)
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());
@@ -365,12 +372,9 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx);
-            let request = SealRange {
-                kind: SealKind::DATA_NODE,
-                range: Range::new(0, 0, 0, 0, Some(1)),
-            };
+            let range = Range::new(0, 0, 0, 0, Some(1));
             let range = client
-                .seal(Some(&config.placement_manager), request)
+                .seal(Some(&config.placement_manager), SealKind::DATA_NODE, range)
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());
@@ -397,12 +401,13 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx);
-            let request = SealRange {
-                kind: SealKind::PLACEMENT_MANAGER,
-                range: Range::new(0, 0, 0, 0, Some(1)),
-            };
+            let range = Range::new(0, 0, 0, 0, Some(1));
             let range = client
-                .seal(Some(&config.placement_manager), request)
+                .seal(
+                    Some(&config.placement_manager),
+                    SealKind::PLACEMENT_MANAGER,
+                    range,
+                )
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());

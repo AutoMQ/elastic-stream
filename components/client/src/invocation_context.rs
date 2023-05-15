@@ -1,11 +1,11 @@
 use std::cell::OnceCell;
 
+use crate::{request, response};
 use log::error;
-use model::{request, response};
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
-pub(crate) struct InvocationContext {
+pub struct InvocationContext {
     request: request::Request,
     pub(crate) response_observer: OnceCell<oneshot::Sender<response::Response>>,
 }

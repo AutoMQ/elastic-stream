@@ -15,6 +15,9 @@
 pub mod client;
 pub mod error;
 pub mod id_generator;
+pub mod invocation_context;
+pub mod request;
+pub mod response;
 
 pub use crate::client::client::Client;
 pub use crate::id_generator::IdGenerator;

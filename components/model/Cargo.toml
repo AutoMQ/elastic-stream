@@ -14,3 +14,5 @@ chrono = { workspace = true }
 strum = "0.24"
 strum_macros = "0.24"
 derivative = { workspace = true }
+codec = { path = "../codec" }
+log = { workspace = true }

@@ -1,17 +1,12 @@
+use crate::{
+    request::{Request, RequestExtension},
+    response,
+};
 use codec::{
     error::FrameError,
     frame::{Frame, OperationCode},
 };
-use model::{
-    payload::Payload,
-    request::Request,
-    response::{self, append::AppendResultEntry},
-    PlacementManagerNode, Status,
-};
-use protocol::rpc::header::{
-    AppendResponse, DescribePlacementManagerClusterResponse, ErrorCode, HeartbeatResponse,
-    IdAllocationResponse, ListRangeResponse, ReportMetricsResponse, SealRangeResponse, SystemError,
-};
+
 use transport::connection::Connection;
 
 use log::{error, info, trace, warn};
@@ -29,7 +24,7 @@ use tokio::sync::{
 };
 use tokio_uring::net::TcpStream;
 
-use super::invocation_context::InvocationContext;
+use crate::invocation_context::InvocationContext;
 
 pub(crate) struct Session {
     pub(crate) target: SocketAddr,
@@ -193,33 +188,37 @@ impl Session {
         frame.header = Some((&request).into());
 
         // Set operation code
-        match &request {
-            Request::Heartbeat { .. } => {
+        match &request.extension {
+            RequestExtension::Heartbeat { .. } => {
                 frame.operation_code = OperationCode::Heartbeat;
             }
 
-            Request::ListRange { .. } => {
+            RequestExtension::ListRange { .. } => {
                 frame.operation_code = OperationCode::ListRange;
             }
 
-            Request::AllocateId { .. } => {
+            RequestExtension::AllocateId { .. } => {
                 frame.operation_code = OperationCode::AllocateId;
             }
 
-            Request::DescribePlacementManager { .. } => {
+            RequestExtension::DescribePlacementManager { .. } => {
                 frame.operation_code = OperationCode::DescribePlacementManager;
             }
 
-            Request::SealRange { .. } => {
+            RequestExtension::CreateRange { .. } => {
+                frame.operation_code = OperationCode::CreateRange;
+            }
+
+            RequestExtension::SealRange { .. } => {
                 frame.operation_code = OperationCode::SealRange;
             }
 
-            Request::Append { buf, .. } => {
+            RequestExtension::Append { buf, .. } => {
                 frame.operation_code = OperationCode::Append;
                 frame.payload = Some(vec![buf.clone()]);
             }
 
-            Request::ReportMetrics { .. } => {
+            RequestExtension::ReportMetrics { .. } => {
                 frame.operation_code = OperationCode::ReportMetrics;
             }
         };
@@ -252,333 +251,6 @@ impl Session {
         Ok(())
     }
 
-    fn handle_heartbeat_response(frame: &Frame) -> response::Response {
-        let mut resp = response::Response::Heartbeat {
-            status: Status::ok(),
-        };
-        if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<HeartbeatResponse>(buf) {
-                Ok(heartbeat) => {
-                    trace!("Received Heartbeat response: {:?}", heartbeat);
-                    let hb = heartbeat.unpack();
-                    let _client_id = hb.client_id;
-                    let _client_role = hb.client_role;
-                    let _status = hb.status;
-                    if let response::Response::Heartbeat { ref mut status } = resp {
-                        *status = _status.as_ref().into();
-                    }
-                }
-
-                Err(e) => {
-                    error!("Failed to parse Heartbeat response header: {:?}", e);
-                }
-            }
-        }
-        resp
-    }
-
-    fn handle_list_ranges_response(frame: &Frame) -> response::Response {
-        let mut response = response::Response::ListRange {
-            status: Status::ok(),
-            ranges: None,
-        };
-        if let Some(ref buf) = frame.header {
-            if let Ok(list_ranges) = flatbuffers::root::<ListRangeResponse>(buf) {
-                let _ranges = list_ranges
-                    .unpack()
-                    .ranges
-                    .iter()
-                    .map(Into::into)
-                    .collect::<Vec<_>>();
-                if let response::Response::ListRange { ranges, .. } = &mut response {
-                    *ranges = Some(_ranges);
-                }
-            }
-        }
-        response
-    }
-
-    fn handle_allocate_id_response(frame: &Frame) -> response::Response {
-        let mut resp = response::Response::AllocateId {
-            status: Status::decode(),
-            id: -1,
-        };
-
-        if frame.system_error() {
-            if let Some(ref buf) = frame.header {
-                match flatbuffers::root::<SystemError>(buf) {
-                    Ok(error_response) => {
-                        let response = error_response.unpack();
-                        // Update status
-                        if let response::Response::AllocateId { ref mut status, .. } = resp {
-                            *status = response.status.as_ref().into();
-                        }
-                    }
-
-                    Err(e) => {
-                        // Deserialize error
-                        warn!(
-                            "Failed to decode `SystemError` using FlatBuffers. Cause: {}",
-                            e
-                        );
-                    }
-                }
-            }
-        } else if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<IdAllocationResponse>(buf) {
-                Ok(response) => {
-                    let response = response.unpack();
-                    if response.status.code == ErrorCode::OK {
-                        if let response::Response::AllocateId {
-                            ref mut id,
-                            ref mut status,
-                        } = resp
-                        {
-                            *id = response.id;
-                            *status = Status::ok();
-                        }
-                    } else if let response::Response::AllocateId {
-                        ref mut id,
-                        ref mut status,
-                    } = resp
-                    {
-                        *id = response.id;
-                        *status = response.status.as_ref().into();
-                    }
-                }
-                Err(e) => {
-                    // Deserialize error
-                    warn!( "Failed to decode `IdAllocation` response header using FlatBuffers. Cause: {}", e);
-                }
-            }
-        }
-
-        resp
-    }
-
-    fn handle_describe_placement_manager_response(frame: &Frame) -> response::Response {
-        let mut resp = response::Response::DescribePlacementManager {
-            status: Status::decode(),
-            nodes: None,
-        };
-
-        if frame.system_error() {
-            if let Some(ref buf) = frame.header {
-                match flatbuffers::root::<SystemError>(buf) {
-                    Ok(response) => {
-                        let response = response.unpack();
-                        // Update status
-                        if let response::Response::DescribePlacementManager {
-                            ref mut status, ..
-                        } = resp
-                        {
-                            *status = response.status.as_ref().into();
-                        }
-                    }
-                    Err(e) => {
-                        // Deserialize error
-                        warn!(
-                            "Failed to decode `SystemError` using FlatBuffers. Cause: {}",
-                            e
-                        );
-                    }
-                }
-            }
-        } else if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<DescribePlacementManagerClusterResponse>(buf) {
-                Ok(response) => {
-                    let response = response.unpack();
-                    if ErrorCode::OK == response.status.code {
-                        let nodes_ = response
-                            .cluster
-                            .nodes
-                            .iter()
-                            .map(Into::into)
-                            .collect::<Vec<PlacementManagerNode>>();
-
-                        if let response::Response::DescribePlacementManager {
-                            ref mut nodes,
-                            ref mut status,
-                        } = resp
-                        {
-                            *status = Status::ok();
-                            *nodes = Some(nodes_);
-                        }
-                    } else {
-                    }
-                }
-                Err(_e) => {
-                    // Deserialize error
-                    warn!( "Failed to decode `DescribePlacementManagerClusterResponse` response header using FlatBuffers. Cause: {}", _e);
-                }
-            }
-        }
-        resp
-    }
-
-    fn handle_seal_range_response(frame: &Frame, _ctx: &InvocationContext) -> response::Response {
-        let mut resp = response::Response::SealRange {
-            status: Status::decode(),
-            range: None,
-        };
-
-        if frame.system_error() {
-            if let Some(ref buf) = frame.header {
-                match flatbuffers::root::<SystemError>(buf) {
-                    Ok(response) => {
-                        let response = response.unpack();
-                        // Update status
-                        if let response::Response::SealRange { ref mut status, .. } = resp {
-                            *status = response.status.as_ref().into();
-                        }
-                    }
-                    Err(e) => {
-                        // Deserialize error
-                        warn!(
-                            "Failed to decode `SystemError` using FlatBuffers. Cause: {}",
-                            e
-                        );
-                    }
-                }
-            }
-        } else if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<SealRangeResponse>(buf) {
-                Ok(response) => {
-                    let response = response.unpack();
-                    if let response::Response::SealRange {
-                        ref mut status,
-                        ref mut range,
-                    } = resp
-                    {
-                        if response.status.code == ErrorCode::OK {
-                            *status = Status::ok();
-                            *range = response.range.clone().map(|range| range.as_ref().into());
-                        } else {
-                            *status = response.status.as_ref().into();
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to decode SealRangesResponse using FlatBuffers. Cause: {}",
-                        e
-                    );
-                }
-            }
-        }
-        resp
-    }
-
-    fn handle_report_metrics_response(frame: &Frame) -> response::Response {
-        let mut resp = response::Response::ReportMetrics {
-            status: Status::ok(),
-        };
-        if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<ReportMetricsResponse>(buf) {
-                Ok(report_metrics) => {
-                    trace!("Received Report Metrics response: {:?}", report_metrics);
-                    let hb = report_metrics.unpack();
-                    let _status = hb.status;
-                    if let response::Response::ReportMetrics { ref mut status } = resp {
-                        *status = _status.as_ref().into();
-                    }
-                }
-
-                Err(e) => {
-                    println!("buf = {:?}", buf);
-                    error!("Failed to parse Report Metrics response header: {:?}", e);
-                }
-            }
-        }
-        resp
-    }
-
-    fn handle_append_response(frame: &Frame, ctx: &InvocationContext) -> response::Response {
-        let mut resp = response::Response::Append {
-            status: Status::decode(),
-            entries: vec![],
-        };
-
-        if frame.system_error() {
-            if let Some(ref buf) = frame.header {
-                match flatbuffers::root::<SystemError>(buf) {
-                    Ok(system_error) => {
-                        let system_error = system_error.unpack();
-                        // Update status
-                        if let response::Response::Append { ref mut status, .. } = resp {
-                            *status = system_error.status.as_ref().into();
-                        }
-                    }
-                    Err(e) => {
-                        // Deserialize error
-                        warn!(
-                            "Failed to decode `SystemError` using FlatBuffers. Cause: {}",
-                            e
-                        );
-                    }
-                }
-            }
-        } else if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<AppendResponse>(buf) {
-                Ok(response) => {
-                    let response = response.unpack();
-                    if let response::Response::Append {
-                        ref mut status,
-                        entries: ref mut results,
-                    } = resp
-                    {
-                        if response.status.code == ErrorCode::OK {
-                            *status = Status::ok();
-
-                            let append_entries = if let Request::Append { buf, .. } = ctx.request()
-                            {
-                                match Payload::parse_append_entries(buf) {
-                                    Ok(entries) => entries,
-                                    Err(_e) => {
-                                        error!("Failed to parse append entries from request payload: {:?}", _e);
-                                        *status = Status::bad_request(
-                                            "Request payload corrupted.".to_owned(),
-                                        );
-                                        return resp;
-                                    }
-                                }
-                            } else {
-                                unreachable!()
-                            };
-
-                            if let Some(items) = response.entries {
-                                debug_assert_eq!(
-                                    append_entries.len(),
-                                    items.len(),
-                                    "Each append-entry should have a corresponding result."
-                                );
-                                *results = items
-                                    .into_iter()
-                                    .map(Into::<AppendResultEntry>::into)
-                                    .zip(append_entries.into_iter())
-                                    .map(|(mut result, entry)| {
-                                        result.entry = entry;
-                                        result
-                                    })
-                                    .collect();
-                            }
-                        } else {
-                            *status = response.status.as_ref().into();
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to decode AppendResponse using FlatBuffers. Cause: {}",
-                        e
-                    );
-                }
-            }
-        }
-
-        resp
-    }
-
     fn handle_response(inflight: &mut HashMap<u32, InvocationContext>, frame: Frame) {
         let stream_id = frame.stream_id;
         trace!(
@@ -589,64 +261,86 @@ impl Session {
 
         match inflight.remove(&stream_id) {
             Some(mut ctx) => {
-                let response = match frame.operation_code {
-                    OperationCode::Heartbeat => Self::handle_heartbeat_response(&frame),
+                let mut response = response::Response::new(frame.operation_code);
+                if frame.system_error() {
+                    response.on_system_error(&frame);
+                } else {
+                    match frame.operation_code {
+                        OperationCode::Heartbeat => {
+                            response.on_heartbeat(&frame);
+                        }
 
-                    OperationCode::ListRange => Self::handle_list_ranges_response(&frame),
+                        OperationCode::ListRange => {
+                            response.on_list_ranges(&frame);
+                        }
 
-                    OperationCode::Unknown => {
-                        warn!("Received an unknown operation code");
-                        return;
+                        OperationCode::Unknown => {
+                            warn!("Received an unknown operation code");
+                            return;
+                        }
+
+                        OperationCode::Ping => todo!(),
+
+                        OperationCode::GoAway => todo!(),
+
+                        OperationCode::AllocateId => {
+                            response.on_allocate_id(&frame);
+                        }
+
+                        OperationCode::Append => {
+                            response.on_append(&frame, &ctx);
+                        }
+
+                        OperationCode::Fetch => {
+                            warn!("Received an unexpected `Fetch` response");
+                            return;
+                        }
+
+                        OperationCode::CreateRange => {
+                            response.on_create_range(&frame, &ctx);
+                        }
+
+                        OperationCode::SealRange => {
+                            response.on_seal_range(&frame);
+                        }
+
+                        OperationCode::SyncRange => {
+                            warn!("Received an unexpected `SyncRanges` response");
+                            return;
+                        }
+
+                        OperationCode::CreateStream => {
+                            warn!("Received an unexpected `CreateStreams` response");
+                            return;
+                        }
+
+                        OperationCode::DeleteStream => {
+                            warn!("Received an unexpected `DeleteStreams` response");
+                            return;
+                        }
+
+                        OperationCode::UpdateStream => {
+                            warn!("Received an unexpected `UpdateStreams` response");
+                            return;
+                        }
+
+                        OperationCode::DescribeStream => {
+                            warn!("Received an unexpected `DescribeStreams` response");
+                            return;
+                        }
+
+                        OperationCode::TrimStream => todo!(),
+
+                        OperationCode::ReportMetrics => {
+                            response.on_report_metrics(&frame);
+                        }
+
+                        OperationCode::DescribePlacementManager => {
+                            response.on_describe_placement_manager(&frame);
+                        }
                     }
+                }
 
-                    OperationCode::Ping => todo!(),
-
-                    OperationCode::GoAway => todo!(),
-
-                    OperationCode::AllocateId => Self::handle_allocate_id_response(&frame),
-
-                    OperationCode::Append => Self::handle_append_response(&frame, &ctx),
-
-                    OperationCode::Fetch => {
-                        warn!("Received an unexpected `Fetch` response");
-                        return;
-                    }
-
-                    OperationCode::SealRange => Self::handle_seal_range_response(&frame, &ctx),
-
-                    OperationCode::SyncRange => {
-                        warn!("Received an unexpected `SyncRanges` response");
-                        return;
-                    }
-
-                    OperationCode::CreateStream => {
-                        warn!("Received an unexpected `CreateStreams` response");
-                        return;
-                    }
-
-                    OperationCode::DeleteStream => {
-                        warn!("Received an unexpected `DeleteStreams` response");
-                        return;
-                    }
-
-                    OperationCode::UpdateStream => {
-                        warn!("Received an unexpected `UpdateStreams` response");
-                        return;
-                    }
-
-                    OperationCode::DescribeStream => {
-                        warn!("Received an unexpected `DescribeStreams` response");
-                        return;
-                    }
-
-                    OperationCode::TrimStream => todo!(),
-
-                    OperationCode::ReportMetrics => Self::handle_report_metrics_response(&frame),
-
-                    OperationCode::DescribePlacementManager => {
-                        Self::handle_describe_placement_manager_response(&frame)
-                    }
-                };
                 ctx.write_response(response);
             }
             None => {
@@ -663,10 +357,7 @@ impl Drop for Session {
     fn drop(&mut self) {
         let requests = unsafe { &mut *self.inflight_requests.get() };
         requests.drain().for_each(|(_stream_id, mut ctx)| {
-            let aborted_response = response::Response::ListRange {
-                status: Status::pm_internal("Aborted".to_owned()),
-                ranges: None,
-            };
+            let aborted_response = response::Response::new(OperationCode::Unknown);
             ctx.write_response(aborted_response);
         });
     }

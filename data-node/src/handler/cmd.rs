@@ -7,7 +7,7 @@ use store::ElasticStore;
 use crate::stream_manager::StreamManager;
 
 use super::{
-    append::Append, fetch::Fetch, heartbeat::Heartbeat, ping::Ping,
+    append::Append, create_range::CreateRange, fetch::Fetch, heartbeat::Heartbeat, ping::Ping,
     seal_range::SealRange,
 };
 
@@ -15,6 +15,7 @@ use super::{
 pub(crate) enum Command<'a> {
     Append(Append<'a>),
     Fetch(Fetch<'a>),
+    CreateRange(CreateRange<'a>),
     SealRange(SealRange<'a>),
     Ping(Ping<'a>),
     Heartbeat(Heartbeat<'a>),
@@ -38,6 +39,10 @@ impl<'a> Command<'a> {
             OperationCode::Fetch => Ok(Command::Fetch(Fetch::parse_frame(frame)?)),
 
             OperationCode::ListRange => todo!(),
+
+            OperationCode::CreateRange => {
+                Ok(Command::CreateRange(CreateRange::parse_frame(frame)?))
+            }
 
             OperationCode::SealRange => Ok(Command::SealRange(SealRange::parse_frame(frame)?)),
 
@@ -65,6 +70,7 @@ impl<'a> Command<'a> {
             Command::Fetch(cmd) => cmd.apply(store, stream_manager, response).await,
             Command::Heartbeat(cmd) => cmd.apply(store, stream_manager, response).await,
             Command::Ping(cmd) => cmd.apply(store, stream_manager, response).await,
+            Command::CreateRange(cmd) => cmd.apply(store, stream_manager, response).await,
             Command::SealRange(cmd) => cmd.apply(store, stream_manager, response).await,
         }
     }

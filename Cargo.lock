@@ -1671,8 +1671,10 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "chrono",
+ "codec",
  "derivative",
  "flatbuffers",
+ "log",
  "protocol",
  "strum",
  "strum_macros",

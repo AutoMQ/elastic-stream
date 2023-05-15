@@ -1,18 +1,22 @@
-pub mod seal;
-
-use crate::{client_role::ClientRole, data_node::DataNode, range_criteria::RangeCriteria};
 use bytes::{Bytes, BytesMut};
+use model::{
+    client_role::ClientRole, data_node::DataNode, range::Range, range_criteria::RangeCriteria,
+};
 use protocol::rpc::header::{
-    AppendRequestT, DataNodeMetricsT, DescribePlacementManagerClusterRequestT, HeartbeatRequestT,
-    IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT, ReportMetricsRequestT,
-    SealRangeRequestT,
+    AppendRequestT, CreateRangeRequestT, DataNodeMetricsT, DescribePlacementManagerClusterRequestT,
+    HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT,
+    ReportMetricsRequestT, SealKind, SealRangeRequestT,
 };
 use std::time::Duration;
 
-use self::seal::SealRange;
+#[derive(Debug, Clone)]
+pub struct Request {
+    pub timeout: Duration,
+    pub extension: RequestExtension,
+}
 
 #[derive(Debug, Clone)]
-pub enum Request {
+pub enum RequestExtension {
     Heartbeat {
         client_id: String,
         role: ClientRole,
@@ -20,12 +24,10 @@ pub enum Request {
     },
 
     ListRange {
-        timeout: Duration,
         criteria: RangeCriteria,
     },
 
     AllocateId {
-        timeout: Duration,
         host: String,
     },
 
@@ -33,13 +35,16 @@ pub enum Request {
         data_node: DataNode,
     },
 
+    CreateRange {
+        range: Range,
+    },
+
     SealRange {
-        timeout: Duration,
-        request: SealRange,
+        kind: SealKind,
+        range: Range,
     },
 
     Append {
-        timeout: Duration,
         buf: Bytes,
     },
 
@@ -66,10 +71,10 @@ pub enum Request {
 }
 
 impl From<&Request> for Bytes {
-    fn from(request: &Request) -> Self {
+    fn from(req: &Request) -> Self {
         let mut builder = flatbuffers::FlatBufferBuilder::new();
-        match request {
-            Request::Heartbeat {
+        match &req.extension {
+            RequestExtension::Heartbeat {
                 client_id,
                 role,
                 data_node,
@@ -83,7 +88,7 @@ impl From<&Request> for Bytes {
                 builder.finish(heartbeat, None);
             }
 
-            Request::ListRange { timeout, criteria } => {
+            RequestExtension::ListRange { criteria } => {
                 let mut criteria_t = ListRangeCriteriaT::default();
                 match criteria {
                     RangeCriteria::StreamId(stream_id) => {
@@ -95,7 +100,7 @@ impl From<&Request> for Bytes {
                 };
 
                 let mut request = ListRangeRequestT::default();
-                request.timeout_ms = timeout.as_millis() as i32;
+                request.timeout_ms = req.timeout.as_millis() as i32;
                 request.criteria = Box::new(criteria_t);
 
                 // TODO: Fill more fields for ListRange request.
@@ -104,48 +109,55 @@ impl From<&Request> for Bytes {
                 builder.finish(req, None);
             }
 
-            Request::AllocateId { timeout: _, host } => {
+            RequestExtension::AllocateId { host } => {
                 let mut request = IdAllocationRequestT::default();
                 request.host = host.clone();
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }
 
-            Request::DescribePlacementManager { data_node } => {
+            RequestExtension::DescribePlacementManager { data_node } => {
                 let mut request = DescribePlacementManagerClusterRequestT::default();
                 request.data_node = Box::new(data_node.into());
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }
 
-            Request::SealRange { timeout, request } => {
-                let mut req = SealRangeRequestT::default();
-                req.timeout_ms = timeout.as_millis() as i32;
-                req.kind = request.kind;
-                let mut range_t = RangeT::default();
-                range_t.stream_id = request.range.stream_id() as i64;
-                range_t.index = request.range.index() as i32;
-                range_t.epoch = request.range.epoch() as i64;
-                range_t.start = request.range.start() as i64;
-                range_t.end = match request.range.end() {
-                    Some(offset) => offset as i64,
-                    None => -1,
-                };
-
-                req.range = Box::new(range_t);
-
-                let request = req.pack(&mut builder);
-                builder.finish(request, None);
-            }
-
-            Request::Append { timeout, buf: _ } => {
-                let mut request = AppendRequestT::default();
-                request.timeout_ms = timeout.as_millis() as i32;
+            RequestExtension::CreateRange { range } => {
+                let mut request = CreateRangeRequestT::default();
+                request.timeout_ms = req.timeout.as_millis() as i32;
+                request.range = Box::new(range.into());
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }
 
-            Request::ReportMetrics {
+            RequestExtension::SealRange { kind, range } => {
+                let mut request = SealRangeRequestT::default();
+                request.timeout_ms = req.timeout.as_millis() as i32;
+                request.kind = request.kind;
+                let mut range_t = RangeT::default();
+                range_t.stream_id = range.stream_id() as i64;
+                range_t.index = range.index() as i32;
+                range_t.epoch = range.epoch() as i64;
+                range_t.start = range.start() as i64;
+                range_t.end = match range.end() {
+                    Some(offset) => offset as i64,
+                    None => -1,
+                };
+
+                request.range = Box::new(range_t);
+                let request = request.pack(&mut builder);
+                builder.finish(request, None);
+            }
+
+            RequestExtension::Append { buf: _ } => {
+                let mut request = AppendRequestT::default();
+                request.timeout_ms = req.timeout.as_millis() as i32;
+                let request = request.pack(&mut builder);
+                builder.finish(request, None);
+            }
+
+            RequestExtension::ReportMetrics {
                 data_node,
                 disk_in_rate,
                 disk_out_rate,

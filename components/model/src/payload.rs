@@ -3,7 +3,7 @@ use std::io::Cursor;
 use bytes::{Buf, Bytes};
 use protocol::flat_model::records::RecordBatchMeta;
 
-use crate::{error::DecodeError, record::flat_record::RecordMagic, response::append::AppendEntry};
+use crate::{error::DecodeError, record::flat_record::RecordMagic, AppendEntry};
 
 pub struct Payload {}
 

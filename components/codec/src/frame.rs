@@ -374,6 +374,9 @@ pub enum OperationCode {
     // Syncs newly writable ranges to a data node to accelerate the availability of a newly created writable range.
     SyncRange = 0x2003,
 
+    // Create a new range for a stream.
+    CreateRange = 0x2004,
+
     // 0x3000 ~ 0x3FFF is reserved for stream management
 
     // Create a batch of streams.
