@@ -29,7 +29,7 @@ chrono = "0.4"
 ctrlc = "3.2.5"
 core_affinity = "0.8"
 crc = "3.0"
-crc32fast = "1.3"
+crc32fast = { version= "1.3", features = ["nightly"]}
 derivative = "2.2"
 futures = { version = "0.3" }
 itertools = {version = "0.10.5" }
