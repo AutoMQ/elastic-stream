@@ -1,8 +1,5 @@
 use super::{lb_policy::LbPolicy, session::Session};
-use crate::{
-    error::ClientError, invocation_context::InvocationContext, request::RequestExtension,
-    response::ResponseExtension,
-};
+use crate::{error::ClientError, invocation_context::InvocationContext};
 use bytes::Bytes;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
@@ -31,7 +28,7 @@ use tokio::{
 };
 use tokio_uring::net::TcpStream;
 
-use crate::{request::Request, response::Response};
+use crate::{request, response};
 
 pub(crate) struct CompositeSession {
     target: String,
@@ -182,9 +179,9 @@ impl CompositeSession {
         let now = Instant::now();
         *self.heartbeat_instant.borrow_mut() = now;
 
-        let request = Request {
+        let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            extension: RequestExtension::Heartbeat {
+            headers: request::Headers::Heartbeat {
                 client_id: self.config.client.client_id.clone(),
                 role: ClientRole::DataNode,
                 data_node: Some(self.config.server.data_node()),
@@ -205,7 +202,7 @@ impl CompositeSession {
             let _res: Vec<Result<(), InvocationContext>> = futures::future::join_all(futures).await;
         }
 
-        let res: Vec<Result<Response, oneshot::error::RecvError>> =
+        let res: Vec<Result<response::Response, oneshot::error::RecvError>> =
             futures::future::join_all(receivers).await;
 
         for item in res {
@@ -233,9 +230,9 @@ impl CompositeSession {
     ) -> Result<i32, ClientError> {
         self.try_reconnect().await;
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
-            let request = Request {
+            let request = request::Request {
                 timeout: timeout.unwrap_or(self.config.client_io_timeout()),
-                extension: RequestExtension::AllocateId {
+                headers: request::Headers::AllocateId {
                     host: host.to_owned(),
                 },
             };
@@ -265,7 +262,7 @@ impl CompositeSession {
                 return Err(ClientError::ServerInternal);
             }
 
-            if let Some(ResponseExtension::AllocateId { id }) = response.extension {
+            if let Some(response::Headers::AllocateId { id }) = response.headers {
                 return Ok(id);
             } else {
                 unreachable!();
@@ -292,9 +289,9 @@ impl CompositeSession {
 
         let (tx, rx) = oneshot::channel();
 
-        let request = Request {
+        let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            extension: RequestExtension::CreateRange { range: range },
+            headers: request::Headers::CreateRange { range: range },
         };
 
         if let Err(ctx) = session.write(request, tx).await {
@@ -315,9 +312,9 @@ impl CompositeSession {
         self.try_reconnect().await;
         // TODO: apply load-balancing among `self.sessions`.
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
-            let request = Request {
+            let request = request::Request {
                 timeout: self.config.client_io_timeout(),
-                extension: RequestExtension::ListRange { criteria },
+                headers: request::Headers::ListRange { criteria },
             };
             let (tx, rx) = oneshot::channel();
             if let Err(_ctx) = session.write(request, tx).await {
@@ -342,7 +339,7 @@ impl CompositeSession {
                 return Err(ClientError::ServerInternal);
             }
 
-            if let Some(ResponseExtension::ListRange { ranges }) = response.extension {
+            if let Some(response::Headers::ListRange { ranges }) = response.headers {
                 return ranges.ok_or(ClientError::ClientInternal);
             } else {
                 unreachable!();
@@ -380,9 +377,9 @@ impl CompositeSession {
 
         let (mut tx, rx) = oneshot::channel();
         let data_node = self.config.server.data_node();
-        let request = Request {
+        let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            extension: RequestExtension::DescribePlacementManager { data_node },
+            headers: request::Headers::DescribePlacementManager { data_node },
         };
 
         let mut request_sent = false;
@@ -437,8 +434,8 @@ impl CompositeSession {
                         );
                         Err(ClientError::ServerInternal)
                     } else {
-                        if let Some(ResponseExtension::DescribePlacementManager { nodes }) =
-                            response.extension
+                        if let Some(response::Headers::DescribePlacementManager { nodes }) =
+                            response.headers
                         {
                             trace!("Received placement manager cluster {:?}", nodes);
                             Ok(nodes)
@@ -481,9 +478,9 @@ impl CompositeSession {
             .next()
             .map(|(_addr, session)| session.clone())
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
-        let request = Request {
+        let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            extension: RequestExtension::SealRange { kind, range },
+            headers: request::Headers::SealRange { kind, range },
         };
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
@@ -498,7 +495,7 @@ impl CompositeSession {
             return Err(ClientError::ServerInternal);
         }
 
-        if let Some(ResponseExtension::SealRange { range }) = response.extension {
+        if let Some(response::Headers::SealRange { range }) = response.headers {
             trace!("Sealed range {:?}", range);
             range.ok_or(ClientError::ClientInternal)
         } else {
@@ -618,15 +615,15 @@ impl CompositeSession {
             .map(|(_addr, session)| session.clone())
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
 
-        let request = Request {
+        let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            extension: RequestExtension::Append { buf },
+            headers: request::Headers::Append { buf },
         };
 
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
             let request = ctx.request();
-            if let RequestExtension::Append { ref buf, .. } = request.extension {
+            if let request::Headers::Append { ref buf, .. } = request.headers {
                 if let Ok(entries) = Payload::parse_append_entries(buf) {
                     error!("Failed to append entries {entries:?}");
                 } else {
@@ -642,7 +639,7 @@ impl CompositeSession {
             return Err(ClientError::ServerInternal);
         }
 
-        if let Some(ResponseExtension::Append { entries }) = response.extension {
+        if let Some(response::Headers::Append { entries }) = response.headers {
             trace!("Append entries {:?}", entries);
             Ok(entries)
         } else {
@@ -659,7 +656,7 @@ impl CompositeSession {
     ) -> Result<(), ClientError> {
         self.try_reconnect().await;
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
-            let extension = RequestExtension::ReportMetrics {
+            let extension = request::Headers::ReportMetrics {
                 data_node: self.config.server.data_node(),
                 disk_in_rate: disk_statistics.get_disk_in_rate(),
                 disk_out_rate: disk_statistics.get_disk_out_rate(),
@@ -679,9 +676,9 @@ impl CompositeSession {
                 range_missing_replica_cnt: 0,
                 range_active_cnt: 0,
             };
-            let request = Request {
+            let request = request::Request {
                 timeout: self.config.client_io_timeout(),
-                extension,
+                headers: extension,
             };
             let (tx, rx) = oneshot::channel();
             if let Err(e) = session.write(request, tx).await {

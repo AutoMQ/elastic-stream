@@ -1,5 +1,4 @@
-use crate::request::Request;
-use crate::request::RequestExtension;
+use crate::request;
 use codec::frame::Frame;
 use codec::frame::OperationCode;
 use log::error;
@@ -32,7 +31,30 @@ pub struct Response {
     pub status: Status,
 
     /// Optional response extension, containing additional operation-code-specific data.
-    pub extension: Option<ResponseExtension>,
+    pub headers: Option<Headers>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Headers {
+    ListRange {
+        ranges: Option<Vec<RangeMetadata>>,
+    },
+
+    AllocateId {
+        id: i32,
+    },
+
+    DescribePlacementManager {
+        nodes: Option<Vec<PlacementManagerNode>>,
+    },
+
+    SealRange {
+        range: Option<RangeMetadata>,
+    },
+
+    Append {
+        entries: Vec<AppendResultEntry>,
+    },
 }
 
 impl Response {
@@ -40,7 +62,7 @@ impl Response {
         Self {
             operation_code,
             status: Status::decode(),
-            extension: None,
+            headers: None,
         }
     }
 
@@ -97,7 +119,7 @@ impl Response {
                     .iter()
                     .map(|item| Into::<RangeMetadata>::into(&item.unpack()))
                     .collect::<Vec<_>>();
-                self.extension = Some(ResponseExtension::ListRange {
+                self.headers = Some(Headers::ListRange {
                     ranges: Some(range),
                 });
             }
@@ -113,7 +135,7 @@ impl Response {
                         return;
                     }
                     self.status = Status::ok();
-                    self.extension = Some(ResponseExtension::AllocateId { id: response.id() });
+                    self.headers = Some(Headers::AllocateId { id: response.id() });
                 }
                 Err(e) => {
                     // Deserialize error
@@ -134,8 +156,8 @@ impl Response {
                     }
                     self.status = Status::ok();
 
-                    let append_entries = if let RequestExtension::Append { ref buf, .. } =
-                        ctx.request().extension
+                    let append_entries = if let request::Headers::Append { ref buf, .. } =
+                        ctx.request().headers
                     {
                         match Payload::parse_append_entries(buf) {
                             Ok(entries) => entries,
@@ -169,7 +191,7 @@ impl Response {
                             })
                             .collect();
 
-                        self.extension = Some(ResponseExtension::Append { entries });
+                        self.headers = Some(Headers::Append { entries });
                     }
                 }
                 Err(e) => {
@@ -190,8 +212,7 @@ impl Response {
                 Ok(response) => {
                     self.status = Into::<Status>::into(&response.status().unpack());
                     if self.status.code != ErrorCode::OK {
-                        if let RequestExtension::SealRange { kind, range } =
-                            &ctx.request().extension
+                        if let request::Headers::SealRange { kind, range } = &ctx.request().headers
                         {
                             warn!(
                                 "Seal range failed: seal-kind={:?}, range={:?}, status={:?}",
@@ -200,7 +221,7 @@ impl Response {
                         }
                         return;
                     }
-                    self.extension = Some(ResponseExtension::SealRange {
+                    self.headers = Some(Headers::SealRange {
                         range: response
                             .range()
                             .map(|range| Into::<RangeMetadata>::into(&range.unpack())),
@@ -249,8 +270,7 @@ impl Response {
                         .map(Into::into)
                         .collect::<Vec<PlacementManagerNode>>();
 
-                    self.extension =
-                        Some(ResponseExtension::DescribePlacementManager { nodes: Some(nodes) });
+                    self.headers = Some(Headers::DescribePlacementManager { nodes: Some(nodes) });
                 }
                 Err(_e) => {
                     // Deserialize error
@@ -259,27 +279,4 @@ impl Response {
             }
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum ResponseExtension {
-    ListRange {
-        ranges: Option<Vec<RangeMetadata>>,
-    },
-
-    AllocateId {
-        id: i32,
-    },
-
-    DescribePlacementManager {
-        nodes: Option<Vec<PlacementManagerNode>>,
-    },
-
-    SealRange {
-        range: Option<RangeMetadata>,
-    },
-
-    Append {
-        entries: Vec<AppendResultEntry>,
-    },
 }

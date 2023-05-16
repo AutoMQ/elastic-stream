@@ -1,7 +1,4 @@
-use crate::{
-    request::{Request, RequestExtension},
-    response,
-};
+use crate::{request, response};
 use codec::{
     error::FrameError,
     frame::{Frame, OperationCode},
@@ -175,7 +172,7 @@ impl Session {
 
     pub(crate) async fn write(
         &self,
-        request: Request,
+        request: request::Request,
         response_observer: oneshot::Sender<response::Response>,
     ) -> Result<(), InvocationContext> {
         trace!("Sending request {:?}", request);
@@ -188,37 +185,37 @@ impl Session {
         frame.header = Some((&request).into());
 
         // Set operation code
-        match &request.extension {
-            RequestExtension::Heartbeat { .. } => {
+        match &request.headers {
+            request::Headers::Heartbeat { .. } => {
                 frame.operation_code = OperationCode::Heartbeat;
             }
 
-            RequestExtension::ListRange { .. } => {
+            request::Headers::ListRange { .. } => {
                 frame.operation_code = OperationCode::ListRange;
             }
 
-            RequestExtension::AllocateId { .. } => {
+            request::Headers::AllocateId { .. } => {
                 frame.operation_code = OperationCode::AllocateId;
             }
 
-            RequestExtension::DescribePlacementManager { .. } => {
+            request::Headers::DescribePlacementManager { .. } => {
                 frame.operation_code = OperationCode::DescribePlacementManager;
             }
 
-            RequestExtension::CreateRange { .. } => {
+            request::Headers::CreateRange { .. } => {
                 frame.operation_code = OperationCode::CreateRange;
             }
 
-            RequestExtension::SealRange { .. } => {
+            request::Headers::SealRange { .. } => {
                 frame.operation_code = OperationCode::SealRange;
             }
 
-            RequestExtension::Append { buf, .. } => {
+            request::Headers::Append { buf, .. } => {
                 frame.operation_code = OperationCode::Append;
                 frame.payload = Some(vec![buf.clone()]);
             }
 
-            RequestExtension::ReportMetrics { .. } => {
+            request::Headers::ReportMetrics { .. } => {
                 frame.operation_code = OperationCode::ReportMetrics;
             }
         };
