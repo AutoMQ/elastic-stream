@@ -13,6 +13,8 @@ type RangeT struct {
 	Start int64 `json:"start"`
 	End int64 `json:"end"`
 	Nodes []*DataNodeT `json:"nodes"`
+	ReplicaCount int32 `json:"replica_count"`
+	AckCount int32 `json:"ack_count"`
 }
 
 func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
@@ -37,6 +39,8 @@ func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	RangeAddStart(builder, t.Start)
 	RangeAddEnd(builder, t.End)
 	RangeAddNodes(builder, nodesOffset)
+	RangeAddReplicaCount(builder, t.ReplicaCount)
+	RangeAddAckCount(builder, t.AckCount)
 	return RangeEnd(builder)
 }
 
@@ -53,6 +57,8 @@ func (rcv *Range) UnPackTo(t *RangeT) {
 		rcv.Nodes(&x, j)
 		t.Nodes[j] = x.UnPack()
 	}
+	t.ReplicaCount = rcv.ReplicaCount()
+	t.AckCount = rcv.AckCount()
 }
 
 func (rcv *Range) UnPack() *RangeT {
@@ -169,8 +175,32 @@ func (rcv *Range) NodesLength() int {
 	return 0
 }
 
+func (rcv *Range) ReplicaCount() int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
+	if o != 0 {
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
+	}
+	return -1
+}
+
+func (rcv *Range) MutateReplicaCount(n int32) bool {
+	return rcv._tab.MutateInt32Slot(16, n)
+}
+
+func (rcv *Range) AckCount() int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(18))
+	if o != 0 {
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
+	}
+	return -1
+}
+
+func (rcv *Range) MutateAckCount(n int32) bool {
+	return rcv._tab.MutateInt32Slot(18, n)
+}
+
 func RangeStart(builder *flatbuffers.Builder) {
-	builder.StartObject(6)
+	builder.StartObject(8)
 }
 func RangeAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(0, streamId, -1)
@@ -192,6 +222,12 @@ func RangeAddNodes(builder *flatbuffers.Builder, nodes flatbuffers.UOffsetT) {
 }
 func RangeStartNodesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
+}
+func RangeAddReplicaCount(builder *flatbuffers.Builder, replicaCount int32) {
+	builder.PrependInt32Slot(6, replicaCount, -1)
+}
+func RangeAddAckCount(builder *flatbuffers.Builder, ackCount int32) {
+	builder.PrependInt32Slot(7, ackCount, -1)
 }
 func RangeEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

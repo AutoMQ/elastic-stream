@@ -1,6 +1,7 @@
 use bytes::{Bytes, BytesMut};
 use model::{
-    client_role::ClientRole, data_node::DataNode, range::Range, range_criteria::RangeCriteria,
+    client_role::ClientRole, data_node::DataNode, range::RangeMetadata,
+    range_criteria::RangeCriteria,
 };
 use protocol::rpc::header::{
     AppendRequestT, CreateRangeRequestT, DataNodeMetricsT, DescribePlacementManagerClusterRequestT,
@@ -36,12 +37,12 @@ pub enum RequestExtension {
     },
 
     CreateRange {
-        range: Range,
+        range: RangeMetadata,
     },
 
     SealRange {
         kind: SealKind,
-        range: Range,
+        range: RangeMetadata,
     },
 
     Append {

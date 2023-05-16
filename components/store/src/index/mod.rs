@@ -1,5 +1,5 @@
 use crate::error::StoreError;
-use model::range::Range;
+use model::range::RangeMetadata;
 use tokio::sync::mpsc;
 
 pub(crate) mod compaction;
@@ -18,12 +18,12 @@ pub trait MinOffset {
 /// Trait of local range manger.
 pub trait LocalRangeManager {
     // TODO: error propagation
-    fn list_by_stream(&self, stream_id: i64, tx: mpsc::UnboundedSender<Range>);
+    fn list_by_stream(&self, stream_id: i64, tx: mpsc::UnboundedSender<RangeMetadata>);
 
     // TODO: error propagation
-    fn list(&self, tx: mpsc::UnboundedSender<Range>);
+    fn list(&self, tx: mpsc::UnboundedSender<RangeMetadata>);
 
-    fn seal(&self, stream_id: i64, range: &Range) -> Result<(), StoreError>;
+    fn seal(&self, stream_id: i64, range: &RangeMetadata) -> Result<(), StoreError>;
 
-    fn add(&self, stream_id: i64, range: &Range) -> Result<(), StoreError>;
+    fn add(&self, stream_id: i64, range: &RangeMetadata) -> Result<(), StoreError>;
 }

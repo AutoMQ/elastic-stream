@@ -17,7 +17,7 @@ use protocol::rpc::header::ReportMetricsResponse;
 use protocol::rpc::header::SealRangeResponse;
 use protocol::rpc::header::SystemError;
 
-use model::range::Range;
+use model::range::RangeMetadata;
 use model::PlacementManagerNode;
 use model::Status;
 
@@ -95,7 +95,7 @@ impl Response {
                 let range = response
                     .ranges()
                     .iter()
-                    .map(|item| Into::<Range>::into(&item.unpack()))
+                    .map(|item| Into::<RangeMetadata>::into(&item.unpack()))
                     .collect::<Vec<_>>();
                 self.extension = Some(ResponseExtension::ListRange {
                     ranges: Some(range),
@@ -203,7 +203,7 @@ impl Response {
                     self.extension = Some(ResponseExtension::SealRange {
                         range: response
                             .range()
-                            .map(|range| Into::<Range>::into(&range.unpack())),
+                            .map(|range| Into::<RangeMetadata>::into(&range.unpack())),
                     });
                 }
                 Err(e) => {
@@ -264,7 +264,7 @@ impl Response {
 #[derive(Debug, Clone)]
 pub enum ResponseExtension {
     ListRange {
-        ranges: Option<Vec<Range>>,
+        ranges: Option<Vec<RangeMetadata>>,
     },
 
     AllocateId {
@@ -276,7 +276,7 @@ pub enum ResponseExtension {
     },
 
     SealRange {
-        range: Option<Range>,
+        range: Option<RangeMetadata>,
     },
 
     Append {

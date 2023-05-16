@@ -10,9 +10,10 @@ use crate::{data_node::DataNode, error::RangeError};
 ///
 /// At the beginning, `end` will be `None` and it would grow as more slots are taken from the range.
 /// Once the range is sealed, it becomes immutable and its right boundary becomes fixed.
+/// TODO: add RangeReplicaMeta
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Clone)]
-pub struct Range {
+pub struct RangeMetadata {
     stream_id: i64,
 
     epoch: u64,
@@ -29,9 +30,18 @@ pub struct Range {
     /// List of data nodes, that all have identical records within the range.
     #[derivative(PartialEq = "ignore")]
     replica: Vec<DataNode>,
+
+    /// The range replica expected count. When cluster nodes count is less than replica count but
+    /// but larger than ack_count, the range can still be successfully created.
+    replica_count: u32,
+
+    /// The range replica ack count, only success ack > ack_count, then the write is success.
+    /// For seal range, success seal range must seal replica count >= (replica_count - ack_count + 1)
+    ack_count: u32,
 }
 
-impl Range {
+impl RangeMetadata {
+    // TODO: replace with new_range, after add RangeReplicaMeta
     pub fn new(stream_id: i64, index: i32, epoch: u64, start: u64, end: Option<u64>) -> Self {
         Self {
             stream_id,
@@ -40,6 +50,29 @@ impl Range {
             start,
             end,
             replica: vec![],
+            replica_count: 0,
+            ack_count: 0,
+        }
+    }
+
+    pub fn new_range(
+        stream_id: i64,
+        index: i32,
+        epoch: u64,
+        start: u64,
+        end: Option<u64>,
+        replica_count: u32,
+        ack_count: u32,
+    ) -> Self {
+        Self {
+            stream_id,
+            index,
+            epoch,
+            start,
+            end,
+            replica: vec![],
+            replica_count,
+            ack_count,
         }
     }
 
@@ -83,6 +116,14 @@ impl Range {
         self.end
     }
 
+    pub fn replica_count(&self) -> u32 {
+        self.replica_count
+    }
+
+    pub fn ack_count(&self) -> u32 {
+        self.ack_count
+    }
+
     pub fn is_sealed(&self) -> bool {
         self.end.is_some()
     }
@@ -98,7 +139,7 @@ impl Range {
     }
 }
 
-impl Display for Range {
+impl Display for RangeMetadata {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -108,8 +149,8 @@ impl Display for Range {
     }
 }
 
-impl From<&Range> for RangeT {
-    fn from(value: &Range) -> Self {
+impl From<&RangeMetadata> for RangeT {
+    fn from(value: &RangeMetadata) -> Self {
         let mut range = RangeT::default();
         range.stream_id = value.stream_id;
         range.epoch = value.epoch as i64;
@@ -132,7 +173,7 @@ impl From<&Range> for RangeT {
     }
 }
 
-impl From<&RangeT> for Range {
+impl From<&RangeT> for RangeMetadata {
     fn from(value: &RangeT) -> Self {
         let mut replica: Vec<DataNode> = vec![];
         if let Some(nodes) = &value.nodes {
@@ -150,6 +191,8 @@ impl From<&RangeT> for Range {
                 offset => Some(offset as u64),
             },
             replica,
+            replica_count: value.replica_count as u32,
+            ack_count: value.ack_count as u32,
         }
     }
 }
@@ -160,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_take_slot() {
-        let mut range = Range::new(0, 0, 0, 0, None);
+        let mut range = RangeMetadata::new(0, 0, 0, 0, None);
         assert_eq!(range.is_sealed(), false);
 
         // Double seal should return the same offset.
@@ -175,13 +218,13 @@ mod tests {
     #[test]
     fn test_contains() {
         // Test a sealed range that contains a given offset.
-        let range = Range::new(0, 0, 0, 0, Some(10));
+        let range = RangeMetadata::new(0, 0, 0, 0, Some(10));
         assert_eq!(range.contains(0), true);
         assert_eq!(range.contains(1), true);
         assert_eq!(range.contains(11), false);
 
         // Test a open range that contains a given offset.
-        let range = Range::new(0, 0, 0, 10, None);
+        let range = RangeMetadata::new(0, 0, 0, 10, None);
         assert_eq!(range.contains(0), false);
         assert_eq!(range.contains(11), true);
         assert_eq!(range.contains(21), true);

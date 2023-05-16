@@ -7,7 +7,7 @@ use bytes::Bytes;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
-    client_role::ClientRole, payload::Payload, range::Range, range_criteria::RangeCriteria,
+    client_role::ClientRole, payload::Payload, range::RangeMetadata, range_criteria::RangeCriteria,
     AppendResultEntry, PlacementManagerNode,
 };
 use observation::metrics::{
@@ -278,7 +278,7 @@ impl CompositeSession {
     /// Create the specified range to the target: placement manager or data node.
     ///
     /// If the target is placement manager, we need to select the session to the primary node;
-    pub(crate) async fn create_range(&self, range: Range) -> Result<(), ClientError> {
+    pub(crate) async fn create_range(&self, range: RangeMetadata) -> Result<(), ClientError> {
         self.try_reconnect().await;
 
         // TODO: If we are creating range on placement manager, we need to select the session to the primary node.
@@ -311,7 +311,7 @@ impl CompositeSession {
     pub(crate) async fn list_range(
         &self,
         criteria: RangeCriteria,
-    ) -> Result<Vec<Range>, ClientError> {
+    ) -> Result<Vec<RangeMetadata>, ClientError> {
         self.try_reconnect().await;
         // TODO: apply load-balancing among `self.sessions`.
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
@@ -467,7 +467,11 @@ impl CompositeSession {
     ///
     /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
     /// Final end value of the range will be resolved after MinCopy of data nodes responded.
-    pub(crate) async fn seal(&self, kind: SealKind, range: Range) -> Result<Range, ClientError> {
+    pub(crate) async fn seal(
+        &self,
+        kind: SealKind,
+        range: RangeMetadata,
+    ) -> Result<RangeMetadata, ClientError> {
         self.try_reconnect().await;
         // TODO: If the seal kind is PM, we need to pick the session/connection to the leader node.
         let session = self

@@ -17,6 +17,7 @@ pub(crate) struct Replicator {
     range: Weak<ReplicationRange>,
     confirm_offset: Rc<RefCell<u64>>,
     data_node: DataNode,
+    corrupted: bool,
 }
 
 impl Replicator {
@@ -35,6 +36,7 @@ impl Replicator {
             range: Rc::downgrade(&range),
             confirm_offset: Rc::new(RefCell::new(confirm_offset)),
             data_node,
+            corrupted: false,
         }
     }
 
@@ -98,5 +100,9 @@ impl Replicator {
                 }
             }
         });
+    }
+
+    pub fn corrupted(&self) -> bool {
+        self.corrupted
     }
 }

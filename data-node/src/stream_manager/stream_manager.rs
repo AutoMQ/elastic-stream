@@ -1,7 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use log::{error, info, trace, warn};
-use model::{data_node::DataNode, range::Range, stream::Stream};
+use model::{data_node::DataNode, range::RangeMetadata, stream::Stream};
 use store::{ElasticStore, Store};
 
 use crate::{error::ServiceError, stream_manager::append_window::AppendWindow};
@@ -249,7 +249,8 @@ impl StreamManager {
             range.start()
         );
         debug_assert_eq!(-1, range.end());
-        let mut stream_range = Range::new(stream_id, range_index, 0, range.start() as u64, None);
+        let mut stream_range =
+            RangeMetadata::new(stream_id, range_index, 0, range.start() as u64, None);
         range.nodes().iter().flatten().for_each(|node| {
             let data_node = DataNode {
                 node_id: node.node_id(),
@@ -376,7 +377,7 @@ impl StreamManager {
     ///
     /// # Note
     /// We need to update `limit` of the returning range if it is mutable.
-    pub fn stream_range_of(&self, stream_id: i64, offset: u64) -> Option<Range> {
+    pub fn stream_range_of(&self, stream_id: i64, offset: u64) -> Option<RangeMetadata> {
         if let Some(stream) = self.get_stream(stream_id) {
             return stream.range_of(offset).and_then(|range| Some(range));
         }
@@ -390,7 +391,7 @@ mod tests {
     use tokio::sync::{mpsc, oneshot};
 
     use log::trace;
-    use model::{range::Range, stream::Stream};
+    use model::{range::RangeMetadata, stream::Stream};
     use protocol::rpc::header::RangeT;
     use store::ElasticStore;
 
@@ -409,7 +410,7 @@ mod tests {
                         let ranges = (0..TOTAL)
                             .map(|i| {
                                 if i < TOTAL - 1 {
-                                    Range::new(
+                                    RangeMetadata::new(
                                         stream_id,
                                         i,
                                         0,
@@ -417,7 +418,7 @@ mod tests {
                                         Some(((i + 1) * 100) as u64),
                                     )
                                 } else {
-                                    Range::new(stream_id, i, 0, (i * 100) as u64, None)
+                                    RangeMetadata::new(stream_id, i, 0, (i * 100) as u64, None)
                                 }
                             })
                             .collect::<Vec<_>>();
@@ -507,8 +508,8 @@ mod tests {
         let (recovery_completion_tx, _recovery_completion_rx) = tokio::sync::oneshot::channel();
         let store = Rc::new(ElasticStore::new(config, recovery_completion_tx)?);
         let mut stream_manager = StreamManager::new(fetcher, store);
-        let range1 = Range::new(0, 0, 0, 0, Some(10));
-        let range2 = Range::new(0, 0, 1, 10, None);
+        let range1 = RangeMetadata::new(0, 0, 0, 0, Some(10));
+        let range2 = RangeMetadata::new(0, 0, 1, 10, None);
         let mut stream = Stream::default();
         stream.ranges = vec![range1, range2];
         stream_manager.streams.insert(0, stream);

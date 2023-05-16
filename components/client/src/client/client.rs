@@ -4,7 +4,7 @@ use crate::error::ClientError;
 
 use bytes::Bytes;
 use log::{error, trace, warn};
-use model::{range::Range, range_criteria::RangeCriteria, AppendResultEntry};
+use model::{range::RangeMetadata, range_criteria::RangeCriteria, AppendResultEntry};
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
     sys_metrics::{DiskStatistics, MemoryStatistics},
@@ -51,7 +51,10 @@ impl Client {
             })
     }
 
-    pub async fn list_range(&self, stream_id: Option<i64>) -> Result<Vec<Range>, ClientError> {
+    pub async fn list_range(
+        &self,
+        stream_id: Option<i64>,
+    ) -> Result<Vec<RangeMetadata>, ClientError> {
         let criteria = if let Some(stream_id) = stream_id {
             trace!(
                 "list_range from {}, stream-id={}",
@@ -104,7 +107,11 @@ impl Client {
         composite_session.heartbeat().await
     }
 
-    pub async fn create_range(&self, target: &str, range: Range) -> Result<(), ClientError> {
+    pub async fn create_range(
+        &self,
+        target: &str,
+        range: RangeMetadata,
+    ) -> Result<(), ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager.get_composite_session(target).await?;
         trace!("Create range to composite-channel={}", target);
@@ -124,8 +131,8 @@ impl Client {
         &self,
         target: Option<&str>,
         kind: SealKind,
-        range: Range,
-    ) -> Result<Range, ClientError> {
+        range: RangeMetadata,
+    ) -> Result<RangeMetadata, ClientError> {
         // Validate request
         match kind {
             SealKind::DATA_NODE => {
@@ -212,7 +219,7 @@ mod tests {
     use bytes::BytesMut;
     use log::trace;
     use model::{
-        range::Range,
+        range::RangeMetadata,
         record::{flat_record::FlatRecordBatch, RecordBatchBuilder},
     };
     use observation::metrics::{
@@ -345,7 +352,7 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx);
-            let range = Range::new(0, 0, 0, 0, None);
+            let range = RangeMetadata::new(0, 0, 0, 0, None);
             let range = client
                 .seal(Some(&config.placement_manager), SealKind::DATA_NODE, range)
                 .await?;
@@ -374,7 +381,7 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx);
-            let range = Range::new(0, 0, 0, 0, Some(1));
+            let range = RangeMetadata::new(0, 0, 0, 0, Some(1));
             let range = client
                 .seal(Some(&config.placement_manager), SealKind::DATA_NODE, range)
                 .await?;
@@ -403,7 +410,7 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx);
-            let range = Range::new(0, 0, 0, 0, Some(1));
+            let range = RangeMetadata::new(0, 0, 0, 0, Some(1));
             let range = client
                 .seal(
                     Some(&config.placement_manager),
