@@ -269,6 +269,7 @@ mod tests {
 
     #[test]
     fn test_list_range_by_stream() -> Result<(), ListRangeError> {
+        test_util::try_init_log();
         tokio_uring::start(async {
             #[allow(unused_variables)]
             let port = 2378;
@@ -299,6 +300,7 @@ mod tests {
 
     #[test]
     fn test_list_range_by_data_node() -> Result<(), ListRangeError> {
+        test_util::try_init_log();
         tokio_uring::start(async {
             #[allow(unused_variables)]
             let port = 2378;
@@ -474,6 +476,7 @@ mod tests {
 
     #[test]
     fn test_report_metrics() -> Result<(), ClientError> {
+        test_util::try_init_log();
         tokio_uring::start(async {
             #[allow(unused_variables)]
             let port = 2378;

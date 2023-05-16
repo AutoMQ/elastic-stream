@@ -317,7 +317,7 @@ impl CompositeSession {
         if let Some((_, session)) = self.sessions.borrow().iter().next() {
             let request = Request {
                 timeout: self.config.client_io_timeout(),
-                extension: RequestExtension::ListRange { criteria: criteria },
+                extension: RequestExtension::ListRange { criteria },
             };
             let (tx, rx) = oneshot::channel();
             if let Err(_ctx) = session.write(request, tx).await {

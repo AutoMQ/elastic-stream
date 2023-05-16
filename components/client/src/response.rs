@@ -88,17 +88,17 @@ impl Response {
     pub fn on_list_ranges(&mut self, frame: &Frame) {
         if let Some(ref buf) = frame.header {
             if let Ok(response) = flatbuffers::root::<ListRangeResponse>(buf) {
-                if response.status().code() != ErrorCode::OK {
-                    self.status = Into::<Status>::into(&response.status().unpack());
+                self.status = Into::<Status>::into(&response.status().unpack());
+                if self.status.code != ErrorCode::OK {
                     return;
                 }
-                let _ranges = response
+                let range = response
                     .ranges()
                     .iter()
                     .map(|item| Into::<Range>::into(&item.unpack()))
                     .collect::<Vec<_>>();
                 self.extension = Some(ResponseExtension::ListRange {
-                    ranges: Some(_ranges),
+                    ranges: Some(range),
                 });
             }
         }
@@ -184,18 +184,26 @@ impl Response {
 
     pub fn on_create_range(&mut self, frame: &Frame, ctx: &InvocationContext) {}
 
-    pub fn on_seal_range(&mut self, frame: &Frame) {
+    pub fn on_seal_range(&mut self, frame: &Frame, ctx: &InvocationContext) {
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<SealRangeResponse>(buf) {
                 Ok(response) => {
-                    let response = response.unpack();
-                    if response.status.code != ErrorCode::OK {
-                        self.status = response.status.as_ref().into();
+                    self.status = Into::<Status>::into(&response.status().unpack());
+                    if self.status.code != ErrorCode::OK {
+                        if let RequestExtension::SealRange { kind, range } =
+                            &ctx.request().extension
+                        {
+                            warn!(
+                                "Seal range failed: seal-kind={:?}, range={:?}, status={:?}",
+                                kind, range, self.status
+                            );
+                        }
                         return;
                     }
-                    self.status = Status::ok();
                     self.extension = Some(ResponseExtension::SealRange {
-                        range: response.range.clone().map(|range| range.as_ref().into()),
+                        range: response
+                            .range()
+                            .map(|range| Into::<Range>::into(&range.unpack())),
                     });
                 }
                 Err(e) => {

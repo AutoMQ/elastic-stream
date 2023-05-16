@@ -134,7 +134,7 @@ impl From<&Request> for Bytes {
             RequestExtension::SealRange { kind, range } => {
                 let mut request = SealRangeRequestT::default();
                 request.timeout_ms = req.timeout.as_millis() as i32;
-                request.kind = request.kind;
+                request.kind = *kind;
                 let mut range_t = RangeT::default();
                 range_t.stream_id = range.stream_id() as i64;
                 range_t.index = range.index() as i32;

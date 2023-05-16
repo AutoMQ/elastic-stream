@@ -301,7 +301,7 @@ impl Session {
                         }
 
                         OperationCode::SealRange => {
-                            response.on_seal_range(&frame);
+                            response.on_seal_range(&frame, &ctx);
                         }
 
                         OperationCode::SyncRange => {
