@@ -13,7 +13,7 @@ use observation::metrics::{
     uring_metrics::UringStatistics,
 };
 use protocol::rpc::header::SealKind;
-use std::{cell::UnsafeCell, rc::Rc, sync::Arc};
+use std::{cell::UnsafeCell, rc::Rc, sync::Arc, time::Duration};
 use tokio::{sync::broadcast, time};
 
 /// `Client` is used to send
@@ -111,6 +111,26 @@ impl Client {
 
     pub async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ClientError> {
         unimplemented!()
+    }
+
+    pub async fn create_stream(
+        &self,
+        replica: u8,
+        retention: Duration,
+    ) -> Result<StreamMetadata, ClientError> {
+        let session_manager = unsafe { &mut *self.session_manager.get() };
+        let composite_session = session_manager
+            .get_composite_session(&self.config.placement_manager)
+            .await?;
+        let future = composite_session.create_stream(replica, retention);
+        time::timeout(self.config.client_io_timeout(), future)
+            .await
+            .map_err(|e| {
+                error!("Timeout when create stream. {}", e);
+                ClientError::RpcTimeout {
+                    timeout: self.config.client_io_timeout(),
+                }
+            })?
     }
 
     pub async fn create_range(

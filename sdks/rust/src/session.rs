@@ -186,11 +186,9 @@ impl Session {
                     )));
                 }
             }
-
-            if let Some(stream) = response.stream {
-                trace!("Created stream: {:?}", stream);
-                return Ok(Into::<StreamMetadata>::into(*stream));
-            }
+            let stream = response.stream;
+            trace!("Created stream: {:?}", stream);
+            return Ok(Into::<StreamMetadata>::into(*stream));
         }
         Err(ClientError::UnexpectedResponse("Bad response".to_owned()))
     }

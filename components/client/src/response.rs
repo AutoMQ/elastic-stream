@@ -6,9 +6,11 @@ use log::info;
 use log::trace;
 use log::warn;
 use model::payload::Payload;
+use model::stream::StreamMetadata;
 use model::AppendResultEntry;
 use protocol::rpc::header::AppendResponse;
 use protocol::rpc::header::CreateRangeResponse;
+use protocol::rpc::header::CreateStreamResponse;
 use protocol::rpc::header::DescribePlacementManagerClusterResponse;
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::HeartbeatResponse;
@@ -38,6 +40,10 @@ pub struct Response {
 
 #[derive(Debug, Clone)]
 pub enum Headers {
+    CreateStream {
+        stream: StreamMetadata,
+    },
+
     ListRange {
         ranges: Option<Vec<RangeMetadata>>,
     },
@@ -300,5 +306,29 @@ impl Response {
                 }
             }
         }
+    }
+
+    pub(crate) fn on_create_stream(&mut self, frame: &Frame, ctx: &InvocationContext) {
+        if let Some(ref buf) = frame.header {
+            match flatbuffers::root::<CreateStreamResponse>(buf) {
+                Ok(response) => {
+                    self.status = Into::<Status>::into(&response.status().unpack());
+                    if self.status.code != ErrorCode::OK {
+                        return;
+                    }
+
+                    let metadata = Into::<StreamMetadata>::into(response.stream().unpack());
+                    info!("Created stream={:?} on {}", metadata, ctx.target());
+                    self.headers = Some(Headers::CreateStream { stream: metadata });
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to decode CreateStreamResponse using FlatBuffers. Cause: {}",
+                        e
+                    );
+                }
+            }
+        }
+        todo!()
     }
 }

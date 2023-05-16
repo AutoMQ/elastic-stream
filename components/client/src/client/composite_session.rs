@@ -5,7 +5,7 @@ use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
     client_role::ClientRole, payload::Payload, range::RangeMetadata, range_criteria::RangeCriteria,
-    AppendResultEntry, PlacementManagerNode,
+    stream::StreamMetadata, AppendResultEntry, PlacementManagerNode,
 };
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
@@ -270,6 +270,40 @@ impl CompositeSession {
         }
 
         Err(ClientError::ClientInternal)
+    }
+
+    pub(crate) async fn create_stream(
+        &self,
+        replica: u8,
+        retention: Duration,
+    ) -> Result<StreamMetadata, ClientError> {
+        self.try_reconnect().await;
+
+        // TODO: If we are creating range on placement manager, we need to select the session to the primary node.
+        let session = self
+            .sessions
+            .borrow()
+            .iter()
+            .next()
+            .map(|(_addr, session)| session.clone())
+            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+
+        let (tx, rx) = oneshot::channel();
+        let request = request::Request {
+            timeout: self.config.client_io_timeout(),
+            headers: request::Headers::CreateStream { replica, retention },
+        };
+
+        if let Err(ctx) = session.write(request, tx).await {
+            error!(
+                "Failed to send create-stream request to {}. Cause: {:?}",
+                self.target, ctx
+            );
+            return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+        }
+
+
+        todo!()
     }
 
     /// Create the specified range to the target: placement manager or data node.

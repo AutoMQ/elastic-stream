@@ -190,6 +190,10 @@ impl Session {
                 frame.operation_code = OperationCode::Heartbeat;
             }
 
+            request::Headers::CreateStream { .. } => {
+                frame.operation_code = OperationCode::CreateStream;
+            }
+
             request::Headers::ListRange { .. } => {
                 frame.operation_code = OperationCode::ListRange;
             }
@@ -307,8 +311,7 @@ impl Session {
                         }
 
                         OperationCode::CreateStream => {
-                            warn!("Received an unexpected `CreateStreams` response");
-                            return;
+                            response.on_create_stream(&frame, &ctx);
                         }
 
                         OperationCode::DeleteStream => {

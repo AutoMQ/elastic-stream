@@ -8,7 +8,7 @@ use protocol::rpc::header::StreamT;
 /// stream are distributed among data-nodes.
 ///
 /// `Stream` on a specific data-node only cares about ranges that are located on it.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct StreamMetadata {
     /// Stream ID, unique within the cluster.
     pub stream_id: u64,

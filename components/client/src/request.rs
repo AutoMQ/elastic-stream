@@ -4,9 +4,10 @@ use model::{
     range_criteria::RangeCriteria,
 };
 use protocol::rpc::header::{
-    AppendRequestT, CreateRangeRequestT, DataNodeMetricsT, DescribePlacementManagerClusterRequestT,
-    HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT,
-    ReportMetricsRequestT, SealKind, SealRangeRequestT,
+    AppendRequestT, CreateRangeRequestT, CreateStreamRequestT, DataNodeMetricsT,
+    DescribePlacementManagerClusterRequestT, HeartbeatRequestT, IdAllocationRequestT,
+    ListRangeCriteriaT, ListRangeRequestT, RangeT, ReportMetricsRequestT, SealKind,
+    SealRangeRequestT, StreamT,
 };
 use std::time::Duration;
 
@@ -22,6 +23,11 @@ pub enum Headers {
         client_id: String,
         role: ClientRole,
         data_node: Option<DataNode>,
+    },
+
+    CreateStream {
+        replica: u8,
+        retention: Duration,
     },
 
     ListRange {
@@ -87,6 +93,16 @@ impl From<&Request> for Bytes {
                 heartbeat_request.data_node = data_node;
                 let heartbeat = heartbeat_request.pack(&mut builder);
                 builder.finish(heartbeat, None);
+            }
+
+            Headers::CreateStream { replica, retention } => {
+                let mut request = CreateStreamRequestT::default();
+                let mut stream = StreamT::default();
+                stream.replica = *replica as i8;
+                stream.retention_period_ms = retention.as_millis() as i64;
+                request.stream = Box::new(stream);
+                let request = request.pack(&mut builder);
+                builder.finish(request, None);
             }
 
             Headers::ListRange { criteria } => {
