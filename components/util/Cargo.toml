@@ -15,8 +15,7 @@ uuid = { workspace = true}
 crc32fast = { workspace = true }
 
 prometheus = {workspace = true}
-procfs =  {version = "0.12.0"}
-procinfo = { git = "https://github.com/tikv/procinfo-rs", rev = "6599eb9dca74229b2c1fcc44118bef7eff127128" }
+procfs = "0.15.1"
 lazy_static = {version = "1.4.0"}
 libc = "0.2.141"
 hyper = { version = "0.14.25", features = ["full"] }

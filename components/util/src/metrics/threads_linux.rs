@@ -7,9 +7,6 @@ use std::{
     time::Instant,
 };
 
-// use collections::HashMap;
-
-use procinfo::pid;
 use prometheus::{
     self,
     core::{Collector, Desc},
@@ -153,7 +150,7 @@ impl Collector for ThreadsCollector {
                 {
                     sanitize_thread_name(tid, thread_name)
                 } else {
-                    sanitize_thread_name(tid, &stat.command)
+                    sanitize_thread_name(tid, &stat.comm)
                 };
                 let cpu_total = metrics
                     .cpu_totals
@@ -164,43 +161,45 @@ impl Collector for ThreadsCollector {
                 // Threads states.
                 let state = metrics
                     .threads_state
-                    .get_metric_with_label_values(&[state_to_str(&stat.state)])
+                    .get_metric_with_label_values(&[stat.state.to_string().as_str()])
                     .unwrap();
                 state.inc();
+                if let Ok(proc) = procfs::process::Process::new(tid) {
+                    if let Ok(io) = proc.io() {
+                        let read_bytes = io.read_bytes;
+                        let write_bytes = io.write_bytes;
+                        // Threads IO.
+                        let read_total = metrics
+                            .io_totals
+                            .get_metric_with_label_values(&[&name, &format!("{}", tid), "read"])
+                            .unwrap();
+                        read_total.set(read_bytes as f64);
 
-                if let Ok(io) = pid::io_task(self.pid, tid) {
-                    let read_bytes = io.read_bytes;
-                    let write_bytes = io.write_bytes;
-                    // Threads IO.
-                    let read_total = metrics
-                        .io_totals
-                        .get_metric_with_label_values(&[&name, &format!("{}", tid), "read"])
-                        .unwrap();
-                    read_total.set(read_bytes as f64);
-
-                    let write_total = metrics
-                        .io_totals
-                        .get_metric_with_label_values(&[&name, &format!("{}", tid), "write"])
-                        .unwrap();
-                    write_total.set(write_bytes as f64);
+                        let write_total = metrics
+                            .io_totals
+                            .get_metric_with_label_values(&[&name, &format!("{}", tid), "write"])
+                            .unwrap();
+                        write_total.set(write_bytes as f64);
+                    }
                 }
 
-                if let Ok(status) = pid::status_task(self.pid, tid) {
+                if let Ok(status) = procfs::process::Process::new(tid).unwrap().status() {
                     // Thread voluntary context switches.
-                    let voluntary_ctxt_switches = status.voluntary_ctxt_switches;
-                    let voluntary_total = metrics
-                        .voluntary_ctxt_switches
-                        .get_metric_with_label_values(&[&name, &format!("{}", tid)])
-                        .unwrap();
-                    voluntary_total.set(voluntary_ctxt_switches as i64);
-
+                    if let Some(voluntary_ctxt_switches) = status.voluntary_ctxt_switches {
+                        let voluntary_total = metrics
+                            .voluntary_ctxt_switches
+                            .get_metric_with_label_values(&[&name, &format!("{}", tid)])
+                            .unwrap();
+                        voluntary_total.set(voluntary_ctxt_switches as i64);
+                    }
                     // Thread nonvoluntary context switches.
-                    let nonvoluntary_ctxt_switches = status.nonvoluntary_ctxt_switches;
-                    let nonvoluntary_total = metrics
-                        .nonvoluntary_ctxt_switches
-                        .get_metric_with_label_values(&[&name, &format!("{}", tid)])
-                        .unwrap();
-                    nonvoluntary_total.set(nonvoluntary_ctxt_switches as i64);
+                    if let Some(nonvoluntary_ctxt_switches) = status.nonvoluntary_ctxt_switches {
+                        let nonvoluntary_total = metrics
+                            .nonvoluntary_ctxt_switches
+                            .get_metric_with_label_values(&[&name, &format!("{}", tid)])
+                            .unwrap();
+                        nonvoluntary_total.set(nonvoluntary_ctxt_switches as i64);
+                    }
                 }
             }
         }
@@ -245,22 +244,6 @@ fn sanitize_thread_name(tid: Pid, raw: &str) -> String {
         name = format!("{}", tid)
     }
     name
-}
-
-fn state_to_str(state: &pid::State) -> &str {
-    match state {
-        pid::State::Running => "R",
-        pid::State::Sleeping => "S",
-        pid::State::Waiting => "D",
-        pid::State::Zombie => "Z",
-        pid::State::Stopped => "T",
-        pid::State::TraceStopped => "t",
-        pid::State::Paging => "W",
-        pid::State::Dead => "X",
-        pid::State::Wakekill => "K",
-        pid::State::Waking => "W",
-        pid::State::Parked => "P",
-    }
 }
 
 fn to_io_err(s: String) -> Error {
@@ -323,14 +306,16 @@ pub mod thread {
     use std::collections::HashMap;
 
     #[inline]
-    fn cpu_total(sys_time: i64, user_time: i64) -> f64 {
+    fn cpu_total(sys_time: u64, user_time: u64) -> f64 {
         (sys_time + user_time) as f64 / ticks_per_second() as f64
     }
 
     #[cfg(target_os = "linux")]
     pub mod linux {
+        use procfs::process::Stat;
+
         #[inline]
-        pub fn cpu_total(stat: &super::FullStat) -> f64 {
+        pub fn cpu_total(stat: &Stat) -> f64 {
             super::cpu_total(stat.stime, stat.utime)
         }
     }
@@ -344,7 +329,7 @@ pub mod thread {
         };
 
         pub use libc::pid_t as Pid;
-        pub use procinfo::pid::{self, Stat as FullStat};
+        use procfs::{process::Stat, ProcResult};
 
         lazy_static::lazy_static! {
             // getconf CLK_TCK
@@ -402,8 +387,8 @@ pub mod thread {
                 .collect())
         }
 
-        pub fn full_thread_stat(pid: Pid, tid: Pid) -> io::Result<FullStat> {
-            pid::stat_task(pid, tid)
+        pub fn full_thread_stat(pid: Pid, tid: Pid) -> ProcResult<Stat> {
+            procfs::process::Process::new(tid).unwrap().stat()
         }
     }
 

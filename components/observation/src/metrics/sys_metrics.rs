@@ -1,6 +1,5 @@
 use std::time::Instant;
 
-use procinfo::pid;
 use sysinfo::{DiskExt, System, SystemExt};
 
 pub struct DiskStatistics {
@@ -34,22 +33,24 @@ impl DiskStatistics {
             .as_millis() as i64
             / 1000;
         self.last_instant = current_instant;
-        if let Ok(io) = pid::io_self() {
-            // pid::io_self() accesses the file '/proc/self/io' and retrieves information about IO.
-            let read_bytes = io.read_bytes as i64;
-            let write_bytes = io.write_bytes as i64;
-            update_rate(
-                &mut self.disk_in_old,
-                &mut self.disk_in_rate,
-                read_bytes,
-                time_delta,
-            );
-            update_rate(
-                &mut self.disk_out_old,
-                &mut self.disk_out_rate,
-                write_bytes,
-                time_delta,
-            );
+        if let Ok(proc) = procfs::process::Process::myself() {
+            if let Ok(io) = proc.io() {
+                // proc.io() accesses the file '/proc/self/io' and retrieves information about IO.
+                let read_bytes = io.read_bytes as i64;
+                let write_bytes = io.write_bytes as i64;
+                update_rate(
+                    &mut self.disk_in_old,
+                    &mut self.disk_in_rate,
+                    read_bytes,
+                    time_delta,
+                );
+                update_rate(
+                    &mut self.disk_out_old,
+                    &mut self.disk_out_rate,
+                    write_bytes,
+                    time_delta,
+                );
+            }
         }
     }
     pub fn get_disk_in_rate(&self) -> i64 {
