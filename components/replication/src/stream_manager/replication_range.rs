@@ -68,7 +68,7 @@ impl ReplicationRange {
         // - when replica_count=3 and ack_count = 3, then result confirm offset = 1.
         // Example2: replicas confirmOffset = [1, corrupted, 3]
         // - when replica_count=3 and ack_count = 1, then result confirm offset = 3.
-        // - when replica_count=3 and ack_count = 2, then result confirm offset = 2.
+        // - when replica_count=3 and ack_count = 2, then result confirm offset = 3.
         // - when replica_count=3 and ack_count = 3, then result is ReplicationError.
         let confirm_offset_index = self.metadata.replica_count() - self.metadata.ack_count();
         self.replicators
