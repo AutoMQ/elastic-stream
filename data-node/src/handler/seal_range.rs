@@ -3,6 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use bytes::Bytes;
 use codec::frame::Frame;
 use log::{error, trace, warn};
+use model::range::RangeMetadata;
 use protocol::rpc::header::{ErrorCode, RangeT, SealRangeRequest, SealRangeResponseT, StatusT};
 use store::ElasticStore;
 
@@ -48,21 +49,19 @@ impl<'a> SealRange<'a> {
         let mut manager = stream_manager.borrow_mut();
 
         let range = request.range;
+        let mut range = Into::<RangeMetadata>::into(&*range);
 
-        match manager.seal(range.stream_id, range.index).await {
-            Ok(offset) => {
+        match manager.seal(&mut range).await {
+            Ok(_) => {
                 status.code = ErrorCode::OK;
                 status.message = Some(String::from("OK"));
-                let mut item = RangeT::default();
-                item.stream_id = range.stream_id;
-                item.index = range.index;
-                item.end = offset as i64;
-                seal_response.range = Some(Box::new(item));
+                seal_response.range = Some(Box::new(Into::<RangeT>::into(&range)));
             }
             Err(e) => {
                 error!(
                     "Failed to seal stream-id={}, range_index={}",
-                    range.stream_id, range.index
+                    range.stream_id(),
+                    range.index()
                 );
                 status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
                 status.message = Some(format!("{:?}", e));

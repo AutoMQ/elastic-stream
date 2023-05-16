@@ -3,9 +3,8 @@ use std::{cell::RefCell, rc::Rc};
 use bytes::Bytes;
 use codec::frame::Frame;
 use log::{error, trace, warn};
-use protocol::rpc::header::{
-    CreateRangeRequest, ErrorCode, RangeT, SealRangeRequest, SealRangeResponseT, StatusT,
-};
+use model::range::RangeMetadata;
+use protocol::rpc::header::{CreateRangeRequest, ErrorCode, SealRangeResponseT, StatusT};
 use store::ElasticStore;
 
 use crate::stream_manager::StreamManager;
@@ -43,19 +42,27 @@ impl<'a> CreateRange<'a> {
     ) {
         let request = self.request.unpack();
         let mut builder = flatbuffers::FlatBufferBuilder::new();
-        let mut seal_response = SealRangeResponseT::default();
-        let mut status = StatusT::default();
-        status.code = ErrorCode::OK;
-        status.message = Some(String::from("OK"));
+        let mut create_response = SealRangeResponseT::default();
+
         let mut manager = stream_manager.borrow_mut();
 
         let range = request.range;
+        let range: RangeMetadata = Into::<RangeMetadata>::into(&*range);
+        if let Err(e) = manager.create_range(range.clone()).await {
+            error!("Failed to create range: {:?}", e);
+            let mut status = StatusT::default();
+            status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
+            status.message = Some(format!("Failed to create range: {}", e.to_string()));
+            create_response.status = Box::new(status);
+        } else {
+            let mut status = StatusT::default();
+            status.code = ErrorCode::OK;
+            status.message = Some(String::from("OK"));
+            create_response.status = Box::new(status);
+            trace!("Created range={:?}", range);
+        }
 
-        // TODO: implement create range in StreamManager.
-        seal_response.status = Box::new(status);
-
-        trace!("{:?}", seal_response);
-        let resp = seal_response.pack(&mut builder);
+        let resp = create_response.pack(&mut builder);
         builder.finish(resp, None);
         let data = builder.finished_data();
         response.header = Some(Bytes::copy_from_slice(data));

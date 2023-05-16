@@ -10,7 +10,7 @@ use std::{
 use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
 use log::{error, info, trace, warn};
-use model::stream::Stream;
+use model::stream::StreamMetadata;
 use protocol::rpc::header::{
     CreateStreamRequestT, CreateStreamResponse, ErrorCode, PlacementManagerCluster, StreamT,
     SystemError,
@@ -99,7 +99,7 @@ impl Session {
         replica: i8,
         retention_period: Duration,
         timeout: Duration,
-    ) -> Result<Stream, ClientError> {
+    ) -> Result<StreamMetadata, ClientError> {
         let stream_id = STREAM_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
         {
@@ -189,7 +189,7 @@ impl Session {
 
             if let Some(stream) = response.stream {
                 trace!("Created stream: {:?}", stream);
-                return Ok(Into::<Stream>::into(*stream));
+                return Ok(Into::<StreamMetadata>::into(*stream));
             }
         }
         Err(ClientError::UnexpectedResponse("Bad response".to_owned()))

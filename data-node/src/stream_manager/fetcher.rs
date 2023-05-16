@@ -1,6 +1,6 @@
 use client::Client;
 use log::{error, trace};
-use model::range::RangeMetadata;
+use model::{range::RangeMetadata, stream::StreamMetadata};
 use std::rc::Rc;
 use tokio::sync::{mpsc, oneshot};
 
@@ -57,6 +57,10 @@ impl Fetcher {
             Fetcher::Channel { sender } => Self::fetch_from_peer_node(sender, stream_id).await,
             Fetcher::PlacementClient { client } => Self::fetch_by_client(client, stream_id).await,
         }
+    }
+
+    pub(crate) async fn stream(&self, stream_id: u64) -> Result<StreamMetadata, ServiceError> {
+        unimplemented!()
     }
 
     async fn fetch_by_client(

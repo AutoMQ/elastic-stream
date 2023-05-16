@@ -1,9 +1,10 @@
 use std::fmt::{self, Display, Formatter};
 
 use derivative::Derivative;
+use log::info;
 use protocol::rpc::header::{DataNodeT, RangeT};
 
-use crate::{data_node::DataNode, error::RangeError};
+use crate::data_node::DataNode;
 
 /// Representation of a stream range in form of `[start, end)` in which `start` is inclusive and `end` is exclusive.
 /// If `start` == `end`, there will be no valid records in the range.
@@ -128,13 +129,12 @@ impl RangeMetadata {
         self.end.is_some()
     }
 
-    pub fn seal(&mut self, end: u64) -> Result<u64, RangeError> {
-        match self.end {
-            None => {
-                self.end = Some(end);
-                Ok(end)
-            }
-            Some(offset) => Err(RangeError::AlreadySealed(offset)),
+    pub fn set_end(&mut self, end: u64) {
+        if let Some(ref mut e) = self.end {
+            info!("Change range end from {} to {}", *e, end);
+            *e = end;
+        } else {
+            self.end = Some(end);
         }
     }
 }
@@ -207,12 +207,9 @@ mod tests {
         assert_eq!(range.is_sealed(), false);
 
         // Double seal should return the same offset.
-        assert_eq!(Ok(100), range.seal(100));
+        range.set_end(100);
         assert_eq!(range.is_sealed(), true);
-
-        assert_eq!(Err(RangeError::AlreadySealed(100)), range.seal(101));
-
-        assert_eq!(range.is_sealed(), true);
+        assert_eq!(range.end(), Some(100));
     }
 
     #[test]

@@ -4,7 +4,9 @@ use crate::error::ClientError;
 
 use bytes::Bytes;
 use log::{error, trace, warn};
-use model::{range::RangeMetadata, range_criteria::RangeCriteria, AppendResultEntry};
+use model::{
+    range::RangeMetadata, range_criteria::RangeCriteria, stream::StreamMetadata, AppendResultEntry,
+};
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
     sys_metrics::{DiskStatistics, MemoryStatistics},
@@ -105,6 +107,10 @@ impl Client {
         trace!("Broadcast heartbeat to composite-channel={}", target);
 
         composite_session.heartbeat().await
+    }
+
+    pub async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ClientError> {
+        unimplemented!()
     }
 
     pub async fn create_range(

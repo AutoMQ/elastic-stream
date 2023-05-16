@@ -91,7 +91,10 @@ impl<'a> Fetch<'a> {
                         status: Some(ok_status),
                     };
                     payloads.push(fetch_result.results);
-                    protocol::rpc::header::FetchResultEntry::create(&mut builder, &fetch_result_args)
+                    protocol::rpc::header::FetchResultEntry::create(
+                        &mut builder,
+                        &fetch_result_args,
+                    )
                 }
                 Err(e) => {
                     warn!("Failed to fetch from store. Cause: {:?}", e);
@@ -114,7 +117,10 @@ impl<'a> Fetch<'a> {
                         batch_count: 0,
                         status: Some(status),
                     };
-                    protocol::rpc::header::FetchResultEntry::create(&mut builder, &fetch_result_args)
+                    protocol::rpc::header::FetchResultEntry::create(
+                        &mut builder,
+                        &fetch_result_args,
+                    )
                 }
             })
             .collect();
@@ -176,7 +182,7 @@ impl<'a> Fetch<'a> {
                     .borrow()
                     .stream_range_of(stream_id, req.fetch_offset() as u64)
                 {
-                    let max_offset = match range.end() {
+                    let max_offset = match range.metadata.end() {
                         // For a sealed range, the upper bound is the end offset(exclusive)
                         Some(end) => Some(end as i64),
                         // TODO: offset should have been filled in the client side.
@@ -184,7 +190,7 @@ impl<'a> Fetch<'a> {
                     };
                     return Ok(ReadOptions {
                         stream_id: stream_id,
-                        range: range.index() as u32,
+                        range: range.metadata.index() as u32,
                         offset: req.fetch_offset(),
                         max_offset: max_offset,
                         max_wait_ms: self.fetch_request.max_wait_ms(),

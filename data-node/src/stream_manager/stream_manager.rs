@@ -1,18 +1,18 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    rc::Rc,
+};
 
 use log::{error, info, trace, warn};
-use model::{data_node::DataNode, range::RangeMetadata, stream::Stream};
-use store::{ElasticStore, Store};
+use model::range::RangeMetadata;
+use store::ElasticStore;
 
-use crate::{error::ServiceError, stream_manager::append_window::AppendWindow};
+use crate::error::ServiceError;
 
-use super::fetcher::Fetcher;
+use super::{fetcher::Fetcher, range::Range, stream::Stream};
 
 pub(crate) struct StreamManager {
     streams: HashMap<i64, Stream>,
-
-    // TODO: `AppendWindow` should be a nested member of `Stream`.
-    windows: HashMap<i64, AppendWindow>,
 
     fetcher: Fetcher,
 
@@ -23,7 +23,6 @@ impl StreamManager {
     pub(crate) fn new(fetcher: Fetcher, store: Rc<ElasticStore>) -> Self {
         Self {
             streams: HashMap::new(),
-            windows: HashMap::new(),
             fetcher,
             store,
         }
@@ -49,309 +48,47 @@ impl StreamManager {
         let ranges = self.fetcher.bootstrap().await?;
 
         for range in ranges {
-            let stream = self.streams.entry(range.stream_id()).or_insert_with(|| {
-                let mut stream = Stream::default();
-                stream.stream_id = range.stream_id();
-                stream
-            });
-            stream.push(range);
-        }
-
-        self.streams.iter_mut().for_each(|(_, stream)| {
-            stream.sort();
-            if stream.is_mut() {
-                if let Some(range) = stream.last() {
-                    let stream_id = range.stream_id();
-                    let start = if let Some(offset) = self
-                        .store
-                        .max_record_offset(stream_id, range.index() as u32)
-                        .expect("Should get max record offset of given stream")
-                    {
-                        if offset > range.start() {
-                            offset
-                        } else {
-                            range.start()
-                        }
-                    } else {
-                        range.start()
-                    };
-                    let append_window = AppendWindow::new(range.index(), start);
-                    self.windows.insert(stream_id, append_window);
-                    trace!(
-                        "Create a new AppendWindow for stream={} with next={}",
-                        stream_id,
-                        range.start()
+            let entry = self.streams.entry(range.stream_id());
+            match entry {
+                Entry::Occupied(mut occupied) => {
+                    occupied.get_mut().create_range(range)?;
+                }
+                Entry::Vacant(vacant) => {
+                    let metadata = self.fetcher.stream(range.stream_id() as u64).await.expect(
+                        "Failed to fetch stream metadata from placement manager during bootstrap",
                     );
+                    let mut stream = Stream::new(metadata);
+                    stream.create_range(range)?;
+                    vacant.insert(stream);
                 }
             }
-        });
-
+        }
         Ok(())
     }
 
-    /// Build and update `AppendWindow` for the specified stream.
-    ///
-    fn build_append_window(&mut self, stream_id: i64) -> Result<(), ServiceError> {
-        if let Some(stream) = self.streams.get_mut(&stream_id) {
-            if stream.is_mut() {
-                let range = stream.last().ok_or_else(|| {
-                    error!("Last range of a mutable stream shall always be present and mutable");
-                    ServiceError::Internal(String::from("Inconsistent internal state"))
-                })?;
-                let window = AppendWindow::new(range.index(), range.start());
-                trace!("Created AppendWindow {:?} for stream={}", window, stream_id);
-                if let Some(prev) = self.windows.insert(stream_id, window) {
-                    if !prev.inflight.is_empty() {
-                        warn!(
-                            "Replaced AppendWindow still have {} inflight slots",
-                            prev.inflight.len()
-                        );
-                    }
-                }
-            } else {
-                trace!("Stream={} is immutable on current data-node", stream_id);
-            }
+    /// Create a new range for the specified stream.
+    pub(crate) async fn create_range(&mut self, range: RangeMetadata) -> Result<(), ServiceError> {
+        info!("Create range={:?}", range);
+        if let Some(stream) = self.streams.get_mut(&range.stream_id()) {
+            stream.create_range(range)
         } else {
-            warn!("No stream={} is found on current data-node", stream_id);
+            Err(ServiceError::NotFound("Service not found".to_owned()))
+        }
+    }
+
+    pub(crate) fn commit(&mut self, stream_id: i64, offset: u64) -> Result<(), ServiceError> {
+        if let Some(stream) = self.streams.get_mut(&stream_id) {
+            stream.commit(offset);
         }
 
         Ok(())
     }
 
-    /// Create `Stream` and `AppendWindow` according to metadata from placement manager.
-    ///
-    ///
-    async fn create_stream_if_missing(&mut self, stream_id: i64) -> Result<bool, ServiceError> {
-        // If, though unlikely, the stream is firstly assigned to it.
-        // TODO: https://doc.rust-lang.org/std/intrinsics/fn.unlikely.html
-        if !self.streams.contains_key(&stream_id) {
-            trace!("About to fetch ranges for stream[id={}]", stream_id);
-            let mut stream = Stream::default();
-            stream.stream_id = stream_id;
-            let node_id = self.store.id();
-            self.fetcher
-                .fetch(stream_id)
-                .await?
-                .into_iter()
-                .filter(|range| {
-                    // TODO: Enable filter after PM uses correct data-node ID
-                    range
-                        .replica()
-                        .iter()
-                        .map(|data_node| data_node.node_id)
-                        .any(|id| node_id == id || true)
-                })
-                .for_each(|range| {
-                    stream.push(range);
-                });
-            stream.sort();
-            self.streams.insert(stream_id, stream);
-            self.build_append_window(stream_id)?;
-            trace!("Created Stream[id={}]", stream_id);
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    /// Refresh stream ranges from placement-manager.
-    ///
-    async fn refresh_stream(&mut self, stream_id: i64) -> Result<(), ServiceError> {
-        let node_id = self.store.id();
-        let mut ranges = self
-            .fetcher
-            .fetch(stream_id)
-            .await?
-            .into_iter()
-            .filter(|range| {
-                range
-                    .replica()
-                    .iter()
-                    .map(|data_node| data_node.node_id)
-                    .any(|id| node_id == id)
-            })
-            .collect::<Vec<_>>();
-        ranges.sort_by(|a, b| a.index().cmp(&b.index()));
-
-        if let Some(stream) = self.streams.get_mut(&stream_id) {
-            // Max range index known
-            let start = match stream.last() {
-                Some(range) => range.index(),
-                None => -1,
-            };
-
-            // Filter and push new ranges into stream
-            ranges
-                .into_iter()
-                .filter(|range| range.index() > start)
-                .for_each(|range| {
-                    stream.push(range);
-                });
-        }
-        self.build_append_window(stream_id)?;
-        Ok(())
-    }
-
-    pub(crate) fn alloc_record_batch_slots(
-        &mut self,
-        range: protocol::rpc::header::Range,
-        batch_size: usize,
-    ) -> Result<u64, ServiceError> {
-        trace!(
-            "Allocate record slots in batch for stream={}, range-index={}, batch-size={}",
-            range.stream_id(),
-            range.index(),
-            batch_size
-        );
-
-        let stream_id = range.stream_id();
-        let range_index = range.index();
-
-        if let Some(window) = self.windows.get_mut(&stream_id) {
-            debug_assert_eq!(range_index, window.range_index);
-            let start_slot = window.alloc_batch_slots(batch_size);
-            return Ok(start_slot);
-        }
-
-        let stream = self.streams.entry(stream_id).or_insert_with(|| {
-            let mut stream = Stream::default();
-            stream.stream_id = stream_id;
-            stream
-        });
-
-        if let Some(range) = stream.last() {
-            if range.index() > range_index {
-                error!(
-                    "Target range to append has been sealed. Stream={}, target-range-index={}, last={}",
-                    stream_id,
-                    range_index,
-                    range.index()
-                );
-                return Err(ServiceError::AlreadySealed);
-            }
-
-            if range.index() == range_index && range.is_sealed() {
-                error!(
-                    "Target range to append has been sealed. Target range-index={}, stream={}",
-                    range_index, stream_id
-                );
-                return Err(ServiceError::AlreadySealed);
-            }
-
-            // The last range known should have been sealed.
-            debug_assert!(range.is_sealed());
-            // TODO: if the last range on data-node is not sealed, we need to double-check with placement managers
-        }
-
-        // Target range to append into is a new one. Let us create it, and its `AppendWindow`.
-        info!(
-            "Stream={} has a new range=[{}, -1)",
-            stream_id,
-            range.start()
-        );
-        debug_assert_eq!(-1, range.end());
-        let mut stream_range =
-            RangeMetadata::new(stream_id, range_index, 0, range.start() as u64, None);
-        range.nodes().iter().flatten().for_each(|node| {
-            let data_node = DataNode {
-                node_id: node.node_id(),
-                advertise_address: node.advertise_addr().to_owned(),
-            };
-            stream_range.replica_mut().push(data_node);
-        });
-
-        let mut append_window = AppendWindow::new(range_index, range.start() as u64);
-        let offset = append_window.alloc_batch_slots(batch_size);
-        stream.push(stream_range);
-        self.windows.insert(stream_id, append_window);
-        Ok(offset)
-    }
-
-    pub(crate) fn ack(&mut self, stream_id: i64, offset: u64) -> Result<(), ServiceError> {
-        if let Some(stream) = self.streams.get_mut(&stream_id) {
-            if !stream.is_mut() {
-                return Err(ServiceError::AlreadySealed);
-            }
-        }
-
-        if let Some(window) = self.windows.get_mut(&stream_id) {
-            window.ack(offset);
-        }
-        Ok(())
-    }
-
-    pub(crate) async fn seal(
-        &mut self,
-        stream_id: i64,
-        range_index: i32,
-    ) -> Result<u64, ServiceError> {
-        //
-        let just_created = self.create_stream_if_missing(stream_id).await?;
-
-        if let Some(stream) = self.streams.get_mut(&stream_id) {
-            if !stream.is_mut() && !just_created {
-                let need_refresh = match stream.last() {
-                    Some(range) => range.index() < range_index,
-                    None => true,
-                };
-                if need_refresh {
-                    self.refresh_stream(stream_id).await?;
-                }
-            }
-        }
-
-        if let Some(stream) = self.streams.get_mut(&stream_id) {
-            match stream.range(range_index) {
-                Some(range) => {
-                    // If the range has already been sealed.
-                    if let Some(end) = range.end() {
-                        return Ok(end);
-                    };
-
-                    // Paranoid check
-                    if let Some(window) = self.windows.get(&stream_id) {
-                        if range_index != window.range_index {
-                            error!( "Inconsistent state: AppendWindow range-index={}, target stream={}, range={}",
-                             window.range_index, stream_id, range_index);
-                            return Err(ServiceError::Seal);
-                        }
-                    }
-
-                    if let Some(range) = stream.last() {
-                        if range_index != range.index() {
-                            error!( "Inconsistent state of stream={}: Last range-index={}, target range={}",
-                            stream_id, range.index(), range_index);
-                            return Err(ServiceError::Seal);
-                        }
-                    }
-
-                    let committed = self
-                        .windows
-                        .remove(&stream_id)
-                        .ok_or_else(|| {
-                            error!("Mutable stream shall always have an AppendWindow");
-                            ServiceError::Internal(String::from(
-                                "Mutable stream without AppendWindow",
-                            ))
-                        })
-                        .map(|window| window.commit)?;
-                    stream
-                        .seal(committed, range_index)
-                        .map_err(|_e| ServiceError::Seal)
-                }
-                None => {
-                    error!(
-                        "Try to seal non-existing range[stream={}, index={}]",
-                        stream_id, range_index
-                    );
-                    return Err(ServiceError::Seal);
-                }
-            }
+    pub(crate) async fn seal(&mut self, range: &mut RangeMetadata) -> Result<(), ServiceError> {
+        if let Some(stream) = self.streams.get_mut(&range.stream_id()) {
+            stream.seal(range)
         } else {
-            error!(
-                "Try to seal a range[index={}] of a non-existing stream[id={}]",
-                range_index, stream_id
-            );
-            return Err(ServiceError::Seal);
+            Err(ServiceError::NotFound("Stream not found".to_owned()))
         }
     }
 
@@ -377,161 +114,11 @@ impl StreamManager {
     ///
     /// # Note
     /// We need to update `limit` of the returning range if it is mutable.
-    pub fn stream_range_of(&self, stream_id: i64, offset: u64) -> Option<RangeMetadata> {
+    pub fn stream_range_of(&self, stream_id: i64, offset: u64) -> Option<Range> {
         if let Some(stream) = self.get_stream(stream_id) {
-            return stream.range_of(offset).and_then(|range| Some(range));
+            stream.range_of(offset)
+        } else {
+            None
         }
-        None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{error::Error, fs::OpenOptions, io::Write, rc::Rc};
-    use tokio::sync::{mpsc, oneshot};
-
-    use log::trace;
-    use model::{range::RangeMetadata, stream::Stream};
-    use protocol::rpc::header::RangeT;
-    use store::ElasticStore;
-
-    use crate::stream_manager::{append_window::AppendWindow, fetcher::Fetcher, StreamManager};
-    const TOTAL: i32 = 16;
-
-    async fn create_fetcher() -> Fetcher {
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let fetcher = Fetcher::Channel { sender: tx };
-
-        tokio_uring::spawn(async move {
-            loop {
-                match rx.recv().await {
-                    Some(task) => {
-                        let stream_id = task.stream_id;
-                        let ranges = (0..TOTAL)
-                            .map(|i| {
-                                if i < TOTAL - 1 {
-                                    RangeMetadata::new(
-                                        stream_id,
-                                        i,
-                                        0,
-                                        (i * 100) as u64,
-                                        Some(((i + 1) * 100) as u64),
-                                    )
-                                } else {
-                                    RangeMetadata::new(stream_id, i, 0, (i * 100) as u64, None)
-                                }
-                            })
-                            .collect::<Vec<_>>();
-                        if let Err(_e) = task.tx.send(Ok(ranges)) {
-                            panic!("Failed to transfer mocked ranges");
-                        }
-                    }
-                    None => {
-                        break;
-                    }
-                }
-            }
-        });
-
-        fetcher
-    }
-
-    #[test]
-    fn test_seal() -> Result<(), Box<dyn Error>> {
-        let path = test_util::create_random_path()?;
-        trace!("Test store directory: {}", path.to_str().unwrap());
-        let _guard = test_util::DirectoryRemovalGuard::new(path.as_path());
-
-        let (port_tx, port_rx) = oneshot::channel();
-        let (stop_tx, stop_rx) = oneshot::channel();
-        let handle = std::thread::spawn(move || {
-            tokio_uring::start(async {
-                let port = test_util::run_listener().await;
-                let _ = port_tx.send(port);
-                let _ = stop_rx.await;
-            });
-        });
-        let port = port_rx.blocking_recv()?;
-        let store = test_util::build_store(
-            format!("localhost:{}", port),
-            path.as_path().to_str().expect("Store-path is invalid"),
-        );
-        let store = Rc::new(store);
-
-        tokio_uring::start(async {
-            let fetcher = create_fetcher().await;
-            let stream_id = 1;
-            let mut stream_manager = StreamManager::new(fetcher, store);
-            let mut range = RangeT::default();
-            range.stream_id = stream_id;
-            range.index = TOTAL - 1;
-            range.start = 0;
-            range.end = -1;
-            let mut builder = flatbuffers::FlatBufferBuilder::new();
-            let range = range.pack(&mut builder);
-            builder.finish(range, None);
-            let data = builder.finished_data();
-            let range = flatbuffers::root::<protocol::rpc::header::Range>(data).unwrap();
-            let offset = stream_manager.alloc_record_batch_slots(range, 1).unwrap();
-            stream_manager.ack(stream_id, offset).unwrap();
-            let seal_offset = stream_manager.seal(stream_id, TOTAL - 1).await.unwrap();
-            assert_eq!(offset + 1, seal_offset);
-        });
-
-        let _ = stop_tx.send(());
-        let _ = handle.join();
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_stream_range_of() -> Result<(), Box<dyn Error>> {
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-        let fetcher = Fetcher::Channel { sender: tx };
-        let mut config = config::Configuration::default();
-        let store_path = test_util::create_random_path()?;
-        let lock_path = store_path.join("LOCK");
-        let mut lock = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .write(true)
-            .open(lock_path.as_path())?;
-        let id = 0_i32;
-        lock.write_all(&id.to_be_bytes())?;
-        let _guard = test_util::DirectoryRemovalGuard::new(store_path.as_path());
-        config
-            .store
-            .path
-            .set_base(store_path.as_path().to_str().unwrap());
-        config.check_and_apply()?;
-
-        let (recovery_completion_tx, _recovery_completion_rx) = tokio::sync::oneshot::channel();
-        let store = Rc::new(ElasticStore::new(config, recovery_completion_tx)?);
-        let mut stream_manager = StreamManager::new(fetcher, store);
-        let range1 = RangeMetadata::new(0, 0, 0, 0, Some(10));
-        let range2 = RangeMetadata::new(0, 0, 1, 10, None);
-        let mut stream = Stream::default();
-        stream.ranges = vec![range1, range2];
-        stream_manager.streams.insert(0, stream);
-        let append_window = AppendWindow::new(0, 100);
-        stream_manager.windows.insert(0, append_window);
-
-        // Verify the sealed one
-        {
-            let stream_range = stream_manager
-                .stream_range_of(0, 5)
-                .expect("Stream range should exist");
-            assert!(stream_range.is_sealed());
-            assert_eq!(Some(10), stream_range.end());
-            assert_eq!(0, stream_range.start());
-            assert_eq!(0, stream_range.stream_id());
-        }
-
-        let stream_range = stream_manager
-            .stream_range_of(0, 30)
-            .expect("Stream range should exist");
-        assert_eq!(10, stream_range.start());
-        assert_eq!(None, stream_range.end());
-        Ok(())
     }
 }

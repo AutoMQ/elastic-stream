@@ -7,7 +7,7 @@ use futures::future::join_all;
 use log::{error, trace, warn};
 use model::record::flat_record::FlatRecordBatch;
 use protocol::rpc::header::{
-    AppendResultEntryArgs, AppendRequest, AppendResponseArgs, ErrorCode, StatusArgs,
+    AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
 };
 use std::{cell::RefCell, rc::Rc};
 use store::{
@@ -134,7 +134,7 @@ impl<'a> Append<'a> {
                     Ok(result) => {
                         if let Err(e) = stream_manager
                             .borrow_mut()
-                            .ack(result.stream_id, result.offset as u64)
+                            .commit(result.stream_id, result.offset as u64)
                         {
                             warn!(
                                 "Failed to ack offset on store completion to stream manager: {:?}",

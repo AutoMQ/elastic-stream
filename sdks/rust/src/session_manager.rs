@@ -1,4 +1,4 @@
-use model::stream::Stream;
+use model::stream::StreamMetadata;
 use std::sync::Arc;
 use tokio::{
     runtime::Runtime,
@@ -35,7 +35,7 @@ impl SessionManager {
         })
     }
 
-    pub(crate) async fn create_stream(&self) -> Result<Stream, ClientError> {
+    pub(crate) async fn create_stream(&self) -> Result<StreamMetadata, ClientError> {
         let (sender, receiver) = oneshot::channel();
         let command = Command::CreateStream {
             target: String::new(),

@@ -1,4 +1,4 @@
-use model::stream::Stream;
+use model::stream::StreamMetadata;
 
 use crate::{client_error::ClientError, session_manager::SessionManager};
 
@@ -7,7 +7,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn create_stream(&self) -> Result<Stream, ClientError> {
+    pub async fn create_stream(&self) -> Result<StreamMetadata, ClientError> {
         self.session_manager.create_stream().await
     }
 }
