@@ -221,7 +221,7 @@ impl Session {
         };
 
         let inflight_requests = unsafe { &mut *self.inflight_requests.get() };
-        let context = InvocationContext::new(request, response_observer);
+        let context = InvocationContext::new(self.target, request, response_observer);
         inflight_requests.insert(frame.stream_id, context);
 
         // Write frame to network

@@ -1,18 +1,19 @@
 //! Util functions for tests.
 //!
 
-use std::time::{Duration, Instant, UNIX_EPOCH};
+use std::time::{Duration, UNIX_EPOCH};
 
 use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
 use log::{debug, error, info, trace, warn};
 use model::payload::Payload;
 use protocol::rpc::header::{
-    AppendRequest, AppendResponseT, AppendResultEntryT, DescribePlacementManagerClusterRequest,
-    DescribePlacementManagerClusterResponseT, ErrorCode, HeartbeatRequest, HeartbeatResponseT,
-    IdAllocationRequest, IdAllocationResponseT, ListRangeRequest, ListRangeResponseT,
-    PlacementManagerClusterT, PlacementManagerNodeT, RangeT, ReportMetricsRequest,
-    ReportMetricsResponseT, SealKind, SealRangeRequest, SealRangeResponseT, StatusT,
+    AppendResponseT, AppendResultEntryT, CreateRangeRequest, CreateRangeResponseT,
+    DescribePlacementManagerClusterRequest, DescribePlacementManagerClusterResponseT, ErrorCode,
+    HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
+    ListRangeRequest, ListRangeResponseT, PlacementManagerClusterT, PlacementManagerNodeT, RangeT,
+    ReportMetricsRequest, ReportMetricsResponseT, SealKind, SealRangeRequest, SealRangeResponseT,
+    StatusT,
 };
 
 use tokio::sync::oneshot;
@@ -217,6 +218,19 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
+                                OperationCode::CreateRange => {
+                                    response_frame.operation_code = OperationCode::CreateRange;
+                                    if let Some(buf) = frame.header.as_ref() {
+                                        if let Ok(req) =
+                                            flatbuffers::root::<CreateRangeRequest>(buf)
+                                        {
+                                            serve_create_range(&req, &mut response_frame);
+                                        } else {
+                                            error!("Failed to decode create-range-request header");
+                                        }
+                                    }
+                                }
+
                                 OperationCode::SealRange => {
                                     response_frame.operation_code = OperationCode::SealRange;
                                     if let Some(buf) = frame.header.as_ref() {
@@ -290,6 +304,20 @@ pub async fn run_listener() -> u16 {
         info!("TestServer shut down OK");
     });
     rx.await.unwrap()
+}
+
+fn serve_create_range(request: &CreateRangeRequest, response_frame: &mut Frame) {
+    let mut response = CreateRangeResponseT::default();
+    response.status = Box::new(StatusT::default());
+    response.status.as_mut().code = ErrorCode::OK;
+    response.range = Some(Box::new(request.range().unpack()));
+
+    let mut builder = flatbuffers::FlatBufferBuilder::new();
+    let resp = response.pack(&mut builder);
+    builder.finish(resp, None);
+    let data = builder.finished_data();
+    response_frame.flag_response();
+    response_frame.header = Some(Bytes::copy_from_slice(data));
 }
 
 fn serve_append(payload: Option<Vec<Bytes>>, response_frame: &mut Frame) {

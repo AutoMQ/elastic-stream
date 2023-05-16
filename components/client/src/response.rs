@@ -2,11 +2,13 @@ use crate::request;
 use codec::frame::Frame;
 use codec::frame::OperationCode;
 use log::error;
+use log::info;
 use log::trace;
 use log::warn;
 use model::payload::Payload;
 use model::AppendResultEntry;
 use protocol::rpc::header::AppendResponse;
+use protocol::rpc::header::CreateRangeResponse;
 use protocol::rpc::header::DescribePlacementManagerClusterResponse;
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::HeartbeatResponse;
@@ -204,7 +206,27 @@ impl Response {
         }
     }
 
-    pub fn on_create_range(&mut self, frame: &Frame, ctx: &InvocationContext) {}
+    pub fn on_create_range(&mut self, frame: &Frame, ctx: &InvocationContext) {
+        if let Some(ref buf) = frame.header {
+            match flatbuffers::root::<CreateRangeResponse>(buf) {
+                Ok(response) => {
+                    self.status = Into::<Status>::into(&response.status().unpack());
+                    if self.status.code != ErrorCode::OK {
+                        return;
+                    }
+                    if let request::Headers::CreateRange { ref range } = ctx.request().headers {
+                        info!("Created range={:?} on {}", range, ctx.target());
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to decode CreateRangeResponse using FlatBuffers. Cause: {}",
+                        e
+                    );
+                }
+            }
+        }
+    }
 
     pub fn on_seal_range(&mut self, frame: &Frame, ctx: &InvocationContext) {
         if let Some(ref buf) = frame.header {

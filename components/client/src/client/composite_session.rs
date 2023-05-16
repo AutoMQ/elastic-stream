@@ -291,7 +291,7 @@ impl CompositeSession {
 
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            headers: request::Headers::CreateRange { range: range },
+            headers: request::Headers::CreateRange { range },
         };
 
         if let Err(ctx) = session.write(request, tx).await {
@@ -302,7 +302,23 @@ impl CompositeSession {
             return Err(ClientError::ConnectionRefused(self.target.to_owned()));
         }
 
-        Ok(())
+        let response = rx.await.map_err(|e| {
+            error!(
+                "Internal client error when creating range on {}. Cause: {:?}",
+                self.target, e
+            );
+            ClientError::ClientInternal
+        })?;
+
+        if response.ok() {
+            Ok(())
+        } else {
+            error!(
+                "Failed to create range on {}. Status: `{:?}`",
+                self.target, response.status
+            );
+            Err(ClientError::ServerInternal)
+        }
     }
 
     pub(crate) async fn list_range(

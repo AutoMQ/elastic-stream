@@ -1,4 +1,4 @@
-use std::cell::OnceCell;
+use std::{cell::OnceCell, net::SocketAddr};
 
 use crate::{request, response};
 use log::error;
@@ -6,21 +6,28 @@ use tokio::sync::oneshot;
 
 #[derive(Debug)]
 pub struct InvocationContext {
+    target: SocketAddr,
     request: request::Request,
     pub(crate) response_observer: OnceCell<oneshot::Sender<response::Response>>,
 }
 
 impl InvocationContext {
     pub(crate) fn new(
+        target: SocketAddr,
         request: request::Request,
         response_observer: oneshot::Sender<response::Response>,
     ) -> Self {
         let cell = OnceCell::new();
         let _ = cell.set(response_observer);
         Self {
+            target,
             request,
             response_observer: cell,
         }
+    }
+
+    pub(crate) fn target(&self) -> SocketAddr {
+        self.target
     }
 
     pub(crate) fn request(&self) -> &request::Request {

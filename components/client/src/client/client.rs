@@ -275,6 +275,26 @@ mod tests {
     }
 
     #[test]
+    fn test_create_range() -> Result<(), ClientError> {
+        test_util::try_init_log();
+        tokio_uring::start(async {
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener().await;
+            let mut config = config::Configuration::default();
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.placement_manager = format!("localhost:{}", port);
+            let target = config.placement_manager.clone();
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(config, tx);
+            let range = RangeMetadata::new(0, 0, 0, 0, None);
+            client.create_range(&target, range).await
+        })
+    }
+
+    #[test]
     fn test_list_range_by_stream() -> Result<(), ListRangeError> {
         test_util::try_init_log();
         tokio_uring::start(async {
