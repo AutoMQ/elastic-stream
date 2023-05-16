@@ -236,14 +236,14 @@ impl Response {
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<DescribePlacementManagerClusterResponse>(buf) {
                 Ok(response) => {
-                    let response = response.unpack();
-                    if ErrorCode::OK != response.status.code {
-                        self.status = response.status.as_ref().into();
+                    self.status = Into::<Status>::into(&response.status().unpack());
+                    if ErrorCode::OK != self.status.code {
                         return;
                     }
 
                     let nodes = response
-                        .cluster
+                        .cluster()
+                        .unpack()
                         .nodes
                         .iter()
                         .map(Into::into)

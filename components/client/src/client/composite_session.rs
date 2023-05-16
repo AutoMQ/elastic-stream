@@ -735,6 +735,7 @@ mod tests {
 
     #[test]
     fn test_describe_placement_manager_cluster() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let mut config = config::Configuration::default();
         config.server.node_id = 1;
         let config = Arc::new(config);
