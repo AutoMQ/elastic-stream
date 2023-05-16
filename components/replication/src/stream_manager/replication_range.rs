@@ -1,6 +1,5 @@
 use std::{
     cell::RefCell,
-    collections::BTreeMap,
     rc::{Rc, Weak},
 };
 
@@ -11,31 +10,34 @@ use model::range::{self, RangeMetadata};
 
 use crate::ReplicationError;
 
-use super::{replication_context::ReplicationContext, replicator::Replicator};
+use super::{replication_stream::ReplicationStream, replicator::Replicator};
 
 #[derive(Debug)]
 pub(crate) struct ReplicationRange {
     metadata: RangeMetadata,
 
+    stream: Weak<ReplicationStream>,
+
     client: Weak<Client>,
 
     replicators: Vec<Replicator>,
-
-    /// Inflight append entry requests.
-    inflight: RefCell<BTreeMap<u64, ReplicationContext>>,
 
     /// exclusive confirm offset.
     confirm_offset: RefCell<u64>,
 }
 
 impl ReplicationRange {
-    pub(crate) fn new(metadata: RangeMetadata, client: Weak<Client>) -> Rc<Self> {
+    pub(crate) fn new(
+        metadata: RangeMetadata,
+        stream: Weak<ReplicationStream>,
+        client: Weak<Client>,
+    ) -> Rc<Self> {
         let confirm_offset = metadata.end().unwrap_or_else(|| metadata.start());
         let this = Self {
             metadata,
+            stream,
             client,
             replicators: vec![],
-            inflight: RefCell::new(BTreeMap::new()),
             confirm_offset: RefCell::new(confirm_offset),
         };
 
@@ -81,19 +83,11 @@ impl ReplicationRange {
             .ok_or(ReplicationError::Internal)
     }
 
-    pub(crate) fn append(&self, payload: Bytes) -> Result<(), ReplicationError> {
-        if self.is_sealed() {
-            return Err(ReplicationError::AlreadySealed);
-        }
-
-        for replicator in &self.replicators {
-            replicator.append(payload.clone());
-        }
-
-        Ok(())
+    pub(crate) fn append(&self, payload: Rc<Bytes>, context: RangeAppendContext) {
+        // FIXME: encode request payload from raw payload and context.
     }
 
-    /// Ack requests to downstream clients.
+    /// update range confirm offset and invoke stream#try_ack.
     pub(crate) fn try_ack(&self) -> Result<(), ReplicationError> {
         let confirm_offset = self.calculate_confirm_offset()?;
         if confirm_offset == *self.confirm_offset.borrow() {
@@ -101,19 +95,32 @@ impl ReplicationRange {
         } else {
             *(self.confirm_offset.borrow_mut()) = confirm_offset;
         }
-        let mut inflight = self.inflight.borrow_mut();
-        loop {
-            if let Some(entry) = inflight.first_entry() {
-                if entry.key() > &confirm_offset {
-                    break;
-                }
-                let mut context = entry.remove();
-                context.ack();
-            } else {
-                break;
-            }
+        if let Some(stream) = self.stream.upgrade() {
+            stream.try_ack();
         }
-
         Ok(())
+    }
+
+    pub(crate) async fn seal(&self) -> Result<u64, ReplicationError> {
+        Ok(*(self.confirm_offset.borrow()))
+    }
+
+    pub(crate) fn is_writable(&self) -> bool {
+        true
+    }
+
+    pub(crate) fn confirm_offset(&self) -> u64 {
+        *(self.confirm_offset.borrow())
+    }
+}
+
+pub struct RangeAppendContext {
+    base_offset: u64,
+    count: u32,
+}
+
+impl RangeAppendContext {
+    pub fn new(base_offset: u64, count: u32) -> Self {
+        Self { base_offset, count }
     }
 }

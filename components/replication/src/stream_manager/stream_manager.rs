@@ -14,7 +14,7 @@ pub(crate) struct StreamManager {
     config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Request>,
     client: Rc<Client>,
-    streams: HashMap<i64, Rc<RefCell<ReplicationStream>>>,
+    streams: HashMap<i64, Rc<ReplicationStream>>,
 }
 
 impl StreamManager {
@@ -54,10 +54,10 @@ impl StreamManager {
 
     async fn read(&mut self, request: ReadRequest, tx: oneshot::Sender<ReadResponse>) {}
 
-    async fn open(&mut self, stream_id: i64) -> Result<ReplicationStream, ReplicationError> {
+    async fn open(&mut self, stream_id: i64) -> Result<Rc<ReplicationStream>, ReplicationError> {
         let client = Rc::downgrade(&self.client);
         let mut stream = ReplicationStream::new(stream_id, client);
-        stream.open().await?;
+        (*stream).open().await?;
         Ok(stream)
     }
 

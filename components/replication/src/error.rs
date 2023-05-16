@@ -13,4 +13,7 @@ pub enum ReplicationError {
 
     #[error("Precondition required")]
     PreconditionRequired,
+
+    #[error("Stream is already closed")]
+    AlreadyClosed,
 }

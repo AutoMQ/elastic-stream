@@ -1,39 +1,63 @@
+use crate::stream_manager::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
 use super::{replication_range::ReplicationRange, window::Window};
 use bytes::Bytes;
 use client::Client;
+use itertools::Itertools;
 use log::error;
+use std::cell::OnceCell;
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::ops::Bound::Included;
 use std::rc::{Rc, Weak};
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
+use tokio::time::{sleep, Duration};
 
 pub(crate) struct ReplicationStream {
+    weak_self: RefCell<Weak<Self>>,
     id: i64,
     window: Option<Window>,
-    ranges: Vec<Rc<ReplicationRange>>,
+    ranges: RefCell<BTreeMap<u64, Rc<ReplicationRange>>>,
     client: Weak<Client>,
+    next_offset: RefCell<u64>,
+    last_range: RefCell<Option<Rc<ReplicationRange>>>,
+    /// #append send StreamAppendRequest to tx.
+    append_requests_tx: mpsc::Sender<StreamAppendRequest>,
+    /// #append_task recv StreamAppendRequest from rx and append to writable range.
+    append_requests_rx: RefCell<mpsc::Receiver<StreamAppendRequest>>,
+    /// send by range ack / delay retry to trigger append task loop next round.
+    append_task_tx: mpsc::Sender<()>,
+    append_task_rx: RefCell<mpsc::Receiver<()>>,
 }
 
 impl ReplicationStream {
-    pub(crate) fn new(id: i64, client: Weak<Client>) -> Self {
-        Self {
+    pub(crate) fn new(id: i64, client: Weak<Client>) -> Rc<Self> {
+        let (append_requests_tx, append_requests_rx) = mpsc::channel(1024);
+        let (append_task_tx, append_task_rx) = mpsc::channel(1024);
+        let mut this = Rc::new(Self {
+            weak_self: RefCell::new(Weak::new()),
             id,
             window: None,
-            ranges: vec![],
+            ranges: RefCell::new(BTreeMap::new()),
             client,
-        }
+            next_offset: RefCell::new(0),
+            last_range: RefCell::new(Option::None),
+            append_requests_tx,
+            append_requests_rx: RefCell::new(append_requests_rx),
+            append_task_tx,
+            append_task_rx: RefCell::new(append_task_rx),
+        });
+
+        *((*this).weak_self.borrow_mut()) = Rc::downgrade(&this);
+        this
     }
 
-    fn is_open(&self) -> bool {
-        self.ranges
-            .iter()
-            .last()
-            .map(|range| !range.is_sealed())
-            .unwrap_or(false)
-    }
-
-    pub(crate) async fn open(&mut self) -> Result<(), ReplicationError> {
+    pub(crate) async fn open(&self) -> Result<(), ReplicationError> {
         let client = self.client.upgrade().ok_or(ReplicationError::Internal)?;
-        self.ranges = client
+        // 1. load all ranges
+        client
             .list_range(Some(self.id))
             .await
             .map_err(|e| {
@@ -41,28 +65,205 @@ impl ReplicationStream {
                 ReplicationError::Internal
             })?
             .into_iter()
-            .map(|metadata| ReplicationRange::new(metadata, self.client.clone()))
-            .collect();
-        if self.is_open() {
-            // TODO: seal data nodes that are backing up the last mutable range.
-
-            let end = 0u64;
-            // TODO: client.seal_and_create
-        } else {
-            // TODO: client.create_range
+            // skip old empty range when two range has the same start offset
+            .sorted_by(|a, b| Ord::cmp(&a.index(), &b.index()))
+            .for_each(|range| {
+                self.ranges.borrow_mut().insert(
+                    range.start(),
+                    ReplicationRange::new(
+                        range,
+                        self.weak_self.borrow().clone(),
+                        self.client.clone(),
+                    ),
+                );
+            });
+        // 2. seal the last range
+        if let Some(entry) = self.ranges.borrow_mut().last_entry() {
+            *(self.last_range.borrow_mut()) = Option::Some(entry.get().clone());
+            match entry.get().seal().await {
+                Ok(confirm_offset) => {
+                    // 3. set stream next offset to the exclusive end of the last range
+                    *self.next_offset.borrow_mut() = confirm_offset;
+                }
+                Err(e) => {
+                    error!("Failed to seal range: {e}");
+                    return Err(ReplicationError::Internal);
+                }
+            }
         }
-
+        let weak_this = self.weak_self.borrow().clone();
+        tokio_uring::spawn(async move { Self::append_task(weak_this).await });
         Ok(())
     }
 
-    pub(crate) fn append(&self, payload: Bytes) -> Result<(), ReplicationError> {
-        if let Some(range) = self.ranges.iter().last() {
-            if range.is_sealed() {
-                return Err(ReplicationError::AlreadySealed);
+    /// Close the stream.
+    /// 1. send stop signal to append task.
+    /// 2. await append task to stop.
+    /// 3. close all ranges.
+    pub fn close(&self) {
+        // TODO: implement close
+    }
+
+    pub(crate) async fn append(
+        &self,
+        payload: Bytes,
+        context: StreamAppendContext,
+    ) -> Result<(), ReplicationError> {
+        let base_offset = *self.next_offset.borrow();
+        *self.next_offset.borrow_mut() = base_offset + context.count as u64;
+
+        let (append_tx, append_rx) = oneshot::channel::<Result<(), ReplicationError>>();
+        // trigger background append task to handle the append request.
+        if let Err(_) = self
+            .append_requests_tx
+            .send(StreamAppendRequest::new(
+                base_offset,
+                payload,
+                context,
+                append_tx,
+            ))
+            .await
+        {
+            return Err(ReplicationError::AlreadyClosed);
+        }
+        // await append result.
+        match append_rx.await {
+            Ok(result) => result,
+            Err(_) => Err(ReplicationError::AlreadyClosed),
+        }
+    }
+
+    async fn new_range(&self) -> Result<(), ReplicationError> {
+        // TODO: implement new range
+        Ok(())
+    }
+
+    pub(crate) fn try_ack(&self) {
+        self.trigger_append_task();
+    }
+
+    pub(crate) fn trigger_append_task(&self) {
+        let _ = self.append_task_tx.try_send(());
+    }
+
+    async fn append_task(stream: Weak<ReplicationStream>) {
+        let stream_option = stream.upgrade();
+        if stream_option.is_none() {
+            return;
+        }
+        let stream = stream_option.unwrap();
+        let mut inflight: BTreeMap<u64, Rc<StreamAppendRequest>> = BTreeMap::new();
+        let mut next_append_start_offset: u64 = 0;
+
+        let mut append_request_rx = (*stream).append_requests_rx.borrow_mut();
+        let mut append_task_rx = (*stream).append_task_rx.borrow_mut();
+        loop {
+            tokio::select! {
+                Some(append_request) = append_request_rx.recv() => {
+                    inflight.insert(append_request.base_offset, Rc::new(append_request));
+                }
+                Some(_) = append_task_rx.recv() => {
+                    // usaully send by range ack / delay retry
+                }
+                // TODO: listener stream close event
             }
-            range.append(payload)
-        } else {
-            Err(ReplicationError::PreconditionRequired)
+            // 1. get writable range.
+            let last_range_ref = (*stream).last_range.borrow();
+            let last_writable_range = match last_range_ref.as_ref() {
+                Some(last_range) => {
+                    if !last_range.is_writable() {
+                        // if last range is not writable, try to seal it and create a new range and retry append in next round.
+                        if let Err(_) = last_range.seal().await {
+                            // delay retry to avoid busy loop
+                            sleep(Duration::from_millis(100)).await;
+                        } else {
+                            // rewind back next append start offset and try append to new writable range in next round.
+                            next_append_start_offset = last_range.confirm_offset();
+                            if let Err(_) = stream.new_range().await {
+                                // delay retry to avoid busy loop
+                                sleep(Duration::from_millis(1000)).await;
+                            }
+                        }
+                        stream.trigger_append_task();
+                        continue;
+                    }
+                    last_range
+                }
+                None => {
+                    if let Err(_) = stream.new_range().await {
+                        // delay retry to avoid busy loop
+                        sleep(Duration::from_millis(1000)).await;
+                        stream.trigger_append_task();
+                    }
+                    continue;
+                }
+            };
+            if !inflight.is_empty() {
+                // 2. ack success append request, and remove them from inflight.
+                let confirm_offset = last_writable_range.confirm_offset();
+                let mut ack_count = 0;
+                for (base_offset, append_request) in inflight.iter() {
+                    if *base_offset < confirm_offset {
+                        // if base offset is less than confirm offset, it means append request is already success.
+                        append_request.success();
+                        ack_count += 1;
+                    }
+                }
+                for _ in 0..ack_count {
+                    inflight.pop_first();
+                }
+
+                // 3. try append request which base_offset >= next_append_start_offset.
+                let cursor = inflight.lower_bound(Included(&next_append_start_offset));
+                while let Some((base_offset, append_request)) = cursor.key_value() {
+                    last_writable_range.append(
+                        append_request.payload.clone(),
+                        RangeAppendContext::new(*base_offset, append_request.context.count),
+                    );
+                    next_append_start_offset = base_offset + append_request.context.count as u64;
+                }
+            }
+        }
+    }
+}
+
+pub(crate) struct StreamAppendContext {
+    count: u32,
+}
+
+impl StreamAppendContext {
+    pub(crate) fn new(count: u32) -> StreamAppendContext {
+        StreamAppendContext { count }
+    }
+}
+
+struct StreamAppendRequest {
+    base_offset: u64,
+    payload: Rc<Bytes>,
+    context: StreamAppendContext,
+    append_tx: RefCell<OnceCell<oneshot::Sender<Result<(), ReplicationError>>>>,
+}
+
+impl StreamAppendRequest {
+    pub fn new(
+        base_offset: u64,
+        payload: Bytes,
+        context: StreamAppendContext,
+        append_tx: oneshot::Sender<Result<(), ReplicationError>>,
+    ) -> Self {
+        let append_tx_cell = OnceCell::new();
+        let _ = append_tx_cell.set(append_tx);
+        Self {
+            base_offset,
+            payload: Rc::new(payload),
+            context,
+            append_tx: RefCell::new(append_tx_cell),
+        }
+    }
+
+    pub fn success(&self) {
+        if let Some(append_tx) = self.append_tx.borrow_mut().take() {
+            let _ = append_tx.send(Ok(()));
         }
     }
 }

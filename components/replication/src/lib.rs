@@ -1,4 +1,5 @@
 #![feature(btree_drain_filter)]
+#![feature(btree_cursors)]
 
 pub mod error;
 mod request;
