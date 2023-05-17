@@ -155,11 +155,14 @@ func (s *Server) startEtcd(ctx context.Context) error {
 		endpoints = append(endpoints, url.String())
 	}
 	etcdLogLevel, _ := zapcore.ParseLevel(s.cfg.Etcd.LogLevel)
+	etcdLogger := logger
+	if logger.Core().Enabled(etcdLogLevel) {
+		etcdLogger = logger.WithOptions(zap.IncreaseLevel(etcdLogLevel))
+	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   endpoints,
 		DialTimeout: _etcdTimeout,
-		Logger: logger.WithOptions(zap.IncreaseLevel(etcdLogLevel)).
-			With(zap.Namespace("etcd-client"), zap.Strings("endpoints", endpoints)),
+		Logger:      etcdLogger.With(zap.Namespace("etcd-client"), zap.Strings("endpoints", endpoints)),
 	})
 
 	if err != nil {
