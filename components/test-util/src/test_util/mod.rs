@@ -73,14 +73,13 @@ fn serve_describe_placement_manager_cluster(
     frame: &mut Frame,
     port: u16,
 ) {
-    trace!("Received a list-ranges request: {:?}", request);
+    trace!("Received: {:#?}", request);
     let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
     let mut resp = DescribePlacementManagerClusterResponseT::default();
-
     {
         let mut cluster = PlacementManagerClusterT::default();
 
-        cluster.nodes = (0..3)
+        cluster.nodes = (0..1)
             .into_iter()
             .map(|i| {
                 let mut node = PlacementManagerNodeT::default();
@@ -95,7 +94,6 @@ fn serve_describe_placement_manager_cluster(
         status.code = ErrorCode::OK;
         status.message = Some(String::from("OK"));
         resp.status = Box::new(status);
-
         resp.cluster = Box::new(cluster);
     }
 

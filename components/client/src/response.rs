@@ -1,6 +1,7 @@
 use crate::request;
 use codec::frame::Frame;
 use codec::frame::OperationCode;
+use log::debug;
 use log::error;
 use log::info;
 use log::trace;
@@ -285,6 +286,7 @@ impl Response {
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<DescribePlacementManagerClusterResponse>(buf) {
                 Ok(response) => {
+                    debug!("Received {response:#?}");
                     self.status = Into::<Status>::into(&response.status().unpack());
                     if ErrorCode::OK != self.status.code {
                         return;

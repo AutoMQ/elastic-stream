@@ -34,19 +34,21 @@ impl Client {
 
     pub async fn allocate_id(&self, host: &str) -> Result<i32, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
-        let session = session_manager
+        let composite_session = session_manager
             .get_composite_session(&self.config.placement_manager)
             .await?;
-        let future = session.allocate_id(host, None);
+        let future = composite_session.allocate_id(host, None);
         time::timeout(self.config.client_io_timeout(), future)
             .await
             .map_err(|e| {
                 warn!("Timeout when allocate ID. {}", e);
-                ClientError::ClientInternal
+                ClientError::RpcTimeout {
+                    timeout: self.config.client_io_timeout(),
+                }
             })?
             .map_err(|e| {
                 error!(
-                    "Failed to receive response from broken channel. Cause: {:?}",
+                    "Failed to receive response from composite session. Cause: {:?}",
                     e
                 );
                 ClientError::ClientInternal
@@ -283,6 +285,7 @@ mod tests {
 
     #[test]
     fn test_allocate_id() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         tokio_uring::start(async {
             #[allow(unused_variables)]
             let port = 2378;

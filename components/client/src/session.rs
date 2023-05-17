@@ -178,7 +178,7 @@ impl Session {
         request: request::Request,
         response_observer: oneshot::Sender<response::Response>,
     ) -> Result<(), InvocationContext> {
-        trace!("Sending request {:?}", request);
+        trace!("Sending {:#?} to {:?}", request, self.target);
 
         // Update last read/write instant.
         *self.idle_since.borrow_mut() = Instant::now();
@@ -368,16 +368,6 @@ impl Session {
                 );
             }
         }
-    }
-}
-
-impl Drop for Session {
-    fn drop(&mut self) {
-        let requests = unsafe { &mut *self.inflight_requests.get() };
-        requests.drain().for_each(|(_stream_id, mut ctx)| {
-            let aborted_response = response::Response::new(OperationCode::Unknown);
-            ctx.write_response(aborted_response);
-        });
     }
 }
 

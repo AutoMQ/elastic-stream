@@ -1,6 +1,7 @@
 use super::{lb_policy::LbPolicy, session::Session};
 use crate::{error::ClientError, invocation_context::InvocationContext};
 use bytes::Bytes;
+use codec::frame::OperationCode;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
@@ -457,6 +458,8 @@ impl CompositeSession {
         &self,
     ) -> Result<Option<Vec<PlacementManagerNode>>, ClientError> {
         self.try_reconnect().await;
+
+        // Get latest `A` records for access point domain name
         let addrs = self
             .target
             .to_socket_addrs()
@@ -514,9 +517,14 @@ impl CompositeSession {
             return Err(ClientError::ClientInternal);
         }
 
-        match time::timeout(self.config.client_connect_timeout(), rx).await {
+        match time::timeout(self.config.client_io_timeout(), rx).await {
             Ok(response) => match response {
                 Ok(response) => {
+                    debug_assert_eq!(
+                        response.operation_code,
+                        OperationCode::DescribePlacementManager,
+                        "Unexpected operation code"
+                    );
                     if !response.ok() {
                         warn!(
                             "Failed to describe placement manager cluster: {:?}",
