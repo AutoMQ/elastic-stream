@@ -43,6 +43,11 @@ impl SessionManager {
                     )
                     .await?,
                 );
+
+                if target == self.config.placement_manager {
+                    session.refresh_cluster().await;
+                }
+
                 sessions.insert(target.to_owned(), Rc::clone(&session));
                 Ok(session)
             }

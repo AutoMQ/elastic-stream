@@ -13,12 +13,18 @@
 #![feature(once_cell)]
 
 pub mod client;
+pub(crate) mod composite_session;
 pub mod error;
 pub mod id_generator;
 pub mod invocation_context;
+pub(crate) mod lb_policy;
+pub(crate) mod node_state;
 pub mod request;
 pub mod response;
+mod session;
+mod session_manager;
 
-pub use crate::client::client::Client;
+pub use crate::client::Client;
 pub use crate::id_generator::IdGenerator;
 pub use crate::id_generator::PlacementManagerIdGenerator;
+pub(crate) use crate::node_state::NodeState;

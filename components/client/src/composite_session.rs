@@ -28,7 +28,7 @@ use tokio::{
 };
 use tokio_uring::net::TcpStream;
 
-use crate::{request, response};
+use crate::{request, response, NodeState};
 
 pub(crate) struct CompositeSession {
     target: String,
@@ -107,73 +107,129 @@ impl CompositeSession {
             <= now
     }
 
+    fn refresh_leadership(&self, nodes: &Vec<PlacementManagerNode>) {
+        debug!("Refresh placement manager cluster leadership");
+        // Sync leader/follower state
+        for node in nodes.iter() {
+            node.advertise_addr
+                .to_socket_addrs()
+                .into_iter()
+                .flatten()
+                .for_each(|addr| {
+                    if let Some((_, session)) = self
+                        .sessions
+                        .borrow_mut()
+                        .iter()
+                        .find(|&entry| *entry.0 == addr)
+                    {
+                        session.set_state(if node.leader {
+                            NodeState::Leader
+                        } else {
+                            NodeState::Follower
+                        })
+                    }
+                });
+        }
+    }
+
+    async fn refresh_sessions(&self, nodes: &Vec<PlacementManagerNode>) {
+        if nodes.is_empty() {
+            trace!("Placement Manager Cluster is empty, no need to refresh sessions");
+            return;
+        }
+
+        // Update last-refresh-cluster-instant.
+        *self.refresh_cluster_instant.borrow_mut() = Instant::now();
+
+        let mut addrs = nodes
+            .into_iter()
+            .map(|node| node.advertise_addr.to_socket_addrs().into_iter())
+            .flatten()
+            .flatten()
+            .filter(|socket_addr| socket_addr.is_ipv4())
+            .dedup()
+            .collect::<Vec<_>>();
+
+        // Remove sessions that are no longer valid
+        self.sessions
+        .borrow_mut()
+        .drain_filter(|k, _v| !addrs.contains(k))
+        .for_each(|(k, _v)| {
+            self.endpoints.borrow_mut().drain_filter(|e| {
+                e == &k
+            });
+            info!("Session to {} will be disconnected because latest Placement Manager Cluster does not contain it any more", k);
+        });
+
+        addrs.drain_filter(|addr| self.sessions.borrow().contains_key(addr));
+
+        addrs.iter().for_each(|addr| {
+            trace!(
+                "Create a new session for new Placement Manager Cluster member: {}",
+                addr
+            );
+        });
+
+        let futures = addrs.into_iter().map(|addr| {
+            Self::connect(
+                addr,
+                self.config.client_connect_timeout(),
+                Arc::clone(&self.config),
+                Rc::clone(&self.sessions),
+                self.shutdown.clone(),
+            )
+        });
+
+        let res: Vec<Result<Session, ClientError>> = futures::future::join_all(futures).await;
+        for item in res {
+            match item {
+                Ok(session) => {
+                    info!(
+                        "Insert a session to composite-session {} using socket: {}",
+                        self.target, session.target
+                    );
+                    self.endpoints.borrow_mut().push(session.target);
+                    self.sessions.borrow_mut().insert(session.target, session);
+                }
+                Err(e) => {
+                    error!("Failed to connect. {:?}", e);
+                }
+            }
+        }
+        self.refresh_leadership(nodes);
+    }
+
+    pub(crate) async fn refresh_cluster(&self) {
+        if let Ok(Some(nodes)) = self.describe_placement_manager_cluster().await {
+            self.refresh_sessions(&nodes).await;
+        }
+    }
+
+    fn pick_session(&self, lb_policy: LbPolicy) -> Option<Session> {
+        match lb_policy {
+            LbPolicy::LeaderOnly => self
+                .sessions
+                .borrow()
+                .iter()
+                .filter(|&(_, session)| session.state() == NodeState::Leader)
+                .map(|(_, session)| session.clone())
+                .next(),
+            LbPolicy::PickFirst => self
+                .sessions
+                .borrow()
+                .iter()
+                .map(|(_, session)| session.clone())
+                .next(),
+            LbPolicy::RoundRobin => unimplemented!(),
+        }
+    }
+
     /// Broadcast heartbeat requests to all nested sessions.
     pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
         self.try_reconnect().await;
 
         if self.need_refresh_cluster() {
-            if let Ok(Some(nodes)) = self.describe_placement_manager_cluster().await {
-                if !nodes.is_empty() {
-                    *self.refresh_cluster_instant.borrow_mut() = Instant::now();
-                    // TODO: Leadership of the placement manager node is NOT preserved here.
-                    let mut addrs = nodes
-                        .into_iter()
-                        .map(|node| node.advertise_addr.to_socket_addrs().into_iter())
-                        .flatten()
-                        .flatten()
-                        .filter(|socket_addr| socket_addr.is_ipv4())
-                        .dedup()
-                        .collect::<Vec<_>>();
-
-                    // Remove sessions that are no longer valid
-                    self.sessions
-                        .borrow_mut()
-                        .drain_filter(|k, _v| !addrs.contains(k))
-                        .for_each(|(k, _v)| {
-                            self.endpoints.borrow_mut().drain_filter(|e| {
-                                e == &k
-                            });
-                            info!("Session to {} will be disconnected because latest Placement Manager Cluster does not contain it any more", k);
-                        });
-
-                    addrs.drain_filter(|addr| self.sessions.borrow().contains_key(addr));
-
-                    addrs.iter().for_each(|addr| {
-                        trace!(
-                            "Create a new session for new Placement Manager Cluster member: {}",
-                            addr
-                        );
-                    });
-
-                    let futures = addrs.into_iter().map(|addr| {
-                        Self::connect(
-                            addr,
-                            self.config.client_connect_timeout(),
-                            Arc::clone(&self.config),
-                            Rc::clone(&self.sessions),
-                            self.shutdown.clone(),
-                        )
-                    });
-
-                    let res: Vec<Result<Session, ClientError>> =
-                        futures::future::join_all(futures).await;
-                    for item in res {
-                        match item {
-                            Ok(session) => {
-                                info!(
-                                    "Insert a session to composite-session {} using socket: {}",
-                                    self.target, session.target
-                                );
-                                self.endpoints.borrow_mut().push(session.target);
-                                self.sessions.borrow_mut().insert(session.target, session);
-                            }
-                            Err(e) => {
-                                error!("Failed to connect. {:?}", e);
-                            }
-                        }
-                    }
-                }
-            }
+            self.refresh_cluster().await;
         }
 
         let now = Instant::now();
@@ -229,7 +285,7 @@ impl CompositeSession {
         timeout: Option<Duration>,
     ) -> Result<i32, ClientError> {
         self.try_reconnect().await;
-        if let Some((_, session)) = self.sessions.borrow().iter().next() {
+        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
             let request = request::Request {
                 timeout: timeout.unwrap_or(self.config.client_io_timeout()),
                 headers: request::Headers::AllocateId {
@@ -279,29 +335,21 @@ impl CompositeSession {
     ) -> Result<StreamMetadata, ClientError> {
         self.try_reconnect().await;
 
-        // TODO: If we are creating range on placement manager, we need to select the session to the primary node.
-        let session = self
-            .sessions
-            .borrow()
-            .iter()
-            .next()
-            .map(|(_addr, session)| session.clone())
-            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
+            let (tx, rx) = oneshot::channel();
+            let request = request::Request {
+                timeout: self.config.client_io_timeout(),
+                headers: request::Headers::CreateStream { replica, retention },
+            };
 
-        let (tx, rx) = oneshot::channel();
-        let request = request::Request {
-            timeout: self.config.client_io_timeout(),
-            headers: request::Headers::CreateStream { replica, retention },
-        };
-
-        if let Err(ctx) = session.write(request, tx).await {
-            error!(
-                "Failed to send create-stream request to {}. Cause: {:?}",
-                self.target, ctx
-            );
-            return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+            if let Err(ctx) = session.write(request, tx).await {
+                error!(
+                    "Failed to send create-stream request to {}. Cause: {:?}",
+                    self.target, ctx
+                );
+                return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+            }
         }
-
 
         todo!()
     }
@@ -311,47 +359,41 @@ impl CompositeSession {
     /// If the target is placement manager, we need to select the session to the primary node;
     pub(crate) async fn create_range(&self, range: RangeMetadata) -> Result<(), ClientError> {
         self.try_reconnect().await;
+        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
+            let (tx, rx) = oneshot::channel();
 
-        // TODO: If we are creating range on placement manager, we need to select the session to the primary node.
-        let session = self
-            .sessions
-            .borrow()
-            .iter()
-            .next()
-            .map(|(_addr, session)| session.clone())
-            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+            let request = request::Request {
+                timeout: self.config.client_io_timeout(),
+                headers: request::Headers::CreateRange { range },
+            };
 
-        let (tx, rx) = oneshot::channel();
+            if let Err(ctx) = session.write(request, tx).await {
+                error!(
+                    "Failed to send create-range request to {}. Cause: {:?}",
+                    self.target, ctx
+                );
+                return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+            }
 
-        let request = request::Request {
-            timeout: self.config.client_io_timeout(),
-            headers: request::Headers::CreateRange { range },
-        };
+            let response = rx.await.map_err(|e| {
+                error!(
+                    "Internal client error when creating range on {}. Cause: {:?}",
+                    self.target, e
+                );
+                ClientError::ClientInternal
+            })?;
 
-        if let Err(ctx) = session.write(request, tx).await {
-            error!(
-                "Failed to send create-range request to {}. Cause: {:?}",
-                self.target, ctx
-            );
-            return Err(ClientError::ConnectionRefused(self.target.to_owned()));
-        }
-
-        let response = rx.await.map_err(|e| {
-            error!(
-                "Internal client error when creating range on {}. Cause: {:?}",
-                self.target, e
-            );
-            ClientError::ClientInternal
-        })?;
-
-        if response.ok() {
-            Ok(())
+            if response.ok() {
+                Ok(())
+            } else {
+                error!(
+                    "Failed to create range on {}. Status: `{:?}`",
+                    self.target, response.status
+                );
+                Err(ClientError::ServerInternal)
+            }
         } else {
-            error!(
-                "Failed to create range on {}. Status: `{:?}`",
-                self.target, response.status
-            );
-            Err(ClientError::ServerInternal)
+            Err(ClientError::ClientInternal)
         }
     }
 
@@ -360,8 +402,7 @@ impl CompositeSession {
         criteria: RangeCriteria,
     ) -> Result<Vec<RangeMetadata>, ClientError> {
         self.try_reconnect().await;
-        // TODO: apply load-balancing among `self.sessions`.
-        if let Some((_, session)) = self.sessions.borrow().iter().next() {
+        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
             let request = request::Request {
                 timeout: self.config.client_io_timeout(),
                 headers: request::Headers::ListRange { criteria },
@@ -435,8 +476,7 @@ impl CompositeSession {
         let mut request_sent = false;
         'outer: loop {
             for addr in &addrs {
-                // TODO: RefCell is held across await, which should be avoided. Drop it before await.
-                if let Some(session) = self.sessions.borrow().get(addr) {
+                if let Some(session) = self.sessions.borrow().get(addr).cloned() {
                     if let Err(mut ctx) = session.write(request.clone(), tx).await {
                         tx = ctx
                             .response_observer()
@@ -520,13 +560,8 @@ impl CompositeSession {
         range: RangeMetadata,
     ) -> Result<RangeMetadata, ClientError> {
         self.try_reconnect().await;
-        // TODO: If the seal kind is PM, we need to pick the session/connection to the leader node.
         let session = self
-            .sessions
-            .borrow()
-            .iter()
-            .next()
-            .map(|(_addr, session)| session.clone())
+            .pick_session(LbPolicy::LeaderOnly)
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
@@ -658,11 +693,7 @@ impl CompositeSession {
     pub(crate) async fn append(&self, buf: Bytes) -> Result<Vec<AppendResultEntry>, ClientError> {
         self.try_reconnect().await;
         let session = self
-            .sessions
-            .borrow()
-            .iter()
-            .next()
-            .map(|(_addr, session)| session.clone())
+            .pick_session(self.lb_policy)
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
 
         let request = request::Request {
@@ -705,7 +736,8 @@ impl CompositeSession {
         memory_statistics: &MemoryStatistics,
     ) -> Result<(), ClientError> {
         self.try_reconnect().await;
-        if let Some((_, session)) = self.sessions.borrow().iter().next() {
+        // TODO: need broadcast metrics to all placement manager cluster nodes
+        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
             let extension = request::Headers::ReportMetrics {
                 data_node: self.config.server.data_node(),
                 disk_in_rate: disk_statistics.get_disk_in_rate(),
@@ -767,7 +799,7 @@ mod tests {
     use tokio::sync::broadcast;
 
     use super::CompositeSession;
-    use crate::client::lb_policy::LbPolicy;
+    use crate::lb_policy::LbPolicy;
     use std::{error::Error, sync::Arc};
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::{request, response};
+use crate::{request, response, NodeState};
 use codec::{
     error::FrameError,
     frame::{Frame, OperationCode},
@@ -36,6 +36,8 @@ pub(crate) struct Session {
     inflight_requests: Rc<UnsafeCell<HashMap<u32, InvocationContext>>>,
 
     idle_since: Rc<RefCell<Instant>>,
+
+    state: Rc<RefCell<NodeState>>,
 }
 
 impl Session {
@@ -167,6 +169,7 @@ impl Session {
             connection,
             inflight_requests: inflight,
             idle_since: Rc::new(RefCell::new(Instant::now())),
+            state: Rc::new(RefCell::new(NodeState::Unknown)),
         }
     }
 
@@ -250,6 +253,21 @@ impl Session {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn state(&self) -> NodeState {
+        *self.state.borrow()
+    }
+
+    pub(crate) fn set_state(&self, state: NodeState) {
+        let current = *self.state.borrow();
+        if current != state {
+            info!(
+                "Node-state of {} is changed: {:#?} --> {:#?}",
+                self.target, current, state
+            );
+            *self.state.borrow_mut() = state;
+        }
     }
 
     fn handle_response(inflight: &mut HashMap<u32, InvocationContext>, frame: Frame) {
@@ -371,6 +389,7 @@ impl Clone for Session {
             connection: Rc::clone(&self.connection),
             inflight_requests: Rc::clone(&self.inflight_requests),
             idle_since: Rc::clone(&self.idle_since),
+            state: Rc::clone(&self.state),
         }
     }
 }
