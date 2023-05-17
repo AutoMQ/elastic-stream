@@ -54,9 +54,13 @@ impl StreamManager {
 
     async fn read(&mut self, request: ReadRequest, tx: oneshot::Sender<ReadResponse>) {}
 
-    async fn open(&mut self, stream_id: i64) -> Result<Rc<ReplicationStream>, ReplicationError> {
+    async fn open(
+        &mut self,
+        stream_id: i64,
+        epoch: u64,
+    ) -> Result<Rc<ReplicationStream>, ReplicationError> {
         let client = Rc::downgrade(&self.client);
-        let mut stream = ReplicationStream::new(stream_id, client);
+        let mut stream = ReplicationStream::new(stream_id, epoch, client);
         (*stream).open().await?;
         Ok(stream)
     }

@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::Bound::Included;
 use std::rc::{Rc, Weak};
+use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration};
@@ -18,6 +19,7 @@ use tokio::time::{sleep, Duration};
 pub(crate) struct ReplicationStream {
     weak_self: RefCell<Weak<Self>>,
     id: i64,
+    epoch: u64,
     window: Option<Window>,
     ranges: RefCell<BTreeMap<u64, Rc<ReplicationRange>>>,
     client: Weak<Client>,
@@ -25,32 +27,44 @@ pub(crate) struct ReplicationStream {
     last_range: RefCell<Option<Rc<ReplicationRange>>>,
     /// #append send StreamAppendRequest to tx.
     append_requests_tx: mpsc::Sender<StreamAppendRequest>,
-    /// #append_task recv StreamAppendRequest from rx and append to writable range.
-    append_requests_rx: RefCell<mpsc::Receiver<StreamAppendRequest>>,
     /// send by range ack / delay retry to trigger append task loop next round.
-    append_task_tx: mpsc::Sender<()>,
-    append_task_rx: RefCell<mpsc::Receiver<()>>,
+    append_tasks_tx: mpsc::Sender<()>,
+    // send when stream close.
+    shutdown_signal_tx: broadcast::Sender<()>,
 }
 
 impl ReplicationStream {
-    pub(crate) fn new(id: i64, client: Weak<Client>) -> Rc<Self> {
+    pub(crate) fn new(id: i64, epoch: u64, client: Weak<Client>) -> Rc<Self> {
         let (append_requests_tx, append_requests_rx) = mpsc::channel(1024);
-        let (append_task_tx, append_task_rx) = mpsc::channel(1024);
-        let mut this = Rc::new(Self {
+        let (append_tasks_tx, append_tasks_rx) = mpsc::channel(1024);
+        let (shutdown_signal_tx, shutdown_signal_rx) = broadcast::channel(1);
+        let this = Rc::new(Self {
             weak_self: RefCell::new(Weak::new()),
             id,
+            epoch,
             window: None,
             ranges: RefCell::new(BTreeMap::new()),
             client,
             next_offset: RefCell::new(0),
             last_range: RefCell::new(Option::None),
             append_requests_tx,
-            append_requests_rx: RefCell::new(append_requests_rx),
-            append_task_tx,
-            append_task_rx: RefCell::new(append_task_rx),
+            append_tasks_tx,
+            shutdown_signal_tx,
         });
 
         *((*this).weak_self.borrow_mut()) = Rc::downgrade(&this);
+
+        let weak_this = this.weak_self.borrow().clone();
+        tokio_uring::spawn(async move {
+            Self::append_task(
+                weak_this,
+                append_requests_rx,
+                append_tasks_rx,
+                shutdown_signal_rx,
+            )
+            .await
+        });
+
         this
     }
 
@@ -91,8 +105,6 @@ impl ReplicationStream {
                 }
             }
         }
-        let weak_this = self.weak_self.borrow().clone();
-        tokio_uring::spawn(async move { Self::append_task(weak_this).await });
         Ok(())
     }
 
@@ -100,8 +112,12 @@ impl ReplicationStream {
     /// 1. send stop signal to append task.
     /// 2. await append task to stop.
     /// 3. close all ranges.
-    pub fn close(&self) {
-        // TODO: implement close
+    pub async fn close(&self) {
+        let _ = self.shutdown_signal_tx.send(());
+        // TODO: await append task to stop.
+        if let Some(range) = self.last_range.borrow().as_ref() {
+            let _ = range.seal().await;
+        }
     }
 
     pub(crate) async fn append(
@@ -133,8 +149,16 @@ impl ReplicationStream {
         }
     }
 
-    async fn new_range(&self) -> Result<(), ReplicationError> {
-        // TODO: implement new range
+    async fn new_range(&self, range_index: i32, start_offset: u64) -> Result<(), ReplicationError> {
+        let range_metadata =
+            ReplicationRange::create(self.id, self.epoch, range_index, start_offset).await?;
+        let range = ReplicationRange::new(
+            range_metadata,
+            self.weak_self.borrow().clone(),
+            self.client.clone(),
+        );
+        self.ranges.borrow_mut().insert(start_offset, range.clone());
+        *self.last_range.borrow_mut() = Some(range.clone());
         Ok(())
     }
 
@@ -143,10 +167,15 @@ impl ReplicationStream {
     }
 
     pub(crate) fn trigger_append_task(&self) {
-        let _ = self.append_task_tx.try_send(());
+        let _ = self.append_tasks_tx.try_send(());
     }
 
-    async fn append_task(stream: Weak<ReplicationStream>) {
+    async fn append_task(
+        stream: Weak<ReplicationStream>,
+        mut append_requests_rx: mpsc::Receiver<StreamAppendRequest>,
+        mut append_tasks_rx: mpsc::Receiver<()>,
+        mut shutdown_signal_rx: broadcast::Receiver<()>,
+    ) {
         let stream_option = stream.upgrade();
         if stream_option.is_none() {
             return;
@@ -155,33 +184,43 @@ impl ReplicationStream {
         let mut inflight: BTreeMap<u64, Rc<StreamAppendRequest>> = BTreeMap::new();
         let mut next_append_start_offset: u64 = 0;
 
-        let mut append_request_rx = (*stream).append_requests_rx.borrow_mut();
-        let mut append_task_rx = (*stream).append_task_rx.borrow_mut();
         loop {
             tokio::select! {
-                Some(append_request) = append_request_rx.recv() => {
+                Some(append_request) = append_requests_rx.recv() => {
                     inflight.insert(append_request.base_offset, Rc::new(append_request));
                 }
-                Some(_) = append_task_rx.recv() => {
+                Some(_) = append_tasks_rx.recv() => {
                     // usaully send by range ack / delay retry
                 }
-                // TODO: listener stream close event
+                _ = shutdown_signal_rx.recv() => {
+                    for (_, append_request) in inflight.iter() {
+                        let _ = append_request.fail(ReplicationError::AlreadyClosed);
+                    }
+                    break;
+                }
             }
+
             // 1. get writable range.
             let last_range_ref = (*stream).last_range.borrow();
             let last_writable_range = match last_range_ref.as_ref() {
                 Some(last_range) => {
                     if !last_range.is_writable() {
                         // if last range is not writable, try to seal it and create a new range and retry append in next round.
-                        if let Err(_) = last_range.seal().await {
-                            // delay retry to avoid busy loop
-                            sleep(Duration::from_millis(100)).await;
-                        } else {
-                            // rewind back next append start offset and try append to new writable range in next round.
-                            next_append_start_offset = last_range.confirm_offset();
-                            if let Err(_) = stream.new_range().await {
+                        match last_range.seal().await {
+                            Ok(end_offset) => {
+                                // rewind back next append start offset and try append to new writable range in next round.
+                                next_append_start_offset = last_range.confirm_offset();
+                                if let Err(_) = stream
+                                    .new_range(last_range.metadata().index() + 1, end_offset)
+                                    .await
+                                {
+                                    // delay retry to avoid busy loop
+                                    sleep(Duration::from_millis(1000)).await;
+                                }
+                            }
+                            Err(_) => {
                                 // delay retry to avoid busy loop
-                                sleep(Duration::from_millis(1000)).await;
+                                sleep(Duration::from_millis(100)).await;
                             }
                         }
                         stream.trigger_append_task();
@@ -190,7 +229,7 @@ impl ReplicationStream {
                     last_range
                 }
                 None => {
-                    if let Err(_) = stream.new_range().await {
+                    if let Err(_) = stream.new_range(0, 0).await {
                         // delay retry to avoid busy loop
                         sleep(Duration::from_millis(1000)).await;
                         stream.trigger_append_task();
@@ -264,6 +303,12 @@ impl StreamAppendRequest {
     pub fn success(&self) {
         if let Some(append_tx) = self.append_tx.borrow_mut().take() {
             let _ = append_tx.send(Ok(()));
+        }
+    }
+
+    pub fn fail(&self, err: ReplicationError) {
+        if let Some(append_tx) = self.append_tx.borrow_mut().take() {
+            let _ = append_tx.send(Err(err));
         }
     }
 }

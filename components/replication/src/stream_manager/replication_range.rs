@@ -44,6 +44,22 @@ impl ReplicationRange {
         Rc::new(this)
     }
 
+    pub(crate) async fn create(
+        stream_id: i64,
+        epoch: u64,
+        index: i32,
+        start_offset: u64,
+    ) -> Result<RangeMetadata, ReplicationError> {
+        // 1. request placement manager to create range.
+        // 2. request placement manager to create range replica.
+        // 3. return metadata
+        todo!()
+    }
+
+    pub(crate) fn metadata(&self) -> &RangeMetadata {
+        &self.metadata
+    }
+
     pub(crate) fn is_sealed(&self) -> bool {
         self.metadata.end().is_some()
     }
