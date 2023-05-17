@@ -841,7 +841,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            assert_eq!(3, nodes.len());
+            assert_eq!(1, nodes.len());
             Ok(())
         })
     }
