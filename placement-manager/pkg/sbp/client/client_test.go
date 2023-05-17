@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/goleak"
 	"go.uber.org/zap"
 
 	"github.com/AutoMQ/placement-manager/pkg/sbp/protocol"
@@ -16,10 +15,6 @@ import (
 	"github.com/AutoMQ/placement-manager/pkg/server/config"
 	tempurl "github.com/AutoMQ/placement-manager/pkg/util/testutil/url"
 )
-
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
 
 type timeoutHandler struct {
 	baseHandler

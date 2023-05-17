@@ -166,19 +166,19 @@ type Rotate struct {
 }
 
 type rotation struct {
-	*lumberjack.Logger
+	lumberjack.Logger
 }
 
 // Sync implements zap.Sink. The remaining methods are implemented
 // by the embedded *lumberjack.Logger.
-func (rotation) Sync() error {
+func (*rotation) Sync() error {
 	return nil
 }
 
 // setupRotation can only be called ONCE since a fixed schema is being used
 func (l *Log) setupRotation() error {
 	err := zap.RegisterSink(RotationSchema, func(url *url.URL) (zap.Sink, error) {
-		return rotation{&lumberjack.Logger{
+		return &rotation{lumberjack.Logger{
 			Filename:   url.Path,
 			MaxSize:    l.Rotate.MaxSize,
 			MaxAge:     l.Rotate.MaxAge,

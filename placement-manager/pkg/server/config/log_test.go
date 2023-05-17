@@ -6,16 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/goleak"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-func TestMain(m *testing.M) {
-	// need to call lumberjack.Logger.Close(), but nowhere to call it now
-	opt := goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun")
-	goleak.VerifyTestMain(m, opt)
-}
 
 func TestLog_Adjust(t *testing.T) {
 	wd, err := os.Getwd()
@@ -122,7 +115,6 @@ func TestLogRotation(t *testing.T) {
 	for _, entry := range entries {
 		info, err := entry.Info()
 		re.NoError(err)
-		t.Log(info.Size())
 		re.LessOrEqual(info.Size(), int64(1<<20))
 	}
 

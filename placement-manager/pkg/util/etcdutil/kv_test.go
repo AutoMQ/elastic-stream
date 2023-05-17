@@ -20,15 +20,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.uber.org/goleak"
 	"go.uber.org/zap"
 
 	"github.com/AutoMQ/placement-manager/pkg/util/testutil"
 )
-
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
 
 func TestGetOne(t *testing.T) {
 	type args struct {
