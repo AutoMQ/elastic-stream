@@ -73,7 +73,7 @@ func NewMember(etcd *embed.Etcd, client *clientv3.Client, id uint64, logger *zap
 		etcd:   etcd,
 		client: client,
 		id:     id,
-		lg:     logger,
+		lg:     logger.With(zap.String("member-id", strconv.FormatUint(id, 10))),
 	}
 }
 

@@ -57,10 +57,11 @@ type EtcdParam struct {
 
 // NewEtcd creates a new etcd kv.
 func NewEtcd(param EtcdParam, lg *zap.Logger) *Etcd {
+	logger := lg.With(zap.String("root-path", param.RootPath))
 	e := &Etcd{
 		rootPath:  []byte(param.RootPath),
 		maxTxnOps: param.MaxTxnOps,
-		lg:        lg,
+		lg:        logger,
 	}
 
 	if e.maxTxnOps == 0 {
@@ -70,11 +71,11 @@ func NewEtcd(param EtcdParam, lg *zap.Logger) *Etcd {
 	if param.CmpFunc != nil {
 		e.newTxnFunc = func(ctx context.Context) clientv3.Txn {
 			// cmpFunc should be evaluated lazily.
-			return etcdutil.NewTxn(ctx, param.KV, lg.With(traceutil.TraceLogField(ctx))).If(param.CmpFunc())
+			return etcdutil.NewTxn(ctx, param.KV, logger.With(traceutil.TraceLogField(ctx))).If(param.CmpFunc())
 		}
 	} else {
 		e.newTxnFunc = func(ctx context.Context) clientv3.Txn {
-			return etcdutil.NewTxn(ctx, param.KV, lg.With(traceutil.TraceLogField(ctx)))
+			return etcdutil.NewTxn(ctx, param.KV, logger.With(traceutil.TraceLogField(ctx)))
 		}
 	}
 	return e

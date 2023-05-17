@@ -44,6 +44,7 @@ type Leadership struct {
 
 // NewLeadership creates a new Leadership.
 func NewLeadership(client *clientv3.Client, leaderKey, purpose string, logger *zap.Logger) *Leadership {
+	logger = logger.With(zap.String("leader-key", leaderKey))
 	leadership := &Leadership{
 		purpose:   purpose,
 		client:    client,
