@@ -86,6 +86,7 @@ impl ReplicationStream {
                     range.start(),
                     ReplicationRange::new(
                         range,
+                        false,
                         self.weak_self.borrow().clone(),
                         self.client.clone(),
                     ),
@@ -154,6 +155,7 @@ impl ReplicationStream {
             ReplicationRange::create(self.id, self.epoch, range_index, start_offset).await?;
         let range = ReplicationRange::new(
             range_metadata,
+            true,
             self.weak_self.borrow().clone(),
             self.client.clone(),
         );

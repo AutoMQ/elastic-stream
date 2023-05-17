@@ -3,6 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::ReplicationError;
 use bytes::Bytes;
 use log::{info, warn};
 use model::{payload::Payload, DataNode};
@@ -17,7 +18,7 @@ pub(crate) struct Replicator {
     range: Weak<ReplicationRange>,
     confirm_offset: Rc<RefCell<u64>>,
     data_node: DataNode,
-    corrupted: bool,
+    corrupted: Rc<RefCell<bool>>,
 }
 
 impl Replicator {
@@ -36,11 +37,12 @@ impl Replicator {
             range: Rc::downgrade(&range),
             confirm_offset: Rc::new(RefCell::new(confirm_offset)),
             data_node,
-            corrupted: false,
+            corrupted: Rc::new(RefCell::new(false)),
         }
     }
 
     pub(crate) fn confirm_offset(&self) -> u64 {
+        // only sealed range replica has confirm offset.
         *self.confirm_offset.borrow()
     }
 
@@ -59,6 +61,7 @@ impl Replicator {
         let offset = Rc::clone(&self.confirm_offset);
         let target = self.data_node.advertise_address.clone();
         let range = self.range.clone();
+        let corrupted = self.corrupted.clone();
 
         // Spawn a task to replicate data to the target data-node.
         tokio_uring::spawn(async move {
@@ -73,6 +76,7 @@ impl Replicator {
                     if attempts > 3 {
                         warn!("Failed to append entries after 3 attempts, aborting replication");
                         // TODO: Mark replication range as failing and incur seal immediately.
+                        corrupted.replace(true);
                         break;
                     }
                 } else {
@@ -92,17 +96,23 @@ impl Replicator {
                 }
 
                 *offset.borrow_mut() = Payload::max_offset(&payload);
+                break;
+            }
 
-                if let Some(range) = range.upgrade() {
-                    if let Err(e) = range.try_ack() {
-                        warn!("Failed to ack: {}", e);
-                    }
-                }
+            if let Some(range) = range.upgrade() {
+                range.try_ack();
             }
         });
     }
 
+    /// Seal the range replica.
+    /// - When range is open for write, then end_offset is Some(end_offset).
+    /// - When range is created by old stream, then end_offset is None.
+    pub(crate) async fn seal(&self, end_offset: Option<u64>) -> Result<u64, ReplicationError> {
+        todo!()
+    }
+
     pub fn corrupted(&self) -> bool {
-        self.corrupted
+        *self.corrupted.borrow()
     }
 }

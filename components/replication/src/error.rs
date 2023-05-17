@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum ReplicationError {
     #[error("RPC timeout")]
     RpcTimeout,
