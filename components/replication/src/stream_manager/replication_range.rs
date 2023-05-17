@@ -260,7 +260,7 @@ impl ReplicationRange {
     }
 
     pub(crate) fn is_sealing(&self) -> bool {
-        *self.status.borrow() & SEALED_FLAG != 0
+        *self.status.borrow() & SEALING_FLAG != 0
     }
 
     pub(crate) fn mark_sealing(&self) {
