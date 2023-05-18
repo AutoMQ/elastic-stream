@@ -260,11 +260,6 @@ impl ReplicationRange {
         // - when replica_count=3 and ack_count = 1, must seal 3 replica success, the result is seal fail Err.
         // - when replica_count=3 and ack_count = 2, must seal 2 replica success, the result end offset = 3.
         // - when replica_count=3 and ack_count = 3, must seal 1 replica success, the result end offset = 1.
-        let end_offsets_len = end_offsets.borrow().len();
-        if end_offsets_len < (replica_count - ack_count + 1) as usize {
-            return Err(ReplicationError::SealReplicaNotEnough);
-        }
-
         // assume the corrupted replica with the largest end offset.
         let end_offset = end_offsets
             .borrow_mut()
@@ -272,7 +267,7 @@ impl ReplicationRange {
             .sorted()
             .nth((replica_count - ack_count) as usize)
             .map(|offset| *offset)
-            .ok_or(ReplicationError::Internal);
+            .ok_or(ReplicationError::SealReplicaNotEnough);
         end_offset
     }
 
