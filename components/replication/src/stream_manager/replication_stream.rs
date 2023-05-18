@@ -201,11 +201,11 @@ impl ReplicationStream {
                 .fetch(
                     max(start_offset, range.start_offset()),
                     min(end_offset, range.confirm_offset()),
-                    max_bytes_hint,
+                    max_bytes_hint as u32,
                 )
                 .await?;
             for bytes in range_records.iter() {
-                max_bytes_hint -= bytes.len() as u32;
+                max_bytes_hint -= min(max_bytes_hint, bytes.len() as u32);
             }
             // TODO: check data integrity.
             records.append(&mut range_records);
