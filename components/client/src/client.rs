@@ -111,10 +111,6 @@ impl Client {
         composite_session.heartbeat().await
     }
 
-    pub async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ClientError> {
-        unimplemented!()
-    }
-
     pub async fn create_stream(
         &self,
         replica: u8,
@@ -129,6 +125,22 @@ impl Client {
             .await
             .map_err(|e| {
                 error!("Timeout when create stream. {}", e);
+                ClientError::RpcTimeout {
+                    timeout: self.config.client_io_timeout(),
+                }
+            })?
+    }
+
+    pub async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ClientError> {
+        let session_manager = unsafe { &mut *self.session_manager.get() };
+        let composite_session = session_manager
+            .get_composite_session(&self.config.placement_manager)
+            .await?;
+        let future = composite_session.describe_stream(stream_id);
+        time::timeout(self.config.client_io_timeout(), future)
+            .await
+            .map_err(|e| {
+                error!("Timeout when describe stream[stream-id={stream_id}]. {}", e);
                 ClientError::RpcTimeout {
                     timeout: self.config.client_io_timeout(),
                 }

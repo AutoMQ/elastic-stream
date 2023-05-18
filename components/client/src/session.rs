@@ -197,6 +197,10 @@ impl Session {
                 frame.operation_code = OperationCode::CreateStream;
             }
 
+            request::Headers::DescribeStream { .. } => {
+                frame.operation_code = OperationCode::DescribeStream;
+            }
+
             request::Headers::ListRange { .. } => {
                 frame.operation_code = OperationCode::ListRange;
             }
@@ -332,6 +336,10 @@ impl Session {
                             response.on_create_stream(&frame, &ctx);
                         }
 
+                        OperationCode::DescribeStream => {
+                            response.on_describe_stream(&frame, &ctx);
+                        }
+
                         OperationCode::DeleteStream => {
                             warn!("Received an unexpected `DeleteStreams` response");
                             return;
@@ -339,11 +347,6 @@ impl Session {
 
                         OperationCode::UpdateStream => {
                             warn!("Received an unexpected `UpdateStreams` response");
-                            return;
-                        }
-
-                        OperationCode::DescribeStream => {
-                            warn!("Received an unexpected `DescribeStreams` response");
                             return;
                         }
 

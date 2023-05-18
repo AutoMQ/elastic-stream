@@ -17,6 +17,7 @@ use protocol::rpc::header::SealKind;
 use std::{
     cell::RefCell,
     collections::HashMap,
+    f32::consts::E,
     io::ErrorKind,
     net::{SocketAddr, ToSocketAddrs},
     rc::Rc,
@@ -335,24 +336,92 @@ impl CompositeSession {
         retention: Duration,
     ) -> Result<StreamMetadata, ClientError> {
         self.try_reconnect().await;
+        let session = self
+            .pick_session(LbPolicy::LeaderOnly)
+            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+        let (tx, rx) = oneshot::channel();
+        let request = request::Request {
+            timeout: self.config.client_io_timeout(),
+            headers: request::Headers::CreateStream { replica, retention },
+        };
 
-        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
-            let (tx, rx) = oneshot::channel();
-            let request = request::Request {
-                timeout: self.config.client_io_timeout(),
-                headers: request::Headers::CreateStream { replica, retention },
-            };
-
-            if let Err(ctx) = session.write(request, tx).await {
-                error!(
-                    "Failed to send create-stream request to {}. Cause: {:?}",
-                    self.target, ctx
-                );
-                return Err(ClientError::ConnectionRefused(self.target.to_owned()));
-            }
+        if let Err(ctx) = session.write(request, tx).await {
+            error!(
+                "Failed to send create-stream request to {}. Cause: {:?}",
+                self.target, ctx
+            );
+            return Err(ClientError::ConnectionRefused(self.target.to_owned()));
         }
 
-        todo!()
+        let response = rx.await.map_err(|e| {
+            error!(
+                "Internal error while creating stream from {}. Cause: {:?}",
+                self.target, e
+            );
+            ClientError::ClientInternal
+        })?;
+
+        if !response.ok() {
+            error!(
+                "Failed to create stream from {}. Status: `{:#?}`",
+                self.target, response.status
+            );
+            // TODO: refine error handling according to status code
+            return Err(ClientError::ClientInternal);
+        }
+
+        if let Some(response::Headers::CreateStream { stream }) = response.headers {
+            Ok(stream)
+        } else {
+            unreachable!();
+        }
+    }
+
+    pub(crate) async fn describe_stream(
+        &self,
+        stream_id: u64,
+    ) -> Result<StreamMetadata, ClientError> {
+        self.try_reconnect().await;
+        let session = self
+            .pick_session(LbPolicy::PickFirst)
+            .ok_or(ClientError::ClientInternal)?;
+
+        let request = request::Request {
+            timeout: self.config.client_io_timeout(),
+            headers: request::Headers::DescribeStream { stream_id },
+        };
+
+        let (tx, rx) = oneshot::channel();
+        if let Err(ctx) = session.write(request, tx).await {
+            error!(
+                "Failed to send describe-stream request to {}. Cause: {:?}",
+                self.target, ctx
+            );
+            return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+        }
+
+        let response = rx.await.map_err(|e| {
+            error!(
+                "Internal error while describing stream from {}. Cause: {:?}",
+                self.target, e
+            );
+            ClientError::ClientInternal
+        })?;
+
+        if !response.ok() {
+            error!(
+                "Failed to describe stream[stream-id={stream_id}] from {}. Status: `{:#?}`",
+                self.target, response.status
+            );
+            // TODO: refine error handling according to status code
+            return Err(ClientError::ServerInternal);
+        }
+
+        if let Some(response::Headers::DescribeStream { stream }) = response.headers {
+            return Ok(stream);
+        } else {
+            unreachable!();
+        }
     }
 
     /// Create the specified range to the target: placement manager or data node.
