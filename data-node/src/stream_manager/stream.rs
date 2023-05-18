@@ -30,6 +30,13 @@ impl Stream {
         Ok(())
     }
 
+    pub(crate) fn reset_commit(&mut self, range_index: i32, offset: u64) {
+        self.ranges
+            .iter_mut()
+            .filter(|range| range.metadata.index() == range_index)
+            .for_each(|range| range.commit(offset));
+    }
+
     pub(crate) fn create_range(&mut self, metadata: RangeMetadata) -> Result<(), ServiceError> {
         self.verify_stream_id(&metadata)?;
 

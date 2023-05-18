@@ -60,7 +60,27 @@ impl Fetcher {
     }
 
     pub(crate) async fn stream(&self, stream_id: u64) -> Result<StreamMetadata, ServiceError> {
-        unimplemented!()
+        if let Fetcher::PlacementClient { client } = self {
+            return client
+                .describe_stream(stream_id)
+                .await
+                .map_err(|_e| {
+                    error!(
+                        "Failed to get stream={} metadata from placement manager",
+                        stream_id
+                    );
+                    ServiceError::DescribeStream
+                })
+                .inspect(|metadata| {
+                    trace!(
+                        "Received stream-metadata={:#?} from placement manager for stream-id={}",
+                        metadata,
+                        stream_id,
+                    );
+                });
+        }
+
+        unimplemented!("Describe stream from peer worker is not implemented yet")
     }
 
     async fn fetch_by_client(

@@ -6,6 +6,9 @@ pub enum ServiceError {
     #[error("Unsupported operation `{0}`")]
     Unsupported(OperationCode),
 
+    #[error("Failed to describe stream")]
+    DescribeStream,
+
     #[error("Failed to acquire stream range from placement managers")]
     AcquireRange,
 

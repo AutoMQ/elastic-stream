@@ -5,7 +5,7 @@ use std::{
 
 use log::{error, info, trace, warn};
 use model::range::RangeMetadata;
-use store::ElasticStore;
+use store::{ElasticStore, Store};
 
 use crate::error::ServiceError;
 
@@ -48,10 +48,18 @@ impl StreamManager {
         let ranges = self.fetcher.bootstrap().await?;
 
         for range in ranges {
+            let committed = self
+                .store
+                .max_record_offset(range.stream_id(), range.index() as u32)
+                .expect("Failed to acquire max offset of the range");
+            let range_index = range.index();
             let entry = self.streams.entry(range.stream_id());
             match entry {
                 Entry::Occupied(mut occupied) => {
                     occupied.get_mut().create_range(range)?;
+                    if let Some(offset) = committed {
+                        occupied.get_mut().reset_commit(range_index, offset);
+                    }
                 }
                 Entry::Vacant(vacant) => {
                     let metadata = self.fetcher.stream(range.stream_id() as u64).await.expect(
@@ -59,6 +67,9 @@ impl StreamManager {
                     );
                     let mut stream = Stream::new(metadata);
                     stream.create_range(range)?;
+                    if let Some(offset) = committed {
+                        stream.reset_commit(range_index, offset);
+                    }
                     vacant.insert(stream);
                 }
             }
@@ -69,11 +80,19 @@ impl StreamManager {
     /// Create a new range for the specified stream.
     pub(crate) async fn create_range(&mut self, range: RangeMetadata) -> Result<(), ServiceError> {
         info!("Create range={:?}", range);
-        if let Some(stream) = self.streams.get_mut(&range.stream_id()) {
-            stream.create_range(range)
-        } else {
-            Err(ServiceError::NotFound("Service not found".to_owned()))
+
+        match self.streams.entry(range.stream_id()) {
+            Entry::Occupied(mut occupied) => {
+                occupied.get_mut().create_range(range)?;
+            }
+            Entry::Vacant(vacant) => {
+                let metadata = self.fetcher.stream(range.stream_id() as u64).await?;
+                let mut stream = Stream::new(metadata);
+                stream.create_range(range)?;
+                vacant.insert(stream);
+            }
         }
+        Ok(())
     }
 
     pub(crate) fn commit(&mut self, stream_id: i64, offset: u64) -> Result<(), ServiceError> {
