@@ -363,6 +363,7 @@ fn serve_create_stream(req: &CreateStreamRequest, response_frame: &mut Frame) {
     response.status = Box::new(status);
 
     let mut stream = req.stream().unpack();
+    stream.stream_id = 1;
 
     response.stream = Some(Box::new(stream));
 

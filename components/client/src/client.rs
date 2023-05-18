@@ -318,13 +318,57 @@ mod tests {
     #[test]
     fn test_create_stream() -> Result<(), Box<dyn Error>> {
         test_util::try_init_log();
-        tokio_uring::start(async move { Ok(()) })
+        tokio_uring::start(async move {
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener().await;
+            let mut config = config::Configuration::default();
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.placement_manager = format!("localhost:{}", port);
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(config, tx);
+            let stream_metadata = client
+                .create_stream(3, std::time::Duration::from_secs(1))
+                .await?;
+            assert_eq!(1, stream_metadata.stream_id);
+            assert_eq!(3, stream_metadata.replica);
+            assert_eq!(
+                std::time::Duration::from_secs(1),
+                stream_metadata.retention_period
+            );
+            Ok(())
+        })
     }
 
     #[test]
     fn test_describe_stream() -> Result<(), Box<dyn Error>> {
         test_util::try_init_log();
-        tokio_uring::start(async move { Ok(()) })
+        tokio_uring::start(async move {
+            #[allow(unused_variables)]
+            let port = 2378;
+            let port = run_listener().await;
+            let mut config = config::Configuration::default();
+            config.server.host = "localhost".to_owned();
+            config.server.port = 10911;
+            config.placement_manager = format!("localhost:{}", port);
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(config, tx);
+
+            let stream_metadata = client
+                .describe_stream(1)
+                .await
+                .expect("Describe stream should not fail");
+            assert_eq!(1, stream_metadata.stream_id);
+            assert_eq!(1, stream_metadata.replica);
+            assert_eq!(
+                std::time::Duration::from_secs(3600 * 24),
+                stream_metadata.retention_period
+            );
+            Ok(())
+        })
     }
 
     #[test]
