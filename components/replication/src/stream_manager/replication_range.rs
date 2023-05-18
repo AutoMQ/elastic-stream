@@ -173,9 +173,15 @@ impl ReplicationRange {
                         let _ = self.seal_task_tx.send(Ok(end_offset));
                         // 2. spawn task to async seal range replicas
                         let replicas = self.replicators.clone();
+                        let replica_count = self.metadata.replica_count();
                         let ack_count = self.metadata.ack_count();
                         tokio_uring::spawn(async move {
-                            let _ = Self::replicas_seal(replicas, ack_count, Some(end_offset));
+                            let _ = Self::replicas_seal(
+                                replicas,
+                                replica_count,
+                                ack_count,
+                                Some(end_offset),
+                            );
                         });
 
                         return Ok(end_offset);
@@ -189,7 +195,14 @@ impl ReplicationRange {
                 // the range is created by old stream, it need to calculate end offset from replicas.
                 let replicas = self.replicators.clone();
                 // 1. seal range replicas and calculate end offset.
-                match Self::replicas_seal(replicas, self.metadata.ack_count(), None).await {
+                match Self::replicas_seal(
+                    replicas,
+                    self.metadata.replica_count(),
+                    self.metadata.ack_count(),
+                    None,
+                )
+                .await
+                {
                     Ok(end_offset) => {
                         // 2. call placement manager to seal range.
                         match self.placement_manager_seal(end_offset).await {
@@ -220,6 +233,7 @@ impl ReplicationRange {
 
     async fn replicas_seal(
         replicas: Rc<Vec<Rc<Replicator>>>,
+        replica_count: u32,
         ack_count: u32,
         end_offset: Option<u64>,
     ) -> Result<u64, ReplicationError> {
@@ -238,13 +252,29 @@ impl ReplicationRange {
         for task in seal_tasks {
             let _ = task.await;
         }
-        let confirm_offset_index = ack_count - 1;
+        // Example1: replicas confirmOffset = [1, 2, 3]
+        // - when replica_count=3 and ack_count = 1, must seal 3 replica success, the result end offset = 3.
+        // - when replica_count=3 and ack_count = 2, must seal 2 replica success, the result end offset = 2.
+        // - when replica_count=3 and ack_count = 3, must seal 1 replica success, the result end offset = 1.
+        // Example2: replicas confirmOffset = [1, corrupted, 3]
+        // - when replica_count=3 and ack_count = 1, must seal 3 replica success, the result is seal fail Err.
+        // - when replica_count=3 and ack_count = 2, must seal 2 replica success, the result end offset = 3.
+        // - when replica_count=3 and ack_count = 3, must seal 1 replica success, the result end offset = 1.
+        let end_offsets_len = end_offsets.borrow().len();
+        if end_offsets_len < (replica_count - ack_count + 1) as usize {
+            return Err(ReplicationError::SealReplicaNotEnough);
+        }
+        let fill_end_offsets_count = replica_count as usize - end_offsets_len;
+        for _ in 0..fill_end_offsets_count {
+            // assume the corrupted replica with the largest end offset.
+            end_offsets.borrow_mut().push(u64::MAX);
+        }
+
         let end_offset = end_offsets
             .borrow_mut()
             .iter()
             .sorted()
-            .rev()
-            .nth(confirm_offset_index as usize)
+            .nth((replica_count - ack_count) as usize)
             .map(|offset| *offset)
             .ok_or(ReplicationError::Internal);
         end_offset

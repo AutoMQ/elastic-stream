@@ -36,7 +36,7 @@ pub struct RangeMetadata {
     /// but larger than ack_count, the range can still be successfully created.
     replica_count: u32,
 
-    /// The range replica ack count, only success ack > ack_count, then the write is success.
+    /// The range replica ack count, only success ack >= ack_count, then the write is success.
     /// For seal range, success seal range must seal replica count >= (replica_count - ack_count + 1)
     ack_count: u32,
 }

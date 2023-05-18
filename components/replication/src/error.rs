@@ -16,4 +16,7 @@ pub enum ReplicationError {
 
     #[error("Stream is already closed")]
     AlreadyClosed,
+
+    #[error("Seal replicas count is not enough")]
+    SealReplicaNotEnough,
 }
