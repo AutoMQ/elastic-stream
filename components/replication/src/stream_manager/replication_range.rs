@@ -264,12 +264,8 @@ impl ReplicationRange {
         if end_offsets_len < (replica_count - ack_count + 1) as usize {
             return Err(ReplicationError::SealReplicaNotEnough);
         }
-        let fill_end_offsets_count = replica_count as usize - end_offsets_len;
-        for _ in 0..fill_end_offsets_count {
-            // assume the corrupted replica with the largest end offset.
-            end_offsets.borrow_mut().push(u64::MAX);
-        }
 
+        // assume the corrupted replica with the largest end offset.
         let end_offset = end_offsets
             .borrow_mut()
             .iter()
