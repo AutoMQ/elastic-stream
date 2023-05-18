@@ -316,6 +316,18 @@ mod tests {
     }
 
     #[test]
+    fn test_create_stream() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
+        tokio_uring::start(async move { Ok(()) })
+    }
+
+    #[test]
+    fn test_describe_stream() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
+        tokio_uring::start(async move { Ok(()) })
+    }
+
+    #[test]
     fn test_create_range() -> Result<(), ClientError> {
         test_util::try_init_log();
         tokio_uring::start(async {

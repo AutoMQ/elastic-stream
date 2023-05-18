@@ -362,7 +362,7 @@ fn serve_create_stream(req: &CreateStreamRequest, response_frame: &mut Frame) {
     status.message = Some("OK".to_string());
     response.status = Box::new(status);
 
-    let mut stream = req.stream();
+    let mut stream = req.stream().unpack();
 
     response.stream = Some(Box::new(stream));
 

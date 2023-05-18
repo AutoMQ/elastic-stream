@@ -194,7 +194,7 @@ fn serve_create_stream(req: &CreateStreamRequest, response_frame: &mut Frame) {
     stream.stream_id = 1;
     stream.replica = request.stream.replica;
     stream.retention_period_ms = request.stream.retention_period_ms;
-    response.stream = Box::new(stream);
+    response.stream = Some(Box::new(stream));
 
     let response = response.pack(&mut builder);
     builder.finish(response, None);
