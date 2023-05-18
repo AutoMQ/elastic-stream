@@ -384,7 +384,7 @@ table CreateStreamResponse {
     status: Status (id: 0, required);
 
     // The created stream
-    stream: Stream (id: 1, required);
+    stream: Stream (id: 1);
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
     throttle_time_ms: int32 (id: 2);

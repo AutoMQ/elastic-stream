@@ -1,19 +1,20 @@
 //! Util functions for tests.
 //!
 
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{self, Duration, UNIX_EPOCH};
 
 use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
 use log::{debug, error, info, trace, warn};
-use model::payload::Payload;
+use model::{payload::Payload, stream::StreamMetadata};
 use protocol::rpc::header::{
     AppendResponseT, AppendResultEntryT, CreateRangeRequest, CreateRangeResponseT,
-    DescribePlacementManagerClusterRequest, DescribePlacementManagerClusterResponseT, ErrorCode,
-    HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
+    CreateStreamRequest, CreateStreamResponseT, DescribePlacementManagerClusterRequest,
+    DescribePlacementManagerClusterResponseT, DescribeStreamRequest, DescribeStreamResponseT,
+    ErrorCode, HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
     ListRangeRequest, ListRangeResponseT, PlacementManagerClusterT, PlacementManagerNodeT, RangeT,
     ReportMetricsRequest, ReportMetricsResponseT, SealKind, SealRangeRequest, SealRangeResponseT,
-    StatusT,
+    StatusT, StreamT,
 };
 
 use tokio::sync::oneshot;
@@ -216,6 +217,34 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
+                                OperationCode::CreateStream => {
+                                    response_frame.operation_code = OperationCode::CreateStream;
+                                    if let Some(buf) = frame.header.as_ref() {
+                                        if let Ok(req) =
+                                            flatbuffers::root::<CreateStreamRequest>(buf)
+                                        {
+                                            serve_create_stream(&req, &mut response_frame);
+                                        } else {
+                                            error!("Failed to decode create-stream-request header");
+                                        }
+                                    }
+                                }
+
+                                OperationCode::DescribeStream => {
+                                    response_frame.operation_code = OperationCode::DescribeStream;
+                                    if let Some(buf) = frame.header.as_ref() {
+                                        if let Ok(req) =
+                                            flatbuffers::root::<DescribeStreamRequest>(buf)
+                                        {
+                                            serve_describe_stream(&req, &mut response_frame);
+                                        } else {
+                                            error!(
+                                                "Failed to decode describe-stream-request header"
+                                            );
+                                        }
+                                    }
+                                }
+
                                 OperationCode::CreateRange => {
                                     response_frame.operation_code = OperationCode::CreateRange;
                                     if let Some(buf) = frame.header.as_ref() {
@@ -302,6 +331,47 @@ pub async fn run_listener() -> u16 {
         info!("TestServer shut down OK");
     });
     rx.await.unwrap()
+}
+
+fn serve_describe_stream(req: &DescribeStreamRequest, response_frame: &mut Frame) {
+    let mut response = DescribeStreamResponseT::default();
+    let mut status = StatusT::default();
+    status.code = ErrorCode::OK;
+    status.message = Some("OK".to_string());
+    response.status = Box::new(status);
+
+    let mut stream = StreamT::default();
+    stream.stream_id = req.stream_id();
+    stream.replica = 1;
+    stream.retention_period_ms = time::Duration::from_secs(3600 * 24).as_millis() as i64;
+
+    response.stream = Some(Box::new(stream));
+
+    let mut builder = flatbuffers::FlatBufferBuilder::new();
+    let resp = response.pack(&mut builder);
+    builder.finish(resp, None);
+    let data = builder.finished_data();
+    response_frame.flag_response();
+    response_frame.header = Some(Bytes::copy_from_slice(data));
+}
+
+fn serve_create_stream(req: &CreateStreamRequest, response_frame: &mut Frame) {
+    let mut response = CreateStreamResponseT::default();
+    let mut status = StatusT::default();
+    status.code = ErrorCode::OK;
+    status.message = Some("OK".to_string());
+    response.status = Box::new(status);
+
+    let mut stream = req.stream();
+
+    response.stream = Some(Box::new(stream));
+
+    let mut builder = flatbuffers::FlatBufferBuilder::new();
+    let resp = response.pack(&mut builder);
+    builder.finish(resp, None);
+    let data = builder.finished_data();
+    response_frame.flag_response();
+    response_frame.header = Some(Bytes::copy_from_slice(data));
 }
 
 fn serve_create_range(request: &CreateRangeRequest, response_frame: &mut Frame) {
