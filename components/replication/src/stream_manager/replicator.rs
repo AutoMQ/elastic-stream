@@ -105,6 +105,15 @@ impl Replicator {
         });
     }
 
+    pub(crate) async fn fetch(
+        &self,
+        start_offset: u64,
+        end_offset: u64,
+        max_bytes_hint: u32,
+    ) -> Result<Vec<Bytes>, ReplicationError> {
+        todo!()
+    }
+
     /// Seal the range replica.
     /// - When range is open for write, then end_offset is Some(end_offset).
     /// - When range is created by old stream, then end_offset is None.

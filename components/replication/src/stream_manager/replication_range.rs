@@ -121,6 +121,34 @@ impl ReplicationRange {
         // FIXME: encode request payload from raw payload and context.
     }
 
+    pub(crate) async fn fetch(
+        &self,
+        start_offset: u64,
+        end_offset: u64,
+        max_bytes_hint: u32,
+    ) -> Result<Vec<Bytes>, ReplicationError> {
+        // TODO: select replica strategy.
+        // - balance the read traffic.
+        // - isolate unreadable (data less than expected, unaccessable) replica.
+        for replicator in self.replicators.iter() {
+            if replicator.corrupted() {
+                continue;
+            }
+            let result = replicator
+                .fetch(start_offset, end_offset, max_bytes_hint)
+                .await;
+            match result {
+                Ok(payloads) => {
+                    return Ok(payloads);
+                }
+                Err(_) => {
+                    continue;
+                }
+            }
+        }
+        Err(ReplicationError::Internal)
+    }
+
     /// update range confirm offset and invoke stream#try_ack.
     pub(crate) fn try_ack(&self) {
         if !self.is_writable() {
@@ -298,6 +326,10 @@ impl ReplicationRange {
 
     pub(crate) fn is_writable(&self) -> bool {
         *self.status.borrow() == 0 && self.open_for_write
+    }
+
+    pub(crate) fn start_offset(&self) -> u64 {
+        self.metadata.start()
     }
 
     pub(crate) fn confirm_offset(&self) -> u64 {

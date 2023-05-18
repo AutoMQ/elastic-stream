@@ -8,8 +8,9 @@ use itertools::Itertools;
 use log::error;
 use std::cell::OnceCell;
 use std::cell::RefCell;
+use std::cmp::{max, min};
 use std::collections::BTreeMap;
-use std::ops::Bound::Included;
+use std::ops::Bound::{Excluded, Included};
 use std::rc::{Rc, Weak};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
@@ -116,7 +117,8 @@ impl ReplicationStream {
     pub async fn close(&self) {
         let _ = self.shutdown_signal_tx.send(());
         // TODO: await append task to stop.
-        if let Some(range) = self.last_range.borrow().as_ref() {
+        let last_range = self.last_range.borrow().as_ref().map(|r| r.clone());
+        if let Some(range) = last_range {
             let _ = range.seal().await;
         }
     }
@@ -148,6 +150,67 @@ impl ReplicationStream {
             Ok(result) => result,
             Err(_) => Err(ReplicationError::AlreadyClosed),
         }
+    }
+
+    pub(crate) async fn fetch(
+        &self,
+        start_offset: u64,
+        end_offset: u64,
+        max_bytes_hint: u32,
+    ) -> Result<Vec<Bytes>, ReplicationError> {
+        if start_offset == end_offset {
+            return Ok(Vec::new());
+        }
+        let last_range = match self.last_range.borrow().as_ref() {
+            Some(range) => range.clone(),
+            None => return Err(ReplicationError::FetchOutOfRange),
+        };
+        // Fetch range is out of stream range.
+        if last_range.confirm_offset() < end_offset {
+            return Err(ReplicationError::FetchOutOfRange);
+        }
+        // Fast path: if fetch range is in the last range, then fetch from it.
+        if last_range.start_offset() <= start_offset {
+            return last_range
+                .fetch(start_offset, end_offset, max_bytes_hint)
+                .await;
+        }
+
+        // Slow path
+        // 1. find all ranges that intersect with the fetch range.
+        // 2. fetch from each range.
+        let mut fetch_ranges: Vec<Rc<ReplicationRange>> = Vec::new();
+        {
+            self.ranges
+                .borrow()
+                .range((Included(start_offset), Excluded(end_offset)))
+                .for_each(|(_, range)| {
+                    fetch_ranges.push(range.clone());
+                });
+        }
+        if fetch_ranges.is_empty() || fetch_ranges[0].start_offset() > start_offset {
+            return Err(ReplicationError::FetchOutOfRange);
+        }
+        let mut records: Vec<Bytes> = Vec::new();
+        let mut max_bytes_hint = max_bytes_hint;
+        for range in fetch_ranges {
+            if max_bytes_hint <= 0 {
+                break;
+            }
+            let mut range_records = range
+                .fetch(
+                    max(start_offset, range.start_offset()),
+                    min(end_offset, range.confirm_offset()),
+                    max_bytes_hint,
+                )
+                .await?;
+            for bytes in range_records.iter() {
+                max_bytes_hint -= bytes.len() as u32;
+            }
+            // TODO: check data integrity.
+            records.append(&mut range_records);
+        }
+        Ok(records)
     }
 
     async fn new_range(&self, range_index: i32, start_offset: u64) -> Result<(), ReplicationError> {

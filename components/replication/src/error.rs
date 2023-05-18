@@ -19,4 +19,7 @@ pub enum ReplicationError {
 
     #[error("Seal replicas count is not enough")]
     SealReplicaNotEnough,
+
+    #[error("Fetch request is out of range")]
+    FetchOutOfRange,
 }
