@@ -70,7 +70,8 @@ type Member struct {
 }
 
 // NewMember create a new Member.
-func NewMember(etcd *embed.Etcd, client *clientv3.Client, id uint64, logger *zap.Logger) *Member {
+func NewMember(etcd *embed.Etcd, client *clientv3.Client, logger *zap.Logger) *Member {
+	id := uint64(etcd.Server.ID())
 	return &Member{
 		etcd:   etcd,
 		client: client,

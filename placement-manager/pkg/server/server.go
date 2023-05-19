@@ -172,7 +172,7 @@ func (s *Server) startEtcd(ctx context.Context) error {
 	s.client = client
 
 	// init member
-	s.member = member.NewMember(etcd, client, uint64(etcd.Server.ID()), logger)
+	s.member = member.NewMember(etcd, client, logger)
 
 	return nil
 }
