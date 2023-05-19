@@ -8,6 +8,7 @@ use crate::ReplicationError;
 use bytes::Bytes;
 use log::{info, warn};
 use model::DataNode;
+use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
 
 /// Replicator is responsible for replicating data to a data-node of range replica.
@@ -87,17 +88,35 @@ impl Replicator {
                 let result = client
                     .append(&target, flat_record_batch_bytes.clone())
                     .await;
-                if let Err(e) = result {
-                    // TODO: inspect error and retry only if it's a network error.
-                    // If the error is a protocol error, we should abort replication.
-                    // If the range is sealed on data-node, we should abort replication and fire replication seal immediately.
-                    warn!("Failed to append entries: {}. Retry...", e);
-                    attempts += 1;
-                    // TODO: Retry immediately?
-                    continue;
+                match result {
+                    Ok(append_result_entries) => {
+                        if append_result_entries.len() != 1 {
+                            warn!("Failed to append entries: unexpected number of entries returned. Retry...");
+                            attempts += 1;
+                            continue;
+                        }
+                        let status = &(append_result_entries[0].status);
+                        if status.code != ErrorCode::OK {
+                            warn!(
+                                "Failed to append entries: status code {:?} is not OK. Retry...",
+                                status
+                            );
+                            attempts += 1;
+                            continue;
+                        }
+                        *offset.borrow_mut() = last_offset;
+                        break;
+                    }
+                    Err(e) => {
+                        // TODO: inspect error and retry only if it's a network error.
+                        // If the error is a protocol error, we should abort replication.
+                        // If the range is sealed on data-node, we should abort replication and fire replication seal immediately.
+                        warn!("Failed to append entries: {}. Retry...", e);
+                        attempts += 1;
+                        // TODO: Retry immediately?
+                        continue;
+                    }
                 }
-                *offset.borrow_mut() = last_offset;
-                break;
             }
 
             if let Some(range) = range.upgrade() {

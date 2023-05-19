@@ -612,7 +612,7 @@ mod tests {
             }
 
             let response = client
-                .append(&config.placement_manager, buf.freeze())
+                .append(&config.placement_manager, vec![buf.freeze()])
                 .await?;
 
             assert_eq!(response.len(), BATCH as usize);
