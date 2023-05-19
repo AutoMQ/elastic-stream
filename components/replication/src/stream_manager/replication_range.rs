@@ -80,11 +80,21 @@ impl ReplicationRange {
             .await
             .map_err(|_| ReplicationError::Internal)?;
         // 2. request data node to create range replica.
+        let mut create_replica_tasks = vec![];
         for node in metadata.replica().iter() {
-            let _ = client
-                .create_range_replica(&node.advertise_address, metadata.clone())
-                .await
-                .map_err(|_| ReplicationError::Internal);
+            let address = node.advertise_address.clone();
+            let metadata = metadata.clone();
+            let client = client.clone();
+            create_replica_tasks.push(tokio_uring::spawn(async move {
+                client
+                    .create_range_replica(&address, metadata)
+                    .await
+                    .map_err(|_| ReplicationError::Internal)
+            }));
+        }
+        for task in create_replica_tasks {
+            // if success replica is less than ack count, the stream append task will create new range triggered by append error.
+            let _ = task.await;
         }
         // 3. return metadata
         Ok(metadata)
