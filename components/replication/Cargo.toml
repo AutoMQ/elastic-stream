@@ -9,6 +9,7 @@ edition = "2021"
 client = { path = "../client" }
 config = { path = "../config" }
 model = { path = "../model" }
+protocol = { path = "../protocol" }
 log = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

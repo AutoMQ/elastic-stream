@@ -12,6 +12,7 @@ use tokio::sync::broadcast;
 use crate::ReplicationError;
 
 use super::{replication_stream::ReplicationStream, replicator::Replicator};
+use protocol::rpc::header::SealKind;
 
 const CORRUPTED_FLAG: u32 = 1 << 0;
 const SEALING_FLAG: u32 = 1 << 1;
@@ -256,7 +257,19 @@ impl ReplicationRange {
     }
 
     async fn placement_manager_seal(&self, end_offset: u64) -> Result<(), ReplicationError> {
-        todo!()
+        if let Some(client) = self.client.upgrade() {
+            let mut metadata = self.metadata.clone();
+            metadata.set_end(end_offset);
+            match client
+                .seal(None, SealKind::PLACEMENT_MANAGER, metadata)
+                .await
+            {
+                Ok(_) => Ok(()),
+                Err(_) => Err(ReplicationError::Internal),
+            }
+        } else {
+            Err(ReplicationError::AlreadyClosed)
+        }
     }
 
     async fn replicas_seal(

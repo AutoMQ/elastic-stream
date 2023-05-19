@@ -3,12 +3,12 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use super::replication_range::ReplicationRange;
 use crate::ReplicationError;
 use bytes::Bytes;
 use log::{info, warn};
 use model::{payload::Payload, DataNode};
-
-use super::replication_range::ReplicationRange;
+use protocol::rpc::header::SealKind;
 
 /// Replicator is responsible for replicating data to a data-node of range replica.
 ///
@@ -118,7 +118,33 @@ impl Replicator {
     /// - When range is open for write, then end_offset is Some(end_offset).
     /// - When range is created by old stream, then end_offset is None.
     pub(crate) async fn seal(&self, end_offset: Option<u64>) -> Result<u64, ReplicationError> {
-        todo!()
+        if let Some(range) = self.range.upgrade() {
+            let mut metadata = range.metadata().clone();
+            if let Some(end_offset) = end_offset {
+                metadata.set_end(end_offset);
+            }
+            if let Some(client) = range.client() {
+                return match client
+                    .seal(
+                        Some(&self.data_node.advertise_address),
+                        SealKind::DATA_NODE,
+                        metadata,
+                    )
+                    .await
+                {
+                    Ok(metadata) => {
+                        let end_offset = metadata.end().ok_or(ReplicationError::Internal)?;
+                        *self.confirm_offset.borrow_mut() = end_offset;
+                        Ok(end_offset)
+                    }
+                    Err(_) => Err(ReplicationError::Internal),
+                };
+            } else {
+                Err(ReplicationError::AlreadyClosed)
+            }
+        } else {
+            Err(ReplicationError::AlreadyClosed)
+        }
     }
 
     pub fn corrupted(&self) -> bool {
