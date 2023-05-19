@@ -22,7 +22,7 @@ func (h *Handler) ListRange(req *protocol.ListRangeRequest, resp *protocol.ListR
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(h.notLeaderError())
+			resp.Error(h.notLeaderError(ctx))
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
@@ -49,7 +49,7 @@ func (h *Handler) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealR
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(h.notLeaderError())
+			resp.Error(h.notLeaderError(ctx))
 		case errors.Is(err, cluster.ErrStreamNotFound):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeNOT_FOUND, Message: err.Error()})
 		case errors.Is(err, cluster.ErrRangeNotFound):
@@ -82,7 +82,7 @@ func (h *Handler) CreateRange(req *protocol.CreateRangeRequest, resp *protocol.C
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(h.notLeaderError())
+			resp.Error(h.notLeaderError(ctx))
 		case errors.Is(err, cluster.ErrStreamNotFound):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeNOT_FOUND, Message: err.Error()})
 		case errors.Is(err, cluster.ErrInvalidRangeIndex):

@@ -31,6 +31,7 @@ import (
 	"github.com/AutoMQ/placement-manager/pkg/server/config"
 	"github.com/AutoMQ/placement-manager/pkg/server/election"
 	"github.com/AutoMQ/placement-manager/pkg/util/etcdutil"
+	"github.com/AutoMQ/placement-manager/pkg/util/traceutil"
 )
 
 const (
@@ -274,16 +275,32 @@ func (m *Member) Leader() *Info {
 	return leader
 }
 
-// ClusterInfo returns all members in the cluster. The first member is the leader.
-func (m *Member) ClusterInfo() []*Info {
-	leader := m.Leader()
-	if leader == nil {
-		return nil
+// ClusterInfo returns all members in the cluster.
+func (m *Member) ClusterInfo(ctx context.Context) ([]*Info, error) {
+	logger := m.lg.With(traceutil.TraceLogField(ctx))
+
+	etcdMembers, err := m.client.MemberList(ctx)
+	if err != nil {
+		logger.Error("failed to list etcd members", zap.Error(err))
+		return nil, errors.Wrap(err, "list etcd members")
 	}
-	members := make([]*Info, 0)
-	members = append(members, leader)
-	// TODO add other members
-	return members
+
+	leader := m.Leader()
+	members := make([]*Info, 0, len(etcdMembers.Members))
+	for _, m := range etcdMembers.Members {
+		member := &Info{
+			Name:       m.Name,
+			MemberID:   m.ID,
+			PeerUrls:   m.PeerURLs,
+			ClientUrls: m.ClientURLs,
+		}
+		if leader != nil && member.MemberID == leader.MemberID {
+			member.IsLeader = true
+		}
+		members = append(members, member)
+	}
+
+	return members, nil
 }
 
 // Etcd returns etcd related information.

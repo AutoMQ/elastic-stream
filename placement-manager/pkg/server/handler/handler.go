@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 
 	"github.com/AutoMQ/placement-manager/api/rpcfb/rpcfb"
@@ -37,27 +39,31 @@ func (h *Handler) Check(req protocol.InRequest, resp protocol.OutResponse) (pass
 	if h.c.IsLeader() {
 		return true
 	}
-	h.lg.Warn("not leader", traceutil.TraceLogField(req.Context()))
 
-	resp.Error(h.notLeaderError())
+	ctx := req.Context()
+	h.lg.Warn("not leader", traceutil.TraceLogField(ctx))
+
+	resp.Error(h.notLeaderError(ctx))
 	return false
 }
 
-func (h *Handler) notLeaderError() *rpcfb.StatusT {
-	pmCluster := h.pmCluster()
+func (h *Handler) notLeaderError(ctx context.Context) *rpcfb.StatusT {
+	pmCluster := h.pmCluster(ctx)
 	return &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: fbutil.Marshal(pmCluster)}
 }
 
-func (h *Handler) pmCluster() *rpcfb.PlacementManagerClusterT {
+func (h *Handler) pmCluster(ctx context.Context) *rpcfb.PlacementManagerClusterT {
 	pm := &rpcfb.PlacementManagerClusterT{Nodes: make([]*rpcfb.PlacementManagerNodeT, 0)}
-	for _, member := range h.c.ClusterInfo() {
+	members, err := h.c.ClusterInfo(ctx)
+	if err != nil {
+		return &rpcfb.PlacementManagerClusterT{Nodes: []*rpcfb.PlacementManagerNodeT{}}
+	}
+	for _, member := range members {
 		pm.Nodes = append(pm.Nodes, &rpcfb.PlacementManagerNodeT{
 			Name:          member.Name,
 			AdvertiseAddr: member.SbpAddr,
+			IsLeader:      member.IsLeader,
 		})
-	}
-	if len(pm.Nodes) > 0 {
-		pm.Nodes[0].IsLeader = true
 	}
 	return pm
 }

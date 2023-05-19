@@ -70,8 +70,8 @@ type RaftCluster struct {
 
 type Member interface {
 	IsLeader() bool
-	// ClusterInfo returns all members in the cluster. The first member is the leader.
-	ClusterInfo() []*member.Info
+	// ClusterInfo returns all members in the cluster.
+	ClusterInfo(ctx context.Context) ([]*member.Info, error)
 }
 
 // Server is the interface for starting a RaftCluster.
@@ -179,6 +179,6 @@ func (c *RaftCluster) IsLeader() bool {
 	return c.member.IsLeader()
 }
 
-func (c *RaftCluster) ClusterInfo() []*member.Info {
-	return c.member.ClusterInfo()
+func (c *RaftCluster) ClusterInfo(ctx context.Context) ([]*member.Info, error) {
+	return c.member.ClusterInfo(ctx)
 }

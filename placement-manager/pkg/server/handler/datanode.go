@@ -41,7 +41,7 @@ func (h *Handler) AllocateID(req *protocol.IDAllocationRequest, resp *protocol.I
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(h.notLeaderError())
+			resp.Error(h.notLeaderError(ctx))
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
@@ -70,7 +70,7 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(h.notLeaderError())
+			resp.Error(h.notLeaderError(ctx))
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
@@ -79,7 +79,8 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 	resp.OK()
 }
 
-func (h *Handler) DescribePMCluster(_ *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
-	resp.Cluster = h.pmCluster()
+func (h *Handler) DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
+	ctx := req.Context()
+	resp.Cluster = h.pmCluster(ctx)
 	resp.OK()
 }
