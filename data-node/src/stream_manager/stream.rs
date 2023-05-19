@@ -100,60 +100,97 @@ impl Stream {
 }
 
 mod tests {
-    // #[test]
-    // fn test_sort_stream() {
-    //     // Construct a stream with 3 ranges, and sort it.
-    //     let mut stream: Stream = StreamT::default().into();
-    //     stream.push(RangeMetadata::new(0, 1, 0, 0, None));
-    //     stream.push(RangeMetadata::new(0, 0, 0, 0, None));
-    //     stream.push(RangeMetadata::new(0, 2, 0, 0, None));
-    //     stream.sort();
+    use std::error::Error;
 
-    //     // Check the ranges are sorted by index.
-    //     assert_eq!(stream.ranges[0].index(), 0);
-    //     assert_eq!(stream.ranges[1].index(), 1);
-    //     assert_eq!(stream.ranges[2].index(), 2);
-    // }
+    use model::{range::RangeMetadata, stream::StreamMetadata};
+    use protocol::rpc::header::StreamT;
 
-    // #[test]
-    // fn test_seal_stream() -> Result<(), Box<dyn Error>> {
-    //     // Construct a stream with 3 ranges, and seal the last range.
-    //     let mut stream: Stream = StreamT::default().into();
-    //     stream.push(RangeMetadata::new(0, 0, 0, 0, None));
-    //     stream.push(RangeMetadata::new(0, 1, 0, 10, Some(20)));
-    //     stream.push(RangeMetadata::new(0, 2, 0, 20, None));
-    //     stream.seal(0, 2)?;
+    #[test]
+    fn test_new() -> Result<(), Box<dyn Error>> {
+        let mut stream = StreamT::default();
+        stream.stream_id = 1;
+        stream.replica = 1;
+        stream.retention_period_ms = 1000;
+        let stream = StreamMetadata::from(stream);
+        assert_eq!(stream.stream_id, 1);
+        assert_eq!(stream.replica, 1);
+        assert_eq!(stream.retention_period.as_millis(), 1000);
+        Ok(())
+    }
 
-    //     // Check the last range is sealed.
-    //     assert_eq!(stream.ranges.last().unwrap().is_sealed(), true);
-    //     Ok(())
-    // }
+    #[test]
+    fn test_create_range() -> Result<(), Box<dyn Error>> {
+        let mut stream = StreamT::default();
+        stream.stream_id = 1;
+        stream.replica = 1;
+        stream.retention_period_ms = 1000;
+        let stream_metadata = StreamMetadata::from(stream);
+        let mut stream = super::Stream::new(stream_metadata);
 
-    // #[test]
-    // fn test_query_from_stream() {
-    //     // Construct a complete stream through a iterator.
-    //     let mut stream: Stream = StreamT::default().into();
+        let range = RangeMetadata::new(1, 0, 0, 0, None);
+        let range = RangeMetadata::from(range);
+        stream.create_range(range)?;
 
-    //     (0..10)
-    //         .map(|i| {
-    //             let mut sr = RangeMetadata::new(0, i, 0, i as u64 * 10, None);
-    //             // Seal the range if it's not the last one.
-    //             if i != 9 {
-    //                 sr.set_end((i as u64 + 1) * 10);
-    //             }
-    //             sr
-    //         })
-    //         .for_each(|range| stream.push(range));
+        assert_eq!(stream.ranges.len(), 1);
 
-    //     // Test the range_of method.
-    //     assert_eq!(stream.range_of(0).unwrap().index(), 0);
-    //     assert_eq!(stream.range_of(5).unwrap().index(), 0);
-    //     assert_eq!(stream.range_of(10).unwrap().index(), 1);
-    //     assert_eq!(stream.range_of(15).unwrap().index(), 1);
-    //     assert_eq!(stream.range_of(20).unwrap().index(), 2);
+        Ok(())
+    }
 
-    //     // Test the range method
-    //     assert_eq!(stream.range(5).unwrap().start(), 50);
-    //     assert_eq!(stream.range(5).unwrap().is_sealed(), true);
-    // }
+    #[test]
+    fn test_commit() -> Result<(), Box<dyn Error>> {
+        let mut stream = StreamT::default();
+        stream.stream_id = 1;
+        stream.replica = 1;
+        stream.retention_period_ms = 1000;
+        let stream_metadata = StreamMetadata::from(stream);
+        let mut stream = super::Stream::new(stream_metadata);
+
+        let range = RangeMetadata::new(1, 0, 0, 0, None);
+        let range = RangeMetadata::from(range);
+        stream.create_range(range)?;
+
+        stream.commit(2);
+
+        assert_eq!(
+            stream
+                .ranges
+                .iter()
+                .next()
+                .expect("Range should exist")
+                .committed(),
+            Some(2)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seal() -> Result<(), Box<dyn Error>> {
+        let mut stream = StreamT::default();
+        stream.stream_id = 1;
+        stream.replica = 1;
+        stream.retention_period_ms = 1000;
+        let stream_metadata = StreamMetadata::from(stream);
+        let mut stream = super::Stream::new(stream_metadata);
+
+        let range = RangeMetadata::new(1, 0, 0, 0, None);
+        let range = RangeMetadata::from(range);
+        stream.create_range(range)?;
+
+        stream.commit(100);
+        let mut metadata = RangeMetadata::new(1, 0, 0, 0, Some(50));
+        stream.seal(&mut metadata)?;
+
+        let committed = stream
+            .ranges
+            .iter()
+            .nth(0)
+            .expect("The first range should exist")
+            .committed();
+        assert_eq!(committed, Some(100));
+        assert!(stream.range_of(50).is_none());
+        assert!(stream.range_of(49).is_some());
+
+        Ok(())
+    }
 }
