@@ -223,7 +223,7 @@ impl Session {
 
             request::Headers::Append { buf, .. } => {
                 frame.operation_code = OperationCode::Append;
-                frame.payload = Some(vec![buf.clone()]);
+                frame.payload = Some(buf.clone());
             }
 
             request::Headers::ReportMetrics { .. } => {

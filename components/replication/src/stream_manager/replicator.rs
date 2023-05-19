@@ -7,7 +7,7 @@ use super::replication_range::ReplicationRange;
 use crate::ReplicationError;
 use bytes::Bytes;
 use log::{info, warn};
-use model::{payload::Payload, DataNode};
+use model::DataNode;
 use protocol::rpc::header::SealKind;
 
 /// Replicator is responsible for replicating data to a data-node of range replica.
@@ -46,7 +46,7 @@ impl Replicator {
         *self.confirm_offset.borrow()
     }
 
-    pub(crate) fn append(&self, payload: Bytes) {
+    pub(crate) fn append(&self, flat_record_batch_bytes: Vec<Bytes>, last_offset: u64) {
         let client = if let Some(range) = self.range.upgrade() {
             if let Some(client) = range.client() {
                 client
@@ -84,7 +84,9 @@ impl Replicator {
                     return;
                 }
 
-                let result = client.append(&target, payload.clone()).await;
+                let result = client
+                    .append(&target, flat_record_batch_bytes.clone())
+                    .await;
                 if let Err(e) = result {
                     // TODO: inspect error and retry only if it's a network error.
                     // If the error is a protocol error, we should abort replication.
@@ -94,8 +96,7 @@ impl Replicator {
                     // TODO: Retry immediately?
                     continue;
                 }
-
-                *offset.borrow_mut() = Payload::max_offset(&payload);
+                *offset.borrow_mut() = last_offset;
                 break;
             }
 

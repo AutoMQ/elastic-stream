@@ -1,13 +1,10 @@
-use crate::{append_entry::AppendEntry, Status};
+use crate::Status;
 
 use chrono::{DateTime, TimeZone, Utc};
 use protocol::rpc::header::AppendResultEntryT;
 
 #[derive(Debug, Clone)]
 pub struct AppendResultEntry {
-    /// Record batch entry.
-    pub entry: AppendEntry,
-
     /// Appending record batch entry result.
     pub status: Status,
 
@@ -18,7 +15,6 @@ pub struct AppendResultEntry {
 impl From<AppendResultEntryT> for AppendResultEntry {
     fn from(value: AppendResultEntryT) -> Self {
         Self {
-            entry: AppendEntry::default(),
             status: (&value.status).into(),
             timestamp: Utc.timestamp(
                 value.timestamp_ms / 1000,

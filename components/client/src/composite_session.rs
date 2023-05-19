@@ -773,7 +773,10 @@ impl CompositeSession {
         ))
     }
 
-    pub(crate) async fn append(&self, buf: Bytes) -> Result<Vec<AppendResultEntry>, ClientError> {
+    pub(crate) async fn append(
+        &self,
+        buf: Vec<Bytes>,
+    ) -> Result<Vec<AppendResultEntry>, ClientError> {
         self.try_reconnect().await;
         let session = self
             .pick_session(self.lb_policy)
@@ -787,13 +790,8 @@ impl CompositeSession {
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
             let request = ctx.request();
-            if let request::Headers::Append { ref buf, .. } = request.headers {
-                if let Ok(entries) = Payload::parse_append_entries(buf) {
-                    error!("Failed to append entries {entries:?}");
-                } else {
-                    error!("Failed to decode append request payload");
-                }
-            }
+            // TODO: decode append info from flat_record_batch_bytes to provide readable information.
+            error!("Failed to append {request:?}");
             return Err(ClientError::ClientInternal);
         }
 

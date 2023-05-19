@@ -6,7 +6,6 @@ use log::error;
 use log::info;
 use log::trace;
 use log::warn;
-use model::payload::Payload;
 use model::stream::StreamMetadata;
 use model::AppendResultEntry;
 use protocol::rpc::header::AppendResponse;
@@ -174,41 +173,11 @@ impl Response {
                     }
                     self.status = Status::ok();
 
-                    let append_entries = if let request::Headers::Append { ref buf, .. } =
-                        ctx.request().headers
-                    {
-                        match Payload::parse_append_entries(buf) {
-                            Ok(entries) => entries,
-                            Err(_e) => {
-                                error!(
-                                    "Failed to parse append entries from request payload: {:?}",
-                                    _e
-                                );
-                                self.status =
-                                    Status::bad_request("Request payload corrupted.".to_owned());
-                                return;
-                            }
-                        }
-                    } else {
-                        unreachable!()
-                    };
-
                     if let Some(items) = response.entries {
-                        debug_assert_eq!(
-                            append_entries.len(),
-                            items.len(),
-                            "Each append-entry should have a corresponding result."
-                        );
                         let entries = items
                             .into_iter()
                             .map(Into::<AppendResultEntry>::into)
-                            .zip(append_entries.into_iter())
-                            .map(|(mut result, entry)| {
-                                result.entry = entry;
-                                result
-                            })
                             .collect();
-
                         self.headers = Some(Headers::Append { entries });
                     }
                 }

@@ -234,7 +234,7 @@ impl Client {
     pub async fn append(
         &self,
         target: &str,
-        buf: Bytes,
+        buf: Vec<Bytes>,
     ) -> Result<Vec<AppendResultEntry>, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager.get_composite_session(target).await?;

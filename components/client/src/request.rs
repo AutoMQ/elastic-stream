@@ -9,6 +9,7 @@ use protocol::rpc::header::{
     IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT, ReportMetricsRequestT,
     SealKind, SealRangeRequestT, StreamT,
 };
+use std::rc::Rc;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -56,7 +57,7 @@ pub enum Headers {
     },
 
     Append {
-        buf: Bytes,
+        buf: Vec<Bytes>,
     },
 
     ReportMetrics {

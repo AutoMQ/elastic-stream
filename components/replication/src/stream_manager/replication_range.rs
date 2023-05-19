@@ -142,11 +142,22 @@ impl ReplicationRange {
     }
 
     pub(crate) fn append(&self, payload: Rc<Bytes>, context: RangeAppendContext) {
-        // FIXME: encode request payload from raw payload and context.
-        let record_batch_builder = RecordBatch::new_builder();
-        record_batch_builder.with_stream_id(self.metadata.stream_id());
-
-        let mut record_batch_meta = RecordBatchMetaT::default();
+        let record_batch = RecordBatch::new_builder()
+            .with_stream_id(self.metadata.stream_id())
+            .with_range_index(self.metadata.index())
+            .with_base_offset(context.base_offset as i64)
+            .with_last_offset_delta(context.count as i32)
+            .with_payload((*payload).clone())
+            .build()
+            .unwrap();
+        let flat_record_batch: FlatRecordBatch = Into::into(record_batch);
+        let (flat_record_batch_bytes, _) = flat_record_batch.encode();
+        for replica in (*self.replicators).iter() {
+            replica.append(
+                flat_record_batch_bytes.clone(),
+                context.base_offset + context.count as u64,
+            );
+        }
     }
 
     pub(crate) async fn fetch(
@@ -219,7 +230,7 @@ impl ReplicationRange {
             }
         } else {
             self.mark_sealing();
-            if (self.open_for_write) {
+            if self.open_for_write {
                 // the range is open for write, it's ok to dirrectly use memory confirm offset as range end offset.
                 let end_offset = self.confirm_offset();
                 // 1. call placement manager to seal range
