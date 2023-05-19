@@ -214,17 +214,22 @@ impl ReplicationStream {
     }
 
     async fn new_range(&self, range_index: i32, start_offset: u64) -> Result<(), ReplicationError> {
-        let range_metadata =
-            ReplicationRange::create(self.id, self.epoch, range_index, start_offset).await?;
-        let range = ReplicationRange::new(
-            range_metadata,
-            true,
-            self.weak_self.borrow().clone(),
-            self.client.clone(),
-        );
-        self.ranges.borrow_mut().insert(start_offset, range.clone());
-        *self.last_range.borrow_mut() = Some(range.clone());
-        Ok(())
+        if let Some(client) = self.client.upgrade() {
+            let range_metadata =
+                ReplicationRange::create(client, self.id, self.epoch, range_index, start_offset)
+                    .await?;
+            let range = ReplicationRange::new(
+                range_metadata,
+                true,
+                self.weak_self.borrow().clone(),
+                self.client.clone(),
+            );
+            self.ranges.borrow_mut().insert(start_offset, range.clone());
+            *self.last_range.borrow_mut() = Some(range.clone());
+            Ok(())
+        } else {
+            Err(ReplicationError::Internal)
+        }
     }
 
     pub(crate) fn try_ack(&self) {

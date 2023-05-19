@@ -427,7 +427,10 @@ impl CompositeSession {
     /// Create the specified range to the target: placement manager or data node.
     ///
     /// If the target is placement manager, we need to select the session to the primary node;
-    pub(crate) async fn create_range(&self, range: RangeMetadata) -> Result<(), ClientError> {
+    pub(crate) async fn create_range(
+        &self,
+        range: RangeMetadata,
+    ) -> Result<RangeMetadata, ClientError> {
         self.try_reconnect().await;
         if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
             let (tx, rx) = oneshot::channel();
@@ -453,14 +456,17 @@ impl CompositeSession {
                 ClientError::ClientInternal
             })?;
 
-            if response.ok() {
-                Ok(())
-            } else {
+            if !response.ok() {
                 error!(
                     "Failed to create range on {}. Status: `{:?}`",
                     self.target, response.status
                 );
-                Err(ClientError::ServerInternal)
+                return Err(ClientError::ServerInternal);
+            }
+            if let Some(response::Headers::CreateRange { range }) = response.headers {
+                return Ok(range);
+            } else {
+                unreachable!();
             }
         } else {
             Err(ClientError::ClientInternal)

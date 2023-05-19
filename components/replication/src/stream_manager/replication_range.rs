@@ -67,15 +67,27 @@ impl ReplicationRange {
     }
 
     pub(crate) async fn create(
+        client: Rc<Client>,
         stream_id: i64,
         epoch: u64,
         index: i32,
         start_offset: u64,
     ) -> Result<RangeMetadata, ReplicationError> {
-        // 1. request placement manager to create range.
-        // 2. request placement manager to create range replica.
+        // 1. request placement manager to create range and get the range metadata.
+        let mut metadata = RangeMetadata::new(stream_id, index, epoch, start_offset, None);
+        metadata = client
+            .create_range(metadata)
+            .await
+            .map_err(|_| ReplicationError::Internal)?;
+        // 2. request data node to create range replica.
+        for node in metadata.replica().iter() {
+            let _ = client
+                .create_range_replica(&node.advertise_address, metadata.clone())
+                .await
+                .map_err(|_| ReplicationError::Internal);
+        }
         // 3. return metadata
-        todo!()
+        Ok(metadata)
     }
 
     pub(crate) fn metadata(&self) -> &RangeMetadata {

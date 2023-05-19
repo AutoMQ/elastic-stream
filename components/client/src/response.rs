@@ -69,6 +69,10 @@ pub enum Headers {
     Append {
         entries: Vec<AppendResultEntry>,
     },
+
+    CreateRange {
+        range: RangeMetadata,
+    },
 }
 
 impl Response {
@@ -226,8 +230,11 @@ impl Response {
                     if self.status.code != ErrorCode::OK {
                         return;
                     }
-                    if let request::Headers::CreateRange { ref range } = ctx.request().headers {
-                        info!("Created range={:?} on {}", range, ctx.target());
+                    if let Some(range) = response
+                        .range()
+                        .map(|r| Into::<RangeMetadata>::into(&r.unpack()))
+                    {
+                        self.headers = Some(Headers::CreateRange { range });
                     }
                 }
                 Err(e) => {

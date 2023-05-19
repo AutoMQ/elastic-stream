@@ -1,6 +1,6 @@
 use super::session_manager::SessionManager;
 
-use crate::error::ClientError;
+use crate::{composite_session::CompositeSession, error::ClientError};
 
 use bytes::Bytes;
 use log::{error, trace, warn};
@@ -147,15 +147,37 @@ impl Client {
             })?
     }
 
+    /// Create a new range by send request to placement manager.
     pub async fn create_range(
         &self,
+        range_metadata: RangeMetadata,
+    ) -> Result<RangeMetadata, ClientError> {
+        let session_manager = unsafe { &mut *self.session_manager.get() };
+        let composite_session = session_manager
+            .get_composite_session(&self.config.placement_manager)
+            .await?;
+        self.create_range0(composite_session, range_metadata).await
+    }
+
+    /// Create a new range replica by send request to data node.
+    pub async fn create_range_replica(
+        &self,
         target: &str,
-        range: RangeMetadata,
+        range_metadata: RangeMetadata,
     ) -> Result<(), ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager.get_composite_session(target).await?;
-        trace!("Create range to composite-channel={}", target);
+        trace!("Create range replica to composite-channel={}", target);
+        self.create_range0(composite_session, range_metadata)
+            .await
+            .map(|_| ())
+    }
 
+    async fn create_range0(
+        &self,
+        composite_session: Rc<CompositeSession>,
+        range: RangeMetadata,
+    ) -> Result<RangeMetadata, ClientError> {
         let future = composite_session.create_range(range);
         time::timeout(self.config.client_io_timeout(), future)
             .await
@@ -387,7 +409,7 @@ mod tests {
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
             let range = RangeMetadata::new(0, 0, 0, 0, None);
-            client.create_range(&target, range).await
+            client.create_range_replica(&target, range).await
         })
     }
 
