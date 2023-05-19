@@ -1,13 +1,11 @@
-mod channel_reader;
-mod channel_writer;
-mod client;
-mod client_builder;
-mod client_error;
-mod command;
-pub(crate) mod io;
-pub mod node;
-mod reader;
-mod session;
-mod session_manager;
-pub(crate) mod test_server;
-mod writer;
+pub mod append_result;
+pub mod error;
+pub mod stream;
+pub mod stream_manager;
+pub mod stream_options;
+
+pub use crate::append_result::AppendResult;
+pub use crate::error::ClientError;
+pub use crate::stream::Stream;
+pub use crate::stream_manager::StreamManager;
+pub use crate::stream_options::StreamOptions;
