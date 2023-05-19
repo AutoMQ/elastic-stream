@@ -187,7 +187,7 @@ func (s *Server) startServer() error {
 	logger.Info("init cluster ID")
 
 	s.rootPath = path.Join(_rootPathPrefix, strconv.FormatUint(s.clusterID, 10))
-	err := s.member.Init(s.cfg, s.Name(), s.rootPath)
+	err := s.member.Init(s.ctx, s.cfg, s.Name(), s.rootPath)
 	if err != nil {
 		return errors.Wrap(err, "init member")
 	}

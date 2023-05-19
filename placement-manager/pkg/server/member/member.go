@@ -42,6 +42,7 @@ const (
 
 	_leaderPathPrefix   = "leader"
 	_priorityPathPrefix = "priority"
+	_sbpAddrPathPrefix  = "sbp"
 
 	_leaderElectionPurpose = "PM leader election"
 
@@ -79,7 +80,7 @@ func NewMember(etcd *embed.Etcd, client *clientv3.Client, id uint64, logger *zap
 }
 
 // Init initializes the member info.
-func (m *Member) Init(cfg *config.Config, name string, clusterRootPath string) error {
+func (m *Member) Init(ctx context.Context, cfg *config.Config, name string, clusterRootPath string) error {
 	info := &Info{
 		Name:       name,
 		MemberID:   m.id,
@@ -96,6 +97,12 @@ func (m *Member) Init(cfg *config.Config, name string, clusterRootPath string) e
 	m.infoValue = bytes
 	m.clusterRootPath = clusterRootPath
 	m.leadership = election.NewLeadership(m.client, m.LeaderPath(), _leaderElectionPurpose, m.lg)
+
+	err = m.setSbpAddress(ctx, info.SbpAddr)
+	if err != nil {
+		return errors.Wrap(err, "set sbp address")
+	}
+
 	return nil
 }
 
@@ -287,12 +294,17 @@ func (m *Member) ClusterInfo(ctx context.Context) ([]*Info, error) {
 
 	leader := m.Leader()
 	members := make([]*Info, 0, len(etcdMembers.Members))
-	for _, m := range etcdMembers.Members {
+	for _, em := range etcdMembers.Members {
+		addr, err := m.getSbpAddress(ctx, em.ID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "get sbp address for member %d", em.ID)
+		}
 		member := &Info{
-			Name:       m.Name,
-			MemberID:   m.ID,
-			PeerUrls:   m.PeerURLs,
-			ClientUrls: m.ClientURLs,
+			Name:       em.Name,
+			MemberID:   em.ID,
+			PeerUrls:   em.PeerURLs,
+			ClientUrls: em.ClientURLs,
+			SbpAddr:    addr,
 		}
 		if leader != nil && member.MemberID == leader.MemberID {
 			member.IsLeader = true
@@ -321,10 +333,48 @@ func (m *Member) unsetLeader() {
 	m.leader.Store(&Info{})
 }
 
+func (m *Member) setSbpAddress(ctx context.Context, address string) error {
+	logger := m.lg.With(zap.String("sbp-address", address))
+
+	txn := etcdutil.NewTxn(ctx, m.client, logger)
+	resp, err := txn.Then(clientv3.OpPut(m.SbpAddrPath(m.id), address)).Commit()
+	if err != nil {
+		logger.Error("failed to put sbp address", zap.Error(err))
+		return errors.Wrap(err, "put sbp address")
+	}
+	if !resp.Succeeded {
+		logger.Error("failed to put sbp address, transaction failed", zap.Error(err))
+		return errors.New("put sbp address failed: transaction failed")
+	}
+
+	return nil
+}
+
+func (m *Member) getSbpAddress(ctx context.Context, id uint64) (string, error) {
+	logger := m.lg.With(zap.Uint64("mid", id))
+
+	key := m.SbpAddrPath(id)
+	kv, err := etcdutil.GetOne(ctx, m.client, []byte(key), logger)
+	if err != nil {
+		logger.Error("failed to get sbp address", zap.Error(err))
+		return "", errors.Wrapf(err, "failed to get sbp address by key %s", key)
+	}
+	if kv == nil {
+		logger.Error("failed to get sbp address, key not found")
+		return "", errors.New("failed to get sbp address: key not found: " + key)
+	}
+
+	return string(kv.Value), nil
+}
+
 func (m *Member) LeaderPath() string {
 	return path.Join(m.clusterRootPath, _leaderPathPrefix)
 }
 
 func (m *Member) getPriorityPath(id uint64) string {
 	return path.Join(m.clusterRootPath, _memberPathPrefix, strconv.FormatUint(id, 10), _priorityPathPrefix)
+}
+
+func (m *Member) SbpAddrPath(id uint64) string {
+	return path.Join(m.clusterRootPath, _memberPathPrefix, strconv.FormatUint(id, 10), _sbpAddrPathPrefix)
 }
