@@ -3,13 +3,14 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::ReplicationError;
 use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
 use model::range::{self, RangeMetadata};
+use model::record::{flat_record::FlatRecordBatch, RecordBatch};
+use protocol::flat_model::records::{KeyValueT, RecordBatchMetaT};
 use tokio::sync::broadcast;
-
-use crate::ReplicationError;
 
 use super::{replication_stream::ReplicationStream, replicator::Replicator};
 use protocol::rpc::header::SealKind;
@@ -142,6 +143,10 @@ impl ReplicationRange {
 
     pub(crate) fn append(&self, payload: Rc<Bytes>, context: RangeAppendContext) {
         // FIXME: encode request payload from raw payload and context.
+        let record_batch_builder = RecordBatch::new_builder();
+        record_batch_builder.with_stream_id(self.metadata.stream_id());
+
+        let mut record_batch_meta = RecordBatchMetaT::default();
     }
 
     pub(crate) async fn fetch(
