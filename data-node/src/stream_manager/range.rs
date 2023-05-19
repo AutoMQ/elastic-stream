@@ -1,15 +1,22 @@
 use log::warn;
 use model::range::RangeMetadata;
+use store::AppendRecordRequest;
+
+use super::window::Window;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Range {
     pub(crate) metadata: RangeMetadata,
+
     committed: Option<u64>,
+
+    window: Window<AppendRecordRequest>,
 }
 
 impl Range {
     pub(crate) fn new(metadata: RangeMetadata) -> Self {
         Self {
+            window: Window::new(metadata.start()),
             metadata,
             committed: None,
         }

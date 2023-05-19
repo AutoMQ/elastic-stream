@@ -141,3 +141,13 @@ impl StreamManager {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+
+    #[test]
+    fn test_new() -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+}

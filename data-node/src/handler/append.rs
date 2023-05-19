@@ -33,7 +33,7 @@ pub(crate) struct Append<'a> {
     //
     // Layout of AppendEntry
     // +-------------------+-------------------+-------------------+------------------------------------------+
-    // |  Magic Code(4B)   |  Meta Len(4B)     |       Meta        |  Payload Len(4B) | Record Batch Payload  |
+    // |  Magic Code(1B)   |  Meta Len(4B)     |       Meta        |  Payload Len(4B) | Record Batch Payload  |
     // +-------------------+-------------------+-------------------+------------------------------------------+
     payload: Bytes,
 }
@@ -211,6 +211,7 @@ impl<'a> Append<'a> {
                 stream_id: record_batch.stream_id(),
                 range: record_batch.range_index(),
                 offset: record_batch.base_offset(),
+                len: record_batch.len(),
                 buffer: record_batch.payload(),
             };
 

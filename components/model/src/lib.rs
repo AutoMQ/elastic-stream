@@ -3,6 +3,7 @@
 
 pub mod append_entry;
 pub mod append_result_entry;
+pub mod batch;
 pub mod client_role;
 pub mod data_node;
 pub mod error;
@@ -16,6 +17,7 @@ pub mod stream;
 
 pub use crate::append_entry::AppendEntry;
 pub use crate::append_result_entry::AppendResultEntry;
+pub use crate::batch::Batch;
 pub use crate::data_node::DataNode;
 pub use crate::placement_manager_node::PlacementManagerNode;
 pub use crate::record::RecordBatch;

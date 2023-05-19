@@ -40,6 +40,10 @@ impl RecordBatch {
         self.metadata.base_offset
     }
 
+    pub fn len(&self) -> usize {
+        self.metadata.last_offset_delta as usize
+    }
+
     pub fn payload(&self) -> Bytes {
         self.payload.clone()
     }
