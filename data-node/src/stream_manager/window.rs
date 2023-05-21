@@ -64,7 +64,7 @@ mod tests {
     use model::Batch;
     use std::{cmp::Ordering, error::Error};
 
-    #[derive(Debug, PartialEq, Eq, PartialOrd)]
+    #[derive(Debug)]
     struct Foo {
         offset: u64,
         len: usize,
@@ -79,6 +79,20 @@ mod tests {
             self.len
         }
     }
+
+    impl PartialEq for Foo {
+        fn eq(&self, other: &Self) -> bool {
+            self.offset == other.offset
+        }
+    }
+
+    impl PartialOrd for Foo {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            other.offset.partial_cmp(&self.offset)
+        }
+    }
+
+    impl Eq for Foo {}
 
     impl Ord for Foo {
         fn cmp(&self, other: &Self) -> Ordering {

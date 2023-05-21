@@ -479,6 +479,7 @@ mod tests {
                 stream_id: 1,
                 range: 0,
                 offset: i,
+                len: 1,
                 buffer: Bytes::from(format!("{}-{}", "hello, world", i)),
             })
             .for_each(|req| {
