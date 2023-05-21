@@ -70,3 +70,41 @@ impl Ord for AppendRecordRequest {
         other.offset.cmp(&self.offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use bytes::Bytes;
+    use std::{collections::BinaryHeap, error::Error};
+
+    use super::AppendRecordRequest;
+
+    #[test]
+    fn test_order() -> Result<(), Box<dyn Error>> {
+        let mut requests = BinaryHeap::new();
+
+        let buffer = Bytes::from_static(b"test");
+
+        let req1 = AppendRecordRequest {
+            stream_id: 0,
+            range: 0,
+            offset: 0,
+            len: 2,
+            buffer: buffer.clone(),
+        };
+
+        let req2 = AppendRecordRequest {
+            stream_id: 0,
+            range: 0,
+            offset: 2,
+            len: 2,
+            buffer: buffer.clone(),
+        };
+
+        requests.push(req2);
+        requests.push(req1.clone());
+
+        assert_eq!(Some(req1), requests.pop());
+        Ok(())
+    }
+}
