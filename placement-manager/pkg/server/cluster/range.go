@@ -274,12 +274,14 @@ func (c *RaftCluster) sealRangeLocked(ctx context.Context, lastRange *rpcfb.Rang
 	logger := c.lg.With(zap.Int64("stream-id", lastRange.StreamId), zap.Int32("range-index", lastRange.Index), zap.Int64("end", end), traceutil.TraceLogField(ctx))
 
 	sealedRange := &rpcfb.RangeT{
-		StreamId: lastRange.StreamId,
-		Epoch:    epoch,
-		Index:    lastRange.Index,
-		Start:    lastRange.Start,
-		End:      end,
-		Nodes:    eraseDataNodesInfo(lastRange.Nodes),
+		StreamId:     lastRange.StreamId,
+		Epoch:        epoch,
+		Index:        lastRange.Index,
+		Start:        lastRange.Start,
+		End:          end,
+		Nodes:        eraseDataNodesInfo(lastRange.Nodes),
+		ReplicaCount: lastRange.ReplicaCount,
+		AckCount:     lastRange.AckCount,
 	}
 
 	logger.Info("start to seal range")
@@ -318,12 +320,14 @@ func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT
 	logger = logger.With(zap.Int32s("node-ids", ids))
 
 	nr := &rpcfb.RangeT{
-		StreamId: newRange.StreamId,
-		Epoch:    newRange.Epoch,
-		Index:    newRange.Index,
-		Start:    newRange.Start,
-		End:      _writableRangeEnd,
-		Nodes:    nodes,
+		StreamId:     newRange.StreamId,
+		Epoch:        newRange.Epoch,
+		Index:        newRange.Index,
+		Start:        newRange.Start,
+		End:          _writableRangeEnd,
+		Nodes:        nodes,
+		ReplicaCount: stream.Replica,
+		AckCount:     stream.AckCount,
 	}
 
 	logger.Info("start to create range")
