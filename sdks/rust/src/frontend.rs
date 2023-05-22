@@ -7,14 +7,14 @@ use log::error;
 use replication::StreamClient;
 use tokio::sync::{mpsc, oneshot};
 
-pub struct StreamManager {
+pub struct Frontend {
     config: Arc<Configuration>,
     tx: mpsc::UnboundedSender<Command>,
     stream_client: StreamClient,
     join_handle: thread::JoinHandle<()>,
 }
 
-impl StreamManager {
+impl Frontend {
     pub fn new(access_point: &str) -> Result<Self, ClientError> {
         let (tx, rx) = mpsc::unbounded_channel();
         let mut config = Configuration::default();
