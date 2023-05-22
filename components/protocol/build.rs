@@ -1,7 +1,12 @@
-use std::path::Path;
+use std::{env, path::Path};
 
 fn main() {
     println!("cargo:rerun-if-changed=fbs/");
+
+    if env::var("SKIP_FLATC").unwrap_or_default() == "1" {
+        return;
+    }
+
     let out_dir = Path::new("src/generated/");
     if !out_dir.exists() {
         std::fs::create_dir_all(out_dir).unwrap();
