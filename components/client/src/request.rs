@@ -2,16 +2,14 @@ use bytes::{Bytes, BytesMut};
 use model::fetch::FetchRequestEntry;
 use model::stream::StreamMetadata;
 use model::{
-    client_role::ClientRole, data_node::DataNode, range::RangeMetadata,
-    range_criteria::RangeCriteria,
+    client_role::ClientRole, data_node::DataNode, range::RangeMetadata, ListRangeCriteria,
 };
 use protocol::rpc::header::{
     AppendRequestT, CreateRangeRequestT, CreateStreamRequestT, DataNodeMetricsT,
-    DescribePlacementManagerClusterRequestT, DescribeStreamRequestT, FetchEntry, FetchEntryT,
-    FetchRequestT, HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT,
-    RangeT, ReportMetricsRequestT, SealKind, SealRangeRequestT, StreamT,
+    DescribePlacementManagerClusterRequestT, DescribeStreamRequestT, FetchEntryT, FetchRequestT,
+    HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT,
+    ReportMetricsRequestT, SealKind, SealRangeRequestT,
 };
-use std::rc::Rc;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -37,7 +35,7 @@ pub enum Headers {
     },
 
     ListRange {
-        criteria: RangeCriteria,
+        criteria: ListRangeCriteria,
     },
 
     AllocateId {
@@ -123,14 +121,13 @@ impl From<&Request> for Bytes {
 
             Headers::ListRange { criteria } => {
                 let mut criteria_t = ListRangeCriteriaT::default();
-                match criteria {
-                    RangeCriteria::StreamId(stream_id) => {
-                        criteria_t.stream_id = *stream_id;
-                    }
-                    RangeCriteria::DataNode(node_id) => {
-                        criteria_t.node_id = *node_id;
-                    }
-                };
+                if let Some(node_id) = criteria.node_id {
+                    criteria_t.node_id = node_id as i32;
+                }
+
+                if let Some(stream_id) = criteria.stream_id {
+                    criteria_t.stream_id = stream_id as i64;
+                }
 
                 let mut request = ListRangeRequestT::default();
                 request.timeout_ms = req.timeout.as_millis() as i32;

@@ -45,7 +45,10 @@ impl StreamManager {
     /// # Panic
     /// If failed to access store to acquire max offset of the stream with mutable range.
     async fn bootstrap(&mut self) -> Result<(), ServiceError> {
-        let ranges = self.fetcher.bootstrap().await?;
+        let ranges = self
+            .fetcher
+            .bootstrap(self.store.config().server.node_id as u32)
+            .await?;
 
         for range in ranges {
             let committed = self
@@ -62,7 +65,7 @@ impl StreamManager {
                     }
                 }
                 Entry::Vacant(vacant) => {
-                    let metadata = self.fetcher.stream(range.stream_id() as u64).await.expect(
+                    let metadata = self.fetcher.describe_stream(range.stream_id() as u64).await.expect(
                         "Failed to fetch stream metadata from placement manager during bootstrap",
                     );
                     let mut stream = Stream::new(metadata);
@@ -86,7 +89,10 @@ impl StreamManager {
                 occupied.get_mut().create_range(range)?;
             }
             Entry::Vacant(vacant) => {
-                let metadata = self.fetcher.stream(range.stream_id() as u64).await?;
+                let metadata = self
+                    .fetcher
+                    .describe_stream(range.stream_id() as u64)
+                    .await?;
                 let mut stream = Stream::new(metadata);
                 stream.create_range(range)?;
                 vacant.insert(stream);

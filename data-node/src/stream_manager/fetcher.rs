@@ -8,8 +8,9 @@ use crate::error::ServiceError;
 
 /// Non-primary `Node` uses this task to delegate query range task to the primary one.
 pub struct FetchRangeTask {
+    pub node_id: Option<u32>,
     /// Stream-id to query
-    pub stream_id: i64,
+    pub stream_id: Option<u64>,
 
     /// Once the query completes, transfer results back to the caller through this oneshot channel.
     pub tx: oneshot::Sender<Result<Vec<RangeMetadata>, ServiceError>>,
@@ -29,10 +30,13 @@ pub(crate) enum Fetcher {
 }
 
 impl Fetcher {
-    pub(crate) async fn bootstrap(&mut self) -> Result<Vec<RangeMetadata>, ServiceError> {
+    pub(crate) async fn bootstrap(
+        &mut self,
+        node_id: u32,
+    ) -> Result<Vec<RangeMetadata>, ServiceError> {
         if let Fetcher::PlacementClient { client } = self {
             return client
-                .list_range(None)
+                .list_ranges(model::ListRangeCriteria::new(Some(node_id), None))
                 .await
                 .map_err(|_e| {
                     error!("Failed to list ranges by data node from placement manager");
@@ -49,17 +53,29 @@ impl Fetcher {
     }
 
     /// TODO: filter out ranges that is not hosted in current data node.
-    pub(crate) async fn fetch(
+    pub(crate) async fn list_ranges(
         &mut self,
-        stream_id: i64,
+        node_id: Option<u32>,
+        stream_id: Option<u64>,
     ) -> Result<Vec<RangeMetadata>, ServiceError> {
         match self {
-            Fetcher::Channel { sender } => Self::fetch_from_peer_node(sender, stream_id).await,
-            Fetcher::PlacementClient { client } => Self::fetch_by_client(client, stream_id).await,
+            Fetcher::Channel { sender } => {
+                Self::list_ranges_from_peer_node(sender, node_id, stream_id).await
+            }
+            Fetcher::PlacementClient { client } => {
+                Self::list_ranges_by_client(
+                    client,
+                    model::ListRangeCriteria::new(node_id, stream_id),
+                )
+                .await
+            }
         }
     }
 
-    pub(crate) async fn stream(&self, stream_id: u64) -> Result<StreamMetadata, ServiceError> {
+    pub(crate) async fn describe_stream(
+        &self,
+        stream_id: u64,
+    ) -> Result<StreamMetadata, ServiceError> {
         if let Fetcher::PlacementClient { client } = self {
             return client
                 .describe_stream(stream_id)
@@ -83,36 +99,47 @@ impl Fetcher {
         unimplemented!("Describe stream from peer worker is not implemented yet")
     }
 
-    async fn fetch_by_client(
+    async fn list_ranges_by_client(
         client: &Client,
-        stream_id: i64,
+        criteria: model::ListRangeCriteria,
     ) -> Result<Vec<RangeMetadata>, ServiceError> {
         client
-            .list_range(Some(stream_id))
+            .list_ranges(criteria.clone())
             .await
             .map_err(|_e| {
                 error!(
-                    "Failed to list ranges for stream={} from placement manager",
-                    stream_id
+                    "Failed to list ranges for stream={:?} from placement manager",
+                    criteria.stream_id
                 );
                 ServiceError::AcquireRange
             })
-            .inspect(|ranges| trace!("Ranges for stream={} is: {:?}", stream_id, ranges))
+            .inspect(|ranges| {
+                trace!(
+                    "Ranges for stream={:?} is: {:?}",
+                    criteria.stream_id,
+                    ranges
+                )
+            })
     }
 
-    async fn fetch_from_peer_node(
+    async fn list_ranges_from_peer_node(
         sender: &mpsc::UnboundedSender<FetchRangeTask>,
-        stream_id: i64,
+        node_id: Option<u32>,
+        stream_id: Option<u64>,
     ) -> Result<Vec<RangeMetadata>, ServiceError> {
         let (tx, rx) = oneshot::channel();
-        let task = FetchRangeTask { stream_id, tx };
+        let task = FetchRangeTask {
+            node_id,
+            stream_id,
+            tx,
+        };
         if let Err(e) = sender.send(task) {
             let task = e.0;
             let _ = task.tx.send(Err(ServiceError::AcquireRange));
         }
         rx.await.map_err(|_e| {
             error!(
-                "Failed to get ranges from primary node for stream={}",
+                "Failed to get ranges from primary node for stream={:?}",
                 stream_id
             );
             ServiceError::Internal("Broken oneshot channel".to_owned())
@@ -145,14 +172,20 @@ pub(crate) mod tests {
                                 .map(|i| {
                                     if i < TOTAL - 1 {
                                         RangeMetadata::new(
-                                            stream_id,
+                                            stream_id.map(|v| v as i64).unwrap(),
                                             i,
                                             0,
                                             (i * 100) as u64,
                                             Some(((i + 1) * 100) as u64),
                                         )
                                     } else {
-                                        RangeMetadata::new(stream_id, i, 0, (i * 100) as u64, None)
+                                        RangeMetadata::new(
+                                            stream_id.map(|v| v as i64).unwrap(),
+                                            i,
+                                            0,
+                                            (i * 100) as u64,
+                                            None,
+                                        )
                                     }
                                 })
                                 .collect::<Vec<_>>();
@@ -167,7 +200,7 @@ pub(crate) mod tests {
                 }
             });
 
-            let res = fetcher.fetch(1).await?;
+            let res = fetcher.list_ranges(Some(0), Some(1)).await?;
             assert_eq!(res.len(), TOTAL as usize);
             drop(fetcher);
             Ok(())

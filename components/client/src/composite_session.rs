@@ -5,8 +5,8 @@ use codec::frame::OperationCode;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
-    client_role::ClientRole, fetch::FetchRequestEntry, fetch::FetchResultEntry, payload::Payload,
-    range::RangeMetadata, range_criteria::RangeCriteria, stream::StreamMetadata, AppendResultEntry,
+    client_role::ClientRole, fetch::FetchRequestEntry, fetch::FetchResultEntry,
+    range::RangeMetadata, stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
     PlacementManagerNode,
 };
 use observation::metrics::{
@@ -18,7 +18,6 @@ use protocol::rpc::header::SealKind;
 use std::{
     cell::RefCell,
     collections::HashMap,
-    f32::consts::E,
     io::ErrorKind,
     net::{SocketAddr, ToSocketAddrs},
     rc::Rc,
@@ -475,7 +474,7 @@ impl CompositeSession {
 
     pub(crate) async fn list_range(
         &self,
-        criteria: RangeCriteria,
+        criteria: ListRangeCriteria,
     ) -> Result<Vec<RangeMetadata>, ClientError> {
         self.try_reconnect().await;
         if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {

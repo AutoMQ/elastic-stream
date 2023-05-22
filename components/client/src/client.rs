@@ -6,7 +6,7 @@ use bytes::Bytes;
 use log::{error, trace, warn};
 use model::{
     fetch::FetchRequestEntry, fetch::FetchResultEntry, range::RangeMetadata,
-    range_criteria::RangeCriteria, stream::StreamMetadata, AppendResultEntry,
+    stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
 };
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
@@ -14,7 +14,7 @@ use observation::metrics::{
     uring_metrics::UringStatistics,
 };
 use protocol::rpc::header::SealKind;
-use std::{cell::UnsafeCell, rc::Rc, sync::Arc, time::Duration};
+use std::{cell::UnsafeCell, rc::Rc, sync::Arc};
 use tokio::{sync::broadcast, time};
 
 /// `Client` is used to send
@@ -56,25 +56,10 @@ impl Client {
             })
     }
 
-    pub async fn list_range(
+    pub async fn list_ranges(
         &self,
-        stream_id: Option<i64>,
+        criteria: ListRangeCriteria,
     ) -> Result<Vec<RangeMetadata>, ClientError> {
-        let criteria = if let Some(stream_id) = stream_id {
-            trace!(
-                "list_range from {}, stream-id={}",
-                self.config.placement_manager,
-                stream_id
-            );
-            RangeCriteria::StreamId(stream_id)
-        } else {
-            trace!(
-                "List stream ranges from placement manager for node-id={}",
-                self.config.server.node_id
-            );
-            RangeCriteria::DataNode(self.config.server.node_id)
-        };
-
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager
             .get_composite_session(&self.config.placement_manager)
@@ -297,6 +282,7 @@ mod tests {
     use bytes::BytesMut;
     use log::trace;
     use model::stream::StreamMetadata;
+    use model::ListRangeCriteria;
     use model::{
         range::RangeMetadata,
         record::{flat_record::FlatRecordBatch, RecordBatchBuilder},
@@ -451,7 +437,8 @@ mod tests {
             let client = Client::new(config, tx);
 
             for i in 1..2 {
-                let ranges = client.list_range(Some(i as i64)).await.unwrap();
+                let criteria = ListRangeCriteria::new(None, Some(i as u64));
+                let ranges = client.list_ranges(criteria).await.unwrap();
                 assert_eq!(
                     false,
                     ranges.is_empty(),
@@ -482,7 +469,8 @@ mod tests {
             let client = Client::new(config, tx);
 
             for _i in 1..2 {
-                let ranges = client.list_range(None).await.unwrap();
+                let criteria = ListRangeCriteria::new(None, None);
+                let ranges = client.list_ranges(criteria).await.unwrap();
                 assert_eq!(
                     false,
                     ranges.is_empty(),

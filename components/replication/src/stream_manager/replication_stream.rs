@@ -78,7 +78,7 @@ impl ReplicationStream {
         let client = self.client.upgrade().ok_or(ReplicationError::Internal)?;
         // 1. load all ranges
         client
-            .list_range(Some(self.id))
+            .list_ranges(model::ListRangeCriteria::new(None, Some(self.id as u64)))
             .await
             .map_err(|e| {
                 error!("Failed to list ranges from placement-manager: {e}");
