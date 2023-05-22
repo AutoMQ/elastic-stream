@@ -296,6 +296,7 @@ impl Client {
 mod tests {
     use bytes::BytesMut;
     use log::trace;
+    use model::stream::StreamMetadata;
     use model::{
         range::RangeMetadata,
         record::{flat_record::FlatRecordBatch, RecordBatchBuilder},
@@ -368,7 +369,12 @@ mod tests {
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
             let stream_metadata = client
-                .create_stream(3, std::time::Duration::from_secs(1))
+                .create_stream(StreamMetadata {
+                    stream_id: 0,
+                    replica: 3,
+                    ack_count: 2,
+                    retention_period: std::time::Duration::from_secs(1),
+                })
                 .await?;
             assert_eq!(1, stream_metadata.stream_id);
             assert_eq!(3, stream_metadata.replica);
