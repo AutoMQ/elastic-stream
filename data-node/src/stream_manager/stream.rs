@@ -20,9 +20,14 @@ impl Stream {
     }
 
     fn verify_stream_id(&self, metadata: &RangeMetadata) -> Result<(), ServiceError> {
-        if self.metadata.stream_id != metadata.stream_id() as u64 {
+        if self
+            .metadata
+            .stream_id
+            .expect("Stream-id should be present")
+            != metadata.stream_id() as u64
+        {
             error!(
-                "Stream-id mismatch, stream_id={}, metadata={}",
+                "Stream-id mismatch, stream_id={:?}, metadata={}",
                 self.metadata.stream_id, metadata
             );
             return Err(ServiceError::Internal("Stream-id mismatch".to_owned()));
@@ -111,7 +116,7 @@ mod tests {
         stream.replica = 1;
         stream.retention_period_ms = 1000;
         let stream = StreamMetadata::from(stream);
-        assert_eq!(stream.stream_id, 1);
+        assert_eq!(stream.stream_id, Some(1));
         assert_eq!(stream.replica, 1);
         assert_eq!(stream.retention_period.as_millis(), 1000);
         Ok(())

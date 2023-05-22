@@ -4,6 +4,7 @@ use client::Client;
 use config::Configuration;
 
 use log::{error, info};
+use model::stream::StreamMetadata;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{command::Command, ClientError};
@@ -76,10 +77,13 @@ impl Worker {
     async fn process_command(client: Rc<Client>, command: Command) {
         match command {
             Command::CreateStream { options, observer } => {
-                let res = client
-                    .create_stream(options.replica, options.retention)
-                    .await
-                    .map_err(Into::into);
+                let metadata = StreamMetadata {
+                    stream_id: None,
+                    replica: options.replica,
+                    ack_count: options.ack,
+                    retention_period: options.retention,
+                };
+                let res = client.create_stream(metadata).await.map_err(Into::into);
                 if let Err(_e) = observer.send(res) {
                     error!("Failed to propagate create-stream result: {_e:#?}");
                 }

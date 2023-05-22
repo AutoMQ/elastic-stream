@@ -11,7 +11,7 @@ use protocol::rpc::header::StreamT;
 #[derive(Debug, Default, Clone)]
 pub struct StreamMetadata {
     /// Stream ID, unique within the cluster.
-    pub stream_id: u64,
+    pub stream_id: Option<u64>,
 
     pub replica: u8,
 
@@ -24,7 +24,11 @@ pub struct StreamMetadata {
 impl From<StreamT> for StreamMetadata {
     fn from(stream: StreamT) -> Self {
         Self {
-            stream_id: stream.stream_id as u64,
+            stream_id: if stream.stream_id < 0 {
+                None
+            } else {
+                Some(stream.stream_id as u64)
+            },
             replica: stream.replica as u8,
             ack_count: stream.ack_count as u8,
             retention_period: Duration::from_millis(stream.retention_period_ms as u64),
@@ -36,7 +40,7 @@ impl From<StreamT> for StreamMetadata {
 impl From<&StreamMetadata> for StreamT {
     fn from(stream: &StreamMetadata) -> Self {
         let mut stream_t = StreamT::default();
-        stream_t.stream_id = stream.stream_id as i64;
+        stream_t.stream_id = stream.stream_id.map_or(-1, |v| v as i64);
         stream_t.replica = stream.replica as i8;
         stream_t.retention_period_ms = stream.retention_period.as_millis() as i64;
         stream_t.ack_count = stream.ack_count as i8;

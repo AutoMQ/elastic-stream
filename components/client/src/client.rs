@@ -370,13 +370,13 @@ mod tests {
             let client = Client::new(config, tx);
             let stream_metadata = client
                 .create_stream(StreamMetadata {
-                    stream_id: 0,
+                    stream_id: None,
                     replica: 3,
                     ack_count: 2,
                     retention_period: std::time::Duration::from_secs(1),
                 })
                 .await?;
-            assert_eq!(1, stream_metadata.stream_id);
+            assert_eq!(Some(1), stream_metadata.stream_id);
             assert_eq!(3, stream_metadata.replica);
             assert_eq!(
                 std::time::Duration::from_secs(1),
@@ -405,7 +405,7 @@ mod tests {
                 .describe_stream(1)
                 .await
                 .expect("Describe stream should not fail");
-            assert_eq!(1, stream_metadata.stream_id);
+            assert_eq!(Some(1), stream_metadata.stream_id);
             assert_eq!(1, stream_metadata.replica);
             assert_eq!(
                 std::time::Duration::from_secs(3600 * 24),
