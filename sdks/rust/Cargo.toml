@@ -4,14 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+client = { path = "../../components/client" }
 codec = { path = "../../components/codec" }
+config = { path = "../../components/config" }
 model = { path = "../../components/model" }
 clap = { workspace = true }
 log =  { workspace = true }
 bytes = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-tokio-util = { workspace = true }
+tokio = { workspace = true }
+tokio-uring = { workspace = true }
 futures = { workspace = true }
+replication = { path = "../../components/replication" }
 thiserror = { workspace = true }
 flatbuffers = { workspace = true }
 protocol = { path = "../../components/protocol" }

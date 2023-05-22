@@ -1,12 +1,20 @@
 use std::io::IoSlice;
 
-use crate::{AppendResult, ClientError};
+use model::stream::StreamMetadata;
+use tokio::sync::mpsc;
+
+use crate::{command::Command, AppendResult, ClientError};
 
 pub struct Stream {
-    id: i64,
+    metadata: StreamMetadata,
+    tx: mpsc::UnboundedSender<Command>,
 }
 
 impl Stream {
+    pub(crate) fn new(metadata: StreamMetadata, tx: mpsc::UnboundedSender<Command>) -> Self {
+        Self { metadata, tx }
+    }
+
     pub async fn min_offset(&self) -> Result<i64, ClientError> {
         todo!()
     }

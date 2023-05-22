@@ -977,7 +977,9 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "clap 4.2.4",
+ "client",
  "codec",
+ "config",
  "flatbuffers",
  "futures",
  "lazy_static",
@@ -985,10 +987,11 @@ dependencies = [
  "minitrace",
  "model",
  "protocol",
+ "replication",
  "test-util",
  "thiserror",
  "tokio",
- "tokio-util",
+ "tokio-uring",
  "util",
 ]
 
