@@ -5,8 +5,9 @@ use codec::frame::OperationCode;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
 use model::{
-    client_role::ClientRole, payload::Payload, range::RangeMetadata, range_criteria::RangeCriteria,
-    stream::StreamMetadata, AppendResultEntry, PlacementManagerNode,
+    client_role::ClientRole, fetch::FetchRequestEntry, fetch::FetchResultEntry, payload::Payload,
+    range::RangeMetadata, range_criteria::RangeCriteria, stream::StreamMetadata, AppendResultEntry,
+    PlacementManagerNode,
 };
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
@@ -804,6 +805,52 @@ impl CompositeSession {
         if let Some(response::Headers::Append { entries }) = response.headers {
             trace!("Append entries {:?}", entries);
             Ok(entries)
+        } else {
+            Err(ClientError::ClientInternal)
+        }
+    }
+
+    pub(crate) async fn fetch(
+        &self,
+        request: FetchRequestEntry,
+    ) -> Result<FetchResultEntry, ClientError> {
+        // TODO: support fetch request group in session level.
+        self.try_reconnect().await;
+        let session = self
+            .pick_session(self.lb_policy)
+            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+
+        let request = request::Request {
+            timeout: self.config.client_io_timeout(),
+            headers: request::Headers::Fetch {
+                entries: vec![request],
+            },
+        };
+        let (tx, rx) = oneshot::channel();
+        if let Err(ctx) = session.write(request, tx).await {
+            let request = ctx.request();
+            error!("Failed to fetch {request:?} to {}", self.target);
+            return Err(ClientError::ClientInternal);
+        }
+
+        let response = rx.await.map_err(|_e| ClientError::ClientInternal)?;
+        if !response.ok() {
+            warn!("Failed to fetch: {:?}", response.status);
+            return Err(ClientError::ServerInternal);
+        }
+
+        if let Some(response::Headers::Fetch { entries }) = response.headers {
+            trace!("Fetch entries {:?}", entries);
+            if entries.len() != 1 {
+                error!("Expect exactly one entry in fetch response");
+                Err(ClientError::ClientInternal)
+            } else {
+                let entry = FetchResultEntry {
+                    status: entries[0].status.clone(),
+                    data: response.payload,
+                };
+                Ok(entry)
+            }
         } else {
             Err(ClientError::ClientInternal)
         }

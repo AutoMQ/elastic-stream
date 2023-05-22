@@ -7,6 +7,7 @@ use super::replication_range::ReplicationRange;
 use crate::ReplicationError;
 use bytes::Bytes;
 use log::{info, warn};
+use model::fetch::{FetchRequestEntry, FetchResultEntry};
 use model::DataNode;
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
@@ -129,9 +130,44 @@ impl Replicator {
         &self,
         start_offset: u64,
         end_offset: u64,
-        max_bytes_hint: u32,
+        batch_max_bytes: u32,
     ) -> Result<Vec<Bytes>, ReplicationError> {
-        todo!()
+        if let Some(range) = self.range.upgrade() {
+            if let Some(client) = range.client() {
+                let result = client
+                    .fetch(
+                        &self.data_node.advertise_address,
+                        FetchRequestEntry {
+                            stream_id: range.metadata().stream_id(),
+                            index: range.metadata().index(),
+                            start_offset,
+                            end_offset,
+                            batch_max_bytes,
+                        },
+                    )
+                    .await;
+                return match result {
+                    Ok(result) => {
+                        let status = result.status;
+                        if status.code != ErrorCode::OK {
+                            warn!("Failed to fetch entries: status {:?}", status);
+                            Err(ReplicationError::Internal)
+                        } else {
+                            Ok(result.data.unwrap_or_else(Vec::new))
+                        }
+                    }
+                    Err(_) => {
+                        return Err(ReplicationError::Internal);
+                    }
+                };
+            } else {
+                warn!("Client was dropped, aborting replication");
+                return Err(ReplicationError::Internal);
+            }
+        } else {
+            warn!("ReplicationRange was dropped, aborting fetch");
+            return Err(ReplicationError::Internal);
+        }
     }
 
     /// Seal the range replica.

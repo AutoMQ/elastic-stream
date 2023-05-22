@@ -156,7 +156,7 @@ impl ReplicationStream {
         &self,
         start_offset: u64,
         end_offset: u64,
-        max_bytes_hint: u32,
+        batch_max_bytes: u32,
     ) -> Result<Vec<Bytes>, ReplicationError> {
         if start_offset == end_offset {
             return Ok(Vec::new());
@@ -172,7 +172,7 @@ impl ReplicationStream {
         // Fast path: if fetch range is in the last range, then fetch from it.
         if last_range.start_offset() <= start_offset {
             return last_range
-                .fetch(start_offset, end_offset, max_bytes_hint)
+                .fetch(start_offset, end_offset, batch_max_bytes)
                 .await;
         }
 
@@ -192,7 +192,7 @@ impl ReplicationStream {
             return Err(ReplicationError::FetchOutOfRange);
         }
         let mut records: Vec<Bytes> = Vec::new();
-        let mut max_bytes_hint = max_bytes_hint;
+        let mut max_bytes_hint = batch_max_bytes;
         for range in fetch_ranges {
             if max_bytes_hint <= 0 {
                 break;

@@ -7,6 +7,7 @@ pub mod batch;
 pub mod client_role;
 pub mod data_node;
 pub mod error;
+pub mod fetch;
 pub mod payload;
 pub mod placement_manager_node;
 pub mod range;

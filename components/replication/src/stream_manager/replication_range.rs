@@ -164,7 +164,7 @@ impl ReplicationRange {
         &self,
         start_offset: u64,
         end_offset: u64,
-        max_bytes_hint: u32,
+        batch_max_bytes: u32,
     ) -> Result<Vec<Bytes>, ReplicationError> {
         // TODO: select replica strategy.
         // - balance the read traffic.
@@ -174,7 +174,7 @@ impl ReplicationRange {
                 continue;
             }
             let result = replicator
-                .fetch(start_offset, end_offset, max_bytes_hint)
+                .fetch(start_offset, end_offset, batch_max_bytes)
                 .await;
             match result {
                 Ok(payloads) => {

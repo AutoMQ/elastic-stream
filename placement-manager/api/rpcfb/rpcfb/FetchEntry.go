@@ -9,6 +9,7 @@ import (
 type FetchEntryT struct {
 	Range *RangeT `json:"range"`
 	FetchOffset int64 `json:"fetch_offset"`
+	EndOffset int64 `json:"end_offset"`
 	BatchMaxBytes int32 `json:"batch_max_bytes"`
 }
 
@@ -18,6 +19,7 @@ func (t *FetchEntryT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	FetchEntryStart(builder)
 	FetchEntryAddRange(builder, range_Offset)
 	FetchEntryAddFetchOffset(builder, t.FetchOffset)
+	FetchEntryAddEndOffset(builder, t.EndOffset)
 	FetchEntryAddBatchMaxBytes(builder, t.BatchMaxBytes)
 	return FetchEntryEnd(builder)
 }
@@ -25,6 +27,7 @@ func (t *FetchEntryT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 func (rcv *FetchEntry) UnPackTo(t *FetchEntryT) {
 	t.Range = rcv.Range(nil).UnPack()
 	t.FetchOffset = rcv.FetchOffset()
+	t.EndOffset = rcv.EndOffset()
 	t.BatchMaxBytes = rcv.BatchMaxBytes()
 }
 
@@ -87,8 +90,20 @@ func (rcv *FetchEntry) MutateFetchOffset(n int64) bool {
 	return rcv._tab.MutateInt64Slot(6, n)
 }
 
-func (rcv *FetchEntry) BatchMaxBytes() int32 {
+func (rcv *FetchEntry) EndOffset() int64 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	if o != 0 {
+		return rcv._tab.GetInt64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FetchEntry) MutateEndOffset(n int64) bool {
+	return rcv._tab.MutateInt64Slot(8, n)
+}
+
+func (rcv *FetchEntry) BatchMaxBytes() int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
 	}
@@ -96,11 +111,11 @@ func (rcv *FetchEntry) BatchMaxBytes() int32 {
 }
 
 func (rcv *FetchEntry) MutateBatchMaxBytes(n int32) bool {
-	return rcv._tab.MutateInt32Slot(8, n)
+	return rcv._tab.MutateInt32Slot(10, n)
 }
 
 func FetchEntryStart(builder *flatbuffers.Builder) {
-	builder.StartObject(3)
+	builder.StartObject(4)
 }
 func FetchEntryAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(range_), 0)
@@ -108,8 +123,11 @@ func FetchEntryAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffset
 func FetchEntryAddFetchOffset(builder *flatbuffers.Builder, fetchOffset int64) {
 	builder.PrependInt64Slot(1, fetchOffset, 0)
 }
+func FetchEntryAddEndOffset(builder *flatbuffers.Builder, endOffset int64) {
+	builder.PrependInt64Slot(2, endOffset, 0)
+}
 func FetchEntryAddBatchMaxBytes(builder *flatbuffers.Builder, batchMaxBytes int32) {
-	builder.PrependInt32Slot(2, batchMaxBytes, 0)
+	builder.PrependInt32Slot(3, batchMaxBytes, 0)
 }
 func FetchEntryEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

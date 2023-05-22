@@ -1,4 +1,5 @@
 use crate::request;
+use bytes::Bytes;
 use codec::frame::Frame;
 use codec::frame::OperationCode;
 use log::debug;
@@ -6,6 +7,7 @@ use log::error;
 use log::info;
 use log::trace;
 use log::warn;
+use model::fetch::FetchResultEntry;
 use model::stream::StreamMetadata;
 use model::AppendResultEntry;
 use protocol::rpc::header::AppendResponse;
@@ -14,6 +16,7 @@ use protocol::rpc::header::CreateStreamResponse;
 use protocol::rpc::header::DescribePlacementManagerClusterResponse;
 use protocol::rpc::header::DescribeStreamResponse;
 use protocol::rpc::header::ErrorCode;
+use protocol::rpc::header::FetchResponse;
 use protocol::rpc::header::HeartbeatResponse;
 use protocol::rpc::header::IdAllocationResponse;
 use protocol::rpc::header::ListRangeResponse;
@@ -37,6 +40,8 @@ pub struct Response {
 
     /// Optional response extension, containing additional operation-code-specific data.
     pub headers: Option<Headers>,
+
+    pub payload: Option<Vec<Bytes>>,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +74,10 @@ pub enum Headers {
         entries: Vec<AppendResultEntry>,
     },
 
+    Fetch {
+        entries: Vec<FetchResultEntry>,
+    },
+
     CreateRange {
         range: RangeMetadata,
     },
@@ -80,6 +89,7 @@ impl Response {
             operation_code,
             status: Status::decode(),
             headers: None,
+            payload: None,
         }
     }
 
@@ -184,6 +194,35 @@ impl Response {
                 Err(e) => {
                     error!(
                         "Failed to decode AppendResponse using FlatBuffers. Cause: {}",
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    pub fn on_fetch(&mut self, frame: &Frame, ctx: &InvocationContext) {
+        if let Some(ref buf) = frame.header {
+            match flatbuffers::root::<FetchResponse>(buf) {
+                Ok(response) => {
+                    let response = response.unpack();
+                    if response.status.code != ErrorCode::OK {
+                        self.status = response.status.as_ref().into();
+                        return;
+                    }
+                    self.status = Status::ok();
+                    if let Some(entries) = response.entries {
+                        let entries = entries
+                            .into_iter()
+                            .map(Into::<FetchResultEntry>::into)
+                            .collect();
+                        self.headers = Some(Headers::Fetch { entries });
+                        self.payload = frame.payload.clone();
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to decode FetchResponse using FlatBuffers. Cause: {}",
                         e
                     );
                 }

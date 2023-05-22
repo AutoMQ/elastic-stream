@@ -1,13 +1,14 @@
 use bytes::{Bytes, BytesMut};
+use model::fetch::FetchRequestEntry;
 use model::{
     client_role::ClientRole, data_node::DataNode, range::RangeMetadata,
     range_criteria::RangeCriteria,
 };
 use protocol::rpc::header::{
     AppendRequestT, CreateRangeRequestT, CreateStreamRequestT, DataNodeMetricsT,
-    DescribePlacementManagerClusterRequestT, DescribeStreamRequestT, HeartbeatRequestT,
-    IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT, ReportMetricsRequestT,
-    SealKind, SealRangeRequestT, StreamT,
+    DescribePlacementManagerClusterRequestT, DescribeStreamRequestT, FetchEntry, FetchEntryT,
+    FetchRequestT, HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT,
+    RangeT, ReportMetricsRequestT, SealKind, SealRangeRequestT, StreamT,
 };
 use std::rc::Rc;
 use std::time::Duration;
@@ -58,6 +59,10 @@ pub enum Headers {
 
     Append {
         buf: Vec<Bytes>,
+    },
+
+    Fetch {
+        entries: Vec<FetchRequestEntry>,
     },
 
     ReportMetrics {
@@ -185,6 +190,27 @@ impl From<&Request> for Bytes {
                 request.timeout_ms = req.timeout.as_millis() as i32;
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
+            }
+
+            Headers::Fetch { entries } => {
+                let mut request = FetchRequestT::default();
+                request.max_wait_ms = req.timeout.as_millis() as i32;
+                request.entries = Some(
+                    entries
+                        .iter()
+                        .map(|entry| {
+                            let mut entry_t = FetchEntryT::default();
+                            let mut range_t = RangeT::default();
+                            range_t.stream_id = entry.stream_id as i64;
+                            range_t.index = entry.index as i32;
+                            entry_t.range = Box::new(range_t);
+                            entry_t.fetch_offset = entry.start_offset as i64;
+                            entry_t.end_offset = entry.end_offset as i64;
+                            entry_t.batch_max_bytes = entry.batch_max_bytes as i32;
+                            entry_t
+                        })
+                        .collect(),
+                );
             }
 
             Headers::ReportMetrics {

@@ -206,9 +206,12 @@ table FetchEntry {
     
     // The offset to fetch from.
     fetch_offset: int64 (id: 1);
+
+    // The exclusive end offset to fetch.
+    end_offset: int64 (id: 2);
     
     // The maximum number of bytes to fetch.
-    batch_max_bytes: int32 (id: 2);
+    batch_max_bytes: int32 (id: 3);
 }
 
 table FetchResponse {

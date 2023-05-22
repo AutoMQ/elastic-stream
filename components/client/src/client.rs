@@ -5,7 +5,8 @@ use crate::{composite_session::CompositeSession, error::ClientError};
 use bytes::Bytes;
 use log::{error, trace, warn};
 use model::{
-    range::RangeMetadata, range_criteria::RangeCriteria, stream::StreamMetadata, AppendResultEntry,
+    fetch::FetchRequestEntry, fetch::FetchResultEntry, range::RangeMetadata,
+    range_criteria::RangeCriteria, stream::StreamMetadata, AppendResultEntry,
 };
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
@@ -239,6 +240,22 @@ impl Client {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager.get_composite_session(target).await?;
         let future = session.append(buf);
+        time::timeout(self.config.client_io_timeout(), future)
+            .await
+            .map_err(|e| ClientError::RpcTimeout {
+                timeout: self.config.client_io_timeout(),
+            })?
+    }
+
+    /// Fetch data from a range replica.
+    pub async fn fetch(
+        &self,
+        target: &str,
+        request: FetchRequestEntry,
+    ) -> Result<FetchResultEntry, ClientError> {
+        let session_manager = unsafe { &mut *self.session_manager.get() };
+        let session = session_manager.get_composite_session(target).await?;
+        let future = session.fetch(request);
         time::timeout(self.config.client_io_timeout(), future)
             .await
             .map_err(|e| ClientError::RpcTimeout {

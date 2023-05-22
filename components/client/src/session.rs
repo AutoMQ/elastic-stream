@@ -226,6 +226,10 @@ impl Session {
                 frame.payload = Some(buf.clone());
             }
 
+            request::Headers::Fetch { entries } => {
+                frame.operation_code = OperationCode::Fetch;
+            }
+
             request::Headers::ReportMetrics { .. } => {
                 frame.operation_code = OperationCode::ReportMetrics;
             }
@@ -315,8 +319,7 @@ impl Session {
                         }
 
                         OperationCode::Fetch => {
-                            warn!("Received an unexpected `Fetch` response");
-                            return;
+                            response.on_fetch(&frame, &ctx);
                         }
 
                         OperationCode::CreateRange => {
