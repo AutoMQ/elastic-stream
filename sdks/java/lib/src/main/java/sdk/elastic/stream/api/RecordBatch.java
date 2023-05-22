@@ -1,7 +1,7 @@
 package sdk.elastic.stream.api;
 
 import java.nio.ByteBuffer;
-import java.util.List;
+import java.util.Map;
 
 /**
  * Record batch.
@@ -27,7 +27,7 @@ public interface RecordBatch {
      *
      * @return batch extension properties.
      */
-    List<KeyValue> properties();
+    Map<String, String> properties();
 
     /**
      * Get raw payload.

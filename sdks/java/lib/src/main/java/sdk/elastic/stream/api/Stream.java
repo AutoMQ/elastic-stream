@@ -37,12 +37,22 @@ public interface Stream {
     /**
      * Fetch recordBatch list from stream. Note the startOffset may be in the middle in the first recordBatch.
      *
-     * @param startOffset  start offset.
+     * @param startOffset  start offset, if the startOffset in middle of a recordBatch, the recordBatch will be returned.
+     * @param endOffset exclusive end offset, if the endOffset in middle of a recordBatch, the recordBatch will be returned.
      * @param maxBytesHint max fetch data size hint, the real return data size may be larger than maxBytesHint.
      * @return - complete success with {@link FetchResult}, when fetch success.
      * - complete exception with {@link FetchOutOfBoundExceptionElastic}, when startOffset is bigger than stream end offset.
      */
-    CompletableFuture<FetchResult> fetch(long startOffset, int maxBytesHint);
+    CompletableFuture<FetchResult> fetch(long startOffset, long endOffset, int maxBytesHint);
+
+    /**
+     * Trim stream.
+     *
+     * @param newStartOffset new start offset.
+     * @return - complete success with async {@link Void}, when trim success.
+     * - complete exception with {@link ElasticStreamClientException}, when trim fail.
+     */
+    CompletableFuture<Void> trim(long newStartOffset);
 
     /**
      * Close the stream.
