@@ -1,22 +1,26 @@
-use log::warn;
+use log::{trace, warn};
 use model::range::RangeMetadata;
 use store::AppendRecordRequest;
 
 use super::window::Window;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Range {
     pub(crate) metadata: RangeMetadata,
 
     committed: Option<u64>,
 
-    window: Window<AppendRecordRequest>,
+    window: Option<Window<AppendRecordRequest>>,
 }
 
 impl Range {
     pub(crate) fn new(metadata: RangeMetadata) -> Self {
         Self {
-            window: Window::new(metadata.start()),
+            window: if metadata.is_sealed() {
+                None
+            } else {
+                Some(Window::new(metadata.start()))
+            },
             metadata,
             committed: None,
         }
@@ -32,6 +36,12 @@ impl Range {
                 warn!("Try to commit offset {}, which is less than current committed offset {}, range={}",
                     offset, *committed, self.metadata);
             } else {
+                trace!(
+                    "Committed offset of stream[id={}] changed from {} to {}",
+                    self.metadata.stream_id(),
+                    *committed,
+                    offset
+                );
                 *committed = offset;
             }
             return;
@@ -49,6 +59,9 @@ impl Range {
         self.metadata.set_end(end);
         metadata.set_end(end);
 
+        // Drop window once the range is sealed.
+        self.window.take();
+
         if !self.data_complete() {
             // TODO: spawn a task to replica data from peers.
         }
@@ -59,6 +72,10 @@ impl Range {
             Some(committed) => committed >= self.metadata.end().unwrap_or(self.metadata.start()),
             None => false,
         }
+    }
+
+    pub(crate) fn window_mut(&mut self) -> Option<&mut Window<AppendRecordRequest>> {
+        self.window.as_mut()
     }
 }
 

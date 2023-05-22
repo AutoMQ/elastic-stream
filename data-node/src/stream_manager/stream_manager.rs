@@ -118,8 +118,8 @@ impl StreamManager {
     ///
     /// # Returns
     /// The stream if it exists, otherwise `None`.
-    pub(crate) fn get_stream(&self, stream_id: i64) -> Option<&Stream> {
-        self.streams.get(&stream_id)
+    pub(crate) fn get_stream(&mut self, stream_id: i64) -> Option<&mut Stream> {
+        self.streams.get_mut(&stream_id)
     }
 
     /// Get `StreamRange` of the given stream_id and offset.
@@ -133,7 +133,7 @@ impl StreamManager {
     ///
     /// # Note
     /// We need to update `limit` of the returning range if it is mutable.
-    pub fn stream_range_of(&self, stream_id: i64, offset: u64) -> Option<Range> {
+    pub fn stream_range_of(&mut self, stream_id: i64, offset: u64) -> Option<&mut Range> {
         if let Some(stream) = self.get_stream(stream_id) {
             stream.range_of(offset)
         } else {

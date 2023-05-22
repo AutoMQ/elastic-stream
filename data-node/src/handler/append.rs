@@ -5,7 +5,7 @@ use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
 use log::{error, trace, warn};
-use model::record::flat_record::FlatRecordBatch;
+use model::{record::flat_record::FlatRecordBatch, Batch};
 use protocol::rpc::header::{
     AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
 };
@@ -209,13 +209,35 @@ impl<'a> Append<'a> {
 
             let request = AppendRecordRequest {
                 stream_id: record_batch.stream_id(),
-                range: record_batch.range_index(),
+                range_index: record_batch.range_index(),
                 offset: record_batch.base_offset(),
                 len: record_batch.len(),
                 buffer: record_batch.payload(),
             };
 
-            append_requests.push(request);
+            if let Some(range) = stream_manager
+                .borrow_mut()
+                .stream_range_of(request.stream_id, request.offset())
+            {
+                if let Some(window) = range.window_mut() {
+                    if window.fast_forward(&request) {
+                        append_requests.push(request);
+                        // Try to dispatch previously buffered requests that become continuous
+                        if let Some(req) = window.pop() {
+                            append_requests.push(req);
+                        }
+                    } else {
+                        // Buffer request whose previous has not arrived yet.
+                        window.push(request);
+                    }
+                }
+            } else {
+                warn!(
+                    "Target stream/range is not found. stream-id={}, range-index={}",
+                    request.stream_id, request.range_index
+                );
+                // TODO: propagate error.
+            }
         }
 
         Ok(append_requests)

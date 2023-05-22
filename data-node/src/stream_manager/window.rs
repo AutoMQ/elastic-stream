@@ -5,7 +5,7 @@ use model::Batch;
 /// Append Request Window ensures append requests of a stream range are dispatched to store in order.
 ///
 /// Note that `Window` is intended to be used by a thread-per-core scenario and is not thread-safe.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Window<R> {
     next: u64,
 
@@ -56,6 +56,12 @@ where
             }
         }
         None
+    }
+
+    /// Clear
+    pub(crate) fn clear(&mut self) {
+        self.requests.clear();
+        self.requests.shrink_to_fit();
     }
 }
 

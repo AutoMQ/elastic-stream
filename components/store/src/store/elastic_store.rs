@@ -185,7 +185,7 @@ impl ElasticStore {
     ) {
         let task = WriteTask {
             stream_id: request.stream_id,
-            range: request.range as u32,
+            range: request.range_index as u32,
             offset: request.offset,
             buffer: request.buffer,
             observer,
@@ -477,7 +477,7 @@ mod tests {
             .into_iter()
             .map(|i| AppendRecordRequest {
                 stream_id: 1,
-                range: 0,
+                range_index: 0,
                 offset: i,
                 len: 1,
                 buffer: Bytes::from(format!("{}-{}", "hello, world", i)),

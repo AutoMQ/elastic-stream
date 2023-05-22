@@ -91,11 +91,10 @@ impl Stream {
         Ok(())
     }
 
-    pub(crate) fn range_of(&self, offset: u64) -> Option<Range> {
+    pub(crate) fn range_of(&mut self, offset: u64) -> Option<&mut Range> {
         self.ranges
-            .iter()
-            .find(|&range| range.metadata.contains(offset))
-            .cloned()
+            .iter_mut()
+            .find(|range| range.metadata.contains(offset))
     }
 }
 

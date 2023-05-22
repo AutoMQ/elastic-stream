@@ -179,7 +179,7 @@ impl<'a> Fetch<'a> {
 
                 // If the stream-range exists and contains the requested offset, build the read options
                 if let Some(range) = stream_manager
-                    .borrow()
+                    .borrow_mut()
                     .stream_range_of(stream_id, req.fetch_offset() as u64)
                 {
                     let max_offset = match range.metadata.end() {
