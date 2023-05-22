@@ -17,6 +17,9 @@ pub enum ClientError {
     #[error("RpcClientError")]
     RpcClientError(#[from] client::error::ClientError),
 
+    #[error("ReplicationError")]
+    Replication(#[from] replication::ReplicationError),
+
     #[error("Unexpected internal client error")]
     Internal(String),
 }

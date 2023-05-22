@@ -1,26 +1,46 @@
 use std::io::IoSlice;
 
 use model::stream::StreamMetadata;
-use tokio::sync::mpsc;
+use replication::StreamClient;
 
-use crate::{command::Command, AppendResult, ClientError};
+use crate::{AppendResult, ClientError};
 
 pub struct Stream {
     metadata: StreamMetadata,
-    tx: mpsc::UnboundedSender<Command>,
+    stream_client: StreamClient,
 }
 
 impl Stream {
-    pub(crate) fn new(metadata: StreamMetadata, tx: mpsc::UnboundedSender<Command>) -> Self {
-        Self { metadata, tx }
+    pub(crate) fn new(metadata: StreamMetadata, stream_client: StreamClient) -> Self {
+        debug_assert!(metadata.stream_id.is_some(), "stream-id should be present");
+        Self {
+            metadata,
+            stream_client,
+        }
     }
 
     pub async fn min_offset(&self) -> Result<i64, ClientError> {
-        todo!()
+        self.stream_client
+            .min_offset(
+                self.metadata
+                    .stream_id
+                    .expect("stream-id should be present"),
+            )
+            .await
+            .map(|v| v as i64)
+            .map_err(Into::into)
     }
 
     pub async fn max_offset(&self) -> Result<i64, ClientError> {
-        todo!()
+        self.stream_client
+            .max_offset(
+                self.metadata
+                    .stream_id
+                    .expect("stream-id should be present"),
+            )
+            .await
+            .map(|v| v as i64)
+            .map_err(Into::into)
     }
 
     /// Append data to the stream.
@@ -29,7 +49,14 @@ impl Stream {
     ///
     /// `data` - Encoded representation of the `RecordBatch`.
     pub async fn append(&self, data: IoSlice<'_>) -> Result<AppendResult, ClientError> {
-        todo!()
+        let request = replication::request::AppendRequest {};
+        self.stream_client
+            .append(request)
+            .await
+            .map(|response| AppendResult {
+                base_offset: response.offset as i64,
+            })
+            .map_err(Into::into)
     }
 
     /// Read data from the stream.
@@ -47,6 +74,14 @@ impl Stream {
         limit: i32,
         max_bytes: i32,
     ) -> Result<IoSlice<'_>, ClientError> {
-        todo!()
+        let request = replication::request::ReadRequest {};
+        self.stream_client
+            .read(request)
+            .await
+            .map(|_response| {
+                let data = "mock";
+                IoSlice::new(data.as_bytes())
+            })
+            .map_err(Into::into)
     }
 }

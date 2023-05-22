@@ -4,7 +4,9 @@ use tokio::sync::oneshot;
 pub struct AppendRequest {}
 
 #[derive(Debug)]
-pub struct AppendResponse {}
+pub struct AppendResponse {
+    pub offset: u64,
+}
 
 #[derive(Debug)]
 pub struct ReadRequest {}

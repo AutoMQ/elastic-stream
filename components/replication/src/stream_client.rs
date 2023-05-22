@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use client::error::ClientError;
 use log::{error, trace};
 use tokio::sync::{mpsc, oneshot};
 
@@ -50,5 +51,13 @@ impl StreamClient {
             error!("Failed to receive read response from stream manager: {e}");
             ReplicationError::RpcTimeout
         })
+    }
+
+    pub async fn min_offset(&self, stream_id: u64) -> Result<u64, ClientError> {
+        todo!()
+    }
+
+    pub async fn max_offset(&self, stream_id: u64) -> Result<u64, ClientError> {
+        todo!()
     }
 }

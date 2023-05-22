@@ -1,20 +1,34 @@
-use std::thread;
+use std::{sync::Arc, thread};
 
 use crate::{command::Command, worker::Worker, ClientError, Stream, StreamOptions};
 
+use config::Configuration;
 use log::error;
+use replication::StreamClient;
 use tokio::sync::{mpsc, oneshot};
 
 pub struct StreamManager {
+    config: Arc<Configuration>,
     tx: mpsc::UnboundedSender<Command>,
+    stream_client: StreamClient,
     join_handle: thread::JoinHandle<()>,
 }
 
 impl StreamManager {
     pub fn new(access_point: &str) -> Result<Self, ClientError> {
         let (tx, rx) = mpsc::unbounded_channel();
-        let join_handle = Worker::spawn(rx, access_point)?;
-        Ok(Self { tx, join_handle })
+        let mut config = Configuration::default();
+        config.placement_manager = access_point.to_owned();
+        let config = Arc::new(config);
+
+        let join_handle = Worker::spawn(rx, Arc::clone(&config))?;
+        let stream_client = StreamClient::new(Arc::clone(&config));
+        Ok(Self {
+            config,
+            stream_client,
+            tx,
+            join_handle,
+        })
     }
 
     pub async fn create(&self, options: StreamOptions) -> Result<Stream, ClientError> {
@@ -33,7 +47,8 @@ impl StreamManager {
             error!("Failed to recieve from oneshot channel");
             ClientError::BrokenChannel(format!("Failed to receive oneshot"))
         })??;
-        Ok(Stream::new(metadata, self.tx.clone()))
+
+        Ok(Stream::new(metadata, self.stream_client.clone()))
     }
 
     pub async fn open(&self, id: i64) -> Result<Stream, ClientError> {
@@ -53,6 +68,6 @@ impl StreamManager {
             ClientError::BrokenChannel(format!("Failed to receive oneshot"))
         })??;
 
-        Ok(Stream::new(metadata, self.tx.clone()))
+        Ok(Stream::new(metadata, self.stream_client.clone()))
     }
 }

@@ -5,6 +5,7 @@ use config::Configuration;
 
 use log::{error, info};
 use model::stream::StreamMetadata;
+use replication::StreamClient;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{command::Command, ClientError};
@@ -13,27 +14,26 @@ pub(crate) struct Worker {
     config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Command>,
     client: Rc<Client>,
+    stream_client: Rc<StreamClient>,
     shutdown: broadcast::Receiver<()>,
 }
 
 impl Worker {
     pub(crate) fn spawn(
         rx: mpsc::UnboundedReceiver<Command>,
-        access_point: &str,
+        config: Arc<Configuration>,
     ) -> Result<thread::JoinHandle<()>, ClientError> {
-        let mut config = Configuration::default();
-        config.placement_manager = access_point.to_owned();
-        let config = Arc::new(config);
-
         thread::Builder::new()
             .name("front-end".to_owned())
             .spawn(move || {
                 let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
                 let client = Rc::new(Client::new(Arc::clone(&config), shutdown_tx.clone()));
+                let stream_client = Rc::new(StreamClient::new(Arc::clone(&config)));
                 let worker = Self {
                     config,
                     rx,
                     client,
+                    stream_client,
                     shutdown: shutdown_tx.subscribe(),
                 };
 
@@ -57,9 +57,10 @@ impl Worker {
                         match cmd {
                             Some(command) => {
                                 let client = Rc::clone(&worker.client);
+                                let stream_client = Rc::clone(&worker.stream_client);
                                 // Process each command in a dedicated coroutine.
                                 tokio_uring::spawn(async move {
-                                    Self::process_command(client, command).await;
+                                    Self::process_command(client, stream_client, command).await;
                                 });
                             }
                             None => {
@@ -74,7 +75,11 @@ impl Worker {
         });
     }
 
-    async fn process_command(client: Rc<Client>, command: Command) {
+    async fn process_command(
+        client: Rc<Client>,
+        stream_client: Rc<StreamClient>,
+        command: Command,
+    ) {
         match command {
             Command::CreateStream { options, observer } => {
                 let metadata = StreamMetadata {

@@ -2,7 +2,7 @@
 #![feature(btree_cursors)]
 
 pub mod error;
-mod request;
+pub mod request;
 pub mod stream_client;
 mod stream_manager;
 
