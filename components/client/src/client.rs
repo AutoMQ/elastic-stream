@@ -114,14 +114,13 @@ impl Client {
 
     pub async fn create_stream(
         &self,
-        replica: u8,
-        retention: Duration,
+        stream_metadata: StreamMetadata,
     ) -> Result<StreamMetadata, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager
             .get_composite_session(&self.config.placement_manager)
             .await?;
-        let future = composite_session.create_stream(replica, retention);
+        let future = composite_session.create_stream(stream_metadata);
         time::timeout(self.config.client_io_timeout(), future)
             .await
             .map_err(|e| {

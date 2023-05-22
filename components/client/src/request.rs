@@ -1,5 +1,6 @@
 use bytes::{Bytes, BytesMut};
 use model::fetch::FetchRequestEntry;
+use model::stream::StreamMetadata;
 use model::{
     client_role::ClientRole, data_node::DataNode, range::RangeMetadata,
     range_criteria::RangeCriteria,
@@ -28,8 +29,7 @@ pub enum Headers {
     },
 
     CreateStream {
-        replica: u8,
-        retention: Duration,
+        stream_metadata: StreamMetadata,
     },
 
     DescribeStream {
@@ -105,11 +105,9 @@ impl From<&Request> for Bytes {
                 builder.finish(heartbeat, None);
             }
 
-            Headers::CreateStream { replica, retention } => {
+            Headers::CreateStream { stream_metadata } => {
                 let mut request = CreateStreamRequestT::default();
-                let mut stream = StreamT::default();
-                stream.replica = *replica as i8;
-                stream.retention_period_ms = retention.as_millis() as i64;
+                let stream = stream_metadata.into();
                 request.stream = Box::new(stream);
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);

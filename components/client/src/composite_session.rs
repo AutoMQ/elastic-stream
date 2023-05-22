@@ -333,8 +333,7 @@ impl CompositeSession {
 
     pub(crate) async fn create_stream(
         &self,
-        replica: u8,
-        retention: Duration,
+        stream_metadata: StreamMetadata,
     ) -> Result<StreamMetadata, ClientError> {
         self.try_reconnect().await;
         let session = self
@@ -343,7 +342,7 @@ impl CompositeSession {
         let (tx, rx) = oneshot::channel();
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            headers: request::Headers::CreateStream { replica, retention },
+            headers: request::Headers::CreateStream { stream_metadata },
         };
 
         if let Err(ctx) = session.write(request, tx).await {

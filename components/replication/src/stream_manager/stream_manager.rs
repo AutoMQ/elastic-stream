@@ -1,7 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use client::Client;
 use config::Configuration;
+use log::warn;
+use model::stream::StreamMetadata;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{
@@ -53,6 +55,16 @@ impl StreamManager {
     async fn append(&mut self, request: AppendRequest, tx: oneshot::Sender<AppendResponse>) {}
 
     async fn read(&mut self, request: ReadRequest, tx: oneshot::Sender<ReadResponse>) {}
+
+    async fn create(
+        &mut self,
+        metadata: StreamMetadata,
+    ) -> Result<StreamMetadata, ReplicationError> {
+        self.client.create_stream(metadata).await.map_err(|e| {
+            warn!("Failed to create stream, {}", e);
+            ReplicationError::Internal
+        })
+    }
 
     async fn open(
         &mut self,

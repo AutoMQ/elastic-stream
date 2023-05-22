@@ -1,4 +1,5 @@
 use std::{
+    borrow::BorrowMut,
     cell::RefCell,
     rc::{Rc, Weak},
 };
@@ -7,9 +8,8 @@ use crate::ReplicationError;
 use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
-use model::range::{self, RangeMetadata};
+use model::range::RangeMetadata;
 use model::record::{flat_record::FlatRecordBatch, RecordBatch};
-use protocol::flat_model::records::{KeyValueT, RecordBatchMetaT};
 use tokio::sync::broadcast;
 
 use super::{replication_stream::ReplicationStream, replicator::Replicator};
@@ -54,7 +54,7 @@ impl ReplicationRange {
 
         let (seal_task_tx, _) = broadcast::channel::<Result<u64, ReplicationError>>(1);
 
-        let this = Self {
+        let mut this = Rc::new(Self {
             metadata,
             open_for_write,
             stream,
@@ -63,9 +63,15 @@ impl ReplicationRange {
             confirm_offset: RefCell::new(confirm_offset),
             status: RefCell::new(status),
             seal_task_tx: Rc::new(seal_task_tx),
-        };
+        });
 
-        Rc::new(this)
+        let mut replicators = Vec::with_capacity(this.metadata.replica().len());
+        for replica_node in this.metadata.replica().iter() {
+            replicators.push(Rc::new(Replicator::new(this.clone(), replica_node.clone())));
+        }
+        Rc::get_mut(&mut this).unwrap().replicators = Rc::new(replicators);
+
+        this
     }
 
     pub(crate) async fn create(
@@ -108,13 +114,6 @@ impl ReplicationRange {
 
     pub(crate) fn client(&self) -> Option<Rc<Client>> {
         self.client.upgrade()
-    }
-
-    pub(crate) fn create_replicator(
-        range: Rc<ReplicationRange>,
-        start_offset: u64,
-    ) -> Result<(), ReplicationError> {
-        Ok(())
     }
 
     fn calculate_confirm_offset(&self) -> Result<u64, ReplicationError> {
@@ -324,7 +323,7 @@ impl ReplicationRange {
             let end_offset = end_offset.clone();
             seal_tasks.push(tokio_uring::spawn(async move {
                 if let Ok(replica_end_offset) = replica.seal(end_offset).await {
-                    end_offsets.borrow_mut().push(replica_end_offset);
+                    (*end_offsets).borrow_mut().push(replica_end_offset);
                 }
             }));
         }
@@ -341,7 +340,7 @@ impl ReplicationRange {
         // - when replica_count=3 and ack_count = 3, must seal 1 replica success, the result end offset = 1.
         // assume the corrupted replica with the largest end offset.
         let end_offset = end_offsets
-            .borrow_mut()
+            .borrow()
             .iter()
             .sorted()
             .nth((replica_count - ack_count) as usize)

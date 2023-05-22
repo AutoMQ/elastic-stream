@@ -9,6 +9,7 @@ import (
 type StreamT struct {
 	StreamId int64 `json:"stream_id"`
 	Replica int8 `json:"replica"`
+	AckCount int8 `json:"ack_count"`
 	RetentionPeriodMs int64 `json:"retention_period_ms"`
 }
 
@@ -17,6 +18,7 @@ func (t *StreamT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	StreamStart(builder)
 	StreamAddStreamId(builder, t.StreamId)
 	StreamAddReplica(builder, t.Replica)
+	StreamAddAckCount(builder, t.AckCount)
 	StreamAddRetentionPeriodMs(builder, t.RetentionPeriodMs)
 	return StreamEnd(builder)
 }
@@ -24,6 +26,7 @@ func (t *StreamT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 func (rcv *Stream) UnPackTo(t *StreamT) {
 	t.StreamId = rcv.StreamId()
 	t.Replica = rcv.Replica()
+	t.AckCount = rcv.AckCount()
 	t.RetentionPeriodMs = rcv.RetentionPeriodMs()
 }
 
@@ -85,8 +88,20 @@ func (rcv *Stream) MutateReplica(n int8) bool {
 	return rcv._tab.MutateInt8Slot(6, n)
 }
 
-func (rcv *Stream) RetentionPeriodMs() int64 {
+func (rcv *Stream) AckCount() int8 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	if o != 0 {
+		return rcv._tab.GetInt8(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *Stream) MutateAckCount(n int8) bool {
+	return rcv._tab.MutateInt8Slot(8, n)
+}
+
+func (rcv *Stream) RetentionPeriodMs() int64 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		return rcv._tab.GetInt64(o + rcv._tab.Pos)
 	}
@@ -94,11 +109,11 @@ func (rcv *Stream) RetentionPeriodMs() int64 {
 }
 
 func (rcv *Stream) MutateRetentionPeriodMs(n int64) bool {
-	return rcv._tab.MutateInt64Slot(8, n)
+	return rcv._tab.MutateInt64Slot(10, n)
 }
 
 func StreamStart(builder *flatbuffers.Builder) {
-	builder.StartObject(3)
+	builder.StartObject(4)
 }
 func StreamAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(0, streamId, -1)
@@ -106,8 +121,11 @@ func StreamAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 func StreamAddReplica(builder *flatbuffers.Builder, replica int8) {
 	builder.PrependInt8Slot(1, replica, 0)
 }
+func StreamAddAckCount(builder *flatbuffers.Builder, ackCount int8) {
+	builder.PrependInt8Slot(2, ackCount, 0)
+}
 func StreamAddRetentionPeriodMs(builder *flatbuffers.Builder, retentionPeriodMs int64) {
-	builder.PrependInt64Slot(2, retentionPeriodMs, 0)
+	builder.PrependInt64Slot(3, retentionPeriodMs, 0)
 }
 func StreamEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

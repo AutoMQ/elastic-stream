@@ -28,16 +28,11 @@ impl Replicator {
     ///
     /// # Arguments
     /// `range` - The replication range.
-    /// `confirm_offset` - The start offset of the last mutable range.
     /// `data_node` - The target data-node to replicate data to.
-    pub(crate) fn new(
-        range: Rc<ReplicationRange>,
-        confirm_offset: u64,
-        data_node: DataNode,
-    ) -> Self {
+    pub(crate) fn new(range: Rc<ReplicationRange>, data_node: DataNode) -> Self {
         Self {
             range: Rc::downgrade(&range),
-            confirm_offset: Rc::new(RefCell::new(confirm_offset)),
+            confirm_offset: Rc::new(RefCell::new(0)),
             data_node,
             corrupted: Rc::new(RefCell::new(false)),
         }
