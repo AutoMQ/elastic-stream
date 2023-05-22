@@ -87,7 +87,7 @@ mod tests {
 
         let req1 = AppendRecordRequest {
             stream_id: 0,
-            range: 0,
+            range_index: 0,
             offset: 0,
             len: 2,
             buffer: buffer.clone(),
@@ -95,7 +95,7 @@ mod tests {
 
         let req2 = AppendRecordRequest {
             stream_id: 0,
-            range: 0,
+            range_index: 0,
             offset: 2,
             len: 2,
             buffer: buffer.clone(),
