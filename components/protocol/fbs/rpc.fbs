@@ -302,10 +302,10 @@ table Range {
     nodes: [DataNode] (id: 5);
 
     // The range replica expected count.
-    replica_count: int32 = -1 (id: 6);
+    replica_count: int8 = -1 (id: 6);
 
     // The range replica ack count, only success ack > ack, then the write is success.
-    ack_count: int32 = -1 (id: 7);
+    ack_count: int8 = -1 (id: 7);
 }
 
 table CreateRangeRequest {
