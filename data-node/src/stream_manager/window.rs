@@ -57,12 +57,6 @@ where
         }
         None
     }
-
-    /// Clear
-    pub(crate) fn clear(&mut self) {
-        self.requests.clear();
-        self.requests.shrink_to_fit();
-    }
 }
 
 #[cfg(test)]
