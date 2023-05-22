@@ -32,10 +32,13 @@ impl StreamClient {
         }
         trace!("Submitted append request to internal stream manager and await response");
 
-        rx.await.map_err(|e| {
-            error!("Failed to receive append response from internal stream manager: {e}");
-            ReplicationError::RpcTimeout
-        })
+        match rx.await {
+            Ok(result) => result,
+            Err(e) => {
+                error!("Failed to receive append response from internal stream manager: {e}");
+                Err(ReplicationError::RpcTimeout)
+            }
+        }
     }
 
     pub async fn read(&self, request: ReadRequest) -> Result<ReadResponse, ReplicationError> {
@@ -47,10 +50,13 @@ impl StreamClient {
         }
         trace!("Submitted read request to internal stream manager and await response");
 
-        rx.await.map_err(|e| {
-            error!("Failed to receive read response from stream manager: {e}");
-            ReplicationError::RpcTimeout
-        })
+        match rx.await {
+            Ok(result) => result,
+            Err(e) => {
+                error!("Failed to receive read response from stream manager: {e}");
+                Err(ReplicationError::RpcTimeout)
+            }
+        }
     }
 
     pub async fn min_offset(&self, stream_id: u64) -> Result<u64, ClientError> {

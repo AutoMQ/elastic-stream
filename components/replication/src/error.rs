@@ -22,4 +22,7 @@ pub enum ReplicationError {
 
     #[error("Fetch request is out of range")]
     FetchOutOfRange,
+
+    #[error("Stream is not exist")]
+    StreamNotExist,
 }

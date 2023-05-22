@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use client::Client;
 use config::Configuration;
@@ -7,23 +7,29 @@ use model::stream::StreamMetadata;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{
-    request::{AppendRequest, AppendResponse, ReadRequest, ReadResponse, Request},
+    request::{
+        self, AppendRequest, AppendResponse, CloseStreamRequest, CreateStreamRequest,
+        CreateStreamResponse, OpenStreamRequest, OpenStreamResponse, ReadRequest, ReadResponse,
+        Request,
+    },
     stream_manager::replication_stream::ReplicationStream,
     ReplicationError,
 };
+
+use super::replication_stream::StreamAppendContext;
 
 pub(crate) struct StreamManager {
     config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Request>,
     client: Rc<Client>,
-    streams: HashMap<i64, Rc<ReplicationStream>>,
+    streams: Rc<RefCell<HashMap<u64, Rc<ReplicationStream>>>>,
 }
 
 impl StreamManager {
     pub(crate) fn new(config: Arc<Configuration>, rx: mpsc::UnboundedReceiver<Request>) -> Self {
         let (shutdown, _rx) = broadcast::channel(1);
         let client = Rc::new(Client::new(Arc::clone(&config), shutdown));
-        let streams = HashMap::new();
+        let streams = Rc::new(RefCell::new(HashMap::new()));
         Self {
             config,
             rx,
@@ -41,7 +47,16 @@ impl StreamManager {
                             this.append(request, tx).await;
                         }
                         Request::Read { request, tx } => {
-                            this.read(request, tx).await;
+                            this.fetch(request, tx).await;
+                        }
+                        Request::CreateStream { request, tx } => {
+                            this.create(request, tx);
+                        }
+                        Request::OpenStream { request, tx } => {
+                            this.open(request, tx);
+                        }
+                        Request::CloseStream { request, tx } => {
+                            this.close(request, tx);
                         }
                     },
                     None => {
@@ -52,30 +67,120 @@ impl StreamManager {
         });
     }
 
-    async fn append(&mut self, request: AppendRequest, tx: oneshot::Sender<AppendResponse>) {}
+    async fn append(
+        &mut self,
+        request: AppendRequest,
+        tx: oneshot::Sender<Result<AppendResponse, ReplicationError>>,
+    ) {
+        let stream = if let Some(stream) = self.streams.borrow().get(&request.stream_id) {
+            Some(stream.clone())
+        } else {
+            None
+        };
+        if let Some(stream) = stream {
+            let stream = stream.clone();
+            tokio_uring::spawn(async move {
+                let result = stream
+                    .append(request.data, StreamAppendContext::new(request.count))
+                    .await
+                    .map(|offset| AppendResponse { offset });
+                let _ = tx.send(result);
+            });
+        } else {
+            let _ = tx.send(Err(ReplicationError::StreamNotExist));
+        }
+    }
 
-    async fn read(&mut self, request: ReadRequest, tx: oneshot::Sender<ReadResponse>) {}
+    async fn fetch(
+        &mut self,
+        request: ReadRequest,
+        tx: oneshot::Sender<Result<ReadResponse, ReplicationError>>,
+    ) {
+        let stream = if let Some(stream) = self.streams.borrow().get(&request.stream_id) {
+            Some(stream.clone())
+        } else {
+            None
+        };
+        if let Some(stream) = stream {
+            let stream = stream.clone();
+            tokio_uring::spawn(async move {
+                let result = stream
+                    .fetch(
+                        request.start_offset,
+                        request.end_offset,
+                        request.batch_max_bytes,
+                    )
+                    .await
+                    .map(|data| ReadResponse { data });
+                let _ = tx.send(result);
+            });
+        } else {
+            let _ = tx.send(Err(ReplicationError::StreamNotExist));
+        }
+    }
 
     async fn create(
         &mut self,
-        metadata: StreamMetadata,
-    ) -> Result<StreamMetadata, ReplicationError> {
-        self.client.create_stream(metadata).await.map_err(|e| {
-            warn!("Failed to create stream, {}", e);
-            ReplicationError::Internal
-        })
+        request: CreateStreamRequest,
+        tx: oneshot::Sender<Result<CreateStreamResponse, ReplicationError>>,
+    ) {
+        let metadata = StreamMetadata {
+            stream_id: None,
+            replica: request.replica,
+            ack_count: request.ack_count,
+            retention_period: request.retension_period,
+        };
+        let result = self
+            .client
+            .create_stream(metadata)
+            .await
+            .map(|metadata| CreateStreamResponse {
+                // TODO: unify stream_id type
+                stream_id: metadata.stream_id.unwrap(),
+            })
+            .map_err(|e| {
+                warn!("Failed to create stream, {}", e);
+                ReplicationError::Internal
+            });
+        let _ = tx.send(result);
     }
 
     async fn open(
         &mut self,
-        stream_id: i64,
-        epoch: u64,
-    ) -> Result<Rc<ReplicationStream>, ReplicationError> {
-        let client = Rc::downgrade(&self.client);
-        let mut stream = ReplicationStream::new(stream_id, epoch, client);
-        (*stream).open().await?;
-        Ok(stream)
+        request: OpenStreamRequest,
+        tx: oneshot::Sender<Result<OpenStreamResponse, ReplicationError>>,
+    ) {
+        let client = self.client.clone();
+        let streams = self.streams.clone();
+        tokio_uring::spawn(async move {
+            let client = Rc::downgrade(&client);
+            let stream = ReplicationStream::new(request.stream_id as i64, request.epoch, client);
+            if let Err(e) = stream.open().await {
+                let _ = tx.send(Err(e));
+                return;
+            }
+            streams.borrow_mut().insert(request.stream_id, stream);
+            let _ = tx.send(Ok(OpenStreamResponse {}));
+        });
     }
 
-    async fn close(&mut self, stream_id: i64, range_id: i32, offset: i64) {}
+    async fn close(
+        &mut self,
+        request: CloseStreamRequest,
+        tx: oneshot::Sender<Result<(), ReplicationError>>,
+    ) {
+        let stream = if let Some(stream) = self.streams.borrow_mut().remove(&request.stream_id) {
+            Some(stream.clone())
+        } else {
+            None
+        };
+        if let Some(stream) = stream {
+            tokio_uring::spawn(async move {
+                stream.close().await;
+                let _ = tx.send(Ok(()));
+            });
+        } else {
+            let _ = tx.send(Err(ReplicationError::StreamNotExist));
+        }
+    }
 }

@@ -1,5 +1,6 @@
 use std::io::IoSlice;
 
+use bytes::Bytes;
 use model::stream::StreamMetadata;
 use replication::StreamClient;
 
@@ -48,8 +49,12 @@ impl Stream {
     /// # Arguments
     ///
     /// `data` - Encoded representation of the `RecordBatch`.
-    pub async fn append(&self, data: IoSlice<'_>) -> Result<AppendResult, ClientError> {
-        let request = replication::request::AppendRequest {};
+    pub async fn append(&self, data: IoSlice<'_>, count: u32) -> Result<AppendResult, ClientError> {
+        let request = replication::request::AppendRequest {
+            stream_id: self.metadata.stream_id.unwrap(),
+            data: Bytes::copy_from_slice(&data),
+            count,
+        };
         self.stream_client
             .append(request)
             .await
@@ -62,19 +67,24 @@ impl Stream {
     /// Read data from the stream.
     ///
     /// # Arguments
-    /// `offset` - The offset of the first record to be read.
-    /// `limit` - The maximum number of records to be read.
+    /// `start_offset` - The start offset of the first record to be read.
+    /// `end_offset` - The exclusive end offset of last records to be read.
     /// `max_bytes` - The maximum number of bytes to be read.
     ///
     /// # Returns
     /// The data read from the stream.
     pub async fn read(
         &self,
-        offset: i64,
-        limit: i32,
-        max_bytes: i32,
+        start_offset: i64,
+        end_offset: i32,
+        batch_max_bytes: i32,
     ) -> Result<IoSlice<'_>, ClientError> {
-        let request = replication::request::ReadRequest {};
+        let request = replication::request::ReadRequest {
+            stream_id: self.metadata.stream_id.unwrap(),
+            start_offset: start_offset as u64,
+            end_offset: end_offset as u64,
+            batch_max_bytes: batch_max_bytes as u32,
+        };
         self.stream_client
             .read(request)
             .await

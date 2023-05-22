@@ -32,6 +32,8 @@ pub(crate) struct ReplicationStream {
     append_tasks_tx: mpsc::Sender<()>,
     // send when stream close.
     shutdown_signal_tx: broadcast::Sender<()>,
+    // stream closed mark.
+    closed: Rc<RefCell<bool>>,
 }
 
 impl ReplicationStream {
@@ -51,17 +53,20 @@ impl ReplicationStream {
             append_requests_tx,
             append_tasks_tx,
             shutdown_signal_tx,
+            closed: Rc::new(RefCell::new(false)),
         });
 
         *((*this).weak_self.borrow_mut()) = Rc::downgrade(&this);
 
         let weak_this = this.weak_self.borrow().clone();
+        let closed = this.closed.clone();
         tokio_uring::spawn(async move {
             Self::append_task(
                 weak_this,
                 append_requests_rx,
                 append_tasks_rx,
                 shutdown_signal_rx,
+                closed,
             )
             .await
         });
@@ -115,6 +120,7 @@ impl ReplicationStream {
     /// 2. await append task to stop.
     /// 3. close all ranges.
     pub async fn close(&self) {
+        *self.closed.borrow_mut() = true;
         let _ = self.shutdown_signal_tx.send(());
         // TODO: await append task to stop.
         let last_range = self.last_range.borrow().as_ref().map(|r| r.clone());
@@ -127,7 +133,10 @@ impl ReplicationStream {
         &self,
         payload: Bytes,
         context: StreamAppendContext,
-    ) -> Result<(), ReplicationError> {
+    ) -> Result<u64, ReplicationError> {
+        if *self.closed.borrow() {
+            return Err(ReplicationError::AlreadyClosed);
+        }
         let base_offset = *self.next_offset.borrow();
         *self.next_offset.borrow_mut() = base_offset + context.count as u64;
 
@@ -147,7 +156,7 @@ impl ReplicationStream {
         }
         // await append result.
         match append_rx.await {
-            Ok(result) => result,
+            Ok(result) => result.map(|_| base_offset),
             Err(_) => Err(ReplicationError::AlreadyClosed),
         }
     }
@@ -245,6 +254,7 @@ impl ReplicationStream {
         mut append_requests_rx: mpsc::Receiver<StreamAppendRequest>,
         mut append_tasks_rx: mpsc::Receiver<()>,
         mut shutdown_signal_rx: broadcast::Receiver<()>,
+        closed: Rc<RefCell<bool>>,
     ) {
         let stream_option = stream.upgrade();
         if stream_option.is_none() {
@@ -268,6 +278,12 @@ impl ReplicationStream {
                     }
                     break;
                 }
+            }
+            if *closed.borrow() {
+                for (_, append_request) in inflight.iter() {
+                    let _ = append_request.fail(ReplicationError::AlreadyClosed);
+                }
+                break;
             }
 
             // 1. get writable range.
