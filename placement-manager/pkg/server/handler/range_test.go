@@ -12,7 +12,6 @@ import (
 )
 
 func TestHandler_ListRange(t *testing.T) {
-	var nodes = []*rpcfb.DataNodeT{{NodeId: 0}, {NodeId: 1}, {NodeId: 2}}
 	type args struct {
 		StreamID int64
 		NodeID   int32
@@ -26,8 +25,8 @@ func TestHandler_ListRange(t *testing.T) {
 			name: "list range by stream id",
 			args: args{StreamID: 1, NodeID: -1},
 			want: []*rpcfb.RangeT{
-				{StreamId: 1, Epoch: 1, Index: 0, Start: 0, End: 42, Nodes: nodes},
-				{StreamId: 1, Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+				{StreamId: 1, Epoch: 1, Index: 0, Start: 0, End: 42},
+				{StreamId: 1, Epoch: 2, Index: 1, Start: 42, End: -1},
 			},
 		},
 		{
@@ -39,12 +38,12 @@ func TestHandler_ListRange(t *testing.T) {
 			name: "list range by node id",
 			args: args{StreamID: -1, NodeID: 1},
 			want: []*rpcfb.RangeT{
-				{StreamId: 0, Epoch: 1, Index: 0, Start: 0, End: 42, Nodes: nodes},
-				{StreamId: 0, Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
-				{StreamId: 1, Epoch: 1, Index: 0, Start: 0, End: 42, Nodes: nodes},
-				{StreamId: 1, Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
-				{StreamId: 2, Epoch: 1, Index: 0, Start: 0, End: 42, Nodes: nodes},
-				{StreamId: 2, Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+				{StreamId: 0, Epoch: 1, Index: 0, Start: 0, End: 42},
+				{StreamId: 0, Epoch: 2, Index: 1, Start: 42, End: -1},
+				{StreamId: 1, Epoch: 1, Index: 0, Start: 0, End: 42},
+				{StreamId: 1, Epoch: 2, Index: 1, Start: 42, End: -1},
+				{StreamId: 2, Epoch: 1, Index: 0, Start: 0, End: 42},
+				{StreamId: 2, Epoch: 2, Index: 1, Start: 42, End: -1},
 			},
 		},
 		{
@@ -56,8 +55,8 @@ func TestHandler_ListRange(t *testing.T) {
 			name: "list range by stream id and node id",
 			args: args{StreamID: 2, NodeID: 2},
 			want: []*rpcfb.RangeT{
-				{StreamId: 2, Epoch: 1, Index: 0, Start: 0, End: 42, Nodes: nodes},
-				{StreamId: 2, Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+				{StreamId: 2, Epoch: 1, Index: 0, Start: 0, End: 42},
+				{StreamId: 2, Epoch: 2, Index: 1, Start: 42, End: -1},
 			},
 		},
 	}
@@ -91,6 +90,9 @@ func TestHandler_ListRange(t *testing.T) {
 			for _, r := range resp.Ranges {
 				fmtNodes(r)
 			}
+			for _, r := range tt.want {
+				fillRangeInfo(r)
+			}
 			re.Equal(tt.want, resp.Ranges)
 		})
 	}
@@ -118,7 +120,6 @@ func prepareRanges(t *testing.T, h *Handler, streamID int64, ranges []preRange) 
 }
 
 func TestSealRange(t *testing.T) {
-	var nodes = []*rpcfb.DataNodeT{{NodeId: 0}, {NodeId: 1}, {NodeId: 2}}
 	type args struct {
 		kind     rpcfb.SealKind
 		epoch    int64
@@ -147,10 +148,10 @@ func TestSealRange(t *testing.T) {
 			},
 			args: args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 2, index: 1, end: 84},
 			want: want{
-				returned: &rpcfb.RangeT{Epoch: 2, Index: 1, Start: 42, End: 84, Nodes: nodes},
+				returned: &rpcfb.RangeT{Epoch: 2, Index: 1, Start: 42, End: 84},
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: 84, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: 84},
 				},
 			},
 		},
@@ -166,8 +167,8 @@ func TestSealRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeNOT_FOUND,
 				errMsg:  "stream 1 not found",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: -1},
 				},
 			},
 		},
@@ -194,8 +195,8 @@ func TestSealRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeRANGE_NOT_FOUND,
 				errMsg:  "range 2 not found in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: -1},
 				},
 			},
 		},
@@ -211,8 +212,8 @@ func TestSealRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeRANGE_ALREADY_SEALED,
 				errMsg:  "range 0 already sealed in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: -1},
 				},
 			},
 		},
@@ -228,8 +229,8 @@ func TestSealRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeRANGE_ALREADY_SEALED,
 				errMsg:  "range 1 already sealed in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: 84, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: 84},
 				},
 			},
 		},
@@ -245,8 +246,8 @@ func TestSealRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeBAD_REQUEST,
 				errMsg:  "invalid end offset 21 (less than start offset 42) for range 1 in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: -1},
 				},
 			},
 		},
@@ -262,8 +263,8 @@ func TestSealRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH,
 				errMsg:  "invalid epoch 1 (less than 2) for range 1 in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: -1},
 				},
 			},
 		},
@@ -298,6 +299,7 @@ func TestSealRange(t *testing.T) {
 			} else {
 				re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code, resp.Status.Message)
 				fmtNodes(resp.Range)
+				fillRangeInfo(tt.want.returned)
 				re.Equal(tt.want.returned, resp.Range)
 			}
 
@@ -313,13 +315,15 @@ func TestSealRange(t *testing.T) {
 			for _, r := range lResp.Ranges {
 				fmtNodes(r)
 			}
+			for _, r := range tt.want.after {
+				fillRangeInfo(r)
+			}
 			re.Equal(tt.want.after, lResp.Ranges)
 		})
 	}
 }
 
 func TestHandler_CreateRange(t *testing.T) {
-	var nodes = []*rpcfb.DataNodeT{{NodeId: 0}, {NodeId: 1}, {NodeId: 2}}
 	type args struct {
 		epoch    int64
 		streamID int64
@@ -346,10 +350,10 @@ func TestHandler_CreateRange(t *testing.T) {
 			},
 			args: args{epoch: 2, index: 1, start: 42},
 			want: want{
-				returned: &rpcfb.RangeT{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+				returned: &rpcfb.RangeT{Epoch: 2, Index: 1, Start: 42, End: -1},
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: -1},
 				},
 			},
 		},
@@ -358,9 +362,9 @@ func TestHandler_CreateRange(t *testing.T) {
 			prepare: []preRange{},
 			args:    args{},
 			want: want{
-				returned: &rpcfb.RangeT{End: -1, Nodes: nodes},
+				returned: &rpcfb.RangeT{End: -1},
 				after: []*rpcfb.RangeT{
-					{End: -1, Nodes: nodes},
+					{End: -1},
 				},
 			},
 		},
@@ -375,7 +379,7 @@ func TestHandler_CreateRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeNOT_FOUND,
 				errMsg:  "stream 1 not found",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
+					{Epoch: 1, End: 42},
 				},
 			},
 		},
@@ -391,8 +395,8 @@ func TestHandler_CreateRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeCREATE_RANGE_BEFORE_SEAL,
 				errMsg:  "create range 2 before sealing the last range 1 in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
-					{Epoch: 2, Index: 1, Start: 42, End: -1, Nodes: nodes},
+					{Epoch: 1, End: 42},
+					{Epoch: 2, Index: 1, Start: 42, End: -1},
 				},
 			},
 		},
@@ -407,7 +411,7 @@ func TestHandler_CreateRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeBAD_REQUEST,
 				errMsg:  "invalid range index 2 (should be 1) in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
+					{Epoch: 1, End: 42},
 				},
 			},
 		},
@@ -422,7 +426,7 @@ func TestHandler_CreateRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeBAD_REQUEST,
 				errMsg:  "invalid range start 84 (should be 42) for range 1 in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
+					{Epoch: 1, End: 42},
 				},
 			},
 		},
@@ -437,7 +441,7 @@ func TestHandler_CreateRange(t *testing.T) {
 				errCode: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH,
 				errMsg:  "invalid range epoch 0 (less than 1) for range 1 in stream 0",
 				after: []*rpcfb.RangeT{
-					{Epoch: 1, End: 42, Nodes: nodes},
+					{Epoch: 1, End: 42},
 				},
 			},
 		},
@@ -471,6 +475,7 @@ func TestHandler_CreateRange(t *testing.T) {
 			} else {
 				re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code, resp.Status.Message)
 				fmtNodes(resp.Range)
+				fillRangeInfo(tt.want.returned)
 				re.Equal(tt.want.returned, resp.Range)
 			}
 
@@ -485,6 +490,9 @@ func TestHandler_CreateRange(t *testing.T) {
 			// check list range response
 			for _, r := range lResp.Ranges {
 				fmtNodes(r)
+			}
+			for _, r := range tt.want.after {
+				fillRangeInfo(r)
 			}
 			re.Equal(tt.want.after, lResp.Ranges)
 		})
@@ -525,7 +533,10 @@ func preCreateStream(tb testing.TB, h *Handler, replica int8) *rpcfb.StreamT {
 	re := require.New(tb)
 
 	req := &protocol.CreateStreamRequest{CreateStreamRequestT: rpcfb.CreateStreamRequestT{
-		Stream: &rpcfb.StreamT{Replica: replica},
+		Stream: &rpcfb.StreamT{
+			Replica:  replica,
+			AckCount: replica,
+		},
 	}}
 	resp := &protocol.CreateStreamResponse{}
 
@@ -616,4 +627,10 @@ func fmtNodes(r *rpcfb.RangeT) {
 	sort.Slice(r.Nodes, func(i, j int) bool {
 		return r.Nodes[i].NodeId < r.Nodes[j].NodeId
 	})
+}
+
+func fillRangeInfo(r *rpcfb.RangeT) {
+	r.Nodes = []*rpcfb.DataNodeT{{NodeId: 0}, {NodeId: 1}, {NodeId: 2}}
+	r.ReplicaCount = 3
+	r.AckCount = 3
 }
