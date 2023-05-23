@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: test env
         run: |
-          echo $CI_TEST
+          echo "new test: $CI_TEST"
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Deps
