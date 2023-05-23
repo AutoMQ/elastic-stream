@@ -26,10 +26,10 @@ jobs:
         run: |
           flatc --version
           flatc --java -o 'sdks/java/flatc/src/main/java' --java-package-prefix 'com.automq.sdk.elastic.stream.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
-      - name: Set up JDK ${{ matrix.jdk }}
+      - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: ${{ matrix.jdk }}
+          java-version: "17"
           distribution: "zulu"
           cache: "gradle"
       - name: Publish package
