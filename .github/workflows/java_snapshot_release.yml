@@ -23,8 +23,10 @@ jobs:
       ENV_SHOW: "show me"
     steps:
       - name: test env
+        env:
+          NEW_CI_TEST: ${{ secrets.ONLY_FOR_TEST }}
         run: |
-          echo "2 new test: $CI_TEST, $ENV_SHOW"
+          echo "2 new test: $NEW_CI_TEST, $ENV_SHOW"
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Deps
