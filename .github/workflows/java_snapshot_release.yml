@@ -10,9 +10,6 @@ name: Publish snapshot package to the Maven Central Repository
 on:
   workflow_call:
 
-permissions:
-  contents: read
-
 jobs:
   publish:
     runs-on: ubuntu-22.04
