@@ -52,6 +52,8 @@ impl Frontend {
     }
 
     pub async fn open(&self, id: i64) -> Result<Stream, ClientError> {
+        
+
         let (tx, rx) = oneshot::channel();
         let command = Command::OpenStream {
             stream_id: id,

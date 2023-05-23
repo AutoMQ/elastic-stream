@@ -1,10 +1,14 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use log::{error, trace};
+use client::error::ClientError;
+use log::{error, info, trace};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    request::{AppendRequest, AppendResponse, ReadRequest, ReadResponse, Request, TrimRequest},
+    request::{
+        AppendRequest, AppendResponse, CloseStreamRequest, CreateStreamRequest, OpenStreamRequest,
+        ReadRequest, ReadResponse, Request,
+    },
     stream_manager::stream_manager::StreamManager,
     ReplicationError,
 };
@@ -20,6 +24,76 @@ impl StreamClient {
         let stream_manager = StreamManager::new(config, rx);
         StreamManager::spawn_loop(stream_manager);
         Self { tx }
+    }
+
+    pub async fn create_stream(
+        &self,
+        replica: u8,
+        ack_count: u8,
+        retention_period: Duration,
+    ) -> Result<u64, ReplicationError> {
+        let request = CreateStreamRequest {
+            replica,
+            ack_count,
+            retention_period,
+        };
+
+        let (tx, rx) = oneshot::channel();
+        let req = Request::CreateStream { request, tx };
+        if let Err(e) = self.tx.send(req) {
+            error!("Failed to dispatch create-stream request to stream manager {e}");
+            return Err(ReplicationError::Internal);
+        }
+
+        match rx.await {
+            Ok(resp) => resp.map(|res| res.stream_id),
+            Err(e) => {
+                error!(
+                    "Failed to receive create-stream response from internal stream manager: {e}"
+                );
+                Err(ReplicationError::RpcTimeout)
+            }
+        }
+    }
+
+    pub async fn open_stream(&self, stream_id: u64, epoch: u64) -> Result<(), ReplicationError> {
+        let request = OpenStreamRequest { stream_id, epoch };
+
+        let (tx, rx) = oneshot::channel();
+        let req = Request::OpenStream { request, tx };
+        if let Err(e) = self.tx.send(req) {
+            error!("Failed to dispatch open-stream request to stream manager {e}");
+            return Err(ReplicationError::Internal);
+        }
+
+        rx.await
+            .map_err(|e| {
+                error!("Failed to receive open-stream response from internal stream manager: {e}");
+                ReplicationError::RpcTimeout
+            })?
+            .map(|_res| {
+                info!("Open stream[id={stream_id}, epoch={epoch}] OK");
+            })
+    }
+
+    pub async fn close_stream(&self, stream_id: u64) -> Result<(), ReplicationError> {
+        let request = CloseStreamRequest { stream_id };
+
+        let (tx, rx) = oneshot::channel();
+        let req = Request::CloseStream { request, tx };
+        if let Err(e) = self.tx.send(req) {
+            error!("Failed to dispatch open-stream request to stream manager {e}");
+            return Err(ReplicationError::Internal);
+        }
+
+        rx.await
+            .map_err(|e| {
+                error!("Failed to receive close-stream response from internal stream manager: {e}");
+                ReplicationError::RpcTimeout
+            })?
+            .map(|_res| {
+                info!("Close stream[id={stream_id}] OK");
+            })
     }
 
     pub async fn append(&self, request: AppendRequest) -> Result<AppendResponse, ReplicationError> {

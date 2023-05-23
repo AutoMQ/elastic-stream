@@ -137,7 +137,7 @@ impl StreamManager {
             stream_id: None,
             replica: request.replica,
             ack_count: request.ack_count,
-            retention_period: request.retension_period,
+            retention_period: request.retention_period,
         };
         let client = self.client.clone();
         tokio_uring::spawn(async move {

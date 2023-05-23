@@ -33,7 +33,7 @@ pub struct ReadResponse {
 pub struct CreateStreamRequest {
     pub replica: u8,
     pub ack_count: u8,
-    pub retension_period: Duration,
+    pub retention_period: Duration,
 }
 
 #[derive(Debug)]
