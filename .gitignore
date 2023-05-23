@@ -4,3 +4,4 @@
 .DS_Store
 components/protocol/src/generated/
 placement-manager/default.*
+benchmark/logs/

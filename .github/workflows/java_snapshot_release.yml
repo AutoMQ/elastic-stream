@@ -16,7 +16,14 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-22.04
+    env:
+      MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+      MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+      CI_TEST: ${{ secrets.ONLY_FOR_TEST }}
     steps:
+      - name: test env
+        run: |
+          echo $CI_TEST
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Deps
@@ -40,7 +47,3 @@ jobs:
           arguments: publish
           gradle-version: wrapper
           build-root-directory: ./sdks/java
-        env:
-          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
-          CI_TEST: ${{ secrets.ONLY_FOR_TEST }}
