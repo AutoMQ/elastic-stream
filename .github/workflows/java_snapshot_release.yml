@@ -26,7 +26,7 @@ jobs:
         env:
           NEW_CI_TEST: ${{ secrets.ONLY_FOR_TEST }}
         run: |
-          echo "2 new test: $NEW_CI_TEST, $ENV_SHOW"
+          echo "2 new test: $NEW_CI_TEST, $ENV_SHOW, ${{ secrets.ONLY_FOR_TEST }}"
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Deps
