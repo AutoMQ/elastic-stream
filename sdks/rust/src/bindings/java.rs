@@ -146,7 +146,8 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_open(
     let front_end = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
     RUNTIME.get().unwrap().spawn(async move {
-        let result = front_end.open(id).await;
+        debug_assert!(id >= 0, "Stream ID should be non-negative");
+        let result = front_end.open(id as u64, 0).await;
         match result {
             Ok(stream) => {
                 let ptr = Box::into_raw(Box::new(stream)) as jlong;

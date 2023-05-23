@@ -1,32 +1,24 @@
 use std::io::IoSlice;
 
-use bytes::Bytes;
-use model::stream::StreamMetadata;
+use bytes::{Bytes, BytesMut};
+use log::{error, info, trace};
 use replication::StreamClient;
 
 use crate::{AppendResult, ClientError};
 
 pub struct Stream {
-    metadata: StreamMetadata,
+    id: u64,
     stream_client: StreamClient,
 }
 
 impl Stream {
-    pub(crate) fn new(metadata: StreamMetadata, stream_client: StreamClient) -> Self {
-        debug_assert!(metadata.stream_id.is_some(), "stream-id should be present");
-        Self {
-            metadata,
-            stream_client,
-        }
+    pub(crate) fn new(id: u64, stream_client: StreamClient) -> Self {
+        Self { id, stream_client }
     }
 
     pub async fn min_offset(&self) -> Result<i64, ClientError> {
         self.stream_client
-            .start_offset(
-                self.metadata
-                    .stream_id
-                    .expect("stream-id should be present"),
-            )
+            .start_offset(self.id)
             .await
             .map(|v| v as i64)
             .map_err(Into::into)
@@ -34,11 +26,7 @@ impl Stream {
 
     pub async fn max_offset(&self) -> Result<i64, ClientError> {
         self.stream_client
-            .next_offset(
-                self.metadata
-                    .stream_id
-                    .expect("stream-id should be present"),
-            )
+            .next_offset(self.id)
             .await
             .map(|v| v as i64)
             .map_err(Into::into)
@@ -50,16 +38,24 @@ impl Stream {
     ///
     /// `data` - Encoded representation of the `RecordBatch`.
     pub async fn append(&self, data: IoSlice<'_>, count: u32) -> Result<AppendResult, ClientError> {
+        trace!("Appending {} bytes to stream-id={}", data.len(), self.id);
         let request = replication::request::AppendRequest {
-            stream_id: self.metadata.stream_id.unwrap(),
+            stream_id: self.id,
             data: Bytes::copy_from_slice(&data),
             count,
         };
         self.stream_client
             .append(request)
             .await
-            .map(|response| AppendResult {
-                base_offset: response.offset as i64,
+            .map(|response| {
+                trace!(
+                    "{count} records appended to stream[id={}], base offset={}",
+                    self.id,
+                    response.offset
+                );
+                AppendResult {
+                    base_offset: response.offset as i64,
+                }
             })
             .map_err(Into::into)
     }
@@ -78,9 +74,15 @@ impl Stream {
         start_offset: i64,
         end_offset: i32,
         batch_max_bytes: i32,
-    ) -> Result<IoSlice<'_>, ClientError> {
+    ) -> Result<Bytes, ClientError> {
+        trace!(
+            "Reading records from stream[id={}], start-offset={}, end-offset={}",
+            self.id,
+            start_offset,
+            end_offset
+        );
         let request = replication::request::ReadRequest {
-            stream_id: self.metadata.stream_id.unwrap(),
+            stream_id: self.id,
             start_offset: start_offset as u64,
             end_offset: end_offset as u64,
             batch_max_bytes: batch_max_bytes as u32,
@@ -88,10 +90,40 @@ impl Stream {
         self.stream_client
             .read(request)
             .await
-            .map(|_response| {
-                let data = "mock";
-                IoSlice::new(data.as_bytes())
+            .map(|response| {
+                let total = response.data.iter().map(|buf| buf.len()).sum();
+                trace!("{total} bytes read from stream[id={}]", self.id);
+
+                // TODO: Avoid copy
+                if response.data.len() == 1 {
+                    response.data[0].clone()
+                } else {
+                    let mut buf = BytesMut::with_capacity(total);
+                    response.data.iter().for_each(|item| {
+                        buf.extend_from_slice(&item[..]);
+                    });
+                    buf.freeze()
+                }
             })
             .map_err(Into::into)
+    }
+}
+
+impl Drop for Stream {
+    fn drop(&mut self) {
+        let client = self.stream_client.clone();
+        let stream_id = self.id;
+        info!("Dropping stream[id={}]", stream_id);
+        tokio_uring::spawn(async move {
+            match client.close_stream(stream_id).await {
+                Ok(_) => {
+                    info!("Closed stream[id={stream_id}]");
+                }
+
+                Err(e) => {
+                    error!("Failed to close stream[id={stream_id}]. Cause: {e:#?}");
+                }
+            }
+        });
     }
 }
