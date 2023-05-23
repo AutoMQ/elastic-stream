@@ -1,13 +1,12 @@
 use std::{sync::Arc, time::Duration};
 
-use client::error::ClientError;
 use log::{error, info, trace};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     request::{
         AppendRequest, AppendResponse, CloseStreamRequest, CreateStreamRequest, OpenStreamRequest,
-        ReadRequest, ReadResponse, Request,
+        ReadRequest, ReadResponse, Request, TrimRequest,
     },
     stream_manager::stream_manager::StreamManager,
     ReplicationError,
