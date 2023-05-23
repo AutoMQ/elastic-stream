@@ -2,11 +2,11 @@
 # They are provided by a third-party and are governed by
 # separate terms of service, privacy policy, and support
 # documentation.
-# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
 
-name: Java-SDK CI with Gradle
-
+# GitHub recommends pinning actions to a commit SHA.
+# To get a newer version, you will need to update the SHA.
+# You can also reference a tag or branch, but the action may change without warning.
+name: Publish snapshot package to the Maven Central Repository
 on:
   workflow_call:
 
@@ -14,13 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: "${{ matrix.os }}, jdk-${{ matrix.jdk }}"
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-22.04]
-        jdk: [11, 17]
+  publish:
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -31,16 +26,18 @@ jobs:
         run: |
           flatc --version
           flatc --java -o 'sdks/java/flatc/src/main/java' --java-package-prefix 'com.automq.sdk.elastic.stream.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
-          tree sdks/java/flatc/src/main/java/sdk/elastic/stream/flatc
       - name: Set up JDK ${{ matrix.jdk }}
         uses: actions/setup-java@v3
         with:
           java-version: ${{ matrix.jdk }}
           distribution: "zulu"
           cache: "gradle"
-      - name: Build with Gradle
+      - name: Publish package
         uses: gradle/gradle-build-action@v2
         with:
-          arguments: build
+          arguments: publish
           gradle-version: wrapper
           build-root-directory: ./sdks/java
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}

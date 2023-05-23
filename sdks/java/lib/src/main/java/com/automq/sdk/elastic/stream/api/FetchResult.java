@@ -1,4 +1,4 @@
-package sdk.elastic.stream.api;
+package com.automq.sdk.elastic.stream.api;
 
 import java.util.List;
 

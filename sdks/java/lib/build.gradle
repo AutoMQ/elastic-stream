@@ -4,14 +4,23 @@ plugins {
     // Apply the maven-publish plugin to allow publishing to Maven Central.
     id 'maven-publish'
     id 'com.google.protobuf' version '0.9.1'
+    id 'signing'
 }
 
 java {
+    withJavadocJar()
     withSourcesJar()
-//    withJavadocJar()
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(8))
     }
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+signing {
+    sign configurations.archives
 }
 
 dependencies {
@@ -76,6 +85,11 @@ tasks.named('sourcesJar') {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
+// TODO: suppress javadoc warnings temporarily.
+tasks.withType(Javadoc).configureEach {
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
 // Inform IDEs like IntelliJ IDEA, Eclipse or NetBeans about the generated code.
 sourceSets {
     main {
@@ -92,6 +106,17 @@ publishing {
             artifactId = 'client-java'
 
             from components.java
+        }
+    }
+
+    repositories {
+        maven {
+            name = 'snapshot'
+            url = 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+            credentials {
+                username = System.getenv("MAVEN_USERNAME")
+                password = System.getenv("MAVEN_PASSWORD")
+            }
         }
     }
 }
