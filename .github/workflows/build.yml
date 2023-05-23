@@ -32,7 +32,7 @@ jobs:
     needs: [paths-filter]
     if: ${{ needs.paths-filter.outputs.java == 'true' }}
     uses: ./.github/workflows/java_build.yml
-  java-snapshot-release:
+  java-snapshot-release: # publish snapshot release to maven
     needs: [java-build]
     if: ${{ needs.paths-filter.outputs.java == 'true' }}
     uses: ./.github/workflows/java_snapshot_release.yml
