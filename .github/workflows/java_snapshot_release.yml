@@ -20,10 +20,11 @@ jobs:
       MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
       CI_TEST: ${{ secrets.ONLY_FOR_TEST }}
+      ENV_SHOW: "show me"
     steps:
       - name: test env
         run: |
-          echo "2 new test: $CI_TEST"
+          echo "2 new test: $CI_TEST, $ENV_SHOW"
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Deps
