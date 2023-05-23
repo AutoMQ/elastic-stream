@@ -22,7 +22,7 @@ impl Stream {
 
     pub async fn min_offset(&self) -> Result<i64, ClientError> {
         self.stream_client
-            .min_offset(
+            .start_offset(
                 self.metadata
                     .stream_id
                     .expect("stream-id should be present"),
@@ -34,7 +34,7 @@ impl Stream {
 
     pub async fn max_offset(&self) -> Result<i64, ClientError> {
         self.stream_client
-            .max_offset(
+            .next_offset(
                 self.metadata
                     .stream_id
                     .expect("stream-id should be present"),

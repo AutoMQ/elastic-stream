@@ -56,6 +56,12 @@ pub struct CloseStreamRequest {
 }
 
 #[derive(Debug)]
+pub struct TrimRequest {
+    pub stream_id: u64,
+    pub new_start_offset: u64,
+}
+
+#[derive(Debug)]
 pub(crate) enum Request {
     Append {
         request: AppendRequest,
@@ -75,6 +81,20 @@ pub(crate) enum Request {
     },
     CloseStream {
         request: CloseStreamRequest,
+        tx: oneshot::Sender<Result<(), ReplicationError>>,
+    },
+    StartOffset {
+        // stream id
+        request: u64,
+        tx: oneshot::Sender<Result<u64, ReplicationError>>,
+    },
+    NextOffset {
+        // stream id
+        request: u64,
+        tx: oneshot::Sender<Result<u64, ReplicationError>>,
+    },
+    Trim {
+        request: TrimRequest,
         tx: oneshot::Sender<Result<(), ReplicationError>>,
     },
 }

@@ -8,9 +8,9 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{
     request::{
-        self, AppendRequest, AppendResponse, CloseStreamRequest, CreateStreamRequest,
+        AppendRequest, AppendResponse, CloseStreamRequest, CreateStreamRequest,
         CreateStreamResponse, OpenStreamRequest, OpenStreamResponse, ReadRequest, ReadResponse,
-        Request,
+        Request, TrimRequest,
     },
     stream_manager::replication_stream::ReplicationStream,
     ReplicationError,
@@ -44,10 +44,10 @@ impl StreamManager {
                 match this.rx.recv().await {
                     Some(request) => match request {
                         Request::Append { request, tx } => {
-                            this.append(request, tx).await;
+                            this.append(request, tx);
                         }
                         Request::Read { request, tx } => {
-                            this.fetch(request, tx).await;
+                            this.fetch(request, tx);
                         }
                         Request::CreateStream { request, tx } => {
                             this.create(request, tx);
@@ -58,6 +58,15 @@ impl StreamManager {
                         Request::CloseStream { request, tx } => {
                             this.close(request, tx);
                         }
+                        Request::StartOffset { request, tx } => {
+                            this.start_offset(request, tx);
+                        }
+                        Request::NextOffset { request, tx } => {
+                            this.next_offset(request, tx);
+                        }
+                        Request::Trim { request, tx } => {
+                            this.trim(request, tx);
+                        }
                     },
                     None => {
                         break;
@@ -67,7 +76,7 @@ impl StreamManager {
         });
     }
 
-    async fn append(
+    fn append(
         &mut self,
         request: AppendRequest,
         tx: oneshot::Sender<Result<AppendResponse, ReplicationError>>,
@@ -91,7 +100,7 @@ impl StreamManager {
         }
     }
 
-    async fn fetch(
+    fn fetch(
         &mut self,
         request: ReadRequest,
         tx: oneshot::Sender<Result<ReadResponse, ReplicationError>>,
@@ -119,7 +128,7 @@ impl StreamManager {
         }
     }
 
-    async fn create(
+    fn create(
         &mut self,
         request: CreateStreamRequest,
         tx: oneshot::Sender<Result<CreateStreamResponse, ReplicationError>>,
@@ -130,22 +139,24 @@ impl StreamManager {
             ack_count: request.ack_count,
             retention_period: request.retension_period,
         };
-        let result = self
-            .client
-            .create_stream(metadata)
-            .await
-            .map(|metadata| CreateStreamResponse {
-                // TODO: unify stream_id type
-                stream_id: metadata.stream_id.unwrap(),
-            })
-            .map_err(|e| {
-                warn!("Failed to create stream, {}", e);
-                ReplicationError::Internal
-            });
-        let _ = tx.send(result);
+        let client = self.client.clone();
+        tokio_uring::spawn(async move {
+            let result = client
+                .create_stream(metadata)
+                .await
+                .map(|metadata| CreateStreamResponse {
+                    // TODO: unify stream_id type
+                    stream_id: metadata.stream_id.unwrap(),
+                })
+                .map_err(|e| {
+                    warn!("Failed to create stream, {}", e);
+                    ReplicationError::Internal
+                });
+            let _ = tx.send(result);
+        });
     }
 
-    async fn open(
+    fn open(
         &mut self,
         request: OpenStreamRequest,
         tx: oneshot::Sender<Result<OpenStreamResponse, ReplicationError>>,
@@ -164,7 +175,7 @@ impl StreamManager {
         });
     }
 
-    async fn close(
+    fn close(
         &mut self,
         request: CloseStreamRequest,
         tx: oneshot::Sender<Result<(), ReplicationError>>,
@@ -178,6 +189,39 @@ impl StreamManager {
             tokio_uring::spawn(async move {
                 stream.close().await;
                 let _ = tx.send(Ok(()));
+            });
+        } else {
+            let _ = tx.send(Err(ReplicationError::StreamNotExist));
+        }
+    }
+
+    fn start_offset(&mut self, stream_id: u64, tx: oneshot::Sender<Result<u64, ReplicationError>>) {
+        let result = if let Some(stream) = self.streams.borrow().get(&stream_id) {
+            Ok(stream.start_offset())
+        } else {
+            Err(ReplicationError::StreamNotExist)
+        };
+        let _ = tx.send(result);
+    }
+
+    fn next_offset(&mut self, stream_id: u64, tx: oneshot::Sender<Result<u64, ReplicationError>>) {
+        let result = if let Some(stream) = self.streams.borrow().get(&stream_id) {
+            Ok(stream.next_offset())
+        } else {
+            Err(ReplicationError::StreamNotExist)
+        };
+        let _ = tx.send(result);
+    }
+
+    fn trim(&mut self, request: TrimRequest, tx: oneshot::Sender<Result<(), ReplicationError>>) {
+        let stream = if let Some(stream) = self.streams.borrow_mut().remove(&request.stream_id) {
+            Some(stream.clone())
+        } else {
+            None
+        };
+        if let Some(stream) = stream {
+            tokio_uring::spawn(async move {
+                let _ = tx.send(stream.trim(request.new_start_offset).await);
             });
         } else {
             let _ = tx.send(Err(ReplicationError::StreamNotExist));

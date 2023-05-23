@@ -129,6 +129,19 @@ impl ReplicationStream {
         }
     }
 
+    pub fn start_offset(&self) -> u64 {
+        self.ranges
+            .borrow()
+            .first_key_value()
+            .map(|(k, _)| *k)
+            .unwrap_or(0)
+    }
+
+    /// next record offset to be appended.
+    pub fn next_offset(&self) -> u64 {
+        *self.next_offset.borrow()
+    }
+
     pub(crate) async fn append(
         &self,
         payload: Bytes,
@@ -349,6 +362,11 @@ impl ReplicationStream {
                 }
             }
         }
+    }
+
+    pub async fn trim(&self, new_start_offset: u64) -> Result<(), ReplicationError> {
+        // TODO
+        Ok(())
     }
 }
 
