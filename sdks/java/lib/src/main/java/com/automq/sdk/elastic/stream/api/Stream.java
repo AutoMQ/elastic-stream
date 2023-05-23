@@ -1,6 +1,4 @@
-package sdk.elastic.stream.api;
-
-import sdk.elastic.stream.api.ElasticStreamClientException.FetchOutOfBoundExceptionElastic;
+package com.automq.sdk.elastic.stream.api;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -41,7 +39,7 @@ public interface Stream {
      * @param endOffset exclusive end offset, if the endOffset in middle of a recordBatch, the recordBatch will be returned.
      * @param maxBytesHint max fetch data size hint, the real return data size may be larger than maxBytesHint.
      * @return - complete success with {@link FetchResult}, when fetch success.
-     * - complete exception with {@link FetchOutOfBoundExceptionElastic}, when startOffset is bigger than stream end offset.
+     * - complete exception with {@link ElasticStreamClientException.FetchOutOfBoundExceptionElastic}, when startOffset is bigger than stream end offset.
      */
     CompletableFuture<FetchResult> fetch(long startOffset, long endOffset, int maxBytesHint);
 
