@@ -10,7 +10,6 @@ import com.automq.elasticstream.client.flatc.records.RecordBatchMeta;
 import com.automq.elasticstream.client.flatc.records.RecordBatchMetaT;
 
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -31,7 +30,7 @@ public class FlatRecordBatchCodec {
      * @param recordBatch {@link RecordBatch}
      * @return storage format record bytes.
      */
-    public static byte[] encode(RecordBatch recordBatch) {
+    public static ByteBuffer encode(RecordBatch recordBatch) {
         int totalLength = 0;
 
         totalLength += 1; // magic
@@ -55,16 +54,14 @@ public class FlatRecordBatchCodec {
         totalLength += 4; // payload length
         totalLength += recordBatch.rawPayload().remaining(); // payload
 
-        byte[] storageFormatBytes = new byte[totalLength];
-        ByteBuf buf = Unpooled.wrappedBuffer(storageFormatBytes);
-        buf.clear();
-        buf.writeByte(MAGIC_V0); // magic
-        buf.writeInt(metaBuf.remaining()); // meta length
-        buf.writeBytes(metaBuf); // RecordBatchMeta
-        buf.writeInt(recordBatch.rawPayload().remaining()); // payload length
-        buf.writeBytes(recordBatch.rawPayload()); // payload
-
-        return storageFormatBytes;
+        ByteBuffer buf = ByteBuffer.allocateDirect(totalLength);
+        buf.put(MAGIC_V0); // magic
+        buf.putInt(metaBuf.remaining()); // meta length
+        buf.put(metaBuf); // RecordBatchMeta
+        buf.putInt(recordBatch.rawPayload().remaining()); // payload length
+        buf.put(recordBatch.rawPayload()); // payload
+        buf.flip();
+        return buf;
     }
 
 
@@ -74,7 +71,7 @@ public class FlatRecordBatchCodec {
      * @param storageFormatBytes storage format bytes.
      * @return RecordBatchWithContext list.
      */
-    public static List<RecordBatchWithContext> decode(byte[] storageFormatBytes) {
+    public static List<RecordBatchWithContext> decode(ByteBuffer storageFormatBytes) {
         ByteBuf buf = Unpooled.wrappedBuffer(storageFormatBytes);
         List<RecordBatchWithContext> recordBatchList = new LinkedList<>();
         while (buf.isReadable()) {
