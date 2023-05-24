@@ -107,9 +107,7 @@ async fn process_read_command(
     batch_max_bytes: i32,
     future: GlobalRef,
 ) {
-    let result = stream
-        .read(start_offset, end_offset as i32, batch_max_bytes)
-        .await;
+    let result = stream.read(start_offset, end_offset, batch_max_bytes).await;
     match result {
         Ok(result) => {
             let result: &[u8] = result.as_ref();
@@ -449,18 +447,18 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_read(
     mut env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
-    offset: jlong,
-    limit: jint,
-    max_bytes: jint,
+    start_offset: jlong,
+    end_offset: jlong,
+    batch_max_bytes: jint,
     future: JObject,
 ) {
     let stream = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
     let command = Command::Read {
         stream: stream,
-        start_offset: offset,
-        end_offset: limit as i64,
-        batch_max_bytes: max_bytes,
+        start_offset: start_offset,
+        end_offset: end_offset,
+        batch_max_bytes: batch_max_bytes,
         future: future,
     };
     let _ = TX.get().unwrap().send(command);

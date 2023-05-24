@@ -72,7 +72,7 @@ impl Stream {
     pub async fn read(
         &self,
         start_offset: i64,
-        end_offset: i32,
+        end_offset: i64,
         batch_max_bytes: i32,
     ) -> Result<Bytes, ClientError> {
         trace!(
