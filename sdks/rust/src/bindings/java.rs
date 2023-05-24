@@ -45,8 +45,63 @@ async fn process_command(cmd: Command<'_>) {
         } => {
             process_open_stream_command(front_end, stream_id, epoch, future).await;
         }
+        Command::MinOffset { stream, future } => {
+            process_min_offset_command(stream, future).await;
+        }
+        Command::MaxOffset { stream, future } => {
+            process_max_offset_command(stream, future).await;
+        }
     }
 }
+async fn process_min_offset_command(stream: &mut Stream, future: GlobalRef) {
+    let result = stream.min_offset().await;
+    match result {
+        Ok(offset) => {
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+
+                let long_class = env.find_class("java/lang/Long").unwrap();
+                let obj = env
+                    .new_object(long_class, "(J)V", &[jni::objects::JValueGen::Long(offset)])
+                    .unwrap();
+                unsafe { call_future_complete_method(env, future, obj) };
+            });
+        }
+        Err(err) => {
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                unsafe {
+                    call_future_complete_exceptionally_method(&mut env, future, err.to_string())
+                };
+            });
+        }
+    };
+}
+
+async fn process_max_offset_command(stream: &mut Stream, future: GlobalRef) {
+    let result = stream.max_offset().await;
+    match result {
+        Ok(offset) => {
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                let long_class = env.find_class("java/lang/Long").unwrap();
+                let obj = env
+                    .new_object(long_class, "(J)V", &[jni::objects::JValueGen::Long(offset)])
+                    .unwrap();
+                unsafe { call_future_complete_method(env, future, obj) };
+            });
+        }
+        Err(err) => {
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                unsafe {
+                    call_future_complete_exceptionally_method(&mut env, future, err.to_string())
+                };
+            });
+        }
+    };
+}
+
 fn process_get_frontend_command(
     access_point: String,
     tx: oneshot::Sender<Result<Frontend, ClientError>>,
@@ -263,28 +318,11 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_minOffset(
 ) {
     let stream = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
-    RUNTIME.get().unwrap().spawn(async move {
-        let result = stream.min_offset().await;
-        match result {
-            Ok(offset) => {
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-
-                    let long_class = env.find_class("java/lang/Long").unwrap();
-                    let obj = env
-                        .new_object(long_class, "(J)V", &[jni::objects::JValueGen::Long(offset)])
-                        .unwrap();
-                    call_future_complete_method(env, future, obj);
-                });
-            }
-            Err(err) => {
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    call_future_complete_exceptionally_method(&mut env, future, err.to_string());
-                });
-            }
-        };
-    });
+    let command = Command::MinOffset {
+        stream: stream,
+        future: future,
+    };
+    let _ = TX.get().unwrap().send(command);
 }
 
 #[no_mangle]
@@ -296,27 +334,11 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_maxOffset(
 ) {
     let stream = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
-    RUNTIME.get().unwrap().spawn(async move {
-        let result = stream.max_offset().await;
-        match result {
-            Ok(offset) => {
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    let long_class = env.find_class("java/lang/Long").unwrap();
-                    let obj = env
-                        .new_object(long_class, "(J)V", &[jni::objects::JValueGen::Long(offset)])
-                        .unwrap();
-                    call_future_complete_method(env, future, obj);
-                });
-            }
-            Err(err) => {
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    call_future_complete_exceptionally_method(&mut env, future, err.to_string());
-                });
-            }
-        };
-    });
+    let command = Command::MaxOffset {
+        stream: stream,
+        future: future,
+    };
+    let _ = TX.get().unwrap().send(command);
 }
 
 #[no_mangle]
