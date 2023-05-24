@@ -4,8 +4,8 @@ public class Frontend extends ElasticStreamObject {
     public Frontend(String access_point) {
         this.ptr = getFrontend(access_point);
     }
-    public CompletableFuture<Stream> create(int replica, int ack, long retention_millis) {
-        CompletableFuture<Stream> future = new CompletableFuture<>(); 
+    public CompletableFuture<Long> create(int replica, int ack, long retention_millis) {
+        CompletableFuture<Long> future = new CompletableFuture<>(); 
         create(this.ptr, replica, ack, retention_millis, future);
         return future;
     }
@@ -14,7 +14,7 @@ public class Frontend extends ElasticStreamObject {
         open(this.ptr, id, future);
         return future;
     }
-    private native void create(long ptr, int replica, int ack, long retention_millis, CompletableFuture<Stream> future);
+    private native void create(long ptr, int replica, int ack, long retention_millis, CompletableFuture<Long> future);
     private native void open(long ptr, long id, CompletableFuture<Stream> future);
     private native long getFrontend(String access_point);
     private native void freeFrontend(long ptr);
