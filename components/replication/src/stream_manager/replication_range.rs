@@ -1,5 +1,4 @@
 use std::{
-    borrow::BorrowMut,
     cell::RefCell,
     rc::{Rc, Weak},
 };
@@ -247,7 +246,8 @@ impl ReplicationRange {
                                 replica_count,
                                 ack_count,
                                 Some(end_offset),
-                            );
+                            )
+                            .await;
                         });
 
                         return Ok(end_offset);
@@ -320,7 +320,6 @@ impl ReplicationRange {
         for replica in replicas.iter() {
             let end_offsets = end_offsets.clone();
             let replica = replica.clone();
-            let end_offset = end_offset.clone();
             seal_tasks.push(tokio_uring::spawn(async move {
                 if let Ok(replica_end_offset) = replica.seal(end_offset).await {
                     (*end_offsets).borrow_mut().push(replica_end_offset);
@@ -344,7 +343,7 @@ impl ReplicationRange {
             .iter()
             .sorted()
             .nth((replica_count - ack_count) as usize)
-            .map(|offset| *offset)
+            .copied()
             .ok_or(ReplicationError::SealReplicaNotEnough);
         end_offset
     }

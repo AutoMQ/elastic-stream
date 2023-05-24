@@ -7,7 +7,7 @@ use super::replication_range::ReplicationRange;
 use crate::ReplicationError;
 use bytes::Bytes;
 use log::{info, warn};
-use model::fetch::{FetchRequestEntry, FetchResultEntry};
+use model::fetch::FetchRequestEntry;
 use model::DataNode;
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
@@ -141,27 +141,25 @@ impl Replicator {
                         },
                     )
                     .await;
-                return match result {
+                match result {
                     Ok(result) => {
                         let status = result.status;
                         if status.code != ErrorCode::OK {
                             warn!("Failed to fetch entries: status {:?}", status);
                             Err(ReplicationError::Internal)
                         } else {
-                            Ok(result.data.unwrap_or_else(Vec::new))
+                            Ok(result.data.unwrap_or_default())
                         }
                     }
-                    Err(_) => {
-                        return Err(ReplicationError::Internal);
-                    }
-                };
+                    Err(_) => Err(ReplicationError::Internal),
+                }
             } else {
                 warn!("Client was dropped, aborting replication");
-                return Err(ReplicationError::Internal);
+                Err(ReplicationError::Internal)
             }
         } else {
             warn!("ReplicationRange was dropped, aborting fetch");
-            return Err(ReplicationError::Internal);
+            Err(ReplicationError::Internal)
         }
     }
 

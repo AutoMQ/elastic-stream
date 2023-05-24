@@ -54,7 +54,7 @@ impl ReplicationStream {
             closed: Rc::new(RefCell::new(false)),
         });
 
-        *((*this).weak_self.borrow_mut()) = Rc::downgrade(&this);
+        *(this.weak_self.borrow_mut()) = Rc::downgrade(&this);
 
         let weak_this = this.weak_self.borrow().clone();
         let closed = this.closed.clone();
@@ -153,7 +153,7 @@ impl ReplicationStream {
 
         let (append_tx, append_rx) = oneshot::channel::<Result<(), ReplicationError>>();
         // trigger background append task to handle the append request.
-        if let Err(_) = self
+        if self
             .append_requests_tx
             .send(StreamAppendRequest::new(
                 base_offset,
@@ -162,6 +162,7 @@ impl ReplicationStream {
                 append_tx,
             ))
             .await
+            .is_err()
         {
             return Err(ReplicationError::AlreadyClosed);
         }
@@ -214,14 +215,14 @@ impl ReplicationStream {
         let mut records: Vec<Bytes> = Vec::new();
         let mut max_bytes_hint = batch_max_bytes;
         for range in fetch_ranges {
-            if max_bytes_hint <= 0 {
+            if max_bytes_hint == 0 {
                 break;
             }
             let mut range_records = range
                 .fetch(
                     max(start_offset, range.start_offset()),
                     min(end_offset, range.confirm_offset()),
-                    max_bytes_hint as u32,
+                    max_bytes_hint,
                 )
                 .await?;
             for bytes in range_records.iter() {
@@ -245,7 +246,7 @@ impl ReplicationStream {
                 self.client.clone(),
             );
             self.ranges.borrow_mut().insert(start_offset, range.clone());
-            *self.last_range.borrow_mut() = Some(range.clone());
+            *self.last_range.borrow_mut() = Some(range);
             Ok(())
         } else {
             Err(ReplicationError::Internal)
@@ -285,20 +286,20 @@ impl ReplicationStream {
                 }
                 _ = shutdown_signal_rx.recv() => {
                     for (_, append_request) in inflight.iter() {
-                        let _ = append_request.fail(ReplicationError::AlreadyClosed);
+                        append_request.fail(ReplicationError::AlreadyClosed);
                     }
                     break;
                 }
             }
             if *closed.borrow() {
                 for (_, append_request) in inflight.iter() {
-                    let _ = append_request.fail(ReplicationError::AlreadyClosed);
+                    append_request.fail(ReplicationError::AlreadyClosed);
                 }
                 break;
             }
 
             // 1. get writable range.
-            let last_range_ref = (*stream).last_range.borrow();
+            let last_range_ref = stream.last_range.borrow();
             let last_writable_range = match last_range_ref.as_ref() {
                 Some(last_range) => {
                     if !last_range.is_writable() {
@@ -307,9 +308,10 @@ impl ReplicationStream {
                             Ok(end_offset) => {
                                 // rewind back next append start offset and try append to new writable range in next round.
                                 next_append_start_offset = last_range.confirm_offset();
-                                if let Err(_) = stream
+                                if stream
                                     .new_range(last_range.metadata().index() + 1, end_offset)
                                     .await
+                                    .is_err()
                                 {
                                     // delay retry to avoid busy loop
                                     sleep(Duration::from_millis(1000)).await;
@@ -326,7 +328,7 @@ impl ReplicationStream {
                     last_range
                 }
                 None => {
-                    if let Err(_) = stream.new_range(0, 0).await {
+                    if stream.new_range(0, 0).await.is_err() {
                         // delay retry to avoid busy loop
                         sleep(Duration::from_millis(1000)).await;
                         stream.trigger_append_task();

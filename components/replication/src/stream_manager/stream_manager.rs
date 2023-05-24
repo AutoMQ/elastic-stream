@@ -40,36 +40,31 @@ impl StreamManager {
 
     pub(crate) fn spawn_loop(mut this: Self) {
         tokio_uring::spawn(async move {
-            loop {
-                match this.rx.recv().await {
-                    Some(request) => match request {
-                        Request::Append { request, tx } => {
-                            this.append(request, tx);
-                        }
-                        Request::Read { request, tx } => {
-                            this.fetch(request, tx);
-                        }
-                        Request::CreateStream { request, tx } => {
-                            this.create(request, tx);
-                        }
-                        Request::OpenStream { request, tx } => {
-                            this.open(request, tx);
-                        }
-                        Request::CloseStream { request, tx } => {
-                            this.close(request, tx);
-                        }
-                        Request::StartOffset { request, tx } => {
-                            this.start_offset(request, tx);
-                        }
-                        Request::NextOffset { request, tx } => {
-                            this.next_offset(request, tx);
-                        }
-                        Request::Trim { request, tx } => {
-                            this.trim(request, tx);
-                        }
-                    },
-                    None => {
-                        break;
+            while let Some(request) = this.rx.recv().await {
+                match request {
+                    Request::Append { request, tx } => {
+                        this.append(request, tx);
+                    }
+                    Request::Read { request, tx } => {
+                        this.fetch(request, tx);
+                    }
+                    Request::CreateStream { request, tx } => {
+                        this.create(request, tx);
+                    }
+                    Request::OpenStream { request, tx } => {
+                        this.open(request, tx);
+                    }
+                    Request::CloseStream { request, tx } => {
+                        this.close(request, tx);
+                    }
+                    Request::StartOffset { request, tx } => {
+                        this.start_offset(request, tx);
+                    }
+                    Request::NextOffset { request, tx } => {
+                        this.next_offset(request, tx);
+                    }
+                    Request::Trim { request, tx } => {
+                        this.trim(request, tx);
                     }
                 }
             }
@@ -81,13 +76,8 @@ impl StreamManager {
         request: AppendRequest,
         tx: oneshot::Sender<Result<AppendResponse, ReplicationError>>,
     ) {
-        let stream = if let Some(stream) = self.streams.borrow().get(&request.stream_id) {
-            Some(stream.clone())
-        } else {
-            None
-        };
+        let stream = self.streams.borrow().get(&request.stream_id).map(Rc::clone);
         if let Some(stream) = stream {
-            let stream = stream.clone();
             tokio_uring::spawn(async move {
                 let result = stream
                     .append(request.data, StreamAppendContext::new(request.count))
@@ -105,13 +95,8 @@ impl StreamManager {
         request: ReadRequest,
         tx: oneshot::Sender<Result<ReadResponse, ReplicationError>>,
     ) {
-        let stream = if let Some(stream) = self.streams.borrow().get(&request.stream_id) {
-            Some(stream.clone())
-        } else {
-            None
-        };
+        let stream = self.streams.borrow().get(&request.stream_id).map(Rc::clone);
         if let Some(stream) = stream {
-            let stream = stream.clone();
             tokio_uring::spawn(async move {
                 let result = stream
                     .fetch(
@@ -180,11 +165,11 @@ impl StreamManager {
         request: CloseStreamRequest,
         tx: oneshot::Sender<Result<(), ReplicationError>>,
     ) {
-        let stream = if let Some(stream) = self.streams.borrow_mut().remove(&request.stream_id) {
-            Some(stream.clone())
-        } else {
-            None
-        };
+        let stream = self
+            .streams
+            .borrow_mut()
+            .remove(&request.stream_id)
+            .map(|stream| Rc::clone(&stream));
         if let Some(stream) = stream {
             tokio_uring::spawn(async move {
                 stream.close().await;
@@ -214,11 +199,11 @@ impl StreamManager {
     }
 
     fn trim(&mut self, request: TrimRequest, tx: oneshot::Sender<Result<(), ReplicationError>>) {
-        let stream = if let Some(stream) = self.streams.borrow_mut().remove(&request.stream_id) {
-            Some(stream.clone())
-        } else {
-            None
-        };
+        let stream = self
+            .streams
+            .borrow_mut()
+            .remove(&request.stream_id)
+            .map(|stream| Rc::clone(&stream));
         if let Some(stream) = stream {
             tokio_uring::spawn(async move {
                 let _ = tx.send(stream.trim(request.new_start_offset).await);
