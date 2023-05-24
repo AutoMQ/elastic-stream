@@ -97,9 +97,14 @@ impl ReplicationStream {
                 );
             });
         // 2. seal the last range
-        if let Some(entry) = self.ranges.borrow_mut().last_entry() {
-            *(self.last_range.borrow_mut()) = Option::Some(entry.get().clone());
-            match entry.get().seal().await {
+        let last_range = self
+            .ranges
+            .borrow_mut()
+            .last_entry()
+            .map(|e| e.get().clone());
+        if let Some(last_range) = last_range {
+            *(self.last_range.borrow_mut()) = Option::Some(last_range.clone());
+            match last_range.seal().await {
                 Ok(confirm_offset) => {
                     // 3. set stream next offset to the exclusive end of the last range
                     *self.next_offset.borrow_mut() = confirm_offset;
@@ -121,7 +126,7 @@ impl ReplicationStream {
         *self.closed.borrow_mut() = true;
         let _ = self.shutdown_signal_tx.send(());
         // TODO: await append task to stop.
-        let last_range = self.last_range.borrow().as_ref().map(|r| r.clone());
+        let last_range = self.last_range.borrow().as_ref().cloned();
         if let Some(range) = last_range {
             let _ = range.seal().await;
         }
@@ -299,8 +304,8 @@ impl ReplicationStream {
             }
 
             // 1. get writable range.
-            let last_range_ref = stream.last_range.borrow();
-            let last_writable_range = match last_range_ref.as_ref() {
+            let last_range = stream.last_range.borrow().as_ref().cloned();
+            let last_writable_range = match last_range {
                 Some(last_range) => {
                     if !last_range.is_writable() {
                         // if last range is not writable, try to seal it and create a new range and retry append in next round.
@@ -364,7 +369,7 @@ impl ReplicationStream {
         }
     }
 
-    pub async fn trim(&self, new_start_offset: u64) -> Result<(), ReplicationError> {
+    pub async fn trim(&self, _new_start_offset: u64) -> Result<(), ReplicationError> {
         // TODO
         Ok(())
     }

@@ -19,7 +19,7 @@ use crate::{
 use super::replication_stream::StreamAppendContext;
 
 pub(crate) struct StreamManager {
-    config: Arc<Configuration>,
+    _config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Request>,
     client: Rc<Client>,
     streams: Rc<RefCell<HashMap<u64, Rc<ReplicationStream>>>>,
@@ -31,7 +31,7 @@ impl StreamManager {
         let client = Rc::new(Client::new(Arc::clone(&config), shutdown));
         let streams = Rc::new(RefCell::new(HashMap::new()));
         Self {
-            config,
+            _config: config,
             rx,
             client,
             streams,

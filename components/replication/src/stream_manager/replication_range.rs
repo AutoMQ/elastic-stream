@@ -219,12 +219,8 @@ impl ReplicationRange {
         if self.is_sealing() {
             // if range is sealing, wait for seal task to complete.
             match self.seal_task_tx.subscribe().recv().await {
-                Ok(result) => {
-                    return result;
-                }
-                Err(_) => {
-                    return Err(ReplicationError::Internal);
-                }
+                Ok(result) => result,
+                Err(_) => Err(ReplicationError::Internal),
             }
         } else {
             self.mark_sealing();
@@ -249,12 +245,11 @@ impl ReplicationRange {
                             )
                             .await;
                         });
-
-                        return Ok(end_offset);
+                        Ok(end_offset)
                     }
                     Err(_) => {
                         self.unmark_sealing();
-                        return Err(ReplicationError::Internal);
+                        Err(ReplicationError::Internal)
                     }
                 }
             } else {
@@ -276,17 +271,17 @@ impl ReplicationRange {
                                 self.mark_sealed();
                                 *self.confirm_offset.borrow_mut() = end_offset;
                                 let _ = self.seal_task_tx.send(Ok(end_offset));
-                                return Ok(end_offset);
+                                Ok(end_offset)
                             }
                             Err(_) => {
                                 self.unmark_sealing();
-                                return Err(ReplicationError::Internal);
+                                Err(ReplicationError::Internal)
                             }
                         }
                     }
                     Err(_) => {
                         self.unmark_sealing();
-                        return Err(ReplicationError::Internal);
+                        Err(ReplicationError::Internal)
                     }
                 }
             }
