@@ -229,13 +229,16 @@ async fn process_create_stream_command(
     };
     let result = front_end.create(options).await;
     match result {
-        Ok(stream) => {
-            let ptr = Box::into_raw(Box::new(stream)) as jlong;
+        Ok(stream_id) => {
             JENV.with(|cell| {
                 let mut env = unsafe { get_thread_local_jenv(cell) };
-                let stream_class = env.find_class("sdk/elastic/stream/jni/Stream").unwrap();
+                let long_class = env.find_class("java/lang/Long").unwrap();
                 let obj = env
-                    .new_object(stream_class, "(J)V", &[jni::objects::JValueGen::Long(ptr)])
+                    .new_object(
+                        long_class,
+                        "(J)V",
+                        &[jni::objects::JValueGen::Long(stream_id as i64)],
+                    )
                     .unwrap();
                 unsafe { call_future_complete_method(env, future, obj) };
             });

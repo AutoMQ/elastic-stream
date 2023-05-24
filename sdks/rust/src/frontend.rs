@@ -25,14 +25,15 @@ impl Frontend {
         })
     }
 
-    pub async fn create(&self, options: StreamOptions) -> Result<Stream, ClientError> {
+    pub async fn create(&self, options: StreamOptions) -> Result<u64, ClientError> {
         info!("Creating stream {options:#?}");
         let stream_id = self
             .stream_client
             .create_stream(options.replica, options.ack, options.retention)
             .await?;
         info!("Stream[id={stream_id}] created");
-        Ok(Stream::new(stream_id, self.stream_client.clone()))
+        Ok(stream_id)
+        // Ok(Stream::new(stream_id, self.stream_client.clone()))
     }
 
     pub async fn open(&self, stream_id: u64, epoch: u64) -> Result<Stream, ClientError> {
