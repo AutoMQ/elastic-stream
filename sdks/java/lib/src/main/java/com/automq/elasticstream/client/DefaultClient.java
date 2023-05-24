@@ -9,7 +9,7 @@ public class DefaultClient implements Client {
     private final StreamClient streamClient;
 
     public DefaultClient(String endpoint) {
-        this.kvClient = new PlacementManagerKVClient(endpoint);
+        this.kvClient = new DefaultKVClient(endpoint);
         this.streamClient = new DefaultStreamClient(endpoint);
     }
 

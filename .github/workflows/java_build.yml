@@ -31,7 +31,7 @@ jobs:
         run: |
           flatc --version
           flatc --java -o 'sdks/java/lib/src/main/java' --java-package-prefix 'com.automq.elasticstream.client.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
-          tree sdks/java/lib/src/main/java/com/automq/elasticstream/client/flatc
+          tree
       - name: Set up JDK ${{ matrix.jdk }}
         uses: actions/setup-java@v3
         with:

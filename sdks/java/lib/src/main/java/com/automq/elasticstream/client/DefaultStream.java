@@ -6,6 +6,7 @@ import com.automq.elasticstream.client.api.RecordBatch;
 import com.automq.elasticstream.client.api.RecordBatchWithContext;
 import com.automq.elasticstream.client.api.Stream;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -45,12 +46,14 @@ public class DefaultStream implements Stream {
     public CompletableFuture<AppendResult> append(RecordBatch recordBatch) {
         byte[] bytes = FlatRecordBatchCodec.encode(recordBatch);
         // TODO: don't need count
-        return jniStream.append(bytes, recordBatch.count()).thenApply(DefaultAppendResult::new);
+        return jniStream.append(ByteBuffer.wrap(bytes), recordBatch.count()).thenApply(DefaultAppendResult::new);
     }
 
     @Override
     public CompletableFuture<FetchResult> fetch(long startOffset, long endOffset, int maxBytesHint) {
-        return jniStream.read(startOffset, endOffset, maxBytesHint).thenApply(bytes -> {
+        return jniStream.read(startOffset, endOffset, maxBytesHint).thenApply(buffer -> {
+            byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);
             List<RecordBatchWithContext> records = FlatRecordBatchCodec.decode(bytes);
             return new DefaultFetchResult(records);
         });

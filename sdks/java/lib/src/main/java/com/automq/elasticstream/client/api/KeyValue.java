@@ -23,4 +23,19 @@ public class KeyValue {
     public ByteBuffer value() {
         return value;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) {
+            return true;
+        }
+        if (!(o instanceof KeyValue)) {
+            return false;
+        }
+        final KeyValue other = (KeyValue) o;
+        return new org.apache.commons.lang3.builder.EqualsBuilder()
+                .append(key, other.key)
+                .append(value.slice(), other.value.slice())
+                .isEquals();
+    }
 }

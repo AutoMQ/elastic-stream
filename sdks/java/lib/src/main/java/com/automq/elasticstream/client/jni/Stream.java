@@ -20,7 +20,7 @@ public class Stream extends ElasticStreamObject {
         append(this.ptr, data, count, future);
         return future;
     }
-    public CompletableFuture<ByteBuffer> read(long offset, int limit, int max_bytes) {
+    public CompletableFuture<ByteBuffer> read(long offset, long limit, int max_bytes) {
         CompletableFuture<ByteBuffer> future = new CompletableFuture<>();
         read(this.ptr, offset, limit, max_bytes, future);
         return future;
@@ -28,7 +28,7 @@ public class Stream extends ElasticStreamObject {
     private native void startOffset(long ptr, CompletableFuture<Long> future);
     private native void nextOffset(long ptr, CompletableFuture<Long> future);
     private native void append(long ptr, ByteBuffer data, int count, CompletableFuture<Long> future);
-    private native void read(long ptr, long offset, int limit, int max_bytes, CompletableFuture<ByteBuffer> future);
+    private native void read(long ptr, long offset, long limit, int max_bytes, CompletableFuture<ByteBuffer> future);
     private native long freeStream(long ptr);
     @Override
     public void close() {
