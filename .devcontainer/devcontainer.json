@@ -40,7 +40,11 @@
 			"extensions": [
 				"rust-lang.rust-analyzer",
 				"golang.go",
-				"vscjava.vscode-java-pack"
+				"vscjava.vscode-java-pack",
+				"vadimcn.vscode-lldb",
+				"streetsidesoftware.code-spell-checker",
+				"github.vscode-github-actions",
+				"bungcip.better-toml"
 			]
 		}
 	}
