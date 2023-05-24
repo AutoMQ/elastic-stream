@@ -1,22 +1,20 @@
 use jni::objects::{GlobalRef, JByteArray, JClass, JObject, JString, JValue, JValueGen};
 use jni::sys::{jint, jlong, JNINativeInterface_, JNI_VERSION_1_8};
 use jni::{JNIEnv, JavaVM};
+use log::{error, info};
 use std::cell::{OnceCell, RefCell};
 use std::ffi::c_void;
 use std::io::IoSlice;
 use std::slice::from_raw_parts;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::oneshot;
-
-use tokio::runtime::{Builder, Runtime};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::{ClientError, Frontend, Stream, StreamOptions};
 
 use super::cmd::Command;
 
-static mut RUNTIME: OnceCell<Runtime> = OnceCell::new();
-static mut TX: OnceCell<tokio::sync::mpsc::UnboundedSender<Command>> = OnceCell::new();
+static mut TX: OnceCell<mpsc::UnboundedSender<Command>> = OnceCell::new();
 
 thread_local! {
     static JAVA_VM: RefCell<Option<Arc<JavaVM>>> = RefCell::new(None);
@@ -182,7 +180,9 @@ fn process_get_frontend_command(
     tx: oneshot::Sender<Result<Frontend, ClientError>>,
 ) {
     let result = Frontend::new(&access_point);
-    tx.send(result);
+    if let Err(_e) = tx.send(result) {
+        error!("Failed to dispatch JNI command to tokio-uring runtime");
+    }
 }
 
 async fn process_open_stream_command(
@@ -259,7 +259,7 @@ async fn process_create_stream_command(
 #[no_mangle]
 pub unsafe extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
     let java_vm = Arc::new(vm);
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = mpsc::unbounded_channel();
     TX.set(tx).expect("Failed to set command channel sender");
     let _ = std::thread::Builder::new()
         .name("Runtime".to_string())
@@ -278,6 +278,7 @@ pub unsafe extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
                             tokio_uring::spawn(async move { process_command(cmd).await });
                         }
                         None => {
+                            info!("JNI command channel is dropped");
                             break;
                         }
                     }
@@ -292,9 +293,7 @@ pub unsafe extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
 /// This function could be only called by java vm when unload this lib.
 #[no_mangle]
 pub unsafe extern "system" fn JNI_OnUnload(_: JavaVM, _: *mut c_void) {
-    if let Some(runtime) = RUNTIME.take() {
-        runtime.shutdown_background();
-    }
+    TX.take();
 }
 
 // Frontend
@@ -353,7 +352,13 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_create(
         retention: Duration::from_millis(retention_millis as u64),
         future,
     };
-    let _ = TX.get().unwrap().send(command);
+    if let Some(tx) = TX.get() {
+        if let Err(_e) = tx.send(command) {
+            error!("Failed to dispatch create stream command to tokio-uring runtime");
+        }
+    } else {
+        info!("JNI command channel was dropped. Ignore a create stream request");
+    }
 }
 #[no_mangle]
 pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_open(
@@ -372,7 +377,13 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_open(
         epoch: 0,
         future: future,
     };
-    let _ = TX.get().unwrap().send(command);
+    if let Some(tx) = TX.get() {
+        if let Err(_e) = tx.send(command) {
+            error!("Failed to dispatch open stream command to tokio-uring runtime");
+        }
+    } else {
+        info!("JNI command channel was dropped. Ignore an open stream request");
+    }
 }
 
 // Stream
@@ -400,7 +411,13 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_minOffset(
         stream: stream,
         future: future,
     };
-    let _ = TX.get().unwrap().send(command);
+    if let Some(tx) = TX.get() {
+        if let Err(_e) = tx.send(command) {
+            error!("Failed to dispatch query min offset command to tokio-uring runtime");
+        }
+    } else {
+        info!("JNI command channel was dropped. Ignore a query min offset request");
+    }
 }
 
 #[no_mangle]
@@ -416,7 +433,13 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_maxOffset(
         stream: stream,
         future: future,
     };
-    let _ = TX.get().unwrap().send(command);
+    if let Some(tx) = TX.get() {
+        if let Err(_e) = tx.send(command) {
+            error!("Failed to dispatch query max offset command to tokio-uring runtime");
+        }
+    } else {
+        info!("JNI command channel was dropped. Ignore a query max offset request");
+    }
 }
 
 #[no_mangle]
@@ -424,7 +447,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_append(
     mut env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
-    mut data: JByteArray,
+    data: JByteArray,
     count: jint,
     future: JObject,
 ) {
@@ -442,12 +465,18 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_append(
         count: count as u32,
         future: future,
     };
-    let _ = TX.get().unwrap().send(command);
+    if let Some(tx) = TX.get() {
+        if let Err(_e) = tx.send(command) {
+            error!("Failed to dispatch append command to tokio-uring runtime");
+        }
+    } else {
+        info!("JNI command channel was dropped. Ignore an append request");
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_read(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
     start_offset: jlong,
@@ -464,7 +493,13 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_read(
         batch_max_bytes: batch_max_bytes,
         future: future,
     };
-    let _ = TX.get().unwrap().send(command);
+    if let Some(tx) = TX.get() {
+        if let Err(_e) = tx.send(command) {
+            error!("Failed to dispatch read-stream command to tokio-uring runtime");
+        }
+    } else {
+        info!("JNI command channel was dropped. Ignore a read request");
+    }
 }
 
 unsafe fn call_future_complete_method(mut env: JNIEnv, future: GlobalRef, obj: JObject) {
