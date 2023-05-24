@@ -7,10 +7,11 @@ use std::io::IoSlice;
 use std::slice::from_raw_parts;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::oneshot;
 
 use tokio::runtime::{Builder, Runtime};
 
-use crate::{frontend, Frontend, Stream, StreamOptions};
+use crate::{frontend, ClientError, Frontend, Stream, StreamOptions};
 
 use super::cmd::Command;
 
@@ -22,26 +23,42 @@ thread_local! {
     static JENV: RefCell<Option<*mut jni::sys::JNIEnv>> = RefCell::new(None);
 }
 
-async fn process_command(cmd: Command, frontend: Frontend) {
+async fn process_command(cmd: Command<'_>) {
     match cmd {
         Command::CreateStream {
+            front_end,
             replica,
             ack_count,
             retention,
             future,
         } => {
-            process_create_stream_command(replica, ack_count, retention, future, &frontend).await;
+            process_create_stream_command(front_end, replica, ack_count, retention, future).await;
+        }
+        Command::GetFrontend { access_point, tx } => {
+            process_get_frontend_command(access_point, tx);
         }
     }
 }
+fn process_get_frontend_command(
+    access_point: String,
+    tx: oneshot::Sender<Result<Frontend, ClientError>>,
+) {
+    let result = Frontend::new(&access_point);
+    tx.send(result);
+}
 
 async fn process_create_stream_command(
+    front_end: &mut Frontend,
     replica: u8,
     ack_count: u8,
     retention: Duration,
     future: GlobalRef,
-    end: &Frontend,
 ) {
+    let options = StreamOptions {
+        replica: replica,
+        ack: ack_count,
+        retention: retention,
+    };
     let result = front_end.create(options).await;
     match result {
         Ok(stream) => {
@@ -65,22 +82,17 @@ async fn process_create_stream_command(
         }
     };
 }
-
 /// # Safety
 ///
 /// This function could be only called by java vm when onload this lib.
 #[no_mangle]
 pub unsafe extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
-    // TODO: make this configurable in the future
-    let thread_count = num_cpus::get();
     let java_vm = Arc::new(vm);
-
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     TX.set(tx).expect("Failed to set command channel sender");
-    std::thread::Builder::new()
+    let _ = std::thread::Builder::new()
         .name("Runtime".to_string())
-        .spawn(async move {
-            // Bind Thread to JVM
+        .spawn(move || {
             JENV.with(|cell| {
                 let env = java_vm.attach_current_thread_as_daemon().unwrap();
                 *cell.borrow_mut() = Some(env.get_raw());
@@ -89,48 +101,18 @@ pub unsafe extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
                 *cell.borrow_mut() = Some(java_vm.clone());
             });
             tokio_uring::start(async move {
-                let frontend = Frontend::new(access_point).unwrap();
                 loop {
-                    match rx.recv() {
-                        Ok(cmd) => {
-                            let client = frontend.clone();
-                            tokio_uring::spawn(async move {
-                                process_command(cmd, client).await;
-                            })
+                    match rx.recv().await {
+                        Some(cmd) => {
+                            tokio_uring::spawn(async move { process_command(cmd).await });
                         }
                         None => {
                             break;
                         }
                     }
                 }
-            })
+            });
         });
-
-    let runtime = Builder::new_multi_thread()
-        .worker_threads(thread_count)
-        .on_thread_start(move || {
-            JENV.with(|cell| {
-                let env = java_vm.attach_current_thread_as_daemon().unwrap();
-                *cell.borrow_mut() = Some(env.get_raw());
-            });
-            JAVA_VM.with(|cell| {
-                *cell.borrow_mut() = Some(java_vm.clone());
-            });
-        })
-        .on_thread_stop(move || {
-            JENV.with(|cell| {
-                *cell.borrow_mut() = None;
-            });
-            JAVA_VM.with(|cell| unsafe {
-                if let Some(vm) = cell.borrow_mut().take() {
-                    vm.detach_current_thread();
-                }
-            });
-        })
-        .enable_time()
-        .build()
-        .unwrap();
-    RUNTIME.set(runtime).unwrap();
     JNI_VERSION_1_8
 }
 
@@ -152,8 +134,14 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_getFrontend(
     _class: JClass,
     access_point: JString,
 ) -> jlong {
+    let (tx, rx) = oneshot::channel();
     let access_point: String = env.get_string(&access_point).unwrap().into();
-    let result = Frontend::new(&access_point);
+    let command = Command::GetFrontend {
+        access_point: access_point,
+        tx: tx,
+    };
+    TX.get().unwrap().send(command);
+    let result = rx.blocking_recv().unwrap();
     match result {
         Ok(frontend) => Box::into_raw(Box::new(frontend)) as jlong,
         Err(err) => {
@@ -185,45 +173,16 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_create(
     retention_millis: jlong,
     future: JObject,
 ) {
+    let front_end = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
     let command = Command::CreateStream {
+        front_end: front_end,
         replica: replica as u8,
         ack_count: ack as u8,
         retention: Duration::from_millis(retention_millis as u64),
         future,
     };
-
-    let tx = TX.get().unwrap();
-    tx.send(command);
-
-    let front_end = &mut *ptr;
-    let options = StreamOptions {
-        replica: replica.try_into().unwrap(),
-        ack: ack.try_into().unwrap(),
-        retention: Duration::from_millis(retention_millis.try_into().unwrap()),
-    };
-    RUNTIME.get().unwrap().spawn(async move {
-        let result = front_end.create(options).await;
-        match result {
-            Ok(stream) => {
-                let ptr = Box::into_raw(Box::new(stream)) as jlong;
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    let stream_class = env.find_class("sdk/elastic/stream/jni/Stream").unwrap();
-                    let obj = env
-                        .new_object(stream_class, "(J)V", &[jni::objects::JValueGen::Long(ptr)])
-                        .unwrap();
-                    call_future_complete_method(env, future, obj);
-                });
-            }
-            Err(err) => {
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    call_future_complete_exceptionally_method(&mut env, future, err.to_string());
-                });
-            }
-        };
-    });
+    let _ = TX.get().unwrap().send(command);
 }
 #[no_mangle]
 pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_open(
