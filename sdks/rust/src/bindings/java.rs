@@ -302,7 +302,7 @@ pub unsafe extern "system" fn JNI_OnUnload(_: JavaVM, _: *mut c_void) {
 // Frontend
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_getFrontend(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_getFrontend(
     mut env: JNIEnv,
     _class: JClass,
     access_point: JString,
@@ -327,7 +327,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_getFrontend(
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_freeFrontend(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_freeFrontend(
     mut _env: JNIEnv,
     _class: JClass,
     ptr: *mut Frontend,
@@ -337,7 +337,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_freeFrontend(
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_create(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_create(
     env: JNIEnv,
     _class: JClass,
     ptr: *mut Frontend,
@@ -364,7 +364,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_create(
     }
 }
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_open(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_open(
     env: JNIEnv,
     _class: JClass,
     ptr: *mut Frontend,
@@ -393,7 +393,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_open(
 // Stream
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_freeStream(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_freeStream(
     env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
@@ -403,7 +403,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_freeStream(
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_minOffset(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_minOffset(
     mut env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
@@ -425,7 +425,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_minOffset(
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_maxOffset(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_maxOffset(
     mut env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
@@ -447,7 +447,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_maxOffset(
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_append(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_append(
     mut env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
@@ -477,7 +477,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_append(
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_read(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_read(
     env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
