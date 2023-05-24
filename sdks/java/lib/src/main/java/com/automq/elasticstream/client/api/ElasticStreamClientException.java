@@ -1,4 +1,4 @@
-package com.automq.sdk.elastic.stream.api;
+package com.automq.elasticstream.client.api;
 
 /**
  * All stream client exceptions will list extends ElasticStreamClientException and list here.

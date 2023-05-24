@@ -1,4 +1,4 @@
-package sdk.elastic.stream.jni;
+package com.automq.elasticstream.client.jni;
 import java.util.concurrent.CompletableFuture;
 public class Stream extends ElasticStreamObject {
     public Stream(long ptr) {

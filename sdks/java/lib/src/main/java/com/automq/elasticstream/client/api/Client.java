@@ -1,4 +1,4 @@
-package com.automq.sdk.elastic.stream.api;
+package com.automq.elasticstream.client.api;
 
 /**
  * Elastic Stream client.

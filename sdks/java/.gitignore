@@ -42,4 +42,4 @@ build/
 .vscode/
 
 logs/
-flatc/src/main/java/
+lib/src/main/java/com/automq/elasticstream/client/flatc/

@@ -1,4 +1,4 @@
-package com.automq.sdk.elastic.stream.api;
+package com.automq.elasticstream.client.api;
 
 public interface RecordBatchWithContext extends RecordBatch {
 

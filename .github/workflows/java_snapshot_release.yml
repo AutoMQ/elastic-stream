@@ -25,7 +25,7 @@ jobs:
       - name: Generate flatbuffers java classes
         run: |
           flatc --version
-          flatc --java -o 'sdks/java/flatc/src/main/java' --java-package-prefix 'com.automq.sdk.elastic.stream.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
+          flatc --java -o 'sdks/java/lib/src/main/java' --java-package-prefix 'com.automq.elasticstream.client.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:

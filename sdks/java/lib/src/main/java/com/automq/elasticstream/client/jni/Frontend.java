@@ -1,4 +1,4 @@
-package sdk.elastic.stream.jni;
+package com.automq.elasticstream.client.jni;
 import java.util.concurrent.CompletableFuture;
 public class Frontend extends ElasticStreamObject {
     public Frontend(String access_point) {

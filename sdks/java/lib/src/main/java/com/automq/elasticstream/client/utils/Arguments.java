@@ -1,4 +1,4 @@
-package com.automq.sdk.elastic.stream.utils;
+package com.automq.elasticstream.client.utils;
 
 public class Arguments {
 

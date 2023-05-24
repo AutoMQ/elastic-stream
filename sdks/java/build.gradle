@@ -1,5 +1,5 @@
 allprojects {
-    group = 'com.automq.sdk.elastic.stream'
+    group = 'com.automq.elasticstream'
     version = '0.0.1-SNAPSHOT'
 
     repositories {

@@ -24,7 +24,6 @@ signing {
 }
 
 dependencies {
-    implementation project(":flatc")
     implementation libs.guava
     // Use flatbuffers to decode and encode sbp messages
     implementation libs.flatbuffers.java
@@ -103,7 +102,7 @@ sourceSets {
 publishing {
     publications {
         maven(MavenPublication) {
-            artifactId = 'client-java'
+            artifactId = 'client'
 
             from components.java
         }

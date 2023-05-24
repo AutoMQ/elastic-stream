@@ -31,7 +31,7 @@ fn main() {
         extra: &[
             "--gen-object-api",
             "--java-package-prefix",
-            "com.automq.sdk.elastic.stream.flatc",
+            "com.automq.elasticstream.client.flatc",
         ],
         ..Default::default()
     })
