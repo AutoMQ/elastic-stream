@@ -20,9 +20,9 @@ public class Stream extends ElasticStreamObject {
         append(this.ptr, data, future);
         return future;
     }
-    public CompletableFuture<ByteBuffer> read(long start_offset, long next_offset, int batch_max_bytes) {
+    public CompletableFuture<ByteBuffer> read(long offset, int limit, int max_bytes) {
         CompletableFuture<ByteBuffer> future = new CompletableFuture<>();
-        read(this.ptr, start_offset, next_offset, batch_max_bytes, future);
+        read(this.ptr, offset, limit, max_bytes, future);
         return future;
     }
     private native void startOffset(long ptr, CompletableFuture<Long> future);
