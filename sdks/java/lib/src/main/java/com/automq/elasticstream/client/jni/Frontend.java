@@ -9,13 +9,13 @@ public class Frontend extends ElasticStreamObject {
         create(this.ptr, replica, ack, retention_millis, future);
         return future;
     }
-    public CompletableFuture<Stream> open(long id) {
+    public CompletableFuture<Stream> open(long id, long epoch) {
         CompletableFuture<Stream> future = new CompletableFuture<>();
-        open(this.ptr, id, future);
+        open(this.ptr, id, epoch, future);
         return future;
     }
     private native void create(long ptr, int replica, int ack, long retention_millis, CompletableFuture<Long> future);
-    private native void open(long ptr, long id, CompletableFuture<Stream> future);
+    private native void open(long ptr, long id, long epoch, CompletableFuture<Stream> future);
     private native long getFrontend(String access_point);
     private native void freeFrontend(long ptr);
     @Override

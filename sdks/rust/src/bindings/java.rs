@@ -204,7 +204,9 @@ async fn process_open_stream_command(
             let ptr = Box::into_raw(Box::new(stream)) as jlong;
             JENV.with(|cell| {
                 let mut env = unsafe { get_thread_local_jenv(cell) };
-                let stream_class = env.find_class("sdk/elastic/stream/jni/Stream").unwrap();
+                let stream_class = env
+                    .find_class("com/automq/elasticstream/client/jni/Stream")
+                    .unwrap();
                 let obj = env
                     .new_object(stream_class, "(J)V", &[jni::objects::JValueGen::Long(ptr)])
                     .unwrap();
@@ -383,7 +385,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
     let command = Command::OpenStream {
         front_end,
         stream_id: id as u64,
-        epoch: 0,
+        epoch: epoch as u64,
         future: future,
     };
 
