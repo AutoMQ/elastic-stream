@@ -10,14 +10,62 @@ use std::time::Duration;
 
 use tokio::runtime::{Builder, Runtime};
 
-use crate::{Frontend, Stream, StreamOptions};
+use crate::{frontend, Frontend, Stream, StreamOptions};
+
+use super::cmd::Command;
 
 static mut RUNTIME: OnceCell<Runtime> = OnceCell::new();
+static mut TX: OnceCell<tokio::sync::mpsc::UnboundedSender<Command>> = OnceCell::new();
 
 thread_local! {
     static JAVA_VM: RefCell<Option<Arc<JavaVM>>> = RefCell::new(None);
     static JENV: RefCell<Option<*mut jni::sys::JNIEnv>> = RefCell::new(None);
 }
+
+async fn process_command(cmd: Command, frontend: Frontend) {
+    match cmd {
+        Command::CreateStream {
+            replica,
+            ack_count,
+            retention,
+            future,
+        } => {
+            process_create_stream_command(replica, ack_count, retention, future, &frontend).await;
+        }
+    }
+}
+
+async fn process_create_stream_command(
+    replica: u8,
+    ack_count: u8,
+    retention: Duration,
+    future: GlobalRef,
+    end: &Frontend,
+) {
+    let result = front_end.create(options).await;
+    match result {
+        Ok(stream) => {
+            let ptr = Box::into_raw(Box::new(stream)) as jlong;
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                let stream_class = env.find_class("sdk/elastic/stream/jni/Stream").unwrap();
+                let obj = env
+                    .new_object(stream_class, "(J)V", &[jni::objects::JValueGen::Long(ptr)])
+                    .unwrap();
+                unsafe { call_future_complete_method(env, future, obj) };
+            });
+        }
+        Err(err) => {
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                unsafe {
+                    call_future_complete_exceptionally_method(&mut env, future, err.to_string())
+                };
+            });
+        }
+    };
+}
+
 /// # Safety
 ///
 /// This function could be only called by java vm when onload this lib.
@@ -26,6 +74,38 @@ pub unsafe extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
     // TODO: make this configurable in the future
     let thread_count = num_cpus::get();
     let java_vm = Arc::new(vm);
+
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    TX.set(tx).expect("Failed to set command channel sender");
+    std::thread::Builder::new()
+        .name("Runtime".to_string())
+        .spawn(async move {
+            // Bind Thread to JVM
+            JENV.with(|cell| {
+                let env = java_vm.attach_current_thread_as_daemon().unwrap();
+                *cell.borrow_mut() = Some(env.get_raw());
+            });
+            JAVA_VM.with(|cell| {
+                *cell.borrow_mut() = Some(java_vm.clone());
+            });
+            tokio_uring::start(async move {
+                let frontend = Frontend::new(access_point).unwrap();
+                loop {
+                    match rx.recv() {
+                        Ok(cmd) => {
+                            let client = frontend.clone();
+                            tokio_uring::spawn(async move {
+                                process_command(cmd, client).await;
+                            })
+                        }
+                        None => {
+                            break;
+                        }
+                    }
+                }
+            })
+        });
+
     let runtime = Builder::new_multi_thread()
         .worker_threads(thread_count)
         .on_thread_start(move || {
@@ -105,13 +185,23 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_create(
     retention_millis: jlong,
     future: JObject,
 ) {
+    let future = env.new_global_ref(future).unwrap();
+    let command = Command::CreateStream {
+        replica: replica as u8,
+        ack_count: ack as u8,
+        retention: Duration::from_millis(retention_millis as u64),
+        future,
+    };
+
+    let tx = TX.get().unwrap();
+    tx.send(command);
+
     let front_end = &mut *ptr;
     let options = StreamOptions {
         replica: replica.try_into().unwrap(),
         ack: ack.try_into().unwrap(),
         retention: Duration::from_millis(retention_millis.try_into().unwrap()),
     };
-    let future = env.new_global_ref(future).unwrap();
     RUNTIME.get().unwrap().spawn(async move {
         let result = front_end.create(options).await;
         match result {

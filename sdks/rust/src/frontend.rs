@@ -6,6 +6,7 @@ use config::Configuration;
 use log::info;
 use replication::StreamClient;
 
+#[derive(Debug, Clone)]
 pub struct Frontend {
     config: Arc<Configuration>,
     stream_client: StreamClient,
