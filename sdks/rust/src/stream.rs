@@ -1,5 +1,6 @@
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use log::{error, info, trace};
+use protocol::flat_model::records::RecordBatchMeta;
 use replication::StreamClient;
 
 use crate::{AppendResult, ClientError};
@@ -34,16 +35,49 @@ impl Stream {
     ///
     /// # Arguments
     ///
-    /// `data` - Encoded representation of the `RecordBatch`.
-    pub async fn append(&self, data: Bytes) -> Result<AppendResult, ClientError> {
-        trace!("Appending {} bytes to stream-id={}", data.len(), self.id);
-        // TODO: parse `RecordBatchMetadata` and `Payload` from data
+    /// `buffer` - Encoded representation of the `RecordBatch`. It contains exactly one append entry.
+    pub async fn append(&self, mut buffer: Bytes) -> Result<AppendResult, ClientError> {
+        let magic_code = buffer.get_i8();
+        debug_assert_eq!(
+            magic_code,
+            model::record::flat_record::RecordMagic::Magic0 as i8
+        );
+
+        let metadata_length = buffer.get_i32() as usize;
+        let metadata = buffer.slice(..(metadata_length));
+        buffer.advance(metadata_length);
+
+        let record_batch = flatbuffers::root::<RecordBatchMeta>(&metadata[..]).map_err(|e| {
+            error!("Invalid record batch metadata: {e:#?}");
+            ClientError::Internal("".to_owned())
+        })?;
+
+        trace!("RecordBatch to append: {record_batch:#?}");
+
+        debug_assert_eq!(
+            self.id,
+            record_batch.stream_id() as u64,
+            "Stream ID should be identical"
+        );
+
+        let payload_length = buffer.get_i32() as usize;
+        let payload = buffer.slice(..payload_length);
+        buffer.advance(payload_length);
+        debug_assert_eq!(
+            true,
+            buffer.is_empty(),
+            "We are expecting exactly one append entry"
+        );
+
+        let count = record_batch.last_offset_delta() as u32;
+
+        // TODO: Pass `RecordBatchMeta` along with payload
         let request = replication::request::AppendRequest {
             stream_id: self.id,
-            data,
-            count: 0,
+            data: payload,
+            count,
         };
-        let count = 0;
+
         self.stream_client
             .append(request)
             .await
