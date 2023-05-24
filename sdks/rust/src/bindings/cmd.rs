@@ -31,4 +31,17 @@ pub enum Command<'a> {
         stream: &'a mut Stream,
         future: GlobalRef,
     },
+    Append {
+        stream: &'a mut Stream,
+        slice: &'a [u8],
+        count: u32,
+        future: GlobalRef,
+    },
+    Read {
+        stream: &'a mut Stream,
+        start_offset: i64,
+        end_offset: i64,
+        batch_max_bytes: i32,
+        future: GlobalRef,
+    },
 }

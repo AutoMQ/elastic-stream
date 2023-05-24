@@ -11,7 +11,7 @@ use tokio::sync::oneshot;
 
 use tokio::runtime::{Builder, Runtime};
 
-use crate::{frontend, ClientError, Frontend, Stream, StreamOptions};
+use crate::{ClientError, Frontend, Stream, StreamOptions};
 
 use super::cmd::Command;
 
@@ -51,8 +51,85 @@ async fn process_command(cmd: Command<'_>) {
         Command::MaxOffset { stream, future } => {
             process_max_offset_command(stream, future).await;
         }
+        Command::Append {
+            stream,
+            slice,
+            count,
+            future,
+        } => {
+            process_append_command(stream, slice, count, future).await;
+        }
+        Command::Read {
+            stream,
+            start_offset,
+            end_offset,
+            batch_max_bytes,
+            future,
+        } => {
+            process_read_command(stream, start_offset, end_offset, batch_max_bytes, future).await;
+        }
     }
 }
+async fn process_append_command(stream: &mut Stream, slice: &[u8], count: u32, future: GlobalRef) {
+    let result = stream
+        .append(IoSlice::new(slice), count.try_into().unwrap())
+        .await;
+    match result {
+        Ok(result) => {
+            let base_offset = result.base_offset;
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                let long_class = env.find_class("java/lang/Long").unwrap();
+                let obj = env
+                    .new_object(
+                        long_class,
+                        "(J)V",
+                        &[jni::objects::JValueGen::Long(base_offset)],
+                    )
+                    .unwrap();
+                unsafe { call_future_complete_method(env, future, obj) };
+            });
+        }
+        Err(err) => {
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                unsafe {
+                    call_future_complete_exceptionally_method(&mut env, future, err.to_string())
+                };
+            });
+        }
+    };
+}
+async fn process_read_command(
+    stream: &mut Stream,
+    start_offset: i64,
+    end_offset: i64,
+    batch_max_bytes: i32,
+    future: GlobalRef,
+) {
+    let result = stream
+        .read(start_offset, end_offset as i32, batch_max_bytes)
+        .await;
+    match result {
+        Ok(result) => {
+            let result: &[u8] = result.as_ref();
+            JENV.with(|cell| {
+                let env = unsafe { get_thread_local_jenv(cell) };
+                let output = env.byte_array_from_slice(&result).unwrap();
+                unsafe { call_future_complete_method(env, future, JObject::from(output)) };
+            });
+        }
+        Err(err) => {
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                unsafe {
+                    call_future_complete_exceptionally_method(&mut env, future, err.to_string())
+                };
+            });
+        }
+    };
+}
+
 async fn process_min_offset_command(stream: &mut Stream, future: GlobalRef) {
     let result = stream.min_offset().await;
     match result {
@@ -357,34 +434,14 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_append(
         .unwrap();
     let len = env.get_array_length(&data).unwrap();
     let slice = from_raw_parts(array.as_ptr() as *mut u8, len.try_into().unwrap());
-    RUNTIME.get().unwrap().spawn(async move {
-        let result = stream
-            .append(IoSlice::new(slice), count.try_into().unwrap())
-            .await;
-        match result {
-            Ok(result) => {
-                let base_offset = result.base_offset;
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    let long_class = env.find_class("java/lang/Long").unwrap();
-                    let obj = env
-                        .new_object(
-                            long_class,
-                            "(J)V",
-                            &[jni::objects::JValueGen::Long(base_offset)],
-                        )
-                        .unwrap();
-                    call_future_complete_method(env, future, obj);
-                });
-            }
-            Err(err) => {
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    call_future_complete_exceptionally_method(&mut env, future, err.to_string());
-                });
-            }
-        };
-    });
+
+    let command = Command::Append {
+        stream: stream,
+        slice: slice,
+        count: count as u32,
+        future: future,
+    };
+    let _ = TX.get().unwrap().send(command);
 }
 
 #[no_mangle]
@@ -399,25 +456,14 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Stream_read(
 ) {
     let stream = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
-    RUNTIME.get().unwrap().spawn(async move {
-        let result = stream.read(offset, limit, max_bytes).await;
-        match result {
-            Ok(result) => {
-                let result: &[u8] = result.as_ref();
-                JENV.with(|cell| {
-                    let env = get_thread_local_jenv(cell);
-                    let output = env.byte_array_from_slice(&result).unwrap();
-                    call_future_complete_method(env, future, JObject::from(output));
-                });
-            }
-            Err(err) => {
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    call_future_complete_exceptionally_method(&mut env, future, err.to_string());
-                });
-            }
-        };
-    });
+    let command = Command::Read {
+        stream: stream,
+        start_offset: offset,
+        end_offset: limit as i64,
+        batch_max_bytes: max_bytes,
+        future: future,
+    };
+    let _ = TX.get().unwrap().send(command);
 }
 
 unsafe fn call_future_complete_method(mut env: JNIEnv, future: GlobalRef, obj: JObject) {
