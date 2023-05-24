@@ -84,7 +84,7 @@ tasks.named('sourcesJar') {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
-// TODO: suppress javadoc warnings temporarily.
+// TODO: suppress javadoc warnings temporarily. In the future PR, ignore warnings for 'flatc' and enhance client javadoc.
 tasks.withType(Javadoc).configureEach {
     options.addStringOption('Xdoclint:none', '-quiet')
 }
