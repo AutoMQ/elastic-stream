@@ -1,11 +1,12 @@
+use bytes::Bytes;
 use jni::objects::{GlobalRef, JClass, JObject, JString, JValue, JValueGen};
 use jni::sys::{jint, jlong, JNINativeInterface_, JNI_VERSION_1_8};
 use jni::{JNIEnv, JavaVM};
 use log::{error, info};
+use std::alloc::Layout;
 use std::cell::{OnceCell, RefCell};
 use std::ffi::c_void;
-use std::io::IoSlice;
-use std::slice::from_raw_parts;
+use std::slice;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -51,11 +52,10 @@ async fn process_command(cmd: Command<'_>) {
         }
         Command::Append {
             stream,
-            slice,
-            count,
+            buf,
             future,
         } => {
-            process_append_command(stream, slice, count, future).await;
+            process_append_command(stream, buf, future).await;
         }
         Command::Read {
             stream,
@@ -68,10 +68,8 @@ async fn process_command(cmd: Command<'_>) {
         }
     }
 }
-async fn process_append_command(stream: &mut Stream, slice: &[u8], count: u32, future: GlobalRef) {
-    let result = stream
-        .append(IoSlice::new(slice), count.try_into().unwrap())
-        .await;
+async fn process_append_command(stream: &mut Stream, buf: Bytes, future: GlobalRef) {
+    let result = stream.append(buf).await;
     match result {
         Ok(result) => {
             let base_offset = result.base_offset;
@@ -107,14 +105,20 @@ async fn process_read_command(
 ) {
     let result = stream.read(start_offset, end_offset, batch_max_bytes).await;
     match result {
-        Ok(result) => {
-            let len = result.len();
-            let buf = result.as_ptr() as *mut u8;
-            // TODO: It should just forget the memory pointed by buf, not the all result
-            std::mem::forget(result);
+        Ok(buffers) => {
+            // Copy buffers to `DirectByteBuffer`
+            let total = buffers.iter().map(|buf| buf.len()).sum();
+            let layout = Layout::from_size_align(total, 1).expect("Bad alignment");
+            let ptr = unsafe { std::alloc::alloc(layout) };
+            let mut p = 0;
+            buffers.iter().for_each(|buf| {
+                unsafe { std::ptr::copy_nonoverlapping(buf.as_ptr(), ptr.add(p), buf.len()) };
+                p += buf.len();
+            });
+
             JENV.with(|cell| {
                 let mut env = unsafe { get_thread_local_jenv(cell) };
-                let obj = unsafe { env.new_direct_byte_buffer(buf, len).unwrap() };
+                let obj = unsafe { env.new_direct_byte_buffer(ptr, total).unwrap() };
                 unsafe { call_future_complete_method(env, future, JObject::from(obj)) };
             });
         }
@@ -355,6 +359,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
         retention: Duration::from_millis(retention_millis as u64),
         future,
     };
+
     if let Some(tx) = TX.get() {
         if let Err(_e) = tx.send(command) {
             error!("Failed to dispatch create stream command to tokio-uring runtime");
@@ -381,6 +386,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
         epoch: 0,
         future: future,
     };
+
     if let Some(tx) = TX.get() {
         if let Err(_e) = tx.send(command) {
             error!("Failed to dispatch open stream command to tokio-uring runtime");
@@ -415,6 +421,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_mi
         stream: stream,
         future: future,
     };
+
     if let Some(tx) = TX.get() {
         if let Err(_e) = tx.send(command) {
             error!("Failed to dispatch query min offset command to tokio-uring runtime");
@@ -437,6 +444,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ma
         stream: stream,
         future: future,
     };
+
     if let Some(tx) = TX.get() {
         if let Err(_e) = tx.send(command) {
             error!("Failed to dispatch query max offset command to tokio-uring runtime");
@@ -452,21 +460,23 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ap
     _class: JClass,
     ptr: *mut Stream,
     data: JObject,
-    count: jint,
     future: JObject,
 ) {
     let stream = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
+
     let buf = env.get_direct_buffer_address((&data).into()).unwrap();
     let len = env.get_direct_buffer_capacity((&data).into()).unwrap();
-    let slice = from_raw_parts(buf, len);
+
+    // Copy data from `DirectByteBuffer` to `Bytes`
+    let buf = Bytes::copy_from_slice(slice::from_raw_parts(buf, len));
 
     let command = Command::Append {
-        stream: stream,
-        slice: slice,
-        count: count as u32,
-        future: future,
+        stream,
+        buf,
+        future,
     };
+
     if let Some(tx) = TX.get() {
         if let Err(_e) = tx.send(command) {
             error!("Failed to dispatch append command to tokio-uring runtime");
@@ -495,6 +505,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_re
         batch_max_bytes: batch_max_bytes,
         future: future,
     };
+
     if let Some(tx) = TX.get() {
         if let Err(_e) = tx.send(command) {
             error!("Failed to dispatch read-stream command to tokio-uring runtime");

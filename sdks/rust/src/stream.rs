@@ -1,6 +1,4 @@
-use std::io::IoSlice;
-
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use log::{error, info, trace};
 use replication::StreamClient;
 
@@ -37,13 +35,15 @@ impl Stream {
     /// # Arguments
     ///
     /// `data` - Encoded representation of the `RecordBatch`.
-    pub async fn append(&self, data: IoSlice<'_>, count: u32) -> Result<AppendResult, ClientError> {
+    pub async fn append(&self, data: Bytes) -> Result<AppendResult, ClientError> {
         trace!("Appending {} bytes to stream-id={}", data.len(), self.id);
+        // TODO: parse `RecordBatchMetadata` and `Payload` from data
         let request = replication::request::AppendRequest {
             stream_id: self.id,
-            data: Bytes::copy_from_slice(&data),
-            count,
+            data,
+            count: 0,
         };
+        let count = 0;
         self.stream_client
             .append(request)
             .await
@@ -74,7 +74,7 @@ impl Stream {
         start_offset: i64,
         end_offset: i64,
         batch_max_bytes: i32,
-    ) -> Result<Bytes, ClientError> {
+    ) -> Result<Vec<Bytes>, ClientError> {
         trace!(
             "Reading records from stream[id={}], start-offset={}, end-offset={}",
             self.id,
@@ -90,20 +90,10 @@ impl Stream {
         self.stream_client
             .read(request)
             .await
-            .map(|response| {
-                let total = response.data.iter().map(|buf| buf.len()).sum();
+            .map(|mut response| {
+                let total: usize = response.data.iter().map(|buf| buf.len()).sum();
                 trace!("{total} bytes read from stream[id={}]", self.id);
-
-                // TODO: Avoid copy
-                if response.data.len() == 1 {
-                    response.data[0].clone()
-                } else {
-                    let mut buf = BytesMut::with_capacity(total);
-                    response.data.iter().for_each(|item| {
-                        buf.extend_from_slice(&item[..]);
-                    });
-                    buf.freeze()
-                }
+                std::mem::take(&mut response.data)
             })
             .map_err(Into::into)
     }

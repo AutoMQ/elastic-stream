@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bytes::Bytes;
 use jni::objects::GlobalRef;
 use tokio::sync::oneshot;
 
@@ -31,12 +32,13 @@ pub enum Command<'a> {
         stream: &'a mut Stream,
         future: GlobalRef,
     },
+
     Append {
         stream: &'a mut Stream,
-        slice: &'a [u8],
-        count: u32,
+        buf: Bytes,
         future: GlobalRef,
     },
+
     Read {
         stream: &'a mut Stream,
         start_offset: i64,
