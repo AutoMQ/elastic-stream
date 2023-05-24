@@ -1,12 +1,14 @@
 package com.automq.elasticstream.client.api;
 
+import com.automq.elasticstream.client.DefaultClientBuilder;
+
 /**
  * Elastic Stream client.
  */
 public interface Client {
 
     static ClientBuilder builder() {
-        throw new UnsupportedOperationException();
+       return new DefaultClientBuilder();
     }
 
     /**

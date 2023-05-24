@@ -14,4 +14,6 @@ public interface ClientBuilder {
 
     ClientBuilder clientAsyncSemaphoreValue(int semaphore);
 
+    Client build();
+
 }
