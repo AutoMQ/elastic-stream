@@ -7,6 +7,7 @@ use crate::ReplicationError;
 use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
+use log::debug;
 use model::range::RangeMetadata;
 use model::record::{flat_record::FlatRecordBatch, RecordBatch};
 use tokio::sync::broadcast;
@@ -218,14 +219,15 @@ impl ReplicationRange {
         }
         if self.is_sealing() {
             // if range is sealing, wait for seal task to complete.
-            match self.seal_task_tx.subscribe().recv().await {
-                Ok(result) => result,
-                Err(_) => Err(ReplicationError::Internal),
-            }
+            self.seal_task_tx
+                .subscribe()
+                .recv()
+                .await
+                .map_err(|_| ReplicationError::Internal)?
         } else {
             self.mark_sealing();
             if self.open_for_write {
-                // the range is open for write, it's ok to dirrectly use memory confirm offset as range end offset.
+                // the range is open for write, it's ok to directly use memory confirm offset as range end offset.
                 let end_offset = self.confirm_offset();
                 // 1. call placement manager to seal range
                 match self.placement_manager_seal(end_offset).await {
@@ -237,13 +239,17 @@ impl ReplicationRange {
                         let replica_count = self.metadata.replica_count();
                         let ack_count = self.metadata.ack_count();
                         tokio_uring::spawn(async move {
-                            let _ = Self::replicas_seal(
+                            if Self::replicas_seal(
                                 replicas,
                                 replica_count,
                                 ack_count,
                                 Some(end_offset),
                             )
-                            .await;
+                            .await
+                            .is_err()
+                            {
+                                debug!("Failed to seal data-node after sealing placement-manager");
+                            }
                         });
                         Ok(end_offset)
                     }
