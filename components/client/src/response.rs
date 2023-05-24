@@ -172,7 +172,7 @@ impl Response {
         }
     }
 
-    pub fn on_append(&mut self, frame: &Frame, ctx: &InvocationContext) {
+    pub fn on_append(&mut self, frame: &Frame, _ctx: &InvocationContext) {
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<AppendResponse>(buf) {
                 Ok(response) => {
@@ -201,7 +201,7 @@ impl Response {
         }
     }
 
-    pub fn on_fetch(&mut self, frame: &Frame, ctx: &InvocationContext) {
+    pub fn on_fetch(&mut self, frame: &Frame, _ctx: &InvocationContext) {
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<FetchResponse>(buf) {
                 Ok(response) => {
@@ -230,7 +230,7 @@ impl Response {
         }
     }
 
-    pub fn on_create_range(&mut self, frame: &Frame, ctx: &InvocationContext) {
+    pub fn on_create_range(&mut self, frame: &Frame, _ctx: &InvocationContext) {
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<CreateRangeResponse>(buf) {
                 Ok(response) => {

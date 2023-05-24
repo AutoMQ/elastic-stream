@@ -44,6 +44,10 @@ impl RecordBatch {
         self.metadata.last_offset_delta as usize
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn payload(&self) -> Bytes {
         self.payload.clone()
     }
@@ -114,7 +118,7 @@ impl RecordBatchBuilder {
         let payload = self.payload.ok_or(RecordError::RequiredFieldMissing)?;
 
         // Convert properties to flatbuffers table
-        let properties = self.properties.and_then(|map| {
+        let properties = self.properties.map(|map| {
             let mut vec = Vec::with_capacity(map.len());
             for (key, value) in map {
                 let mut kv = KeyValueT::default();
@@ -122,7 +126,7 @@ impl RecordBatchBuilder {
                 kv.value = value;
                 vec.push(kv);
             }
-            Some(vec)
+            vec
         });
 
         let mut metadata = RecordBatchMetaT::default();

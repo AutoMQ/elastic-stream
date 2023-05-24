@@ -21,6 +21,12 @@ impl HandleJoiner {
     }
 }
 
+impl Default for HandleJoiner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for HandleJoiner {
     fn drop(&mut self) {
         if let Ok(mut handles) = self.handles.lock() {

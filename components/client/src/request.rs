@@ -166,8 +166,8 @@ impl From<&Request> for Bytes {
                 request.timeout_ms = req.timeout.as_millis() as i32;
                 request.kind = *kind;
                 let mut range_t = RangeT::default();
-                range_t.stream_id = range.stream_id() as i64;
-                range_t.index = range.index() as i32;
+                range_t.stream_id = range.stream_id();
+                range_t.index = range.index();
                 range_t.epoch = range.epoch() as i64;
                 range_t.start = range.start() as i64;
                 range_t.end = match range.end() {
@@ -196,8 +196,8 @@ impl From<&Request> for Bytes {
                         .map(|entry| {
                             let mut entry_t = FetchEntryT::default();
                             let mut range_t = RangeT::default();
-                            range_t.stream_id = entry.stream_id as i64;
-                            range_t.index = entry.index as i32;
+                            range_t.stream_id = entry.stream_id;
+                            range_t.index = entry.index;
                             entry_t.range = Box::new(range_t);
                             entry_t.fetch_offset = entry.start_offset as i64;
                             entry_t.end_offset = entry.end_offset as i64;

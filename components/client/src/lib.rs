@@ -10,7 +10,6 @@
 #![feature(iterator_try_collect)]
 #![feature(hash_drain_filter)]
 #![feature(drain_filter)]
-#![feature(once_cell)]
 
 pub mod client;
 pub(crate) mod composite_session;

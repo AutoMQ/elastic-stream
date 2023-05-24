@@ -6,7 +6,7 @@ use std::time::{self, Duration, UNIX_EPOCH};
 use bytes::Bytes;
 use codec::frame::{Frame, OperationCode};
 use log::{debug, error, info, trace, warn};
-use model::{payload::Payload, stream::StreamMetadata};
+use model::payload::Payload;
 use protocol::rpc::header::{
     AppendResponseT, AppendResultEntryT, CreateRangeRequest, CreateRangeResponseT,
     CreateStreamRequest, CreateStreamResponseT, DescribePlacementManagerClusterRequest,

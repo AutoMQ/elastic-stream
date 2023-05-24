@@ -186,7 +186,7 @@ impl Default for Path {
             base: tmp_store_path
                 .as_path()
                 .to_str()
-                .unwrap_or_else(|| "/tmp/store")
+                .unwrap_or("/tmp/store")
                 .to_owned(),
             wal: "wal".to_owned(),
             metadata: "metadata".to_owned(),

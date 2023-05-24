@@ -103,6 +103,7 @@ impl Stream {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use std::error::Error;
 

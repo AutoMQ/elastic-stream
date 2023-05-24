@@ -641,8 +641,6 @@ mod tests {
         },
     };
 
-    use bytes::Buf;
-
     use crate::index::{record_handle::RecordHandle, MinOffset};
 
     struct SampleMinOffset {

@@ -387,7 +387,7 @@ pub mod thread {
                 .collect())
         }
 
-        pub fn full_thread_stat(pid: Pid, tid: Pid) -> ProcResult<Stat> {
+        pub fn full_thread_stat(_pid: Pid, tid: Pid) -> ProcResult<Stat> {
             procfs::process::Process::new(tid).unwrap().stat()
         }
     }

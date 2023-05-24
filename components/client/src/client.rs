@@ -226,7 +226,7 @@ impl Client {
         let future = session.append(buf);
         time::timeout(self.config.client_io_timeout(), future)
             .await
-            .map_err(|e| ClientError::RpcTimeout {
+            .map_err(|_e| ClientError::RpcTimeout {
                 timeout: self.config.client_io_timeout(),
             })?
     }
@@ -242,7 +242,7 @@ impl Client {
         let future = session.fetch(request);
         time::timeout(self.config.client_io_timeout(), future)
             .await
-            .map_err(|e| ClientError::RpcTimeout {
+            .map_err(|_e| ClientError::RpcTimeout {
                 timeout: self.config.client_io_timeout(),
             })?
     }

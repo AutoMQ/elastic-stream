@@ -2,6 +2,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) enum LbPolicy {
     PickFirst,
-    RoundRobin,
     LeaderOnly,
 }

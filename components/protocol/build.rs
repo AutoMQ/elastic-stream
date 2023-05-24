@@ -1,4 +1,3 @@
-use flatc_rust;
 use std::path::Path;
 
 fn main() {

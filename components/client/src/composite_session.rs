@@ -62,7 +62,7 @@ impl CompositeSession {
             .map_err(|_e| ClientError::BadAddress)?
         {
             let res = Self::connect(
-                socket_addr.clone(),
+                socket_addr,
                 config.client_connect_timeout(),
                 Arc::clone(&config),
                 Rc::clone(&sessions),
@@ -71,7 +71,7 @@ impl CompositeSession {
             .await;
             match res {
                 Ok(session) => {
-                    endpoints.borrow_mut().push(socket_addr.clone());
+                    endpoints.borrow_mut().push(socket_addr);
                     sessions.borrow_mut().insert(socket_addr, session);
                     info!("Connection to {} established", target.to_string());
                     break;
@@ -109,7 +109,7 @@ impl CompositeSession {
             <= now
     }
 
-    fn refresh_leadership(&self, nodes: &Vec<PlacementManagerNode>) {
+    fn refresh_leadership(&self, nodes: &[PlacementManagerNode]) {
         debug!("Refresh placement manager cluster leadership");
         // Sync leader/follower state
         for node in nodes.iter() {
@@ -144,9 +144,8 @@ impl CompositeSession {
         *self.refresh_cluster_instant.borrow_mut() = Instant::now();
 
         let mut addrs = nodes
-            .into_iter()
-            .map(|node| node.advertise_addr.to_socket_addrs().into_iter())
-            .flatten()
+            .iter()
+            .flat_map(|node| node.advertise_addr.to_socket_addrs().into_iter())
             .flatten()
             .filter(|socket_addr| socket_addr.is_ipv4())
             .dedup()
@@ -222,7 +221,6 @@ impl CompositeSession {
                 .iter()
                 .map(|(_, session)| session.clone())
                 .next(),
-            LbPolicy::RoundRobin => unimplemented!(),
         }
     }
 
@@ -248,15 +246,22 @@ impl CompositeSession {
 
         let mut receivers = vec![];
         {
-            let sessions = self.sessions.borrow();
+            let sessions = self
+                .sessions
+                .borrow()
+                .iter()
+                .map(|(_addr, session)| session.clone())
+                .collect::<Vec<_>>();
+
             let futures = sessions
                 .iter()
-                .map(|(_addr, session)| {
+                .map(|session| {
                     let (tx, rx) = oneshot::channel();
                     receivers.push(rx);
                     session.write(request.clone(), tx)
                 })
                 .collect::<Vec<_>>();
+
             let _res: Vec<Result<(), InvocationContext>> = futures::future::join_all(futures).await;
         }
 
@@ -417,7 +422,7 @@ impl CompositeSession {
         }
 
         if let Some(response::Headers::DescribeStream { stream }) = response.headers {
-            return Ok(stream);
+            Ok(stream)
         } else {
             unreachable!();
         }
@@ -463,7 +468,7 @@ impl CompositeSession {
                 return Err(ClientError::ServerInternal);
             }
             if let Some(response::Headers::CreateRange { range }) = response.headers {
-                return Ok(range);
+                Ok(range)
             } else {
                 unreachable!();
             }
@@ -553,18 +558,21 @@ impl CompositeSession {
         let mut request_sent = false;
         'outer: loop {
             for addr in &addrs {
-                if let Some(session) = self.sessions.borrow().get(addr).cloned() {
-                    if let Err(mut ctx) = session.write(request.clone(), tx).await {
-                        tx = ctx
-                            .response_observer()
-                            .expect("Response observer should NOT be consumed");
-                        error!("Failed to send request to {}", addr);
-                        continue;
-                    }
-                    trace!("Describe placement manager cluster via {}", addr);
-                    request_sent = true;
-                    break 'outer;
+                let session = match self.sessions.borrow().get(addr) {
+                    Some(session) => session.clone(),
+                    None => continue,
+                };
+
+                if let Err(mut ctx) = session.write(request.clone(), tx).await {
+                    tx = ctx
+                        .response_observer()
+                        .expect("Response observer should NOT be consumed");
+                    error!("Failed to send request to {}", addr);
+                    continue;
                 }
+                trace!("Describe placement manager cluster via {}", addr);
+                request_sent = true;
+                break 'outer;
             }
 
             if !request_sent {
@@ -605,15 +613,13 @@ impl CompositeSession {
                             response.status
                         );
                         Err(ClientError::ServerInternal)
+                    } else if let Some(response::Headers::DescribePlacementManager { nodes }) =
+                        response.headers
+                    {
+                        trace!("Received placement manager cluster {:?}", nodes);
+                        Ok(nodes)
                     } else {
-                        if let Some(response::Headers::DescribePlacementManager { nodes }) =
-                            response.headers
-                        {
-                            trace!("Received placement manager cluster {:?}", nodes);
-                            Ok(nodes)
-                        } else {
-                            Err(ClientError::ClientInternal)
-                        }
+                        Err(ClientError::ClientInternal)
                     }
                 }
                 Err(_e) => Err(ClientError::ClientInternal),
@@ -893,15 +899,22 @@ impl CompositeSession {
 
         let mut receivers = vec![];
         {
-            let sessions = self.sessions.borrow();
+            let sessions = self
+                .sessions
+                .borrow()
+                .iter()
+                .map(|(_socket, session)| session.clone())
+                .collect::<Vec<_>>();
+
             let futures = sessions
                 .iter()
-                .map(|(_addr, session)| {
+                .map(|session| {
                     let (tx, rx) = oneshot::channel();
                     receivers.push(rx);
                     session.write(request.clone(), tx)
                 })
                 .collect::<Vec<_>>();
+
             let _res: Vec<Result<(), InvocationContext>> = futures::future::join_all(futures).await;
         }
         let res: Vec<Result<response::Response, oneshot::error::RecvError>> =

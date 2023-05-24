@@ -79,7 +79,7 @@ impl FlatRecordBatch {
         if cursor.remaining() < metadata_len + 4 {
             return Err(DecodeError::DataLengthMismatch);
         }
-        cursor.advance(metadata_len as usize);
+        cursor.advance(metadata_len);
 
         // Read the payload length from the given buf
         let payload_len = cursor.get_i32() as usize;
@@ -139,7 +139,7 @@ impl FlatRecordBatch {
     }
 
     pub fn decode(self) -> Result<RecordBatch, DecodeError> {
-        let batch_meta = root_as_record_batch_meta(&self.metadata.as_ref())
+        let batch_meta = root_as_record_batch_meta(self.metadata.as_ref())
             .map_err(|_| DecodeError::InvalidDataFormat)?;
 
         let batch_meta_t = batch_meta.unpack();

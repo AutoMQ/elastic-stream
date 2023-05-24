@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use sysinfo::{DiskExt, System, SystemExt};
 
+#[derive(Debug)]
 pub struct DiskStatistics {
     sys: System,
     last_instant: Instant,
@@ -10,8 +11,9 @@ pub struct DiskStatistics {
     disk_in_rate: i64,
     disk_out_rate: i64,
 }
-impl DiskStatistics {
-    pub fn new() -> Self {
+
+impl Default for DiskStatistics {
+    fn default() -> Self {
         Self {
             sys: System::new(),
             last_instant: Instant::now(),
@@ -21,6 +23,13 @@ impl DiskStatistics {
             disk_out_rate: 0,
         }
     }
+}
+
+impl DiskStatistics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// The record() is responsible for capturing the current state of metrics,
     /// based on this data, it calculates the corresponding rates,
     /// which indicate the speed at which these metrics are changing over time.
@@ -70,14 +79,22 @@ impl DiskStatistics {
     }
 }
 
+#[derive(Debug)]
 pub struct MemoryStatistics {
     sys: System,
 }
 
-impl MemoryStatistics {
-    pub fn new() -> Self {
+impl Default for MemoryStatistics {
+    fn default() -> Self {
         Self { sys: System::new() }
     }
+}
+
+impl MemoryStatistics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn record(&mut self) {
         self.sys.refresh_memory();
     }
@@ -95,6 +112,8 @@ fn update_rate(old_metric: &mut i64, rate: &mut i64, cur_metric: i64, time_delta
         *rate = metric_delta / time_delta;
     }
 }
+
+#[cfg(test)]
 mod tests {
     use std::{
         fs::{self, File},
@@ -110,7 +129,7 @@ mod tests {
     fn write_one_gb() {
         let path = Path::new("/tmp/test_data");
         // create a new file for writing
-        let file = File::create(&path).unwrap();
+        let file = File::create(path).unwrap();
         let mut writer = BufWriter::new(file);
 
         // write 1GB of random data to the file

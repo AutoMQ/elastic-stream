@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use log::{error, info, trace, warn};
+use log::info;
 use model::range::RangeMetadata;
 use store::{ElasticStore, Store};
 

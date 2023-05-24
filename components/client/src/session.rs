@@ -226,7 +226,7 @@ impl Session {
                 frame.payload = Some(buf.clone());
             }
 
-            request::Headers::Fetch { entries } => {
+            request::Headers::Fetch { .. } => {
                 frame.operation_code = OperationCode::Fetch;
             }
 

@@ -21,7 +21,7 @@ impl<'a> Ping<'a> {
     pub(crate) async fn apply(
         &self,
         _store: Rc<ElasticStore>,
-        stream_manager: Rc<RefCell<StreamManager>>,
+        _stream_manager: Rc<RefCell<StreamManager>>,
         response: &mut Frame,
     ) {
         trace!("Ping[stream-id={}] received", self.request.stream_id);

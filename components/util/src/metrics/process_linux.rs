@@ -79,6 +79,12 @@ impl ProcessCollector {
     }
 }
 
+impl Default for ProcessCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Collector for ProcessCollector {
     fn desc(&self) -> Vec<&Desc> {
         self.descs.iter().collect()

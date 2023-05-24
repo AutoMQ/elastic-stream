@@ -9,7 +9,7 @@ pub struct Payload {}
 
 impl Payload {
     /// Decode max offset contained in the request payload.
-    pub fn max_offset(payload: &Bytes) -> u64 {
+    pub fn max_offset(_payload: &Bytes) -> u64 {
         unimplemented!()
     }
 
@@ -48,11 +48,12 @@ impl Payload {
             // Partial decode via Flatbuffers
             let metadata = flatbuffers::root::<RecordBatchMeta>(&remaining[..metadata_len])?;
 
-            let mut entry = AppendEntry::default();
-            entry.stream_id = metadata.stream_id() as u64;
-            entry.index = metadata.range_index() as u32;
-            entry.offset = metadata.base_offset() as u64;
-            entry.len = metadata.last_offset_delta() as u32;
+            let entry = AppendEntry {
+                stream_id: metadata.stream_id() as u64,
+                index: metadata.range_index() as u32,
+                offset: metadata.base_offset() as u64,
+                len: metadata.last_offset_delta() as u32,
+            };
             entries.push(entry);
 
             // Advance record batch metadata

@@ -5,6 +5,8 @@ use prometheus::{
     core::{Atomic, AtomicF64, AtomicU64},
     *,
 };
+
+#[derive(Debug)]
 pub struct DataNodeStatistics {
     last_instant: Instant,
     network_append_old: i16,
@@ -16,8 +18,9 @@ pub struct DataNodeStatistics {
     network_failed_append_rate: i16,
     network_failed_fetch_rate: i16,
 }
-impl DataNodeStatistics {
-    pub fn new() -> Self {
+
+impl Default for DataNodeStatistics {
+    fn default() -> Self {
         Self {
             last_instant: Instant::now(),
             network_append_old: 0,
@@ -30,6 +33,13 @@ impl DataNodeStatistics {
             network_failed_fetch_rate: 0,
         }
     }
+}
+
+impl DataNodeStatistics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// The record() is responsible for capturing the current state of metrics,
     /// based on this data, it calculates the corresponding rates.
     pub fn record(&mut self) {
@@ -168,12 +178,10 @@ lazy_static! {
     .unwrap();
 }
 
+#[cfg(test)]
 mod tests {
-    use log::{error, trace, warn};
-    use std::{
-        thread::sleep,
-        time::{Duration, Instant},
-    };
+    use log::trace;
+    use std::{thread::sleep, time::Duration};
 
     // use log::trace;
 

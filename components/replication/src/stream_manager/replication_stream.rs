@@ -1,7 +1,7 @@
 use crate::stream_manager::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
-use super::{replication_range::ReplicationRange, window::Window};
+use super::replication_range::ReplicationRange;
 use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
@@ -21,7 +21,6 @@ pub(crate) struct ReplicationStream {
     weak_self: RefCell<Weak<Self>>,
     id: i64,
     epoch: u64,
-    window: Option<Window>,
     ranges: RefCell<BTreeMap<u64, Rc<ReplicationRange>>>,
     client: Weak<Client>,
     next_offset: RefCell<u64>,
@@ -45,7 +44,6 @@ impl ReplicationStream {
             weak_self: RefCell::new(Weak::new()),
             id,
             epoch,
-            window: None,
             ranges: RefCell::new(BTreeMap::new()),
             client,
             next_offset: RefCell::new(0),

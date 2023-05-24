@@ -37,7 +37,7 @@ pub(crate) fn generate_flame_graph(
 
             let base_path = cwd.join(&config.server.profiling.report_path);
             if !base_path.exists() {
-                if let Err(e) = std::fs::create_dir_all(base_path.as_path()) {
+                if let Err(_e) = std::fs::create_dir_all(base_path.as_path()) {
                     error!(
                         "Failed to create directory[{:?}] to save flamegraph files",
                         base_path

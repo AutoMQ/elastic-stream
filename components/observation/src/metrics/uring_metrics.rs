@@ -11,13 +11,19 @@ pub struct UringStatistics {
     uring_task_rate: i16,
 }
 
-impl UringStatistics {
-    pub fn new() -> Self {
+impl Default for UringStatistics {
+    fn default() -> Self {
         Self {
             last_instant: Instant::now(),
             uring_task_old: 0,
             uring_task_rate: 0,
         }
+    }
+}
+
+impl UringStatistics {
+    pub fn new() -> Self {
+        Self::default()
     }
     /// The record() is responsible for capturing the current state of metrics,
     /// based on this data, it calculates the corresponding rates.
@@ -145,6 +151,7 @@ lazy_static! {
     ).unwrap();
 }
 
+#[cfg(test)]
 mod tests {
     use std::{thread::sleep, time::Duration};
 

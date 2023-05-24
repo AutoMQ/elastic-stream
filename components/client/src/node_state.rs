@@ -4,5 +4,4 @@ pub(crate) enum NodeState {
     Unknown,
     Leader,
     Follower,
-    Candidate,
 }
