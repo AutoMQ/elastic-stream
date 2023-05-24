@@ -25,7 +25,7 @@ public class DefaultStreamClient implements StreamClient {
 
     @Override
     public CompletableFuture<Stream> openStream(long streamId, OpenStreamOptions options) {
-        return frontend.open(streamId).thenApply(s -> new DefaultStream(streamId, s));
+        return frontend.open(streamId, 0).thenApply(s -> new DefaultStream(streamId, s));
     }
 
     public String toString() {
