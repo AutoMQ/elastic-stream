@@ -37,6 +37,14 @@ async fn process_command(cmd: Command<'_>) {
         Command::GetFrontend { access_point, tx } => {
             process_get_frontend_command(access_point, tx);
         }
+        Command::OpenStream {
+            front_end,
+            stream_id,
+            epoch,
+            future,
+        } => {
+            process_open_stream_command(front_end, stream_id, epoch, future).await;
+        }
     }
 }
 fn process_get_frontend_command(
@@ -45,6 +53,36 @@ fn process_get_frontend_command(
 ) {
     let result = Frontend::new(&access_point);
     tx.send(result);
+}
+
+async fn process_open_stream_command(
+    front_end: &mut Frontend,
+    stream_id: u64,
+    epoch: u64,
+    future: GlobalRef,
+) {
+    let result = front_end.open(stream_id, epoch).await;
+    match result {
+        Ok(stream) => {
+            let ptr = Box::into_raw(Box::new(stream)) as jlong;
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                let stream_class = env.find_class("sdk/elastic/stream/jni/Stream").unwrap();
+                let obj = env
+                    .new_object(stream_class, "(J)V", &[jni::objects::JValueGen::Long(ptr)])
+                    .unwrap();
+                unsafe { call_future_complete_method(env, future, obj) };
+            });
+        }
+        Err(err) => {
+            JENV.with(|cell| {
+                let mut env = unsafe { get_thread_local_jenv(cell) };
+                unsafe {
+                    call_future_complete_exceptionally_method(&mut env, future, err.to_string())
+                };
+            });
+        }
+    };
 }
 
 async fn process_create_stream_command(
@@ -140,7 +178,7 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_getFrontend(
         access_point: access_point,
         tx: tx,
     };
-    TX.get().unwrap().send(command);
+    let _ = TX.get().unwrap().send(command);
     let result = rx.blocking_recv().unwrap();
     match result {
         Ok(frontend) => Box::into_raw(Box::new(frontend)) as jlong,
@@ -194,29 +232,14 @@ pub unsafe extern "system" fn Java_sdk_elastic_stream_jni_Frontend_open(
 ) {
     let front_end = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
-    RUNTIME.get().unwrap().spawn(async move {
-        debug_assert!(id >= 0, "Stream ID should be non-negative");
-        let result = front_end.open(id as u64, 0).await;
-        match result {
-            Ok(stream) => {
-                let ptr = Box::into_raw(Box::new(stream)) as jlong;
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    let stream_class = env.find_class("sdk/elastic/stream/jni/Stream").unwrap();
-                    let obj = env
-                        .new_object(stream_class, "(J)V", &[jni::objects::JValueGen::Long(ptr)])
-                        .unwrap();
-                    call_future_complete_method(env, future, obj);
-                });
-            }
-            Err(err) => {
-                JENV.with(|cell| {
-                    let mut env = get_thread_local_jenv(cell);
-                    call_future_complete_exceptionally_method(&mut env, future, err.to_string());
-                });
-            }
-        };
-    });
+    debug_assert!(id >= 0, "Stream ID should be non-negative");
+    let command = Command::OpenStream {
+        front_end,
+        stream_id: id as u64,
+        epoch: 0,
+        future: future,
+    };
+    let _ = TX.get().unwrap().send(command);
 }
 
 // Stream

@@ -17,4 +17,10 @@ pub enum Command<'a> {
         retention: Duration,
         future: GlobalRef,
     },
+    OpenStream {
+        front_end: &'a mut Frontend,
+        stream_id: u64,
+        epoch: u64,
+        future: GlobalRef,
+    },
 }
