@@ -6,8 +6,6 @@ dependencies {
     implementation project(":lib")
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(8))
-    }
+compileJava {
+    options.release = 8
 }

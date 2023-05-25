@@ -10,9 +10,10 @@ plugins {
 java {
     withJavadocJar()
     withSourcesJar()
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(8))
-    }
+}
+
+compileJava {
+    options.release = 8
 }
 
 artifacts {
