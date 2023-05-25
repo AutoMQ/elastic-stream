@@ -27,6 +27,10 @@ jobs:
       - name: Install Deps
         run: |
           ./scripts/install_deps.sh
+      - name: Build Shared Library
+        run: cargo build -p frontend 
+      - name: Copy Shared Library
+        run: cp target/debug/libfrontend.so sdks/sdk-java/frontend/src/main/resources/META-INF/native/libfrontend.so
       - name: Generate flatbuffers java classes
         run: |
           flatc --version
