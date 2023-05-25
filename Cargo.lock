@@ -996,6 +996,7 @@ dependencies = [
  "client",
  "codec",
  "config",
+ "env_logger",
  "flatbuffers",
  "futures",
  "jni",

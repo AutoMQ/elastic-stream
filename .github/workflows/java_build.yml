@@ -30,17 +30,12 @@ jobs:
       - name: Generate flatbuffers java classes
         run: |
           flatc --version
-          flatc --java -o 'sdks/java/lib/src/main/java' --java-package-prefix 'com.automq.elasticstream.client.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
+          flatc --java -o 'sdks/sdk-java/frontend/src/main/generated' --java-package-prefix 'com.automq.elasticstream.client.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
           tree
       - name: Set up JDK ${{ matrix.jdk }}
         uses: actions/setup-java@v3
         with:
           java-version: ${{ matrix.jdk }}
           distribution: "zulu"
-          cache: "gradle"
-      - name: Build with Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          arguments: build -x signArchives
-          gradle-version: wrapper
-          build-root-directory: ./sdks/java
+      - name: Build with Maven
+        run: mvn package
