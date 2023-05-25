@@ -14,6 +14,16 @@
                 "-c", "${workspaceFolder}/etc/data-node.yaml",
                 "-l", "${workspaceFolder}/etc/data-node-log.yaml",
             ]
+        },
+        {
+            "type": "lldb",
+            "name": "Stream Test",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/target/debug/examples/main",
+            "env": {
+                "RUST_LOG": "trace"
+            },
         }
     ]
 }
