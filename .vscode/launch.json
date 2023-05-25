@@ -19,7 +19,7 @@
             "type": "lldb",
             "name": "Stream Test",
             "request": "launch",
-            "preLaunchTask": "build",
+            "preLaunchTask": "build-frontend",
             "program": "${workspaceFolder}/target/debug/examples/main",
             "env": {
                 "RUST_LOG": "trace"

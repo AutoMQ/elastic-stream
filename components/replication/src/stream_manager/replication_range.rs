@@ -7,7 +7,7 @@ use crate::ReplicationError;
 use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
-use log::debug;
+use log::{debug, error, info, warn};
 use model::range::RangeMetadata;
 use model::record::{flat_record::FlatRecordBatch, RecordBatch};
 use tokio::sync::broadcast;
@@ -21,6 +21,8 @@ const SEALED_FLAG: u32 = 1 << 2;
 
 #[derive(Debug)]
 pub(crate) struct ReplicationRange {
+    log_indent: String,
+
     metadata: RangeMetadata,
 
     stream: Weak<ReplicationStream>,
@@ -54,7 +56,9 @@ impl ReplicationRange {
 
         let (seal_task_tx, _) = broadcast::channel::<Result<u64, ReplicationError>>(1);
 
+        let log_indent = format!("Range[{}#{}]", metadata.stream_id(), metadata.index());
         let mut this = Rc::new(Self {
+            log_indent,
             metadata,
             open_for_write,
             stream,
@@ -70,7 +74,10 @@ impl ReplicationRange {
             replicators.push(Rc::new(Replicator::new(this.clone(), replica_node.clone())));
         }
         Rc::get_mut(&mut this).unwrap().replicators = Rc::new(replicators);
-
+        info!(
+            "Load range with metadata: {:?} open_for_write={open_for_write}",
+            this.metadata
+        );
         this
     }
 
@@ -83,10 +90,10 @@ impl ReplicationRange {
     ) -> Result<RangeMetadata, ReplicationError> {
         // 1. request placement manager to create range and get the range metadata.
         let mut metadata = RangeMetadata::new(stream_id, index, epoch, start_offset, None);
-        metadata = client
-            .create_range(metadata)
-            .await
-            .map_err(|_| ReplicationError::Internal)?;
+        metadata = client.create_range(metadata).await.map_err(|e| {
+            error!("Create range[{stream_id}#{index}] to pm failed, err: {e}");
+            ReplicationError::Internal
+        })?;
         // 2. request data node to create range replica.
         let mut create_replica_tasks = vec![];
         for node in metadata.replica().iter() {
@@ -97,7 +104,10 @@ impl ReplicationRange {
                 client
                     .create_range_replica(&address, metadata)
                     .await
-                    .map_err(|_| ReplicationError::Internal)
+                    .map_err(|e| {
+                        error!("Create range[{stream_id}#{index}] to data node[{address}] failed, err: {e}");
+                        ReplicationError::Internal
+                    })
             }));
         }
         for task in create_replica_tasks {
@@ -179,7 +189,8 @@ impl ReplicationRange {
                 Ok(payloads) => {
                     return Ok(payloads);
                 }
-                Err(_) => {
+                Err(e) => {
+                    warn!(target: &self.log_indent, "Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes} fail, err: {e}");
                     continue;
                 }
             }
@@ -203,7 +214,8 @@ impl ReplicationRange {
                     stream.try_ack();
                 }
             }
-            Err(_) => {
+            Err(err) => {
+                warn!(target: &self.log_indent, "Calculate confirm offset fail, current confirm_offset=[{}], err: {err}", self.confirm_offset());
                 self.mark_corrupted();
                 if let Some(stream) = self.stream.upgrade() {
                     stream.try_ack();
@@ -219,11 +231,10 @@ impl ReplicationRange {
         }
         if self.is_sealing() {
             // if range is sealing, wait for seal task to complete.
-            self.seal_task_tx
-                .subscribe()
-                .recv()
-                .await
-                .map_err(|_| ReplicationError::Internal)?
+            self.seal_task_tx.subscribe().recv().await.map_err(|_| {
+                error!(target: &self.log_indent, "Seal task channel closed");
+                ReplicationError::Internal
+            })?
         } else {
             self.mark_sealing();
             if self.open_for_write {
@@ -232,14 +243,17 @@ impl ReplicationRange {
                 // 1. call placement manager to seal range
                 match self.placement_manager_seal(end_offset).await {
                     Ok(_) => {
+                        info!(target: &self.log_indent, "The range is created by current stream, then directly seal with memory confirm_offset=[{}]", end_offset);
                         self.mark_sealed();
                         let _ = self.seal_task_tx.send(Ok(end_offset));
                         // 2. spawn task to async seal range replicas
                         let replicas = self.replicators.clone();
                         let replica_count = self.metadata.replica_count();
                         let ack_count = self.metadata.ack_count();
+                        let log_indent = self.log_indent.clone();
                         tokio_uring::spawn(async move {
                             if Self::replicas_seal(
+                                &log_indent,
                                 replicas,
                                 replica_count,
                                 ack_count,
@@ -253,7 +267,8 @@ impl ReplicationRange {
                         });
                         Ok(end_offset)
                     }
-                    Err(_) => {
+                    Err(e) => {
+                        error!(target: &self.log_indent, "Request pm seal fail, err: {e}");
                         self.erase_sealing();
                         Err(ReplicationError::Internal)
                     }
@@ -263,6 +278,7 @@ impl ReplicationRange {
                 let replicas = self.replicators.clone();
                 // 1. seal range replicas and calculate end offset.
                 match Self::replicas_seal(
+                    &self.log_indent,
                     replicas,
                     self.metadata.replica_count(),
                     self.metadata.ack_count(),
@@ -272,6 +288,7 @@ impl ReplicationRange {
                 {
                     Ok(end_offset) => {
                         // 2. call placement manager to seal range.
+                        info!(target: &self.log_indent, "The range is created by other stream, then seal replicas to calculate end_offset=[{}]", end_offset);
                         match self.placement_manager_seal(end_offset).await {
                             Ok(_) => {
                                 self.mark_sealed();
@@ -279,7 +296,8 @@ impl ReplicationRange {
                                 let _ = self.seal_task_tx.send(Ok(end_offset));
                                 Ok(end_offset)
                             }
-                            Err(_) => {
+                            Err(e) => {
+                                error!(target: &self.log_indent, "Request pm seal fail, err: {e}");
                                 self.erase_sealing();
                                 Err(ReplicationError::Internal)
                             }
@@ -311,6 +329,7 @@ impl ReplicationRange {
     }
 
     async fn replicas_seal(
+        log_indent: &String,
         replicas: Rc<Vec<Rc<Replicator>>>,
         replica_count: u32,
         ack_count: u32,
@@ -346,6 +365,7 @@ impl ReplicationRange {
             .nth((replica_count - ack_count) as usize)
             .copied()
             .ok_or(ReplicationError::SealReplicaNotEnough);
+        info!(target: log_indent, "Replicas seal with end_offsets={end_offsets:#?} and final end_offset={end_offset:#?}");
         end_offset
     }
 

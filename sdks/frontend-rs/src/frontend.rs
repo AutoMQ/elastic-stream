@@ -10,7 +10,7 @@ use replication::StreamClient;
 pub struct Frontend {
     #[allow(dead_code)]
     config: Arc<Configuration>,
-    
+
     stream_client: StreamClient,
 }
 

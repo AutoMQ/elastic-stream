@@ -16,10 +16,13 @@ impl From<AppendResultEntryT> for AppendResultEntry {
     fn from(value: AppendResultEntryT) -> Self {
         Self {
             status: (&value.status).into(),
-            timestamp: Utc.timestamp_opt(
-                value.timestamp_ms / 1000,
-                (value.timestamp_ms % 1000 * 1_000_000) as u32,
-            ).latest().expect("Invalid UTC time"),
+            timestamp: Utc
+                .timestamp_opt(
+                    value.timestamp_ms / 1000,
+                    (value.timestamp_ms % 1000 * 1_000_000) as u32,
+                )
+                .latest()
+                .expect("Invalid UTC time"),
         }
     }
 }

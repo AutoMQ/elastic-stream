@@ -6,6 +6,12 @@
             "command": "cargo",
             "args": [ "build", "--features", "paranoid" ],
             "group": "build",
+        },
+        {
+            "label": "build-frontend",
+            "command": "cargo",
+            "args": [ "build", "--features", "paranoid", "-p", "frontend"],
+            "group": "build",
         }
     ]
 }
