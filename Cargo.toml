@@ -16,7 +16,7 @@ members = [
     "components/test-util",
     "components/observation",
     "data-node",
-    "sdks/rust"
+    "sdks/frontend-rs"
 ]
 
 [workspace.dependencies]

@@ -28,12 +28,12 @@ jobs:
         run: |
           ./scripts/install_deps.sh
       - name: Build Shared Library
-        run: cargo build -p frontend -Z unstable-options --out-dir=sdks/sdk-java/frontend/src/main/resources/META-INF/native/
+        run: cargo build -p frontend -Z unstable-options --out-dir=sdks/frontend-java/frontend/src/main/resources/META-INF/native/
       - name: Set up JDK ${{ matrix.jdk }}
         uses: actions/setup-java@v3
         with:
           java-version: ${{ matrix.jdk }}
           distribution: "zulu"
       - name: Build with Maven
-        working-directory: ./sdks/sdk-java
+        working-directory: ./sdks/frontend-java
         run: mvn package

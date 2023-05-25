@@ -19,12 +19,12 @@ jobs:
         with:
           filters: |
             java:
-              - 'sdks/sdk-java/**'
+              - 'sdks/frontend-java/**'
               - 'components/protocol/fbs/*.fbs'
             rust:
               - 'data-node/**'
               - 'components/**'
-              - 'sdks/rust/**'
+              - 'sdks/frontend-rs/**'
             pm:
               - 'placement-manager/**'
               - 'components/protocol/fbs/rpc.fbs'
