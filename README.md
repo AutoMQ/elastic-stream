@@ -79,5 +79,5 @@ Read the [following link](https://doc.rust-lang.org/beta/unstable-book/compiler-
 
 ### Launch Data-Node Server
 ```sh
-cargo run --bin data-node -- -c etc/data-node.yaml
+cargo run --bin data-node -- -c etc/data-node.yaml --log etc/data-node-log.yaml
 ```

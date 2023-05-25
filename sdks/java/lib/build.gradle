@@ -5,6 +5,11 @@ plugins {
     id 'maven-publish'
     id 'com.google.protobuf' version '0.9.1'
     id 'signing'
+    id 'application'
+}
+
+application {
+    mainClassName = project.hasProperty("mainClass") ? project.getProperty("mainClass") : "NULL"
 }
 
 java {
