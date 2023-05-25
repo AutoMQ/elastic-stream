@@ -28,11 +28,7 @@ jobs:
         run: |
           ./scripts/install_deps.sh
       - name: Build Shared Library
-        run: cargo build -p frontend 
-      - name: Copy Shared Library
-        run: |
-          ls -lah target/debug
-          cp target/debug/libfrontend.so sdks/sdk-java/frontend/src/main/resources/META-INF/native/libfrontend.so
+        run: cargo build -p frontend -Z unstable-options --out-dir=sdks/sdk-java/frontend/src/main/resources/META-INF/native/
       - name: Generate flatbuffers java classes
         run: |
           flatc --version
