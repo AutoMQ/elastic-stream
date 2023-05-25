@@ -167,7 +167,7 @@ impl ReplicationRange {
     ) -> Result<Vec<Bytes>, ReplicationError> {
         // TODO: select replica strategy.
         // - balance the read traffic.
-        // - isolate unreadable (data less than expected, unaccessable) replica.
+        // - isolate unreadable (data less than expected, unaccessible) replica.
         for replicator in self.replicators.iter() {
             if replicator.corrupted() {
                 continue;
@@ -254,7 +254,7 @@ impl ReplicationRange {
                         Ok(end_offset)
                     }
                     Err(_) => {
-                        self.unmark_sealing();
+                        self.erase_sealing();
                         Err(ReplicationError::Internal)
                     }
                 }
@@ -280,13 +280,13 @@ impl ReplicationRange {
                                 Ok(end_offset)
                             }
                             Err(_) => {
-                                self.unmark_sealing();
+                                self.erase_sealing();
                                 Err(ReplicationError::Internal)
                             }
                         }
                     }
                     Err(_) => {
-                        self.unmark_sealing();
+                        self.erase_sealing();
                         Err(ReplicationError::Internal)
                     }
                 }
@@ -355,7 +355,7 @@ impl ReplicationRange {
 
     pub(crate) fn mark_sealed(&self) {
         *self.status.borrow_mut() |= SEALED_FLAG;
-        self.unmark_sealing();
+        self.erase_sealing();
     }
 
     pub(crate) fn is_sealing(&self) -> bool {
@@ -366,7 +366,7 @@ impl ReplicationRange {
         *self.status.borrow_mut() |= SEALING_FLAG;
     }
 
-    pub(crate) fn unmark_sealing(&self) {
+    pub(crate) fn erase_sealing(&self) {
         *self.status.borrow_mut() &= !SEALING_FLAG;
     }
 
