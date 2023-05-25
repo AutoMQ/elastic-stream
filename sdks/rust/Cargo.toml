@@ -28,4 +28,4 @@ test-util = { path = "../../components/test-util" }
 minitrace = { workspace = true }
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["lib"]
