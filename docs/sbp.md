@@ -55,9 +55,10 @@ The table below shows all the supported frame types along with a preallocated op
 | 0x1001 | APPEND | Append records to the data node. |
 | 0x1002 | FETCH | Fetch records from the data node. |
 | 0x2001 | LIST_RANGES | List ranges from the PM of a batch of streams. |
-| 0x2002 | SEAL_RANGES | Request seal ranges of a batch of streams. The PM will provide the `SEAL_AND_NEW` semantic while Data Node only provide the `SEAL` semantic. |
+| 0x2002 | SEAL_RANGE | Request to seal a range of a stream. Both PM and data-node serve this operation accordingly |
 | 0x2003 | SYNC_RANGES | Syncs newly writable ranges to a data node to accelerate the availability of a newly created writable range. |
-| 0x2004 | DESCRIBE_RANGES | Describe the details of a batch of ranges, mainly used to get the max offset of the current writable range. |
+| 0x2004 | CRATE_RANGE | Request PM to create a new range for the specified stream |
+| 0x2005 | DESCRIBE_RANGE | Describe the details of a batch of ranges, mainly used to get the max offset of the current writable range. |
 | 0x3001 | CREATE_STREAMS | Create a batch of streams. |
 | 0x3002 | DELETE_STREAMS | Delete a batch of streams. |
 | 0x3003 | UPDATE_STREAMS | Update a batch of streams. |
