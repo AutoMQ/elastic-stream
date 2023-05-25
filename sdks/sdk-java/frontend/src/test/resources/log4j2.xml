@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration monitorInterval="30">
+    <Properties>
+        <Property name="PROJECT"> java-sdk </Property>
+        <Property name="CHARSET"> UTF-8 </Property>
+        <Property name="CLR">{FATAL=bright red, ERROR=red, WARN=bright yellow, INFO=Normal, DEBUG=white, TRACE=black}</Property>
+        <Property name="STD_PATTERN">
+            %highlight{[%d{yy-MM-dd HH:mm:ss.SSS}] [%5p]}${CLR} %clr{-}{faint}%clr{[%10.15t]}{faint}: %highlight{%m}${CLR} [%l]%n
+        </Property>
+        <Property name="LOG_PATTERN">
+            [%d{yy-MM-dd HH:mm:ss.SSS}] [%5p] -[%10.15t]: %m [%l]%n
+        </Property>
+    </Properties>
+    <appenders>
+        <console name="Console" target="SYSTEM_OUT">
+            <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            <PatternLayout charset ="${CHARSET}" pattern="${STD_PATTERN}" disableAnsi="false"/>
+        </console>
+        <RollingFile name="RollingFileInfo" fileName="logs/${PROJECT}.log"
+                     filePattern="logs/$${date:yyyy-MM}/${PROJECT}-%d{yyyy-MM-dd}-%i.log">
+            <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            <PatternLayout charset ="${CHARSET}" pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="100 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
+
+    </appenders>
+    <loggers>
+        <root level="all">
+            <appender-ref ref="Console"/>
+<!--            <appender-ref ref="RollingFileInfo"/>-->
+        </root>
+    </loggers>
+
+</configuration>
