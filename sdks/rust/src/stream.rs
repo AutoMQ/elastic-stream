@@ -63,8 +63,7 @@ impl Stream {
         let payload_length = buffer.get_i32() as usize;
         let payload = buffer.slice(..payload_length);
         buffer.advance(payload_length);
-        debug_assert_eq!(
-            true,
+        debug_assert!(
             buffer.is_empty(),
             "We are expecting exactly one append entry"
         );

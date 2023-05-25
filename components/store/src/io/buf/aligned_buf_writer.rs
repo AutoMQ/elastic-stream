@@ -197,6 +197,7 @@ impl AlignedBufWriter {
         self.write(slice)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn write_u64(&mut self, value: u64) -> Result<(), StoreError> {
         let big_endian = value.to_be();
         let data = ptr::addr_of!(big_endian);

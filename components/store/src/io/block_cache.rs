@@ -2,15 +2,8 @@ use log::{error, info, trace};
 use std::{
     cell::UnsafeCell, cmp, collections::BTreeMap, ops::Bound, rc::Rc, sync::Arc, time::Instant,
 };
-use thiserror::Error;
 
 use super::buf::AlignedBuf;
-
-#[derive(Error, Debug)]
-enum CacheError {
-    #[error("Cache miss")]
-    Miss,
-}
 
 #[derive(Debug)]
 pub(crate) struct Entry {

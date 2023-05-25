@@ -36,7 +36,7 @@ impl<'a> SealRange<'a> {
 
     pub(crate) async fn apply(
         &self,
-        store: Rc<ElasticStore>,
+        _store: Rc<ElasticStore>,
         stream_manager: Rc<RefCell<StreamManager>>,
         response: &mut Frame,
     ) {

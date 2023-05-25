@@ -205,7 +205,7 @@ impl ElasticStore {
 impl Store for ElasticStore {
     async fn append(
         &self,
-        options: WriteOptions,
+        _options: WriteOptions,
         request: AppendRecordRequest,
     ) -> Result<AppendResult, AppendError> {
         let now = std::time::Instant::now();

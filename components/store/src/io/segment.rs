@@ -35,12 +35,6 @@ pub(crate) struct TimeRange {
     pub(crate) end: Option<SystemTime>,
 }
 
-impl TimeRange {
-    pub(crate) fn new(begin: SystemTime) -> Self {
-        Self { begin, end: None }
-    }
-}
-
 /// `LogSegment` consists of fixed length blocks, which are groups of variable-length records.
 ///
 /// The writer writes and reader reads in chunks of blocks. `BlockSize` are normally multiple of the
@@ -213,9 +207,7 @@ impl LogSegment {
             ))?;
         let metadata = file.metadata()?;
 
-        let mut status = Status::OpenAt;
-
-        if self.size != metadata.len() {
+        let status = if self.size != metadata.len() {
             debug_assert!(0 == metadata.len(), "LogSegmentFile is corrupted");
             fcntl::fallocate(
                 file.as_raw_fd(),
@@ -224,11 +216,11 @@ impl LogSegment {
                 self.size as libc::off_t,
             )
             .map_err(|errno| StoreError::System(errno as i32))?;
-            status = Status::ReadWrite;
+            Status::ReadWrite
         } else {
             // We assume the log segment file is read-only. The recovery/apply procedure would update status accordingly.
-            status = Status::Read;
-        }
+            Status::Read
+        };
 
         self.status = status;
         self.sd = Some(SegmentDescriptor {

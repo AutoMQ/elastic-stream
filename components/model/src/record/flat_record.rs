@@ -165,13 +165,6 @@ fn root_as_record_batch_meta(
     flatbuffers::root::<RecordBatchMeta>(buf)
 }
 
-/// Assumes, without verification, that a buffer of bytes contains a RecordBatchMeta and returns it.
-/// # Safety
-/// Callers must trust the given bytes do indeed contain a valid `RecordBatchMeta`.
-fn root_as_record_batch_meta_unchecked(buf: &[u8]) -> RecordBatchMeta {
-    unsafe { flatbuffers::root_unchecked::<RecordBatchMeta>(buf) }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::record::RecordBatchBuilder;

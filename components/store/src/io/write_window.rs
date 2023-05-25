@@ -5,9 +5,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
 pub(crate) enum WriteWindowError {
-    #[error("A previous entry(offset: {offset:?}, length: {length:?}) exists")]
-    Existed { offset: u64, length: u32 },
-
     #[error(
         "Invalid commit attempt (offset: {offset:?}, previous_length: {previous_length:?}, attempted_length: {attempted_length:?})"
     )]

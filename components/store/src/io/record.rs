@@ -1,7 +1,5 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use crate::error::StoreError;
-
 /// Length of record prefix: CRC(4B) + Size(3B) + Type(1B)
 pub const RECORD_PREFIX_LENGTH: u64 = 4 + 3 + 1;
 
@@ -56,9 +54,11 @@ impl RecordType {
         l | t as u32
     }
 
-    pub(crate) fn parse(val: u32) -> Result<(u32, Self), StoreError> {
+    #[cfg(test)]
+    pub(crate) fn parse(val: u32) -> Result<(u32, Self), crate::error::StoreError> {
         let t = val & 0xFF;
-        let t = RecordType::try_from(t as u8).map_err(|_e| StoreError::UnsupportedRecordType)?;
+        let t = RecordType::try_from(t as u8)
+            .map_err(|_e| crate::error::StoreError::UnsupportedRecordType)?;
         Ok((val >> 8, t))
     }
 }

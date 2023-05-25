@@ -232,9 +232,9 @@ async fn process_create_stream_command(
     future: GlobalRef,
 ) {
     let options = StreamOptions {
-        replica: replica,
+        replica,
         ack: ack_count,
-        retention: retention,
+        retention,
     };
     let result = front_end.create(options).await;
     match result {
@@ -315,10 +315,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
 ) -> jlong {
     let (tx, rx) = oneshot::channel();
     let access_point: String = env.get_string(&access_point).unwrap().into();
-    let command = Command::GetFrontend {
-        access_point: access_point,
-        tx: tx,
-    };
+    let command = Command::GetFrontend { access_point, tx };
     let _ = TX.get().unwrap().send(command);
     let result = rx.blocking_recv().unwrap();
     match result {
@@ -355,7 +352,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
     let front_end = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
     let command = Command::CreateStream {
-        front_end: front_end,
+        front_end,
         replica: replica as u8,
         ack_count: ack as u8,
         retention: Duration::from_millis(retention_millis as u64),
@@ -386,7 +383,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
         front_end,
         stream_id: id as u64,
         epoch: epoch as u64,
-        future: future,
+        future,
     };
 
     if let Some(tx) = TX.get() {
@@ -419,10 +416,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_mi
 ) {
     let stream = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
-    let command = Command::StartOffset {
-        stream: stream,
-        future: future,
-    };
+    let command = Command::StartOffset { stream, future };
 
     if let Some(tx) = TX.get() {
         if let Err(_e) = tx.send(command) {
@@ -442,10 +436,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ma
 ) {
     let stream = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
-    let command = Command::NextOffset {
-        stream: stream,
-        future: future,
-    };
+    let command = Command::NextOffset { stream, future };
 
     if let Some(tx) = TX.get() {
         if let Err(_e) = tx.send(command) {
@@ -501,11 +492,11 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_re
     let stream = &mut *ptr;
     let future = env.new_global_ref(future).unwrap();
     let command = Command::Read {
-        stream: stream,
-        start_offset: start_offset,
-        end_offset: end_offset,
-        batch_max_bytes: batch_max_bytes,
-        future: future,
+        stream,
+        start_offset,
+        end_offset,
+        batch_max_bytes,
+        future,
     };
 
     if let Some(tx) = TX.get() {

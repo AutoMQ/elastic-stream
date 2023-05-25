@@ -262,7 +262,7 @@ impl Wal {
                 continue;
             }
 
-            if Self::scan_record(segment, &mut pos, &&indexer)? {
+            if Self::scan_record(segment, &mut pos, &indexer)? {
                 need_scan = false;
                 info!("Recovery completed at `{}`", pos);
             }
@@ -332,6 +332,7 @@ impl Wal {
 
     /// New a segment, and then open it in the classic way, i.e. without uring.
     /// Notes: this is only used in tests to avoid the complexity of uring.
+    #[cfg(test)]
     pub(crate) fn open_segment_directly(&mut self) -> Result<(), StoreError> {
         let mut segment = self.alloc_segment()?;
         segment.open()?;

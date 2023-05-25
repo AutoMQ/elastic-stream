@@ -8,15 +8,19 @@ use replication::StreamClient;
 
 #[derive(Debug, Clone)]
 pub struct Frontend {
+    #[allow(dead_code)]
     config: Arc<Configuration>,
+    
     stream_client: StreamClient,
 }
 
 impl Frontend {
     pub fn new(access_point: &str) -> Result<Self, ClientError> {
         info!("New frontend with access-point: {access_point}");
-        let mut config = Configuration::default();
-        config.placement_manager = access_point.to_owned();
+        let config = Configuration {
+            placement_manager: access_point.to_owned(),
+            ..Default::default()
+        };
         let config = Arc::new(config);
         let stream_client = StreamClient::new(Arc::clone(&config));
         Ok(Self {

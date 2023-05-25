@@ -3,7 +3,7 @@ use std::{
     alloc::{self, Layout},
     fmt::{self, Display, Formatter},
     ops::{Bound, RangeBounds},
-    ptr::{self, read_unaligned, NonNull},
+    ptr::{self, NonNull},
     slice,
     sync::atomic::{AtomicUsize, Ordering},
 };
@@ -77,6 +77,7 @@ impl AlignedBuf {
     ///
     /// # Returns
     /// `true` if the cache hit; `false` otherwise.
+    #[allow(dead_code)]
     pub(crate) fn covers(&self, wal_offset: u64, len: u32) -> bool {
         self.wal_offset <= wal_offset
             && wal_offset + len as u64 <= self.wal_offset + self.limit() as u64
@@ -100,6 +101,7 @@ impl AlignedBuf {
         self.limit.load(Ordering::Relaxed)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn write_u32(&self, cursor: u64, value: u32) -> bool {
         if self.limit.load(Ordering::Relaxed) + 4 > self.capacity {
             return false;
@@ -110,15 +112,17 @@ impl AlignedBuf {
     }
 
     /// Get u32 in big-endian byte order.
+    #[allow(dead_code)]
     pub(crate) fn read_u32(&self, pos: usize) -> Result<u32, StoreError> {
         debug_assert!(self.limit.load(Ordering::Relaxed) >= pos);
         if self.limit.load(Ordering::Relaxed) - pos < std::mem::size_of::<u32>() {
             return Err(StoreError::InsufficientData);
         }
-        let value = unsafe { read_unaligned::<u32>(self.ptr.as_ptr().add(pos) as *const u32) };
+        let value = unsafe { ptr::read_unaligned::<u32>(self.ptr.as_ptr().add(pos) as *const u32) };
         Ok(u32::from_be(value))
     }
 
+    #[allow(dead_code)]
     pub(crate) fn write_u64(&self, cursor: u64, value: u64) -> bool {
         if self.limit.load(Ordering::Relaxed) + 8 > self.capacity {
             return false;
@@ -128,13 +132,14 @@ impl AlignedBuf {
         self.write_buf(cursor, data)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn read_u64(&self, pos: usize) -> Result<u64, StoreError> {
         debug_assert!(self.limit.load(Ordering::Relaxed) > pos);
         if pos + 8 > self.limit.load(Ordering::Relaxed) {
             return Err(StoreError::InsufficientData);
         }
 
-        let value = unsafe { read_unaligned::<u64>(self.ptr.as_ptr().add(pos) as *const u64) };
+        let value = unsafe { ptr::read_unaligned::<u64>(self.ptr.as_ptr().add(pos) as *const u64) };
         Ok(u64::from_be(value))
     }
 
