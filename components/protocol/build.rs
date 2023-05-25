@@ -16,7 +16,7 @@ fn main() {
     .expect("flatc");
 
     println!("cargo:rerun-if-changed=fbs/");
-    let out_dir = Path::new("../../sdks/java/lib/src/main/java/");
+    let out_dir = Path::new("../../sdks/sdk-java/frontend/src/main/generated/");
     let gen_path_buf = out_dir.join("com/automq/elasticstream/client/flatc/");
     let gen_dir = gen_path_buf.as_path();
     // clean up the directory

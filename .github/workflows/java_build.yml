@@ -29,11 +29,6 @@ jobs:
           ./scripts/install_deps.sh
       - name: Build Shared Library
         run: cargo build -p frontend -Z unstable-options --out-dir=sdks/sdk-java/frontend/src/main/resources/META-INF/native/
-      - name: Generate flatbuffers java classes
-        run: |
-          flatc --version
-          flatc --java -o 'sdks/sdk-java/frontend/src/main/generated' --java-package-prefix 'com.automq.elasticstream.client.flatc' --gen-object-api components/protocol/fbs/rpc.fbs components/protocol/fbs/model.fbs
-          tree
       - name: Set up JDK ${{ matrix.jdk }}
         uses: actions/setup-java@v3
         with:
