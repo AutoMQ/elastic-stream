@@ -313,22 +313,42 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
     _class: JClass,
     access_point: JString,
 ) -> jlong {
-    let (tx, rx) = oneshot::channel();
-    let access_point: String = env.get_string(&access_point).unwrap().into();
-    let command = Command::GetFrontend {
-        access_point: access_point,
-        tx: tx,
-    };
-    let _ = TX.get().unwrap().send(command);
-    let result = rx.blocking_recv().unwrap();
-    match result {
-        Ok(frontend) => Box::into_raw(Box::new(frontend)) as jlong,
-        Err(err) => {
-            let _ = env.exception_clear();
-            env.throw_new("java/lang/Exception", err.to_string())
-                .expect("Couldn't throw exception");
-            0
+    let (tx_frontend, rx_frontend) = oneshot::channel();
+    let command = env
+        .get_string(&access_point)
+        .map(|access_point| Command::GetFrontend {
+            access_point: access_point.into(),
+            tx: tx_frontend,
+        });
+    if let Ok(command) = command {
+        match TX.get() {
+            Some(tx) => match tx.send(command) {
+                Ok(_) => match rx_frontend.blocking_recv() {
+                    Ok(result) => match result {
+                        Ok(frontend) => Box::into_raw(Box::new(frontend)) as jlong,
+                        Err(err) => {
+                            throw_exception(&mut env, &err.to_string());
+                            0
+                        }
+                    },
+                    Err(_) => {
+                        error!("Failed to receive GetFrontend command response from tokio-uring runtime");
+                        0
+                    }
+                },
+                Err(_) => {
+                    error!("Failed to dispatch GetFrontend command to tokio-uring runtime");
+                    0
+                }
+            },
+            None => {
+                info!("JNI command channel was dropped. Ignore a GetFrontend request");
+                0
+            }
         }
+    } else {
+        info!("Failed to construct GetFrontend command. Ignore a GetFrontend request");
+        0
     }
 }
 
@@ -344,7 +364,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
 
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_create(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     ptr: *mut Frontend,
     replica: jint,
@@ -352,49 +372,57 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
     retention_millis: jlong,
     future: JObject,
 ) {
-    let front_end = &mut *ptr;
-    let future = env.new_global_ref(future).unwrap();
-    let command = Command::CreateStream {
-        front_end: front_end,
-        replica: replica as u8,
-        ack_count: ack as u8,
-        retention: Duration::from_millis(retention_millis as u64),
-        future,
-    };
-
-    if let Some(tx) = TX.get() {
-        if let Err(_e) = tx.send(command) {
-            error!("Failed to dispatch create stream command to tokio-uring runtime");
+    let command = env.new_global_ref(future).map(|future| {
+        let front_end = &mut *ptr;
+        Command::CreateStream {
+            front_end: front_end,
+            replica: replica as u8,
+            ack_count: ack as u8,
+            retention: Duration::from_millis(retention_millis as u64),
+            future,
+        }
+    });
+    if let Ok(command) = command {
+        if let Some(tx) = TX.get() {
+            if let Err(_e) = tx.send(command) {
+                error!("Failed to dispatch CreateStream command to tokio-uring runtime");
+            }
+        } else {
+            info!("JNI command channel was dropped. Ignore a CreateStream request");
         }
     } else {
-        info!("JNI command channel was dropped. Ignore a create stream request");
-    }
+        info!("Failed to construct CreateStream command");
+    };
 }
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_open(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     ptr: *mut Frontend,
     id: jlong,
     epoch: jlong,
     future: JObject,
 ) {
-    let front_end = &mut *ptr;
-    let future = env.new_global_ref(future).unwrap();
     debug_assert!(id >= 0, "Stream ID should be non-negative");
-    let command = Command::OpenStream {
-        front_end,
-        stream_id: id as u64,
-        epoch: epoch as u64,
-        future: future,
-    };
-
-    if let Some(tx) = TX.get() {
-        if let Err(_e) = tx.send(command) {
-            error!("Failed to dispatch open stream command to tokio-uring runtime");
+    let command = env.new_global_ref(future).map(|future| {
+        let front_end = &mut *ptr;
+        Command::OpenStream {
+            front_end,
+            stream_id: id as u64,
+            epoch: epoch as u64,
+            future: future,
+        }
+    });
+    if let Ok(command) = command {
+        if let Some(tx) = TX.get() {
+            if let Err(_e) = tx.send(command) {
+                error!("Failed to dispatch OpenStream command to tokio-uring runtime");
+            }
+        } else {
+            info!("JNI command channel was dropped. Ignore an OpenStream request");
         }
     } else {
-        info!("JNI command channel was dropped. Ignore an open stream request");
+        info!("Failed to construct OpenStream command");
     }
 }
 
@@ -417,19 +445,23 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_mi
     ptr: *mut Stream,
     future: JObject,
 ) {
-    let stream = &mut *ptr;
-    let future = env.new_global_ref(future).unwrap();
-    let command = Command::StartOffset {
-        stream: stream,
-        future: future,
-    };
-
-    if let Some(tx) = TX.get() {
-        if let Err(_e) = tx.send(command) {
-            error!("Failed to dispatch query min offset command to tokio-uring runtime");
+    let command = env.new_global_ref(future).map(|future| {
+        let stream = &mut *ptr;
+        Command::StartOffset {
+            stream: stream,
+            future: future,
+        }
+    });
+    if let Ok(command) = command {
+        if let Some(tx) = TX.get() {
+            if let Err(_e) = tx.send(command) {
+                error!("Failed to dispatch StartOffset command to tokio-uring runtime");
+            }
+        } else {
+            info!("JNI command channel was dropped. Ignore a StartOffset request");
         }
     } else {
-        info!("JNI command channel was dropped. Ignore a query min offset request");
+        info!("Failed to construct StartOffset command.");
     }
 }
 
@@ -440,19 +472,23 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ma
     ptr: *mut Stream,
     future: JObject,
 ) {
-    let stream = &mut *ptr;
-    let future = env.new_global_ref(future).unwrap();
-    let command = Command::NextOffset {
-        stream: stream,
-        future: future,
-    };
-
-    if let Some(tx) = TX.get() {
-        if let Err(_e) = tx.send(command) {
-            error!("Failed to dispatch query max offset command to tokio-uring runtime");
+    let command = env.new_global_ref(future).map(|future| {
+        let stream = &mut *ptr;
+        Command::NextOffset {
+            stream: stream,
+            future: future,
+        }
+    });
+    if let Ok(command) = command {
+        if let Some(tx) = TX.get() {
+            if let Err(_e) = tx.send(command) {
+                error!("Failed to dispatch NextOffset command to tokio-uring runtime");
+            }
+        } else {
+            info!("JNI command channel was dropped. Ignore a NextOffset request");
         }
     } else {
-        info!("JNI command channel was dropped. Ignore a query max offset request");
+        info!("Failed to construct NextOffset command");
     }
 }
 
@@ -464,27 +500,31 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ap
     data: JObject,
     future: JObject,
 ) {
-    let stream = &mut *ptr;
-    let future = env.new_global_ref(future).unwrap();
-
-    let buf = env.get_direct_buffer_address((&data).into()).unwrap();
-    let len = env.get_direct_buffer_capacity((&data).into()).unwrap();
-
-    // Copy data from `DirectByteBuffer` to `Bytes`
-    let buf = Bytes::copy_from_slice(slice::from_raw_parts(buf, len));
-
-    let command = Command::Append {
-        stream,
-        buf,
-        future,
+    let buf = env.get_direct_buffer_address((&data).into());
+    let len = env.get_direct_buffer_capacity((&data).into());
+    let future = env.new_global_ref(future);
+    let command: Result<Command, ()> = match (buf, len, future) {
+        (Ok(buf), Ok(len), Ok(future)) => {
+            let stream = &mut *ptr;
+            let buf = Bytes::copy_from_slice(slice::from_raw_parts(buf, len));
+            Ok(Command::Append {
+                stream,
+                buf,
+                future,
+            })
+        }
+        _ => Err(()),
     };
-
-    if let Some(tx) = TX.get() {
-        if let Err(_e) = tx.send(command) {
-            error!("Failed to dispatch append command to tokio-uring runtime");
+    if let Ok(command) = command {
+        if let Some(tx) = TX.get() {
+            if let Err(_e) = tx.send(command) {
+                error!("Failed to dispatch Append command to tokio-uring runtime");
+            }
+        } else {
+            info!("JNI command channel was dropped. Ignore an Append request");
         }
     } else {
-        info!("JNI command channel was dropped. Ignore an append request");
+        info!("Failed to construct Append command");
     }
 }
 
@@ -498,22 +538,26 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_re
     batch_max_bytes: jint,
     future: JObject,
 ) {
-    let stream = &mut *ptr;
-    let future = env.new_global_ref(future).unwrap();
-    let command = Command::Read {
-        stream: stream,
-        start_offset: start_offset,
-        end_offset: end_offset,
-        batch_max_bytes: batch_max_bytes,
-        future: future,
-    };
-
-    if let Some(tx) = TX.get() {
-        if let Err(_e) = tx.send(command) {
-            error!("Failed to dispatch read-stream command to tokio-uring runtime");
+    let command = env.new_global_ref(future).map(|future| {
+        let stream = &mut *ptr;
+        Command::Read {
+            stream: stream,
+            start_offset: start_offset,
+            end_offset: end_offset,
+            batch_max_bytes: batch_max_bytes,
+            future: future,
+        }
+    });
+    if let Ok(command) = command {
+        if let Some(tx) = TX.get() {
+            if let Err(_e) = tx.send(command) {
+                error!("Failed to dispatch Read command to tokio-uring runtime");
+            }
+        } else {
+            info!("JNI command channel was dropped. Ignore a Read request");
         }
     } else {
-        info!("JNI command channel was dropped. Ignore a read request");
+        info!("Failed to construct Read command");
     }
 }
 
@@ -552,4 +596,10 @@ unsafe fn call_future_complete_exceptionally_method(
 unsafe fn get_thread_local_jenv(cell: &RefCell<Option<*mut *const JNINativeInterface_>>) -> JNIEnv {
     let env_ptr = cell.borrow().unwrap();
     JNIEnv::from_raw(env_ptr).unwrap()
+}
+
+fn throw_exception(env: &mut JNIEnv, msg: &str) {
+    let _ = env.exception_clear();
+    env.throw_new("java/lang/Exception", msg)
+        .expect("Couldn't throw exception");
 }
