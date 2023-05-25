@@ -68,10 +68,12 @@ ifeq (,$(HOST_OS))
   endif
 endif
 ifeq (,$(HOST_ARCH))
+  HOST_ARCH := $(shell uname -m)
   ifeq ($(shell uname -m),x86_64)
     HOST_ARCH := amd64
-  else
-    HOST_ARCH := $(shell uname -m)
+  endif
+  ifeq ($(shell uname -m),aarch64)
+    HOST_ARCH := arm64
   endif
 endif
 
