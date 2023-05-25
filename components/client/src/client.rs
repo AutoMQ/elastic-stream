@@ -362,6 +362,7 @@ mod tests {
                     retention_period: std::time::Duration::from_secs(1),
                 })
                 .await?;
+            dbg!(&stream_metadata);
             assert!(stream_metadata.stream_id.is_some());
             assert_eq!(1, stream_metadata.replica);
             assert_eq!(
@@ -416,7 +417,7 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
-            let range = RangeMetadata::new(12, 0, 0, 0, None);
+            let range = RangeMetadata::new(100, 0, 0, 0, None);
             client.create_range_replica(&target, range).await
         })
     }

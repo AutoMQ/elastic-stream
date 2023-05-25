@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use model::error;
 use protocol::rpc::header::ErrorCode;
 use thiserror::Error;
 
@@ -31,6 +32,9 @@ pub enum ClientError {
 
     #[error("Append records failed with error code: `{0:?}`")]
     Append(ErrorCode),
+
+    #[error("Create topic failed with error code: `{0:?}`")]
+    CreateRange(ErrorCode),
 
     #[error("Server internal error")]
     ServerInternal,

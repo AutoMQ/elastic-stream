@@ -480,9 +480,7 @@ impl CompositeSession {
                     "Failed to create range on {} for elastic-stream[id={}]: {response:#?}",
                     self.target, stream_id
                 );
-
-                // TODO: refine error handling according to status code
-                return Err(ClientError::ServerInternal);
+                return Err(ClientError::CreateRange(response.status.code));
             }
             if let Some(response::Headers::CreateRange { range }) = response.headers {
                 Ok(range)
