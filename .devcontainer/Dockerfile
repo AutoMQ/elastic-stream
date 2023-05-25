@@ -8,5 +8,6 @@ RUN apt-get update  \
     && unzip Linux.flatc.binary.clang++-12.zip && mv flatc /usr/local/bin/ \
     && wget 'https://dl.google.com/go/go1.20.4.linux-amd64.tar.gz' \
     && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz \
-    && echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
+    && echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile \
+    && rustup component add rustfmt clippy rust-docs rust-src --toolchain nightly-x86_64-unknown-linux-gnu
 
