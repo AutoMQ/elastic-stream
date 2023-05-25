@@ -21,7 +21,12 @@
 			"version": "latest",
 			"moby": true,
 			"dockerDashComposeVersion": "v1"
-		}
+		},
+		"ghcr.io/devcontainers/features/rust:1": {
+			"profile": "default"
+		},
+		"ghcr.io/devcontainers/features/go:1": {},
+		"ghcr.io/devcontainers/features/java:1": {}
 	},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.

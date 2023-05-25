@@ -1,13 +1,6 @@
-FROM mcr.microsoft.com/devcontainers/rust:0-1-buster
+FROM mcr.microsoft.com/devcontainers/base:bullseye
 RUN apt-get update  \
     && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get install -y clang \ 
-    && apt-get install -y default-jdk \
-    && cd /tmp \
-    && wget 'https://github.com/google/flatbuffers/releases/download/v23.5.9/Linux.flatc.binary.clang++-12.zip' \
-    && unzip Linux.flatc.binary.clang++-12.zip && mv flatc /usr/local/bin/ \
-    && wget 'https://dl.google.com/go/go1.20.4.linux-amd64.tar.gz' \
-    && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz \
-    && echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile \
-    && rustup component add rustfmt clippy rust-docs rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-
+    && apt-get install -y cmake && apt-get install -y clang\ 
+    && cd /tmp && wget https://github.com/google/flatbuffers/archive/refs/tags/v23.3.3.zip \
+    && unzip v23.3.3.zip && cd flatbuffers-23.3.3 && /usr/bin/cmake -G "Unix Makefiles" && make -j && mv flatc /usr/local/bin/
