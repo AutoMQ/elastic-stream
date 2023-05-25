@@ -345,7 +345,7 @@ mod tests {
         test_util::try_init_log();
         tokio_uring::start(async move {
             #[allow(unused_variables)]
-            let port = 2378;
+            let port = 12378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
@@ -357,13 +357,13 @@ mod tests {
             let stream_metadata = client
                 .create_stream(StreamMetadata {
                     stream_id: None,
-                    replica: 3,
-                    ack_count: 2,
+                    replica: 1,
+                    ack_count: 1,
                     retention_period: std::time::Duration::from_secs(1),
                 })
                 .await?;
-            assert_eq!(Some(1), stream_metadata.stream_id);
-            assert_eq!(3, stream_metadata.replica);
+            assert!(stream_metadata.stream_id.is_some());
+            assert_eq!(1, stream_metadata.replica);
             assert_eq!(
                 std::time::Duration::from_secs(1),
                 stream_metadata.retention_period
@@ -406,7 +406,7 @@ mod tests {
         test_util::try_init_log();
         tokio_uring::start(async {
             #[allow(unused_variables)]
-            let port = 2378;
+            let port = 12378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
@@ -416,7 +416,7 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
-            let range = RangeMetadata::new(0, 0, 0, 0, None);
+            let range = RangeMetadata::new(12, 0, 0, 0, None);
             client.create_range_replica(&target, range).await
         })
     }

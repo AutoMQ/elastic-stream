@@ -299,7 +299,7 @@ pub extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_freeFro
 
 #[no_mangle]
 pub extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_create(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     ptr: *mut Frontend,
     replica: jint,
@@ -331,7 +331,7 @@ pub extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_create(
 }
 #[no_mangle]
 pub extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_open(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     ptr: *mut Frontend,
     id: jlong,
@@ -365,7 +365,7 @@ pub extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_open(
 
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_freeStream(
-    env: JNIEnv,
+    _env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
 ) {
@@ -375,7 +375,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_fr
 
 #[no_mangle]
 pub extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_startOffset(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
     future: JObject,
@@ -402,7 +402,7 @@ pub extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_startOffs
 
 #[no_mangle]
 pub extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_nextOffset(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
     future: JObject,
@@ -429,7 +429,7 @@ pub extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_nextOffse
 
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_append(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     ptr: *mut Stream,
     data: JObject,

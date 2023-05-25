@@ -93,10 +93,12 @@ impl Frame {
                 n
             }
             Err(_) => {
-                trace!(
-                    "Only {} bytes in buffer. Read more data to proceed",
-                    src.remaining()
-                );
+                if src.remaining() > 0 {
+                    trace!(
+                        "Only {} bytes in buffer. Read more data to proceed",
+                        src.remaining()
+                    );
+                }
                 return Err(FrameError::Incomplete);
             }
         };

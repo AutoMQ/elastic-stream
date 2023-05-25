@@ -201,8 +201,16 @@ impl CompositeSession {
     }
 
     pub(crate) async fn refresh_cluster(&self) {
-        if let Ok(Some(nodes)) = self.describe_placement_manager_cluster().await {
-            self.refresh_sessions(&nodes).await;
+        match self.describe_placement_manager_cluster().await {
+            Ok(Some(nodes)) => {
+                self.refresh_sessions(&nodes).await;
+            }
+            Ok(None) => {
+                warn!("Placement Manager Cluster is empty, no need to refresh sessions");
+            }
+            Err(e) => {
+                error!("Failed to describe placement manager cluster. {:?}", e);
+            }
         }
     }
 
@@ -212,7 +220,14 @@ impl CompositeSession {
                 .sessions
                 .borrow()
                 .iter()
-                .filter(|&(_, session)| session.state() == NodeState::Leader)
+                .filter(|&(_, session)| {
+                    trace!(
+                        "State of session to {} is {:?}",
+                        session.target,
+                        session.state()
+                    );
+                    session.state() == NodeState::Leader
+                })
                 .map(|(_, session)| session.clone())
                 .next(),
             LbPolicy::PickFirst => self
@@ -438,7 +453,7 @@ impl CompositeSession {
         self.try_reconnect().await;
         if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
             let (tx, rx) = oneshot::channel();
-
+            let stream_id = range.stream_id();
             let request = request::Request {
                 timeout: self.config.client_io_timeout(),
                 headers: request::Headers::CreateRange { range },
@@ -462,9 +477,11 @@ impl CompositeSession {
 
             if !response.ok() {
                 error!(
-                    "Failed to create range on {}. Status: `{:?}`",
-                    self.target, response.status
+                    "Failed to create range on {} for elastic-stream[id={}]: {response:#?}",
+                    self.target, stream_id
                 );
+
+                // TODO: refine error handling according to status code
                 return Err(ClientError::ServerInternal);
             }
             if let Some(response::Headers::CreateRange { range }) = response.headers {
