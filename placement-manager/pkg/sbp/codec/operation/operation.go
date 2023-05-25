@@ -18,7 +18,7 @@ const (
 
 	OpListRange   uint16 = 0x2001
 	OpSealRange   uint16 = 0x2002
-	OpCreateRange uint16 = 0x2003
+	OpCreateRange uint16 = 0x2004
 
 	OpCreateStream   uint16 = 0x3001
 	OpDeleteStream   uint16 = 0x3002
