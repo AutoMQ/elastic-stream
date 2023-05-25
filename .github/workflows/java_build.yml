@@ -30,7 +30,9 @@ jobs:
       - name: Build Shared Library
         run: cargo build -p frontend 
       - name: Copy Shared Library
-        run: cp target/debug/libfrontend.so sdks/sdk-java/frontend/src/main/resources/META-INF/native/libfrontend.so
+        run: |
+          ls -lah target/debug
+          cp target/debug/libfrontend.so sdks/sdk-java/frontend/src/main/resources/META-INF/native/libfrontend.so
       - name: Generate flatbuffers java classes
         run: |
           flatc --version
