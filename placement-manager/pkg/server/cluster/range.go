@@ -172,6 +172,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 	if err != nil {
 		return nil, err
 	}
+	c.fillDataNodesInfo(sealedRange.Nodes)
 	return sealedRange, nil
 }
 
