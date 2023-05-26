@@ -14,6 +14,7 @@ use observation::metrics::{
     sys_metrics::{DiskStatistics, MemoryStatistics},
     uring_metrics::UringStatistics,
 };
+use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
 use std::{
     cell::RefCell,
@@ -682,7 +683,10 @@ impl CompositeSession {
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            headers: request::Headers::SealRange { kind, range },
+            headers: request::Headers::SealRange {
+                kind,
+                range: range.clone(),
+            },
         };
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
@@ -693,6 +697,11 @@ impl CompositeSession {
 
         let response = rx.await.map_err(|_e| ClientError::ClientInternal)?;
         if !response.ok() {
+            if response.status.code == ErrorCode::RANGE_ALREADY_SEALED {
+                // TODO: check whether end_offset is match if the range is already sealed
+                warn!("Range{range:?} already sealed");
+                return Ok(range);
+            }
             warn!("Failed to seal range: {:?}", response.status);
             return Err(ClientError::ServerInternal);
         }
