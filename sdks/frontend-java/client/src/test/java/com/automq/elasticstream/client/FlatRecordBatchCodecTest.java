@@ -25,7 +25,7 @@ public class FlatRecordBatchCodecTest {
         properties.put("k1", "v1");
         properties.put("k2", "v2");
         RecordBatch src = new DefaultRecordBatch(payload.length, 233, properties, buffer);
-        List<RecordBatchWithContext> list = FlatRecordBatchCodec.decode(FlatRecordBatchCodec.encode(src));
+        List<RecordBatchWithContext> list = FlatRecordBatchCodec.decode(FlatRecordBatchCodec.encode(123, src));
         Assert.assertEquals(1, list.size());
         RecordBatchWithContext dst = list.get(0);
         Assert.assertEquals(src.count(), dst.count());

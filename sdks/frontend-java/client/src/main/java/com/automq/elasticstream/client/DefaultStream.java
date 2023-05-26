@@ -44,7 +44,7 @@ public class DefaultStream implements Stream {
 
     @Override
     public CompletableFuture<AppendResult> append(RecordBatch recordBatch) {
-        ByteBuffer buf = FlatRecordBatchCodec.encode(recordBatch);
+        ByteBuffer buf = FlatRecordBatchCodec.encode(streamId, recordBatch);
         return jniStream.append(buf).thenApply(DefaultAppendResult::new);
     }
 

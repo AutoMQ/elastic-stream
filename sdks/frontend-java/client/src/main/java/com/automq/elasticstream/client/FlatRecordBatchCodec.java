@@ -30,7 +30,7 @@ public class FlatRecordBatchCodec {
      * @param recordBatch {@link RecordBatch}
      * @return storage format record bytes.
      */
-    public static ByteBuffer encode(RecordBatch recordBatch) {
+    public static ByteBuffer encode(long streamId, RecordBatch recordBatch) {
         int totalLength = 0;
 
         totalLength += 1; // magic
@@ -38,6 +38,7 @@ public class FlatRecordBatchCodec {
         // encode RecordBatchMeta
         FlatBufferBuilder metaBuilder = new FlatBufferBuilder();
         RecordBatchMetaT recordBatchMetaT = new RecordBatchMetaT();
+        recordBatchMetaT.setStreamId(streamId);
         recordBatchMetaT.setLastOffsetDelta(recordBatch.count());
         recordBatchMetaT.setBaseTimestamp(recordBatch.baseTimestamp());
         recordBatchMetaT.setProperties(recordBatch.properties().entrySet().stream().map(entry -> {
