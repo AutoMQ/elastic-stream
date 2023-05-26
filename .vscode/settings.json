@@ -1,10 +1,12 @@
 {
     "cSpell.words": [
         "Addrs",
+        "automq",
         "byteorder",
         "chrono",
         "Deque",
         "EBUSY",
+        "elasticstream",
         "endianness",
         "errno",
         "fallocate",

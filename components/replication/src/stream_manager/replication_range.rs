@@ -21,7 +21,7 @@ const SEALED_FLAG: u32 = 1 << 2;
 
 #[derive(Debug)]
 pub(crate) struct ReplicationRange {
-    log_indent: String,
+    log_ident: String,
 
     metadata: RangeMetadata,
 
@@ -29,7 +29,7 @@ pub(crate) struct ReplicationRange {
 
     client: Weak<Client>,
 
-    replicators: Rc<Vec<Rc<Replicator>>>,
+    replicators: Rc<RefCell<Vec<Rc<Replicator>>>>,
 
     /// Exclusive confirm offset.
     confirm_offset: RefCell<u64>,
@@ -56,14 +56,14 @@ impl ReplicationRange {
 
         let (seal_task_tx, _) = broadcast::channel::<Result<u64, ReplicationError>>(1);
 
-        let log_indent = format!("Range[{}#{}]", metadata.stream_id(), metadata.index());
-        let mut this = Rc::new(Self {
-            log_indent,
+        let log_ident = format!("Range[{}#{}]", metadata.stream_id(), metadata.index());
+        let this = Rc::new(Self {
+            log_ident,
             metadata,
             open_for_write,
             stream,
             client,
-            replicators: Rc::new(vec![]),
+            replicators: Rc::new(RefCell::new(vec![])),
             confirm_offset: RefCell::new(confirm_offset),
             status: RefCell::new(status),
             seal_task_tx: Rc::new(seal_task_tx),
@@ -73,7 +73,7 @@ impl ReplicationRange {
         for replica_node in this.metadata.replica().iter() {
             replicators.push(Rc::new(Replicator::new(this.clone(), replica_node.clone())));
         }
-        Rc::get_mut(&mut this).unwrap().replicators = Rc::new(replicators);
+        *this.replicators.borrow_mut() = replicators;
         info!(
             "Load range with metadata: {:?} open_for_write={open_for_write}",
             this.metadata
@@ -127,7 +127,7 @@ impl ReplicationRange {
     }
 
     fn calculate_confirm_offset(&self) -> Result<u64, ReplicationError> {
-        if self.replicators.is_empty() {
+        if self.replicators.borrow().is_empty() {
             return Err(ReplicationError::Internal);
         }
 
@@ -141,6 +141,7 @@ impl ReplicationRange {
         // - when replica_count=3 and ack_count = 3, then result is ReplicationError.
         let confirm_offset_index = self.metadata.ack_count() - 1;
         self.replicators
+            .borrow()
             .iter()
             .filter(|r| !r.corrupted())
             .map(|r| r.confirm_offset())
@@ -161,7 +162,7 @@ impl ReplicationRange {
             .unwrap();
         let flat_record_batch: FlatRecordBatch = Into::into(record_batch);
         let (flat_record_batch_bytes, _) = flat_record_batch.encode();
-        for replica in (*self.replicators).iter() {
+        for replica in (*self.replicators).borrow().iter() {
             replica.append(
                 flat_record_batch_bytes.clone(),
                 context.base_offset + context.count as u64,
@@ -178,7 +179,7 @@ impl ReplicationRange {
         // TODO: select replica strategy.
         // - balance the read traffic.
         // - isolate unreadable (data less than expected, unaccessible) replica.
-        for replicator in self.replicators.iter() {
+        for replicator in self.replicators.borrow().iter() {
             if replicator.corrupted() {
                 continue;
             }
@@ -190,7 +191,7 @@ impl ReplicationRange {
                     return Ok(payloads);
                 }
                 Err(e) => {
-                    warn!(target: &self.log_indent, "Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes} fail, err: {e}");
+                    warn!(target: &self.log_ident, "Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes} fail, err: {e}");
                     continue;
                 }
             }
@@ -215,7 +216,7 @@ impl ReplicationRange {
                 }
             }
             Err(err) => {
-                warn!(target: &self.log_indent, "Calculate confirm offset fail, current confirm_offset=[{}], err: {err}", self.confirm_offset());
+                warn!(target: &self.log_ident, "Calculate confirm offset fail, current confirm_offset=[{}], err: {err}", self.confirm_offset());
                 self.mark_corrupted();
                 if let Some(stream) = self.stream.upgrade() {
                     stream.try_ack();
@@ -232,7 +233,7 @@ impl ReplicationRange {
         if self.is_sealing() {
             // if range is sealing, wait for seal task to complete.
             self.seal_task_tx.subscribe().recv().await.map_err(|_| {
-                error!(target: &self.log_indent, "Seal task channel closed");
+                error!(target: &self.log_ident, "Seal task channel closed");
                 ReplicationError::Internal
             })?
         } else {
@@ -243,17 +244,17 @@ impl ReplicationRange {
                 // 1. call placement manager to seal range
                 match self.placement_manager_seal(end_offset).await {
                     Ok(_) => {
-                        info!(target: &self.log_indent, "The range is created by current stream, then directly seal with memory confirm_offset=[{}]", end_offset);
+                        info!(target: &self.log_ident, "The range is created by current stream, then directly seal with memory confirm_offset=[{}]", end_offset);
                         self.mark_sealed();
                         let _ = self.seal_task_tx.send(Ok(end_offset));
                         // 2. spawn task to async seal range replicas
                         let replicas = self.replicators.clone();
                         let replica_count = self.metadata.replica_count();
                         let ack_count = self.metadata.ack_count();
-                        let log_indent = self.log_indent.clone();
+                        let log_ident = self.log_ident.clone();
                         tokio_uring::spawn(async move {
                             if Self::replicas_seal(
-                                &log_indent,
+                                &log_ident,
                                 replicas,
                                 replica_count,
                                 ack_count,
@@ -268,7 +269,7 @@ impl ReplicationRange {
                         Ok(end_offset)
                     }
                     Err(e) => {
-                        error!(target: &self.log_indent, "Request pm seal fail, err: {e}");
+                        error!(target: &self.log_ident, "Request pm seal fail, err: {e}");
                         self.erase_sealing();
                         Err(ReplicationError::Internal)
                     }
@@ -278,7 +279,7 @@ impl ReplicationRange {
                 let replicas = self.replicators.clone();
                 // 1. seal range replicas and calculate end offset.
                 match Self::replicas_seal(
-                    &self.log_indent,
+                    &self.log_ident,
                     replicas,
                     self.metadata.replica_count(),
                     self.metadata.ack_count(),
@@ -288,7 +289,7 @@ impl ReplicationRange {
                 {
                     Ok(end_offset) => {
                         // 2. call placement manager to seal range.
-                        info!(target: &self.log_indent, "The range is created by other stream, then seal replicas to calculate end_offset=[{}]", end_offset);
+                        info!(target: &self.log_ident, "The range is created by other stream, then seal replicas to calculate end_offset=[{}]", end_offset);
                         match self.placement_manager_seal(end_offset).await {
                             Ok(_) => {
                                 self.mark_sealed();
@@ -297,7 +298,7 @@ impl ReplicationRange {
                                 Ok(end_offset)
                             }
                             Err(e) => {
-                                error!(target: &self.log_indent, "Request pm seal fail, err: {e}");
+                                error!(target: &self.log_ident, "Request pm seal fail, err: {e}");
                                 self.erase_sealing();
                                 Err(ReplicationError::Internal)
                             }
@@ -329,14 +330,15 @@ impl ReplicationRange {
     }
 
     async fn replicas_seal(
-        log_indent: &String,
-        replicas: Rc<Vec<Rc<Replicator>>>,
+        log_ident: &String,
+        replicas: Rc<RefCell<Vec<Rc<Replicator>>>>,
         replica_count: u32,
         ack_count: u32,
         end_offset: Option<u64>,
     ) -> Result<u64, ReplicationError> {
         let end_offsets = Rc::new(RefCell::new(Vec::<u64>::new()));
         let mut seal_tasks = vec![];
+        let replicas = replicas.borrow().clone();
         for replica in replicas.iter() {
             let end_offsets = end_offsets.clone();
             let replica = replica.clone();
@@ -365,7 +367,7 @@ impl ReplicationRange {
             .nth((replica_count - ack_count) as usize)
             .copied()
             .ok_or(ReplicationError::SealReplicaNotEnough);
-        info!(target: log_indent, "Replicas seal with end_offsets={end_offsets:#?} and final end_offset={end_offset:#?}");
+        info!(target: log_ident, "Replicas seal with end_offsets={end_offsets:#?} and final end_offset={end_offset:#?}");
         end_offset
     }
 

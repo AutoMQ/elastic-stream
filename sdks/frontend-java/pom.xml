@@ -9,7 +9,7 @@
     <name>parent</name>
 
     <modules>
-        <module>frontend</module>
+        <module>client</module>
         <module>examples</module>
     </modules>
 

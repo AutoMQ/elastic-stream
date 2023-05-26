@@ -17,7 +17,7 @@ use protocol::rpc::header::SealKind;
 /// It is created by ReplicationRange and is dropped when the range is sealed.
 #[derive(Debug)]
 pub(crate) struct Replicator {
-    log_indent: String,
+    log_ident: String,
     range: Weak<ReplicationRange>,
     confirm_offset: Rc<RefCell<u64>>,
     data_node: DataNode,
@@ -33,7 +33,7 @@ impl Replicator {
     pub(crate) fn new(range: Rc<ReplicationRange>, data_node: DataNode) -> Self {
         let metadata = range.metadata().clone();
         Self {
-            log_indent: format!(
+            log_ident: format!(
                 "Replica[{}#{}-{}#{}]",
                 metadata.stream_id(),
                 metadata.index(),
@@ -57,11 +57,11 @@ impl Replicator {
             if let Some(client) = range.client() {
                 client
             } else {
-                warn!(target: &self.log_indent, "Client was dropped, aborting replication");
+                warn!(target: &self.log_ident, "Client was dropped, aborting replication");
                 return;
             }
         } else {
-            warn!(target: &self.log_indent, "ReplicationRange was dropped, aborting replication");
+            warn!(target: &self.log_ident, "ReplicationRange was dropped, aborting replication");
             return;
         };
         let offset = Rc::clone(&self.confirm_offset);
@@ -70,24 +70,24 @@ impl Replicator {
         let corrupted = self.corrupted.clone();
 
         // Spawn a task to replicate data to the target data-node.
-        let log_indent = self.log_indent.clone();
+        let log_ident = self.log_ident.clone();
         tokio_uring::spawn(async move {
             let mut attempts = 1;
             loop {
                 if let Some(range) = range.upgrade() {
                     if range.is_sealed() {
-                        info!(target: &log_indent, "Range is sealed, aborting replication");
+                        info!(target: &log_ident, "Range is sealed, aborting replication");
                         break;
                     }
 
                     if attempts > 3 {
-                        warn!(target: &log_indent, "Failed to append entries after 3 attempts, aborting replication");
+                        warn!(target: &log_ident, "Failed to append entries after 3 attempts, aborting replication");
                         // TODO: Mark replication range as failing and incur seal immediately.
                         corrupted.replace(true);
                         break;
                     }
                 } else {
-                    warn!(target: &log_indent, "ReplicationRange was dropped, aborting replication");
+                    warn!(target: &log_ident, "ReplicationRange was dropped, aborting replication");
                     return;
                 }
 
@@ -97,13 +97,13 @@ impl Replicator {
                 match result {
                     Ok(append_result_entries) => {
                         if append_result_entries.len() != 1 {
-                            error!(target: &log_indent, "Failed to append entries: unexpected number of entries returned. Retry...");
+                            error!(target: &log_ident, "Failed to append entries: unexpected number of entries returned. Retry...");
                             attempts += 1;
                             continue;
                         }
                         let status = &(append_result_entries[0].status);
                         if status.code != ErrorCode::OK {
-                            warn!(target: &log_indent, "Failed to append entries: status code {status:?} is not OK. Retry...");
+                            warn!(target: &log_ident, "Failed to append entries: status code {status:?} is not OK. Retry...");
                             attempts += 1;
                             continue;
                         }
@@ -114,7 +114,7 @@ impl Replicator {
                         // TODO: inspect error and retry only if it's a network error.
                         // If the error is a protocol error, we should abort replication.
                         // If the range is sealed on data-node, we should abort replication and fire replication seal immediately.
-                        warn!(target: &log_indent, "Failed to append entries: {e}. Retry...");
+                        warn!(target: &log_ident, "Failed to append entries: {e}. Retry...");
                         attempts += 1;
                         // TODO: Retry immediately?
                         continue;
@@ -152,7 +152,7 @@ impl Replicator {
                     Ok(result) => {
                         let status = result.status;
                         if status.code != ErrorCode::OK {
-                            warn!(target: &self.log_indent, "Failed to fetch entries: status {:?}", status);
+                            warn!(target: &self.log_ident, "Failed to fetch entries: status {:?}", status);
                             Err(ReplicationError::Internal)
                         } else {
                             Ok(result.data.unwrap_or_default())
@@ -161,11 +161,11 @@ impl Replicator {
                     Err(_) => Err(ReplicationError::Internal),
                 }
             } else {
-                warn!(target: &self.log_indent, "Client was dropped, aborting replication");
+                warn!(target: &self.log_ident, "Client was dropped, aborting replication");
                 Err(ReplicationError::Internal)
             }
         } else {
-            warn!(target: &self.log_indent, "ReplicationRange was dropped, aborting fetch");
+            warn!(target: &self.log_ident, "ReplicationRange was dropped, aborting fetch");
             Err(ReplicationError::Internal)
         }
     }
@@ -190,21 +190,21 @@ impl Replicator {
                 {
                     Ok(metadata) => {
                         let end_offset = metadata.end().ok_or(ReplicationError::Internal)?;
-                        warn!(target: &self.log_indent, "Seal replica success with end_offset {end_offset}");
+                        warn!(target: &self.log_ident, "Seal replica success with end_offset {end_offset}");
                         *self.confirm_offset.borrow_mut() = end_offset;
                         Ok(end_offset)
                     }
                     Err(e) => {
-                        error!(target: &self.log_indent, "Seal replica fail, err: {e}");
+                        error!(target: &self.log_ident, "Seal replica fail, err: {e}");
                         Err(ReplicationError::Internal)
                     }
                 };
             } else {
-                warn!(target: &self.log_indent, "Client was dropped, aborting seal");
+                warn!(target: &self.log_ident, "Client was dropped, aborting seal");
                 Err(ReplicationError::AlreadyClosed)
             }
         } else {
-            warn!(target: &self.log_indent, "Range was dropped, aborting seal");
+            warn!(target: &self.log_ident, "Range was dropped, aborting seal");
             Err(ReplicationError::AlreadyClosed)
         }
     }

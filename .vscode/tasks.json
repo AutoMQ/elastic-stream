@@ -10,7 +10,7 @@
         {
             "label": "build-frontend",
             "command": "cargo",
-            "args": [ "build", "--features", "paranoid", "-p", "frontend"],
+            "args": [ "build", "-p", "frontend"],
             "group": "build",
         }
     ]
