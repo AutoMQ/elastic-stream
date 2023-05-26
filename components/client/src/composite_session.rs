@@ -451,7 +451,7 @@ impl CompositeSession {
         range: RangeMetadata,
     ) -> Result<RangeMetadata, ClientError> {
         self.try_reconnect().await;
-        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
+        if let Some(session) = self.pick_session(self.lb_policy) {
             let (tx, rx) = oneshot::channel();
             let stream_id = range.stream_id();
             let request = request::Request {

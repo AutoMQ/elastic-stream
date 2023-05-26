@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use model::error;
 use protocol::rpc::header::ErrorCode;
 use thiserror::Error;
 

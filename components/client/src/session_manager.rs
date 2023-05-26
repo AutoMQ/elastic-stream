@@ -34,17 +34,23 @@ impl SessionManager {
         match sessions.get(target) {
             Some(session) => Ok(Rc::clone(session)),
             None => {
+                let lb_policy = if target == self.config.placement_manager {
+                    super::lb_policy::LbPolicy::LeaderOnly
+                } else {
+                    super::lb_policy::LbPolicy::PickFirst
+                };
+
                 let session = Rc::new(
                     CompositeSession::new(
                         target,
                         Arc::clone(&self.config),
-                        super::lb_policy::LbPolicy::PickFirst,
+                        lb_policy,
                         self.shutdown.clone(),
                     )
                     .await?,
                 );
 
-                if target == self.config.placement_manager {
+                if lb_policy == super::lb_policy::LbPolicy::LeaderOnly {
                     session.refresh_cluster().await;
                 }
 
