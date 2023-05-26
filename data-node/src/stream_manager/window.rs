@@ -1,5 +1,6 @@
 use std::collections::BinaryHeap;
 
+use log::trace;
 use model::Batch;
 
 /// Append Request Window ensures append requests of a stream range are dispatched to store in order.
@@ -31,13 +32,15 @@ where
         self.next = next;
     }
 
-    #[inline(always)]
-    pub(crate) fn accept(&self, request: &R) -> bool {
-        request.offset() == self.next
-    }
-
     pub(crate) fn fast_forward(&mut self, request: &R) -> bool {
-        if self.accept(request) {
+        if request.offset() < self.next {
+            trace!(
+                "Retry request tolerated, offset={}, len={}",
+                request.offset(),
+                request.len()
+            );
+            return true;
+        } else if request.offset() == self.next {
             self.next += request.len() as u64;
             return true;
         }
