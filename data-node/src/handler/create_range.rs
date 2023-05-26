@@ -4,7 +4,7 @@ use bytes::Bytes;
 use codec::frame::Frame;
 use log::{error, trace, warn};
 use model::range::RangeMetadata;
-use protocol::rpc::header::{CreateRangeRequest, ErrorCode, SealRangeResponseT, StatusT};
+use protocol::rpc::header::{CreateRangeRequest, ErrorCode, RangeT, SealRangeResponseT, StatusT};
 use store::ElasticStore;
 
 use crate::stream_manager::StreamManager;
@@ -51,6 +51,7 @@ impl<'a> CreateRange<'a> {
         if let Err(e) = manager.create_range(range.clone()).await {
             error!("Failed to create range: {:?}", e);
             let mut status = StatusT::default();
+            // TODO: Map service error to the corresponding error code.
             status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
             status.message = Some(format!("Failed to create range: {}", e.to_string()));
             create_response.status = Box::new(status);
@@ -59,6 +60,8 @@ impl<'a> CreateRange<'a> {
             status.code = ErrorCode::OK;
             status.message = Some(String::from("OK"));
             create_response.status = Box::new(status);
+            // Write back the range metadata to client so that client may maintain consistent code.
+            create_response.range = Some(Box::new(Into::<RangeT>::into(&range)));
             trace!("Created range={:?}", range);
         }
 

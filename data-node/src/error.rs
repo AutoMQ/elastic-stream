@@ -18,7 +18,7 @@ pub enum ServiceError {
     #[error("The range is already sealed")]
     AlreadySealed,
 
-    #[error("The range is already existed")]
+    #[error("The range already existed")]
     AlreadyExisted,
 
     #[error("Resource `{0}` is not found")]

@@ -332,8 +332,8 @@ impl ReplicationRange {
     async fn replicas_seal(
         log_ident: &String,
         replicas: Rc<RefCell<Vec<Rc<Replicator>>>>,
-        replica_count: u32,
-        ack_count: u32,
+        replica_count: u8,
+        ack_count: u8,
         end_offset: Option<u64>,
     ) -> Result<u64, ReplicationError> {
         let end_offsets = Rc::new(RefCell::new(Vec::<u64>::new()));

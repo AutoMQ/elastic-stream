@@ -34,11 +34,11 @@ pub struct RangeMetadata {
 
     /// The range replica expected count. When cluster nodes count is less than replica count but
     /// but larger than ack_count, the range can still be successfully created.
-    replica_count: u32,
+    replica_count: u8,
 
     /// The range replica ack count, only success ack >= ack_count, then the write is success.
     /// For seal range, success seal range must seal replica count >= (replica_count - ack_count + 1)
-    ack_count: u32,
+    ack_count: u8,
 }
 
 impl RangeMetadata {
@@ -62,8 +62,8 @@ impl RangeMetadata {
         epoch: u64,
         start: u64,
         end: Option<u64>,
-        replica_count: u32,
-        ack_count: u32,
+        replica_count: u8,
+        ack_count: u8,
     ) -> Self {
         Self {
             stream_id,
@@ -117,11 +117,11 @@ impl RangeMetadata {
         self.end
     }
 
-    pub fn replica_count(&self) -> u32 {
+    pub fn replica_count(&self) -> u8 {
         self.replica_count
     }
 
-    pub fn ack_count(&self) -> u32 {
+    pub fn ack_count(&self) -> u8 {
         self.ack_count
     }
 
@@ -169,6 +169,8 @@ impl From<&RangeMetadata> for RangeT {
         } else {
             range.nodes = Some(replica);
         }
+        range.replica_count = value.replica_count as i8;
+        range.ack_count = value.ack_count as i8;
         range
     }
 }
@@ -191,8 +193,8 @@ impl From<&RangeT> for RangeMetadata {
                 offset => Some(offset as u64),
             },
             replica,
-            replica_count: value.replica_count as u32,
-            ack_count: value.ack_count as u32,
+            replica_count: value.replica_count as u8,
+            ack_count: value.ack_count as u8,
         }
     }
 }

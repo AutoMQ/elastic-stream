@@ -378,7 +378,7 @@ mod tests {
         test_util::try_init_log();
         tokio_uring::start(async move {
             #[allow(unused_variables)]
-            let port = 2378;
+            let port = 12378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
@@ -418,6 +418,33 @@ mod tests {
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
             let range = RangeMetadata::new(100, 0, 0, 0, None);
+            client.create_range_replica(&target, range).await
+        })
+    }
+
+    #[test]
+    fn test_create_range_data_node() -> Result<(), ClientError> {
+        test_util::try_init_log();
+        tokio_uring::start(async {
+            #[allow(unused_variables)]
+            let placement_manager_port = 12378;
+            let placement_manager_port = run_listener().await;
+
+            #[allow(unused_variables)]
+            let data_node_port = 10911;
+            let data_node_port = run_listener().await;
+
+            let mut config = config::Configuration::default();
+            config.server.host = "127.0.0.1".to_owned();
+            config.server.port = data_node_port;
+            config.placement_manager = format!("127.0.0.1:{}", placement_manager_port);
+
+            let target = format!("127.0.0.1:{}", data_node_port);
+
+            let config = Arc::new(config);
+            let (tx, _rx) = broadcast::channel(1);
+            let client = Client::new(config, tx);
+            let range = RangeMetadata::new_range(203, 0, 0, 0, None, 1, 1);
             client.create_range_replica(&target, range).await
         })
     }

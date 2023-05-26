@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::{error, info, trace, warn};
 use model::{range::RangeMetadata, stream::StreamMetadata};
 
 use crate::error::ServiceError;
@@ -45,13 +45,31 @@ impl Stream {
     pub(crate) fn create_range(&mut self, metadata: RangeMetadata) -> Result<(), ServiceError> {
         self.verify_stream_id(&metadata)?;
 
-        let existed = self
+        let res = self
             .ranges
             .iter()
-            .any(|range: &Range| range.metadata.index() == metadata.index());
-        if existed {
-            info!("Range already exists, metadata={}", metadata);
-            return Err(ServiceError::AlreadyExisted);
+            .find(|range| range.metadata.index() == metadata.index());
+
+        if let Some(range) = res {
+            if range.metadata == metadata {
+                trace!("No-op, when creating range with same metadata");
+                return Ok(());
+            } else {
+                error!(
+                    "Attempting to create inconsistent range. Prior range-metadata={}, attempted range-metadata={:#?}",
+                    range.metadata, metadata
+                );
+                return Err(ServiceError::AlreadyExisted);
+            }
+        }
+
+        if let Some(range) = self.ranges.iter().rev().next() {
+            if range.metadata.index() > metadata.index() {
+                warn!(
+                    "Attempting to create a range which should have been sealed: {:#?}. Last range on current node: {:#?}",
+                    metadata, range.metadata
+                );
+            }
         }
 
         self.ranges.push(Range::new(metadata));

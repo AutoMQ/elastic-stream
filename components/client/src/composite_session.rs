@@ -482,6 +482,7 @@ impl CompositeSession {
                 );
                 return Err(ClientError::CreateRange(response.status.code));
             }
+
             if let Some(response::Headers::CreateRange { range }) = response.headers {
                 Ok(range)
             } else {
