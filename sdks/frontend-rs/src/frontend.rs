@@ -35,7 +35,7 @@ impl Frontend {
             .stream_client
             .create_stream(options.replica, options.ack, options.retention)
             .await?;
-        info!("Stream[id={stream_id}] created");
+        info!("Created Stream[id={stream_id}]");
         Ok(stream_id)
         // Ok(Stream::new(stream_id, self.stream_client.clone()))
     }
