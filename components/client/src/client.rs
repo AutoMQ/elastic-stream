@@ -212,7 +212,15 @@ impl Client {
 
             Some(addr) => session_manager.get_composite_session(addr).await?,
         };
-        composite_session.seal(kind, range).await
+        let future = composite_session.seal(kind, range);
+        time::timeout(self.config.client_io_timeout(), future)
+            .await
+            .map_err(|_| {
+                error!("Timeout when seal range");
+                ClientError::RpcTimeout {
+                    timeout: self.config.client_io_timeout(),
+                }
+            })?
     }
 
     /// Append data to a range.

@@ -322,7 +322,10 @@ impl ReplicationRange {
                 .await
             {
                 Ok(_) => Ok(()),
-                Err(_) => Err(ReplicationError::Internal),
+                Err(e) => {
+                    error!(target: &self.log_ident, "Request pm seal with end_offset[{end_offset}] fail, err: {e}");
+                    Err(ReplicationError::Internal)
+                }
             }
         } else {
             Err(ReplicationError::AlreadyClosed)

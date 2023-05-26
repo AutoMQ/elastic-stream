@@ -214,22 +214,16 @@ impl CompositeSession {
         }
     }
 
-    fn pick_session(&self, lb_policy: LbPolicy) -> Option<Session> {
+    async fn pick_session(&self, lb_policy: LbPolicy) -> Option<Session> {
         match lb_policy {
-            LbPolicy::LeaderOnly => self
-                .sessions
-                .borrow()
-                .iter()
-                .filter(|&(_, session)| {
-                    trace!(
-                        "State of session to {} is {:?}",
-                        session.target,
-                        session.state()
-                    );
-                    session.state() == NodeState::Leader
-                })
-                .map(|(_, session)| session.clone())
-                .next(),
+            LbPolicy::LeaderOnly => match self.pick_leader_session() {
+                Some(session) => Some(session),
+                None => {
+                    trace!("No leader session found, try describe placement manager cluster again");
+                    self.refresh_cluster().await;
+                    self.pick_leader_session()
+                }
+            },
             LbPolicy::PickFirst => self
                 .sessions
                 .borrow()
@@ -237,6 +231,22 @@ impl CompositeSession {
                 .map(|(_, session)| session.clone())
                 .next(),
         }
+    }
+
+    fn pick_leader_session(&self) -> Option<Session> {
+        self.sessions
+            .borrow()
+            .iter()
+            .filter(|&(_, session)| {
+                trace!(
+                    "State of session to {} is {:?}",
+                    session.target,
+                    session.state()
+                );
+                session.state() == NodeState::Leader
+            })
+            .map(|(_, session)| session.clone())
+            .next()
     }
 
     /// Broadcast heartbeat requests to all nested sessions.
@@ -307,7 +317,7 @@ impl CompositeSession {
         timeout: Option<Duration>,
     ) -> Result<i32, ClientError> {
         self.try_reconnect().await;
-        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
+        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly).await {
             let request = request::Request {
                 timeout: timeout.unwrap_or(self.config.client_io_timeout()),
                 headers: request::Headers::AllocateId {
@@ -357,6 +367,7 @@ impl CompositeSession {
         self.try_reconnect().await;
         let session = self
             .pick_session(LbPolicy::LeaderOnly)
+            .await
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
         let (tx, rx) = oneshot::channel();
         let request = request::Request {
@@ -403,6 +414,7 @@ impl CompositeSession {
         self.try_reconnect().await;
         let session = self
             .pick_session(LbPolicy::PickFirst)
+            .await
             .ok_or(ClientError::ClientInternal)?;
 
         let request = request::Request {
@@ -451,7 +463,7 @@ impl CompositeSession {
         range: RangeMetadata,
     ) -> Result<RangeMetadata, ClientError> {
         self.try_reconnect().await;
-        if let Some(session) = self.pick_session(self.lb_policy) {
+        if let Some(session) = self.pick_session(self.lb_policy).await {
             let (tx, rx) = oneshot::channel();
             let stream_id = range.stream_id();
             let request = request::Request {
@@ -498,7 +510,7 @@ impl CompositeSession {
         criteria: ListRangeCriteria,
     ) -> Result<Vec<RangeMetadata>, ClientError> {
         self.try_reconnect().await;
-        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly) {
+        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly).await {
             let request = request::Request {
                 timeout: self.config.client_io_timeout(),
                 headers: request::Headers::ListRange { criteria },
@@ -666,6 +678,7 @@ impl CompositeSession {
         self.try_reconnect().await;
         let session = self
             .pick_session(LbPolicy::LeaderOnly)
+            .await
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
@@ -801,6 +814,7 @@ impl CompositeSession {
         self.try_reconnect().await;
         let session = self
             .pick_session(self.lb_policy)
+            .await
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
 
         let request = request::Request {
@@ -838,6 +852,7 @@ impl CompositeSession {
         self.try_reconnect().await;
         let session = self
             .pick_session(self.lb_policy)
+            .await
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
 
         let request = request::Request {

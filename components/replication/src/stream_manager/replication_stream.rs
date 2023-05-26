@@ -349,7 +349,7 @@ impl ReplicationStream {
                             }
                             Err(_) => {
                                 // delay retry to avoid busy loop
-                                sleep(Duration::from_millis(100)).await;
+                                sleep(Duration::from_millis(1000)).await;
                             }
                         }
                         stream.trigger_append_task();
