@@ -207,6 +207,7 @@ mod tests {
 
         // Decode the above bytes to FlatRecordBatch
         let mut batch_buf = bytes_mute.freeze();
+        let backup_buf = batch_buf.clone();
         let flat_batch = FlatRecordBatch::init_from_buf(&mut batch_buf).unwrap();
         let mut record_batch = flat_batch.decode().unwrap();
 
@@ -217,7 +218,7 @@ mod tests {
         assert_eq!(record_batch.range_index(), 0);
         assert_eq!(record_batch.metadata.base_offset, 1024);
         assert_eq!(record_batch.metadata.last_offset_delta, 10);
-        assert_eq!(record_batch.payload, Bytes::from("hello world"));
+        assert_eq!(record_batch.payload, backup_buf);
 
         let properties = record_batch.metadata.properties.take();
         assert!(properties.is_some());
