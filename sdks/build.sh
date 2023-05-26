@@ -2,6 +2,6 @@
 
 BASEDIR=$(dirname "$0")
 cd "$BASEDIR/.." || exit
-cargo build -p frontend -Z unstable-options --out-dir=sdks/frontend-java/frontend/src/main/resources/META-INF/native/
+cargo build -p frontend -Z unstable-options --out-dir=sdks/frontend-java/client/src/main/resources/META-INF/native/
 cd sdks/frontend-java || exit
 mvn package
