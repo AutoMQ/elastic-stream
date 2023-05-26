@@ -60,6 +60,8 @@ impl FlatRecordBatch {
     }
 
     /// Inits a FlatRecordBatch from a buffer of bytes received from storage or network layer.
+    /// 
+    /// * Side effect: the position of the given buf will be advanced after a successful init, if any error occurs, the position will not be changed.
     pub fn init_from_buf(buf: &mut Bytes) -> Result<Self, DecodeError> {
         let mut cursor = Cursor::new(&buf[..]);
         if cursor.remaining() < MIN_RECORD_BATCH_LEN {
@@ -204,8 +206,12 @@ mod tests {
         assert_eq!(total_len, 0);
 
         // Decode the above bytes to FlatRecordBatch
-        let flat_batch = FlatRecordBatch::init_from_buf(&mut bytes_mute.freeze()).unwrap();
+        let mut batch_buf = bytes_mute.freeze();
+        let flat_batch = FlatRecordBatch::init_from_buf(&mut batch_buf).unwrap();
         let mut record_batch = flat_batch.decode().unwrap();
+
+        // Side effect test: the position of batch_buf should be advanced to the end.
+        assert_eq!(batch_buf.len(), 0);
 
         assert_eq!(record_batch.stream_id(), stream_id);
         assert_eq!(record_batch.range_index(), 0);
