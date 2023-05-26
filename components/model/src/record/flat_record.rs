@@ -97,7 +97,7 @@ impl FlatRecordBatch {
         // Slice payload
         let payload_from = 1 /* magic-code */ + 4 /* metadata length field */ + metadata_len + 4 /* payload length field */;
         let payload_to = payload_from + payload_len;
-        let payload = buf.slice(payload_from..payload_to);
+        let payload = buf.slice(..payload_to);
 
         buf.advance(payload_to);
 

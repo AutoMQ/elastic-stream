@@ -14,6 +14,7 @@ pub struct AppendRecordRequest {
 
     pub len: usize,
 
+    // Buffer of a complete AppendEntry 
     pub buffer: bytes::Bytes,
 }
 
