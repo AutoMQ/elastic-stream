@@ -99,7 +99,7 @@ func startSbpHandler(tb testing.TB, sbpClient sbpClient.Client, isLeader bool) (
 		server = &mockServerNotLeader{server}
 	}
 
-	c := cluster.NewRaftCluster(context.Background(), &config.Cluster{SealReqTimeoutMs: 1000, DataNodeTimeout: time.Minute}, zap.NewNop())
+	c := cluster.NewRaftCluster(context.Background(), &config.Cluster{SealReqTimeoutMs: 1000, DataNodeTimeout: time.Minute}, server.Member(), zap.NewNop())
 	err := c.Start(server)
 	re.NoError(err)
 

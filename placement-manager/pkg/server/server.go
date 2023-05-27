@@ -198,7 +198,7 @@ func (s *Server) startServer() error {
 		MaxTxnOps: s.cfg.Etcd.MaxTxnOps,
 	}, logger)}
 	s.storage = endpoint.NewEndpoint(etcdKV, logger)
-	s.cluster = cluster.NewRaftCluster(s.ctx, s.cfg.Cluster, logger)
+	s.cluster = cluster.NewRaftCluster(s.ctx, s.cfg.Cluster, s.member, logger)
 	s.sbpClient = sbpClient.NewClient(s.cfg.Sbp.Client, logger)
 
 	sbpAddr := s.cfg.SbpAddr

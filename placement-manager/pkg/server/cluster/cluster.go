@@ -83,12 +83,13 @@ type Server interface {
 }
 
 // NewRaftCluster creates a new RaftCluster.
-func NewRaftCluster(ctx context.Context, cfg *config.Cluster, logger *zap.Logger) *RaftCluster {
+func NewRaftCluster(ctx context.Context, cfg *config.Cluster, member Member, logger *zap.Logger) *RaftCluster {
 	return &RaftCluster{
-		ctx:   ctx,
-		cfg:   cfg,
-		cache: cache.NewCache(),
-		lg:    logger,
+		ctx:    ctx,
+		cfg:    cfg,
+		member: member,
+		cache:  cache.NewCache(),
+		lg:     logger,
 	}
 }
 
@@ -108,7 +109,6 @@ func (c *RaftCluster) Start(s Server) error {
 	logger.Info("starting raft cluster")
 
 	c.storage = s.Storage()
-	c.member = s.Member()
 	c.runningCtx, c.runningCancel = context.WithCancel(c.ctx)
 	c.sAlloc = s.IDAllocator(_streamIDAllocKey, uint64(endpoint.MinStreamID), _streamIDStep)
 	c.dnAlloc = s.IDAllocator(_dataNodeIDAllocKey, uint64(endpoint.MinDataNodeID), _dataNodeIDStep)

@@ -19,7 +19,7 @@ func TestRaftCluster_fillDataNodesInfo(t *testing.T) {
 
 	var node rpcfb.DataNodeT
 	_ = gofakeit.New(1).Struct(&node)
-	cluster := NewRaftCluster(context.Background(), nil, zap.NewNop())
+	cluster := NewRaftCluster(context.Background(), nil, nil, zap.NewNop())
 	cluster.cache.SaveDataNode(&cache.DataNode{
 		DataNodeT: node,
 	})
