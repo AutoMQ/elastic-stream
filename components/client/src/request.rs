@@ -206,6 +206,8 @@ impl From<&Request> for Bytes {
                         })
                         .collect(),
                 );
+                let request = request.pack(&mut builder);
+                builder.finish(request, None);
             }
 
             Headers::ReportMetrics {

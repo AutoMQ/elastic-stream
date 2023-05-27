@@ -2,6 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "java",
+            "name": "Main",
+            "request": "launch",
+            "mainClass": "com.automq.elasticstream.client.examples.Main",
+            "projectName": "examples"
+        },
+        {
             "type": "lldb",
             "name": "Launch Data Node",
             "request": "launch",
@@ -11,8 +18,10 @@
                 "RUST_LOG": "trace"
             },
             "args": [
-                "-c", "${workspaceFolder}/etc/data-node.yaml",
-                "-l", "${workspaceFolder}/etc/data-node-log.yaml",
+                "-c",
+                "${workspaceFolder}/etc/data-node.yaml",
+                "-l",
+                "${workspaceFolder}/etc/data-node-log.yaml"
             ]
         },
         {
@@ -23,7 +32,7 @@
             "program": "${workspaceFolder}/target/debug/examples/main",
             "env": {
                 "RUST_LOG": "trace"
-            },
+            }
         }
     ]
 }
