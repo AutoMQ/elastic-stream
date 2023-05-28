@@ -31,9 +31,8 @@ pub struct ReadOptions {
     /// Logical offset, from which to read records
     pub offset: i64,
 
-    /// Logical offset, the exclusive upper bound of the read range
-    /// `None` means there is no upper bound
-    pub max_offset: Option<i64>,
+    /// Logical offset, the exclusive upper boundary of the read range, specified by client.
+    pub max_offset: u64,
 
     /// The maximum time in milliseconds to wait for the read response.
     pub max_wait_ms: i32,

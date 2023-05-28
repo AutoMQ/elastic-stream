@@ -182,17 +182,11 @@ impl<'a> Fetch<'a> {
                     .borrow_mut()
                     .stream_range_of(stream_id, req.fetch_offset() as u64)
                 {
-                    let max_offset = match range.metadata.end() {
-                        // For a sealed range, the upper bound is the end offset(exclusive)
-                        Some(end) => Some(end as i64),
-                        // TODO: offset should have been filled in the client side.
-                        None => Some(0),
-                    };
                     return Ok(ReadOptions {
                         stream_id: stream_id,
                         range: range.metadata.index() as u32,
                         offset: req.fetch_offset(),
-                        max_offset: max_offset,
+                        max_offset: req.end_offset() as u64,
                         max_wait_ms: self.fetch_request.max_wait_ms(),
                         max_bytes: req.batch_max_bytes(),
                     });

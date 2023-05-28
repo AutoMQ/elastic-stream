@@ -235,7 +235,7 @@ impl Store for ElasticStore {
             options.stream_id,
             options.range,
             options.offset as u64,
-            options.max_offset.map(|o| o as u64),
+            options.max_offset,
             options.max_bytes as u32,
             index_tx,
         );
@@ -502,7 +502,7 @@ mod tests {
                             stream_id: 1,
                             range: 0,
                             offset: 0,
-                            max_offset: None,
+                            max_offset: 1024,
                             max_bytes: 1,
                             max_wait_ms: 1000,
                         };
@@ -537,7 +537,7 @@ mod tests {
                 stream_id: 1,
                 range: 0,
                 offset: 0,
-                max_offset: None,
+                max_offset: 1024,
                 max_bytes: 1024 * 1024 * 1024,
                 max_wait_ms: 1000,
             };

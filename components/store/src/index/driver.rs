@@ -32,7 +32,7 @@ pub(crate) enum IndexCommand {
         stream_id: i64,
         range: u32,
         offset: u64,
-        max_offset: Option<u64>,
+        max_offset: u64,
         max_bytes: u32,
         observer: oneshot::Sender<Result<Option<Vec<RecordHandle>>, StoreError>>,
     },
@@ -98,7 +98,7 @@ impl IndexDriver {
         stream_id: i64,
         range: u32,
         offset: u64,
-        max_offset: Option<u64>,
+        max_offset: u64,
         max_bytes: u32,
         observer: oneshot::Sender<Result<Option<Vec<RecordHandle>>, StoreError>>,
     ) {

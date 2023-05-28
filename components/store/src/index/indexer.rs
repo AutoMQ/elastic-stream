@@ -197,13 +197,13 @@ impl Indexer {
 
     /// The specific offset is not guaranteed to exist,
     /// because it may have been compacted or point to a intermediate position of a record batch.
-    /// So the `scan_record_handles_left_shift` will left shift the offset as a lower bound to scan the records
+    /// So the `scan_record_handles_left_shift` will left-shift the offset as a lower bound to scan the records
     pub(crate) fn scan_record_handles_left_shift(
         &self,
         stream_id: i64,
         range: u32,
         offset: u64,
-        max_offset: Option<u64>,
+        max_offset: u64,
         max_bytes: u32,
     ) -> Result<Option<Vec<RecordHandle>>, StoreError> {
         let left_key = self.retrieve_left_key(stream_id, range, offset)?;
@@ -212,10 +212,8 @@ impl Indexer {
         read_opts.set_iterate_lower_bound(&left_key[..]);
         read_opts.set_iterate_upper_bound((stream_id + 1).to_be_bytes());
 
-        if let Some(max_offset) = max_offset {
-            let upper_key = self.build_index_key(stream_id, range, max_offset);
-            read_opts.set_iterate_upper_bound(&upper_key[..]);
-        }
+        let upper_key = self.build_index_key(stream_id, range, max_offset);
+        read_opts.set_iterate_upper_bound(&upper_key[..]);
 
         self.scan_record_handles_from(read_opts, max_bytes)
     }
@@ -805,7 +803,7 @@ mod tests {
         // While the logical offset is 10, 20, 30, ..., which means each record batch contains 10 records.
 
         // Case one: scan from a exist key
-        let handles = indexer.scan_record_handles_left_shift(0, range, 10, None, 128 * 2)?;
+        let handles = indexer.scan_record_handles_left_shift(0, range, 10, 100, 128 * 2)?;
         assert_eq!(true, handles.is_some());
         let handles = handles.unwrap();
         assert_eq!(2, handles.len());
@@ -817,7 +815,7 @@ mod tests {
         });
 
         // Case two: scan from a left key
-        let handles = indexer.scan_record_handles_left_shift(0, range, 12, None, 128 * 2)?;
+        let handles = indexer.scan_record_handles_left_shift(0, range, 12, 100, 128 * 2)?;
         assert_eq!(true, handles.is_some());
         let handles = handles.unwrap();
         assert_eq!(2, handles.len());
@@ -829,7 +827,7 @@ mod tests {
         });
 
         // Case three: scan from a key smaller than the smallest key
-        let handles = indexer.scan_record_handles_left_shift(0, range, 1, None, 128 * 2)?;
+        let handles = indexer.scan_record_handles_left_shift(0, range, 1, 100, 128 * 2)?;
         assert_eq!(true, handles.is_some());
         let handles = handles.unwrap();
         assert_eq!(2, handles.len());
@@ -842,11 +840,11 @@ mod tests {
 
         // Case four: scan from a key bigger than the biggest key
 
-        let handles = indexer.scan_record_handles_left_shift(0, range, CNT * 11, None, 128 * 2)?;
+        let handles = indexer.scan_record_handles_left_shift(0, range, CNT * 11, 100, 128 * 2)?;
         assert_eq!(true, handles.is_none());
 
         // Case five: scan with a max offset
-        let handles = indexer.scan_record_handles_left_shift(0, range, 10, Some(40), 128 * 10)?;
+        let handles = indexer.scan_record_handles_left_shift(0, range, 10, 40, 128 * 10)?;
         // Three records are scanned
         assert_eq!(true, handles.is_some());
         let handles = handles.unwrap();
