@@ -74,10 +74,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let end = i + 11; // in middle of next record batch
             let mut bytes = vec_bytes_to_bytes(stream.read(start, end, i32::MAX).await?);
             let records = decode_flat_record_batch(&mut bytes)?;
-            // exepct read 2 record batch
+            // expect read 2 record batch
             assert_eq!(2, records.len());
             for j in 0..2 as i64 {
-                let record = &records[j];
+                let record = &records[j as usize];
                 assert_eq!((i + j) * 10, record.base_offset());
                 assert_eq!(
                     record.payload(),

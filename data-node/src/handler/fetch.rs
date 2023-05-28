@@ -3,7 +3,7 @@ use codec::frame::Frame;
 
 use flatbuffers::FlatBufferBuilder;
 use futures::Future;
-use log::warn;
+use log::{trace, warn};
 use protocol::rpc::header::{
     ErrorCode, FetchRequest, FetchResponseArgs, FetchResultEntryArgs, StatusArgs,
 };
@@ -43,7 +43,7 @@ impl<'a> Fetch<'a> {
                 return Err(ErrorCode::BAD_REQUEST);
             }
         };
-
+        trace!("Received {fetch_request:#?}");
         Ok(Fetch { fetch_request })
     }
 

@@ -19,18 +19,17 @@ appenders:
       pattern: "{d(%Y-%m-%d %H:%M:%S)} | {({l}):5.5} | {f}:{L} — {m}{n}"
 
 root:
-  level: info 
+  level: trace 
   appenders:
     - stdout
 
 loggers:
   store:
-    level: info
+    level: trace
     appenders:
       - store
     additive: false
-
-  data-node:
+  data_node:
     level: trace
     appenders:
       - data-node

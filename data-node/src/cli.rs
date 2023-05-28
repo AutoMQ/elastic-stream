@@ -1,5 +1,6 @@
 use clap::Parser;
 use config::Configuration;
+use log::info;
 use std::{fs::File, path::Path};
 
 #[derive(Debug, Parser, Clone)]
@@ -29,7 +30,9 @@ impl Cli {
             std::process::exit(22);
         }
 
-        log4rs::init_file(log_config, Default::default())
+        log4rs::init_file(log_config, Default::default())?;
+        info!("Log initialized");
+        Ok(())
     }
 
     pub fn create_config(&self) -> anyhow::Result<Configuration> {
