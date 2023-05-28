@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Created stream with id: {}", stream_id);
         let stream = frontend.open(stream_id, 0).await?;
 
-        info!("Step1: append 10 record batch");
+        info!("Step1: append 10-record batch");
         for i in 0..10 {
             let payload = Bytes::from(format!("Hello World {i:0>8}!"));
             let record_batch = RecordBatch::new_builder()
@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let end = i + 11; // in middle of next record batch
             let mut bytes = vec_bytes_to_bytes(stream.read(start, end, i32::MAX).await?);
             let records = decode_flat_record_batch(&mut bytes)?;
-            // expect read 2 record batch
+            // expect to read 2 record batches
             assert_eq!(2, records.len());
             for j in 0..2 as i64 {
                 let record = &records[j as usize];
@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sleep(Duration::from_secs(1)).await;
         let stream = frontend.open(stream_id, 0).await?;
 
-        info!("Step5: append more 10 record batch");
+        info!("Step5: append more 10-record batches");
         for i in 0..10 {
             let offset = i + 10;
             let payload = Bytes::from(format!("Hello World {offset:0>8}!"));
