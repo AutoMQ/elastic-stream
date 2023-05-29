@@ -14,9 +14,8 @@ use crate::{
 
 use io_uring::{opcode, squeue, types};
 use log::{debug, error, info, trace, warn};
-use model::{payload::Payload, record::flat_record::FlatRecordBatch};
+use model::payload::Payload;
 use percentage::Percentage;
-use protocol::flat_model::records::RecordBatchMeta;
 
 /// A WalCache holds the configurations of cache management, and supports count the usage of the memory.
 pub(crate) struct WalCache {
