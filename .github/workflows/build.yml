@@ -32,10 +32,6 @@ jobs:
     needs: [paths-filter]
     if: ${{ needs.paths-filter.outputs.java == 'true' }}
     uses: ./.github/workflows/java_build.yml
-  java-snapshot-release:
-    needs: [java-build]
-    if: ${{ needs.paths-filter.outputs.java == 'true' }}
-    uses: ./.github/workflows/java_snapshot_release.yml
   rust-build:
     needs: [paths-filter]
     if: ${{ needs.paths-filter.outputs.rust == 'true' }}
