@@ -6,6 +6,7 @@ use log::{error, info};
 use std::alloc::Layout;
 use std::cell::{OnceCell, RefCell};
 use std::ffi::c_void;
+use std::io::Write;
 use std::slice;
 use std::sync::Arc;
 use std::time::Duration;
@@ -212,6 +213,19 @@ async fn process_create_stream_command(
 /// This function could be only called by java vm when onload this lib.
 #[no_mangle]
 pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
+    env_logger::builder()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{}:{} {} [{}] - {}",
+                record.file().unwrap_or("unknown"),
+                record.line().unwrap_or(0),
+                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                record.level(),
+                record.args()
+            )
+        })
+        .init();
     let java_vm = Arc::new(vm);
     let (tx, mut rx) = mpsc::unbounded_channel();
     if let Err(_) = unsafe { TX.set(tx) } {

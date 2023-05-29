@@ -1,12 +1,12 @@
 use bytes::{Bytes, BytesMut};
 use frontend::{Frontend, StreamOptions};
-use log::{info, LevelFilter};
+use log::info;
 use model::{record::flat_record::FlatRecordBatch, RecordBatch};
 use std::io::Write;
 use tokio::time::{sleep, Duration};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::Builder::new()
+    env_logger::builder()
         .format(|buf, record| {
             writeln!(
                 buf,
@@ -18,7 +18,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 record.args()
             )
         })
-        .filter_level(LevelFilter::Trace)
         .init();
     tokio_uring::start(async {
         let frontend = Frontend::new("127.0.0.1:12378")?;

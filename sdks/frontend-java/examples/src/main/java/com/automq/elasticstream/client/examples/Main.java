@@ -2,7 +2,9 @@ package com.automq.elasticstream.client.examples;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.sql.Time;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 
 import com.automq.elasticstream.client.DefaultRecordBatch;
 import com.automq.elasticstream.client.api.AppendResult;
@@ -18,7 +20,7 @@ import static org.junit.Assert.*;
 public class Main {
 
     public static void main(String[] args) throws Exception {
-        Client client = Client.builder().endpoint("127.0.0.1:12378").build();
+        Client client = Client.builder().endpoint("127.0.0.1:12378").kvEndpoint("127.0.0.1:12379").build();
         Stream stream = client.streamClient()
                 .createAndOpenStream(CreateStreamOptions.newBuilder().replicaCount(1).build()).get();
         long streamId = stream.streamId();
@@ -98,6 +100,11 @@ public class Main {
             System.out.println("fetch record result offset[" + recordBatch.baseOffset() + ","
                 + recordBatch.lastOffset() + "]" + " payload:" + payloadStr + ".");
             assertEquals(String.format("hello world %03d", i), payloadStr);
+        }
+
+        while(true) {
+            TimeUnit.SECONDS.sleep(1);
+            System.out.println("Tick");
         }
     }
 
