@@ -85,7 +85,7 @@ impl FlatRecordBatch {
 
         // Read the payload length from the given buf
         let payload_len = cursor.get_i32() as usize;
-        if cursor.remaining() != payload_len {
+        if cursor.remaining() < payload_len {
             return Err(DecodeError::DataLengthMismatch);
         }
 

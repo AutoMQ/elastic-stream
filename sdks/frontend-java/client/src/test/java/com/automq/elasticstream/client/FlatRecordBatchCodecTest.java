@@ -20,7 +20,6 @@ public class FlatRecordBatchCodecTest {
     public void testCodec() {
         byte[] payload = "hello world".getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.wrap(payload);
-        buffer.flip();
         Map<String, String> properties = new HashMap<>();
         properties.put("k1", "v1");
         properties.put("k2", "v2");
@@ -34,6 +33,9 @@ public class FlatRecordBatchCodecTest {
         Assert.assertEquals(src.count(), dst.lastOffset());
         Assert.assertEquals(properties, dst.properties());
         Assert.assertEquals(buffer, dst.rawPayload());
+        byte[] dstPayloadBytes = new byte[dst.rawPayload().remaining()];
+        dst.rawPayload().get(dstPayloadBytes);
+        Assert.assertEquals("hello world", new String(dstPayloadBytes, StandardCharsets.UTF_8));
     }
 
 

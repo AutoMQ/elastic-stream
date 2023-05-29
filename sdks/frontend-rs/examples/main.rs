@@ -93,6 +93,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sleep(Duration::from_secs(1)).await;
         let stream = frontend.open(stream_id, 0).await?;
 
+        assert_eq!(100, stream.next_offset().await?);
+
         info!("Step5: append more 10-record batches");
         for i in 0..10 {
             let offset = i + 10;
@@ -116,8 +118,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         info!("Step6: read 20 record batch one by one");
         for i in 0..20 {
-            let start = i;
-            let end = i + 10;
+            let start = i * 10;
+            let end = i * 10 + 10;
             let mut bytes = vec_bytes_to_bytes(stream.read(start, end, i32::MAX).await?);
             let records = decode_flat_record_batch(&mut bytes)?;
             assert_eq!(1, records.len());

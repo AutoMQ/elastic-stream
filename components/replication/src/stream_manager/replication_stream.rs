@@ -224,12 +224,15 @@ impl ReplicationStream {
         // 2. fetch from each range.
         let mut fetch_ranges: Vec<Rc<ReplicationRange>> = Vec::new();
         {
-            self.ranges
-                .borrow()
-                .range((Included(start_offset), Excluded(end_offset)))
-                .for_each(|(_, range)| {
-                    fetch_ranges.push(range.clone());
-                });
+            let ranges = self.ranges.borrow();
+            let mut cursor = ranges.upper_bound(Included(&start_offset));
+            while let Some(range) = cursor.value() {
+                if range.start_offset() >= end_offset {
+                    break;
+                }
+                fetch_ranges.push(range.clone());
+                cursor.move_next();
+            }
         }
         if fetch_ranges.is_empty() || fetch_ranges[0].start_offset() > start_offset {
             return Err(ReplicationError::FetchOutOfRange);
