@@ -6,6 +6,8 @@ public interface ClientBuilder {
 
     ClientBuilder endpoint(String endpoint);
 
+    ClientBuilder kvEndpoint(String kvEndpoint);
+
     ClientBuilder connectionTimeout(Duration duration);
 
     ClientBuilder channelMaxIdleTime(Duration duration);

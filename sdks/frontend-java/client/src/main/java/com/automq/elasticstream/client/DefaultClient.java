@@ -8,8 +8,8 @@ public class DefaultClient implements Client {
     private final KVClient kvClient;
     private final StreamClient streamClient;
 
-    public DefaultClient(String endpoint) {
-        this.kvClient = new DefaultKVClient(endpoint);
+    public DefaultClient(String endpoint, String kvEndpoint) {
+        this.kvClient = new DefaultKVClient(kvEndpoint);
         this.streamClient = new DefaultStreamClient(endpoint);
     }
 

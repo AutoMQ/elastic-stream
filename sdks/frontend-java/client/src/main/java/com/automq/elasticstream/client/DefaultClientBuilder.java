@@ -7,10 +7,17 @@ import java.time.Duration;
 
 public class DefaultClientBuilder implements ClientBuilder {
     private String endpoint;
+    private String kvEndpoint;
 
     @Override
     public ClientBuilder endpoint(String endpoint) {
         this.endpoint = endpoint;
+        return this;
+    }
+
+    @Override
+    public ClientBuilder kvEndpoint(String kvEndpoint) {
+        this.kvEndpoint = kvEndpoint;
         return this;
     }
 
@@ -36,6 +43,6 @@ public class DefaultClientBuilder implements ClientBuilder {
 
     @Override
     public Client build() {
-        return new DefaultClient(endpoint);
+        return new DefaultClient(endpoint, kvEndpoint);
     }
 }
