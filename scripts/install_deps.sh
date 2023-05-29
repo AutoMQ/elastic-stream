@@ -26,4 +26,3 @@ try_install_sccache() {
 }
 
 try_install_flatc
-try_install_sccache
