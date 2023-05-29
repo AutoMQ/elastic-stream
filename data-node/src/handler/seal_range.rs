@@ -7,7 +7,7 @@ use model::range::RangeMetadata;
 use protocol::rpc::header::{ErrorCode, RangeT, SealRangeRequest, SealRangeResponseT, StatusT};
 use store::ElasticStore;
 
-use crate::stream_manager::StreamManager;
+use crate::{error::ServiceError, stream_manager::StreamManager};
 
 use super::util::root_as_rpc_request;
 
@@ -63,7 +63,10 @@ impl<'a> SealRange<'a> {
                     range.stream_id(),
                     range.index()
                 );
-                status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
+                match e {
+                    ServiceError::NotFound(_) => status.code = ErrorCode::RANGE_NOT_FOUND,
+                    _ => status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR,
+                }
                 status.message = Some(format!("{:?}", e));
             }
         }

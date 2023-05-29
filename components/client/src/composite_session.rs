@@ -99,7 +99,7 @@ impl CompositeSession {
         if self.target != self.config.placement_manager {
             return false;
         }
-        
+
         let cluster_size = self.sessions.borrow().len();
         if cluster_size <= 1 {
             debug!("Placement Manager Cluster size is {} which is rare in production, flag refresh-cluster true", cluster_size);
@@ -682,7 +682,7 @@ impl CompositeSession {
     ) -> Result<RangeMetadata, ClientError> {
         self.try_reconnect().await;
         let session = self
-            .pick_session(LbPolicy::LeaderOnly)
+            .pick_session(self.lb_policy)
             .await
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
         let request = request::Request {
@@ -705,6 +705,16 @@ impl CompositeSession {
                 // TODO: check whether end_offset is match if the range is already sealed
                 warn!("Range{range:?} already sealed");
                 return Ok(range);
+            }
+            if response.status.code == ErrorCode::RANGE_NOT_FOUND {
+                warn!("Range{range:?} not found, use start_offset as end_offset");
+                return Ok(RangeMetadata::new(
+                    range.stream_id(),
+                    range.index(),
+                    range.epoch(),
+                    range.start(),
+                    Some(range.start()),
+                ));
             }
             warn!("Failed to seal range: {:?}", response.status);
             return Err(ClientError::ServerInternal);
