@@ -2,10 +2,12 @@ use bytes::{BufMut, BytesMut};
 use codec::frame::Frame;
 
 use flatbuffers::FlatBufferBuilder;
-use futures::Future;
+use futures::{future, Future};
 use log::{trace, warn};
+use minstant::Instant;
 use protocol::rpc::header::{
-    ErrorCode, FetchRequest, FetchResponseArgs, FetchResultEntryArgs, StatusArgs,
+    ErrorCode, FetchRequest, FetchResponse, FetchResponseArgs, FetchResultEntry,
+    FetchResultEntryArgs, Status, StatusArgs,
 };
 use std::{cell::RefCell, pin::Pin, rc::Rc};
 use store::{error::FetchError, option::ReadOptions, ElasticStore, FetchResult, Store};
@@ -62,18 +64,23 @@ impl<'a> Fetch<'a> {
                     as Pin<Box<dyn Future<Output = Result<store::FetchResult, FetchError>>>>,
                 Err(fetch_err) => {
                     let res: Result<store::FetchResult, FetchError> = Err(fetch_err);
-                    Box::pin(futures::future::ready(res))
+                    Box::pin(future::ready(res))
                         as Pin<Box<dyn Future<Output = Result<store::FetchResult, FetchError>>>>
                 }
             })
             .collect::<Vec<_>>();
 
-        let res_from_store: Vec<Result<FetchResult, FetchError>> =
-            futures::future::join_all(futures).await;
+        // TODO: handle store timeout
+        let start = Instant::now();
+        let res_from_store: Vec<Result<FetchResult, FetchError>> = future::join_all(futures).await;
+        trace!(
+            "Fetch records from store took {:?}us",
+            start.elapsed().as_micros()
+        );
 
         let mut builder = FlatBufferBuilder::with_capacity(MIN_BUFFER_SIZE);
         let mut payloads = Vec::new();
-        let ok_status = protocol::rpc::header::Status::create(
+        let ok_status = Status::create(
             &mut builder,
             &StatusArgs {
                 code: ErrorCode::OK,
@@ -90,11 +97,13 @@ impl<'a> Fetch<'a> {
                         batch_count: fetch_result.results.len() as i32,
                         status: Some(ok_status),
                     };
+                    trace!(
+                        "Fetch Stream[id={}] returns {} buffer slices",
+                        fetch_result.stream_id,
+                        fetch_result.results.len()
+                    );
                     payloads.push(fetch_result.results);
-                    protocol::rpc::header::FetchResultEntry::create(
-                        &mut builder,
-                        &fetch_result_args,
-                    )
+                    FetchResultEntry::create(&mut builder, &fetch_result_args)
                 }
                 Err(e) => {
                     warn!("Failed to fetch from store. Cause: {:?}", e);
@@ -104,7 +113,7 @@ impl<'a> Fetch<'a> {
                     if let Some(err_message) = err_message {
                         err_message_fb = Some(builder.create_string(err_message.as_str()));
                     }
-                    let status = protocol::rpc::header::Status::create(
+                    let status = Status::create(
                         &mut builder,
                         &StatusArgs {
                             code: err_code,
@@ -117,23 +126,19 @@ impl<'a> Fetch<'a> {
                         batch_count: 0,
                         status: Some(status),
                     };
-                    protocol::rpc::header::FetchResultEntry::create(
-                        &mut builder,
-                        &fetch_result_args,
-                    )
+                    FetchResultEntry::create(&mut builder, &fetch_result_args)
                 }
             })
             .collect();
 
         let fetch_results_fb = builder.create_vector(&fetch_results);
-        let res_args = FetchResponseArgs {
+        let fetch_response_args = FetchResponseArgs {
             throttle_time_ms: 0,
             entries: Some(fetch_results_fb),
             status: Some(ok_status),
         };
-        let res_offset = protocol::rpc::header::FetchResponse::create(&mut builder, &res_args);
-        let res_header = finish_response_builder(&mut builder, res_offset);
-        response.header = Some(res_header);
+        let fetch_response = FetchResponse::create(&mut builder, &fetch_response_args);
+        response.header = Some(finish_response_builder(&mut builder, fetch_response));
 
         // Flatten the payloads, since we already identified the sequence of the payloads
         let payloads: Vec<_> = payloads
