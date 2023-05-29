@@ -35,6 +35,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.nullable;
 
 @RunWith(JUnit4.class)
 public class DefaultKVClientTest {
@@ -90,7 +91,8 @@ public class DefaultKVClientTest {
 
         kvClient.getKV(kvList.stream().map(KeyValue::key).collect(Collectors.toList()))
             .thenAccept(loadedList -> {
-                assertEquals(0, loadedList.size());
+                assertEquals(1, loadedList.size());
+                assertEquals(null, loadedList.get(0).value());
             }).get();
     }
 
@@ -105,8 +107,9 @@ public class DefaultKVClientTest {
             .thenCompose(r -> kvClient.delKV(Collections.singletonList(toDeleteKey)))
             .thenCompose(r -> kvClient.getKV(kvList.stream().map(KeyValue::key).collect(Collectors.toList())))
             .thenAccept(loadedList -> {
-                assertEquals(1, loadedList.size());
+                assertEquals(2, loadedList.size());
                 assertEquals(kvList.get(0), loadedList.get(0));
+                assertEquals(null, loadedList.get(1).value());
             }).get();
     }
 

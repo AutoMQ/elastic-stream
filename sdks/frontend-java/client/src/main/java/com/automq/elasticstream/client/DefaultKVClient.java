@@ -58,12 +58,15 @@ public class DefaultKVClient implements KVClient {
         return FutureUtils.buildCompletableFuture(kvFutureStub.load(requestBuilder.build()))
             .thenApply(r -> {
                 List<KeyValue> keyValues = new java.util.ArrayList<>(keys.size());
+                //TODO: check return size match
                 for (int i = 0; i < r.getItemsList().size(); i++) {
                     if (r.getItems(i).hasError()) {
+                        //TODO: check kv not exist error type
+                        keyValues.add(KeyValue.of(keys.get(i), null));
                         log.warn("fail to load value for key {}, error msg: {}", keys.get(i), r.getItems(i).getError());
                         continue;
                     }
-                    keyValues.add(KeyValue.of(r.getItems(i).getName().toString(StandardCharsets.ISO_8859_1), r.getItems(i).getPayload().asReadOnlyByteBuffer()));
+                    keyValues.add(KeyValue.of(keys.get(i), r.getItems(i).getPayload().asReadOnlyByteBuffer()));
                 }
                 return keyValues;
             });
