@@ -34,7 +34,7 @@ jobs:
     uses: ./.github/workflows/java_build.yml
   java-snapshot-release:
     needs: [java-build]
-    if: false #${{ needs.paths-filter.outputs.java == 'true' }}
+    if: ${{ needs.paths-filter.outputs.java == 'true' }}
     uses: ./.github/workflows/java_snapshot_release.yml
   rust-build:
     needs: [paths-filter]

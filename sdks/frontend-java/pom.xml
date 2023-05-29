@@ -4,9 +4,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.automq.elasticstream</groupId>
-    <artifactId>parent</artifactId>
+    <artifactId>frontend</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>parent</name>
+    <name>frontend</name>
 
     <modules>
         <module>client</module>
@@ -67,4 +67,15 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>maven</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>maven</id>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
 </project>
