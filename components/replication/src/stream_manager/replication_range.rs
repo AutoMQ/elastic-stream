@@ -73,6 +73,7 @@ impl ReplicationRange {
         for replica_node in this.metadata.replica().iter() {
             replicators.push(Rc::new(Replicator::new(this.clone(), replica_node.clone())));
         }
+        // #Safty: the replicators only changed(init) in range new.
         unsafe {
             Rc::get_mut_unchecked(&mut this).replicators = Rc::new(replicators);
         }
