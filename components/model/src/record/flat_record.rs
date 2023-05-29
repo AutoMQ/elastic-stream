@@ -60,7 +60,7 @@ impl FlatRecordBatch {
     }
 
     /// Inits a FlatRecordBatch from a buffer of bytes received from storage or network layer.
-    /// 
+    ///
     /// * Side effect: the position of the given buf will be advanced after a successful init, if any error occurs, the position will not be changed.
     pub fn init_from_buf(buf: &mut Bytes) -> Result<Self, DecodeError> {
         let mut cursor = Cursor::new(&buf[..]);
@@ -97,7 +97,7 @@ impl FlatRecordBatch {
         // Slice payload
         let payload_from = 1 /* magic-code */ + 4 /* metadata length field */ + metadata_len + 4 /* payload length field */;
         let payload_to = payload_from + payload_len;
-        let payload = buf.slice(..payload_to);
+        let payload = buf.slice(payload_from..payload_to);
 
         buf.advance(payload_to);
 
@@ -172,7 +172,7 @@ fn root_as_record_batch_meta(
 
 #[cfg(test)]
 mod tests {
-    use crate::record::RecordBatchBuilder;
+    use crate::{payload::Payload, record::RecordBatchBuilder};
 
     use super::*;
 
@@ -207,7 +207,17 @@ mod tests {
 
         // Decode the above bytes to FlatRecordBatch
         let mut batch_buf = bytes_mute.freeze();
-        let backup_buf = batch_buf.clone();
+
+        if let (Some(entry), len) = Payload::parse_append_entry(&batch_buf).unwrap() {
+            assert_eq!(len, batch_buf.len());
+            assert_eq!(entry.stream_id as i64, stream_id);
+            assert_eq!(entry.index, 0);
+            assert_eq!(entry.offset, 1024);
+            assert_eq!(entry.len, 10);
+        } else {
+            panic!("parse_append_entry failed");
+        }
+
         let flat_batch = FlatRecordBatch::init_from_buf(&mut batch_buf).unwrap();
         let mut record_batch = flat_batch.decode().unwrap();
 
@@ -218,7 +228,7 @@ mod tests {
         assert_eq!(record_batch.range_index(), 0);
         assert_eq!(record_batch.metadata.base_offset, 1024);
         assert_eq!(record_batch.metadata.last_offset_delta, 10);
-        assert_eq!(record_batch.payload, backup_buf);
+        assert_eq!(record_batch.payload, Bytes::from("hello world"));
 
         let properties = record_batch.metadata.properties.take();
         assert!(properties.is_some());

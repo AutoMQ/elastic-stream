@@ -5,7 +5,7 @@ use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
 use log::{error, trace, warn};
-use model::{record::flat_record::FlatRecordBatch, Batch};
+use model::{payload::Payload, record::flat_record::FlatRecordBatch, Batch};
 use protocol::rpc::header::{
     AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
 };
@@ -195,25 +195,25 @@ impl<'a> Append<'a> {
         stream_manager: &Rc<RefCell<StreamManager>>,
     ) -> Result<Vec<AppendRecordRequest>, ErrorCode> {
         let mut append_requests: Vec<AppendRecordRequest> = Vec::new();
-        let mut payload = self.payload.clone();
-        while !payload.is_empty() {
-            let record_batch = FlatRecordBatch::init_from_buf(&mut payload).map_err(|e| {
-                error!("Failed to decode record batch from payload. Cause: {:?}", e);
+        let mut pos = 0;
+        while let (Some(entry), len) =
+            Payload::parse_append_entry(&self.payload[pos..]).map_err(|e| {
+                error!(
+                    "Failed to decode append entries from payload. Cause: {:?}",
+                    e
+                );
                 ErrorCode::BAD_REQUEST
-            })?;
-
-            let record_batch = record_batch.decode().map_err(|e| {
-                error!("Failed to decode record batch from payload. Cause: {:?}", e);
-                ErrorCode::BAD_REQUEST
-            })?;
-
+            })?
+        {
             let request = AppendRecordRequest {
-                stream_id: record_batch.stream_id(),
-                range_index: record_batch.range_index(),
-                offset: record_batch.base_offset(),
-                len: record_batch.len(),
-                buffer: record_batch.payload(),
+                stream_id: entry.stream_id as i64,
+                range_index: entry.index as i32,
+                offset: entry.offset as i64,
+                len: entry.len as usize,
+                buffer: self.payload.slice(pos..pos + len),
             };
+
+            pos += len;
 
             if let Some(range) = stream_manager
                 .borrow_mut()
