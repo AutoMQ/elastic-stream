@@ -95,7 +95,11 @@ impl CompositeSession {
         })
     }
 
-    fn need_refresh_cluster(&self) -> bool {
+    fn need_refresh_placement_manager_cluster(&self) -> bool {
+        if self.target != self.config.placement_manager {
+            return false;
+        }
+        
         let cluster_size = self.sessions.borrow().len();
         if cluster_size <= 1 {
             debug!("Placement Manager Cluster size is {} which is rare in production, flag refresh-cluster true", cluster_size);
@@ -201,7 +205,7 @@ impl CompositeSession {
         self.refresh_leadership(nodes);
     }
 
-    pub(crate) async fn refresh_cluster(&self) {
+    pub(crate) async fn refresh_placement_manager_cluster(&self) {
         match self.describe_placement_manager_cluster().await {
             Ok(Some(nodes)) => {
                 self.refresh_sessions(&nodes).await;
@@ -221,7 +225,7 @@ impl CompositeSession {
                 Some(session) => Some(session),
                 None => {
                     trace!("No leader session found, try describe placement manager cluster again");
-                    self.refresh_cluster().await;
+                    self.refresh_placement_manager_cluster().await;
                     self.pick_leader_session()
                 }
             },
@@ -254,8 +258,8 @@ impl CompositeSession {
     pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
         self.try_reconnect().await;
 
-        if self.need_refresh_cluster() {
-            self.refresh_cluster().await;
+        if self.need_refresh_placement_manager_cluster() {
+            self.refresh_placement_manager_cluster().await;
         }
 
         let now = Instant::now();
@@ -908,8 +912,8 @@ impl CompositeSession {
         memory_statistics: &MemoryStatistics,
     ) -> Result<(), ClientError> {
         self.try_reconnect().await;
-        if self.need_refresh_cluster() {
-            self.refresh_cluster().await;
+        if self.need_refresh_placement_manager_cluster() {
+            self.refresh_placement_manager_cluster().await;
         }
         // TODO: add disk_unindexed_data_size, range_missing_replica_cnt, range_active_cnt
         let extension = request::Headers::ReportMetrics {

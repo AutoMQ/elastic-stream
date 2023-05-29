@@ -51,7 +51,7 @@ impl SessionManager {
                 );
 
                 if lb_policy == super::lb_policy::LbPolicy::LeaderOnly {
-                    session.refresh_cluster().await;
+                    session.refresh_placement_manager_cluster().await;
                 }
 
                 sessions.insert(target.to_owned(), Rc::clone(&session));
