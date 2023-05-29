@@ -1,5 +1,6 @@
 #![feature(btree_drain_filter)]
 #![feature(btree_cursors)]
+#![feature(get_mut_unchecked)]
 
 pub mod error;
 pub mod request;

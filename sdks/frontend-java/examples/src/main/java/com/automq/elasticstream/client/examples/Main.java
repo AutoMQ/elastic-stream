@@ -52,7 +52,7 @@ public class Main {
 
         System.out.println("Step3: cross read 10 record batch");
         for (int i = 0; i < 9; i++) {
-            FetchResult fetchResult = stream.fetch(i * 1, i * 10 + 11, Integer.MAX_VALUE).get();
+            FetchResult fetchResult = stream.fetch(i * 10, i * 10 + 11, Integer.MAX_VALUE).get();
             assertEquals(2, fetchResult.recordBatchList().size());
             for (int j = 0; j < 2; j++) {
                 int index = i + j;
@@ -85,8 +85,8 @@ public class Main {
         }
 
         System.out.println("Step6: read 20 record batch one by one");
-        for (int i = 0; i < 10; i++) {
-            FetchResult fetchResult = stream.fetch(i * 10 , i * 10 + 10, 1).get();
+        for (int i = 0; i < 20; i++) {
+            FetchResult fetchResult = stream.fetch(i * 10 , i * 10 + 10, Integer.MAX_VALUE).get();
             assertEquals(1, fetchResult.recordBatchList().size());
             RecordBatchWithContext recordBatch = fetchResult.recordBatchList().get(0);
             assertEquals(i * 10, recordBatch.baseOffset());

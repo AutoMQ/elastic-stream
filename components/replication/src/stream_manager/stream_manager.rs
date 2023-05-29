@@ -131,7 +131,7 @@ impl StreamManager {
                 .await
                 .map(|metadata| CreateStreamResponse {
                     // TODO: unify stream_id type
-                    stream_id: metadata.stream_id.unwrap(),
+                    stream_id: metadata.stream_id.expect("stream id cannot be none"),
                 })
                 .map_err(|e| {
                     warn!("Failed to create stream, {}", e);

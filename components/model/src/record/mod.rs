@@ -12,11 +12,6 @@ pub struct RecordBatch {
 }
 
 impl RecordBatch {
-    /// Create a new record batch with the given meta and payload.
-    fn new(metadata: RecordBatchMetaT, payload: Bytes) -> Self {
-        Self { metadata, payload }
-    }
-
     /// New a builder to build a record batch.
     pub fn new_builder() -> RecordBatchBuilder {
         RecordBatchBuilder::default()

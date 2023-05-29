@@ -29,7 +29,7 @@ pub(crate) struct ReplicationRange {
 
     client: Weak<Client>,
 
-    replicators: Rc<RefCell<Vec<Rc<Replicator>>>>,
+    replicators: Rc<Vec<Rc<Replicator>>>,
 
     /// Exclusive confirm offset.
     confirm_offset: RefCell<u64>,
@@ -57,13 +57,13 @@ impl ReplicationRange {
         let (seal_task_tx, _) = broadcast::channel::<Result<u64, ReplicationError>>(1);
 
         let log_ident = format!("Range[{}#{}]", metadata.stream_id(), metadata.index());
-        let this = Rc::new(Self {
+        let mut this = Rc::new(Self {
             log_ident,
             metadata,
             open_for_write,
             stream,
             client,
-            replicators: Rc::new(RefCell::new(vec![])),
+            replicators: Rc::new(vec![]),
             confirm_offset: RefCell::new(confirm_offset),
             status: RefCell::new(status),
             seal_task_tx: Rc::new(seal_task_tx),
@@ -73,7 +73,9 @@ impl ReplicationRange {
         for replica_node in this.metadata.replica().iter() {
             replicators.push(Rc::new(Replicator::new(this.clone(), replica_node.clone())));
         }
-        *this.replicators.borrow_mut() = replicators;
+        unsafe {
+            Rc::get_mut_unchecked(&mut this).replicators = Rc::new(replicators);
+        }
         info!(
             "Load range with metadata: {:?} open_for_write={open_for_write}",
             this.metadata
@@ -127,7 +129,7 @@ impl ReplicationRange {
     }
 
     fn calculate_confirm_offset(&self) -> Result<u64, ReplicationError> {
-        if self.replicators.borrow().is_empty() {
+        if self.replicators.is_empty() {
             return Err(ReplicationError::Internal);
         }
 
@@ -141,7 +143,6 @@ impl ReplicationRange {
         // - when replica_count=3 and ack_count = 3, then result is ReplicationError.
         let confirm_offset_index = self.metadata.ack_count() - 1;
         self.replicators
-            .borrow()
             .iter()
             .filter(|r| !r.corrupted())
             .map(|r| r.confirm_offset())
@@ -159,10 +160,10 @@ impl ReplicationRange {
             .with_last_offset_delta(context.count as i32)
             .with_payload((*payload).clone())
             .build()
-            .unwrap();
+            .expect("valid record batch");
         let flat_record_batch: FlatRecordBatch = Into::into(record_batch);
         let (flat_record_batch_bytes, _) = flat_record_batch.encode();
-        for replica in (*self.replicators).borrow().iter() {
+        for replica in (*self.replicators).iter() {
             replica.append(
                 flat_record_batch_bytes.clone(),
                 context.base_offset + context.count as u64,
@@ -179,7 +180,7 @@ impl ReplicationRange {
         // TODO: select replica strategy.
         // - balance the read traffic.
         // - isolate unreadable (data less than expected, unaccessible) replica.
-        for replicator in self.replicators.borrow().iter() {
+        for replicator in self.replicators.iter() {
             if replicator.corrupted() {
                 continue;
             }
@@ -334,14 +335,14 @@ impl ReplicationRange {
 
     async fn replicas_seal(
         log_ident: &String,
-        replicas: Rc<RefCell<Vec<Rc<Replicator>>>>,
+        replicas: Rc<Vec<Rc<Replicator>>>,
         replica_count: u8,
         ack_count: u8,
         end_offset: Option<u64>,
     ) -> Result<u64, ReplicationError> {
         let end_offsets = Rc::new(RefCell::new(Vec::<u64>::new()));
         let mut seal_tasks = vec![];
-        let replicas = replicas.borrow().clone();
+        let replicas = replicas.clone();
         for replica in replicas.iter() {
             let end_offsets = end_offsets.clone();
             let replica = replica.clone();

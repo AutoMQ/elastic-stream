@@ -10,7 +10,7 @@ use std::cell::OnceCell;
 use std::cell::RefCell;
 use std::cmp::{max, min};
 use std::collections::BTreeMap;
-use std::ops::Bound::{Excluded, Included};
+use std::ops::Bound::Included;
 use std::rc::{Rc, Weak};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
@@ -299,7 +299,7 @@ impl ReplicationStream {
             warn!("Stream is already released, then directly exit append task");
             return;
         }
-        let stream = stream_option.unwrap();
+        let stream = stream_option.expect("stream id cannot be none");
         let log_ident = &stream.log_ident;
         let mut inflight: BTreeMap<u64, Rc<StreamAppendRequest>> = BTreeMap::new();
         let mut next_append_start_offset: u64 = 0;
