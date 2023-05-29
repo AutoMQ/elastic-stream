@@ -38,7 +38,7 @@ jobs:
           # The env-vars are matched by *prefix*, so the default `RUST` var will
           # match all of `RUSTC`, `RUSTUP_*`, `RUSTFLAGS`, `RUSTDOC_*`, etc.
           # default: "CARGO CC CFLAGS CXX CMAKE RUST"
-          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST"
+          env-vars: ""
 
           # The cargo workspaces and target directory configuration.
           # These entries are separated by newlines and have the form
@@ -106,7 +106,7 @@ jobs:
           # The env-vars are matched by *prefix*, so the default `RUST` var will
           # match all of `RUSTC`, `RUSTUP_*`, `RUSTFLAGS`, `RUSTDOC_*`, etc.
           # default: "CARGO CC CFLAGS CXX CMAKE RUST"
-          env-vars: "CARGO CC CFLAGS CXX CMAKE RUST"
+          env-vars: ""
 
           # The cargo workspaces and target directory configuration.
           # These entries are separated by newlines and have the form
