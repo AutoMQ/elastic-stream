@@ -54,8 +54,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         info!("Step2: read 10 record batch one by one");
         for i in 0..10 {
-            let start = i;
-            let end = i + 10;
+            let start = i * 10;
+            let end = i * 10 + 10;
             let mut bytes = vec_bytes_to_bytes(stream.read(start, end, i32::MAX).await?);
             let records = decode_flat_record_batch(&mut bytes)?;
             assert_eq!(1, records.len());
@@ -70,8 +70,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         info!("Step3: cross read 10 record batch");
         for i in 0..9 {
-            let start = i + 1; // in middle of first record batch
-            let end = i + 11; // in middle of next record batch
+            let start = i * 10 + 1; // in middle of first record batch
+            let end = i * 10 + 11; // in middle of next record batch
             let mut bytes = vec_bytes_to_bytes(stream.read(start, end, i32::MAX).await?);
             let records = decode_flat_record_batch(&mut bytes)?;
             // expect to read 2 record batches

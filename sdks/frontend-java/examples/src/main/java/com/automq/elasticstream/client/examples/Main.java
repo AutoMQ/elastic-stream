@@ -19,22 +19,32 @@ public class Main {
         Stream stream = client.streamClient()
                 .createAndOpenStream(CreateStreamOptions.newBuilder().replicaCount(1).build()).get();
 
-        byte[] payload = "hello world".getBytes(StandardCharsets.UTF_8);
-        ByteBuffer buffer = ByteBuffer.wrap(payload);
-        buffer.flip();
-        AppendResult appendResult = stream
-                .append(new DefaultRecordBatch(payload.length, 0, Collections.emptyMap(), buffer)).get();
-        long offset = appendResult.baseOffset();
-        System.out.println("append record result offset:" + offset);
-
-        FetchResult fetchResult = stream.fetch(offset, offset + 1, 1).get();
-        for (RecordBatchWithContext recordBatchWithContext : fetchResult.recordBatchList()) {
-            byte[] rawPayload = new byte[recordBatchWithContext.rawPayload().remaining()];
-            recordBatchWithContext.rawPayload().get(rawPayload);
-            System.out.println("fetch record result offset[" + recordBatchWithContext.baseOffset() + ","
-                    + recordBatchWithContext.lastOffset() + "]" + " payload:"
-                    + new String(rawPayload, StandardCharsets.UTF_8));
+        for (int i = 0; i < 10; i++) {
+            byte[] payload = String.format("hello world %03d", i).getBytes(StandardCharsets.UTF_8);
+            ByteBuffer buffer = ByteBuffer.wrap(payload);
+            buffer.flip();
+            AppendResult appendResult = stream
+                    .append(new DefaultRecordBatch(10, 0, Collections.emptyMap(), buffer)).get();
+            long offset = appendResult.baseOffset();
+            System.out.println("append record result offset:" + offset);
+            assert offset == i * 10;
         }
+
+        for (int i = 0; i < 10; i++) {
+            FetchResult fetchResult = stream.fetch(i * 10 , i * 10 + 10, 1).get();
+            assert 1 == fetchResult.recordBatchList().size();
+            RecordBatchWithContext recordBatch = fetchResult.recordBatchList().get(0);
+            assert (i * 10) == recordBatch.baseOffset();
+            assert (i * 10 + 9) == recordBatch.lastOffset();
+
+            byte[] rawPayload = new byte[recordBatch.rawPayload().remaining()];
+            recordBatch.rawPayload().get(rawPayload);
+            String payloadStr = new String(rawPayload, StandardCharsets.UTF_8);
+            System.out.println("fetch record result offset[" + recordBatch.baseOffset() + ","
+                + recordBatch.lastOffset() + "]" + " payload:" + payloadStr + ".");
+            assert String.format("hello world %03d", i).equals(payloadStr);
+        }
+
     }
 
 }
