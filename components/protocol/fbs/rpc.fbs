@@ -43,7 +43,11 @@ enum ErrorCode : int16 {
     // or
     // Try to create a new range with an epoch that is smaller than the previous range's epoch.
     EXPIRED_RANGE_EPOCH = 1471,
-    // The operation is not supported.
+
+    // Server understands the intended operation but it does not support that.
+    UNSUPPORTED_OPERATION = 1498,
+
+    // The operation is unknown.
     UNKNOWN_OPERATION = 1499,
 
     // 15xx is reserved for placement manager errors
@@ -66,7 +70,6 @@ enum ErrorCode : int16 {
     // 25xx is reserved for data node errors
     DN_INTERNAL_SERVER_ERROR = 2500,
     DN_NOT_IMPLEMENTED = 2501,
-    DN_NOT_LEADER_RANGE = 2502,
 }
 
 // The Status type defines a logical error model.

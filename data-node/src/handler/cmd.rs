@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use codec::frame::{Frame, OperationCode};
+use log::error;
 use protocol::rpc::header::ErrorCode;
 use store::ElasticStore;
 
@@ -24,21 +25,30 @@ pub(crate) enum Command<'a> {
 impl<'a> Command<'a> {
     pub fn from_frame(frame: &Frame) -> Result<Command, ErrorCode> {
         match frame.operation_code {
-            OperationCode::Unknown => todo!(),
+            OperationCode::Unknown => Err(ErrorCode::UNSUPPORTED_OPERATION),
 
             OperationCode::Ping => Ok(Command::Ping(Ping::new(frame))),
 
-            OperationCode::GoAway => todo!(),
+            OperationCode::GoAway => {
+                error!("GoAway is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
 
             OperationCode::Heartbeat => Ok(Command::Heartbeat(Heartbeat::parse_frame(frame)?)),
 
-            OperationCode::AllocateId => unreachable!(),
+            OperationCode::AllocateId => {
+                error!("AllocateId is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
 
             OperationCode::Append => Ok(Command::Append(Append::parse_frame(frame)?)),
 
             OperationCode::Fetch => Ok(Command::Fetch(Fetch::parse_frame(frame)?)),
 
-            OperationCode::ListRange => todo!(),
+            OperationCode::ListRange => {
+                error!("ListRange is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
 
             OperationCode::CreateRange => {
                 Ok(Command::CreateRange(CreateRange::parse_frame(frame)?))
@@ -46,15 +56,40 @@ impl<'a> Command<'a> {
 
             OperationCode::SealRange => Ok(Command::SealRange(SealRange::parse_frame(frame)?)),
 
-            OperationCode::SyncRange => todo!(),
-            OperationCode::CreateStream => todo!(),
-            OperationCode::DeleteStream => todo!(),
-            OperationCode::UpdateStream => todo!(),
-            OperationCode::DescribeStream => todo!(),
-            OperationCode::TrimStream => todo!(),
-            OperationCode::ReportMetrics => todo!(),
+            OperationCode::SyncRange => Err(ErrorCode::UNSUPPORTED_OPERATION),
+
+            OperationCode::CreateStream => {
+                error!("CreateStream is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
+
+            OperationCode::DeleteStream => {
+                error!("DeleteStream is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
+
+            OperationCode::UpdateStream => {
+                error!("UpdateStream is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
+
+            OperationCode::DescribeStream => {
+                error!("DescribeStream is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
+            OperationCode::TrimStream => {
+                error!("TrimStream is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
+
+            OperationCode::ReportMetrics => {
+                error!("ReportMetrics is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
+            }
+
             OperationCode::DescribePlacementManager => {
-                todo!()
+                error!("DescribePlacementManager is not supported in data-node");
+                Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
         }
     }

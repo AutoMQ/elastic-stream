@@ -1,7 +1,6 @@
 //! Server-side handlers, processors for requests of each kind.
 //!
 //! See details docs for each operation code
-
 mod append;
 mod cmd;
 mod create_range;
@@ -16,8 +15,10 @@ use crate::{
     metrics::{APPEND_LATENCY, FETCH_LATENCY},
     stream_manager::StreamManager,
 };
+use bytes::Bytes;
 use codec::frame::Frame;
 use log::{trace, warn};
+use protocol::rpc::header::{StatusT, SystemErrorT};
 use std::{cell::RefCell, rc::Rc};
 use store::ElasticStore;
 
@@ -60,38 +61,47 @@ impl ServerCall {
         // If the response sequence is not ended, please note reset the flag in the subsequent logic.
         response.flag_end_of_response_stream();
 
-        let cmd = match Command::from_frame(&self.request).ok() {
-            Some(it) => it,
-            None => {
-                // TODO: return error response
-                return;
+        match Command::from_frame(&self.request) {
+            Ok(cmd) => {
+                // Log the `cmd` object.
+                trace!(
+                    "Command of frame[stream-id={}]: {:?}",
+                    self.request.stream_id,
+                    cmd
+                );
+
+                // Delegate the request to its dedicated handler.
+                cmd.apply(
+                    Rc::clone(&self.store),
+                    Rc::clone(&self.stream_manager),
+                    &mut response,
+                )
+                .await;
+
+                match cmd {
+                    Command::Append(_) => {
+                        APPEND_LATENCY.observe(now.elapsed().as_micros() as f64);
+                    }
+                    Command::Fetch(_) => {
+                        FETCH_LATENCY.observe(now.elapsed().as_micros() as f64);
+                    }
+                    _ => {}
+                }
+                trace!("Response frame generated. stream-id={}", response.stream_id);
+            }
+            Err(e) => {
+                response.flag_system_err();
+                let mut system_error = SystemErrorT::default();
+                let mut status = StatusT::default();
+                status.code = e;
+                system_error.status = Box::new(status);
+                let mut builder = flatbuffers::FlatBufferBuilder::new();
+                let header = system_error.pack(&mut builder);
+                builder.finish(header, None);
+                let data = builder.finished_data();
+                response.header = Some(Bytes::copy_from_slice(data));
             }
         };
-
-        // Log the `cmd` object.
-        trace!(
-            "Command of frame[stream-id={}]: {:?}",
-            self.request.stream_id,
-            cmd
-        );
-
-        // Delegate the request to its dedicated handler.
-        cmd.apply(
-            Rc::clone(&self.store),
-            Rc::clone(&self.stream_manager),
-            &mut response,
-        )
-        .await;
-        match cmd {
-            Command::Append(_) => {
-                APPEND_LATENCY.observe(now.elapsed().as_micros() as f64);
-            }
-            Command::Fetch(_) => {
-                FETCH_LATENCY.observe(now.elapsed().as_micros() as f64);
-            }
-            _ => {}
-        }
-        trace!("Response frame generated. stream-id={}", response.stream_id);
 
         // Send response to channel.
         // Note there is a spawned task, in which channel writer is polling the channel.
