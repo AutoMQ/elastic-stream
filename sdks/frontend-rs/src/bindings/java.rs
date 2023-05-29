@@ -834,7 +834,7 @@ fn get_thread_local_jenv(cell: &RefCell<Option<*mut *const JNINativeInterface_>>
 
 fn throw_exception(env: &mut JNIEnv, msg: &str) {
     let _ = env.exception_clear();
-    if let Err(_) = env.throw_new("java/lang/Exception", msg) {
+    if env.throw_new("java/lang/Exception", msg).is_err() {
         error!("Failed to throw new exception");
     }
 }
