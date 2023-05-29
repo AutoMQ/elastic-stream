@@ -217,7 +217,7 @@ impl<'a> Append<'a> {
 
             if let Some(range) = stream_manager
                 .borrow_mut()
-                .stream_range_of(request.stream_id, request.offset())
+                .get_range(request.stream_id, request.range_index)
             {
                 if let Some(window) = range.window_mut() {
                     if window.fast_forward(&request) {

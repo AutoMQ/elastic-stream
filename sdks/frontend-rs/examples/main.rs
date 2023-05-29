@@ -131,6 +131,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             info!("Fetch [{start}, {end}) result: {:#?}", record);
         }
+        info!("All test task success");
 
         Ok(())
     })

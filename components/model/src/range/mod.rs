@@ -87,6 +87,7 @@ impl RangeMetadata {
 
     /// Test if the given offset is within the range.
     pub fn contains(&self, offset: u64) -> bool {
+        // FIXME: use the nextOffset/confirmOffset to check end contains
         if self.start > offset {
             return false;
         }

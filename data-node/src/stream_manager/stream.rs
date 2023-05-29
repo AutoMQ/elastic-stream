@@ -119,6 +119,12 @@ impl Stream {
             .iter_mut()
             .find(|range| range.metadata.contains(offset))
     }
+
+    pub(crate) fn get_range(&mut self, index: i32) -> Option<&mut Range> {
+        self.ranges
+            .iter_mut()
+            .find(|range| range.metadata.index() == index)
+    }
 }
 
 #[cfg(test)]

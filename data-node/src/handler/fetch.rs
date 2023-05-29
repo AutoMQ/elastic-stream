@@ -176,15 +176,17 @@ impl<'a> Fetch<'a> {
             .map(|req| {
                 // Retrieve stream id from req.range
                 let stream_id = req.range().stream_id();
+                let range_index = req.range().index();
 
                 // If the stream-range exists and contains the requested offset, build the read options
-                if let Some(range) = stream_manager
+                // FIXME: Use range_manager instead of stream_manager
+                if let Some(_) = stream_manager
                     .borrow_mut()
-                    .stream_range_of(stream_id, req.fetch_offset() as u64)
+                    .get_range(stream_id, range_index)
                 {
                     return Ok(ReadOptions {
                         stream_id: stream_id,
-                        range: range.metadata.index() as u32,
+                        range: range_index as u32,
                         offset: req.fetch_offset(),
                         max_offset: req.end_offset() as u64,
                         max_wait_ms: self.fetch_request.max_wait_ms(),

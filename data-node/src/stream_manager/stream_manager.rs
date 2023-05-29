@@ -128,20 +128,9 @@ impl StreamManager {
         self.streams.get_mut(&stream_id)
     }
 
-    /// Get `StreamRange` of the given stream_id and offset.
-    ///
-    /// # Arguments
-    /// `stream_id` - The ID of the stream.
-    /// `offset` - The logical offset, starting from which to fetch records.
-    ///
-    /// # Returns
-    /// The `StreamRange` if there is one.
-    ///
-    /// # Note
-    /// We need to update `limit` of the returning range if it is mutable.
-    pub fn stream_range_of(&mut self, stream_id: i64, offset: u64) -> Option<&mut Range> {
+    pub fn get_range(&mut self, stream_id: i64, index: i32) -> Option<&mut Range> {
         if let Some(stream) = self.get_stream(stream_id) {
-            stream.range_of(offset)
+            stream.get_range(index)
         } else {
             None
         }
