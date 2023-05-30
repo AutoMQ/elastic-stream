@@ -6,6 +6,7 @@ pub mod stream;
 pub mod stream_options;
 
 pub use crate::append_result::AppendResult;
+pub(crate) use crate::bindings::stopwatch::Stopwatch;
 pub use crate::error::ClientError;
 pub use crate::frontend::Frontend;
 pub use crate::stream::Stream;

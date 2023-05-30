@@ -22,8 +22,9 @@ util = { path = "../../components/util" }
 lazy_static = { workspace = true }
 jni = "0.21.1"
 num_cpus = "1.15.0"
-env_logger = { workspace = true }
 chrono = { workspace = true }
+minstant = { workspace = true }
+env_logger = { workspace = true }
 
 [dev-dependencies]
 test-util = { path = "../../components/test-util" }

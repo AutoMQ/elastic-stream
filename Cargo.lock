@@ -1004,6 +1004,7 @@ dependencies = [
  "lazy_static",
  "log",
  "minitrace",
+ "minstant",
  "model",
  "num_cpus",
  "protocol",

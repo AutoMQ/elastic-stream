@@ -9,10 +9,10 @@ use std::ffi::c_void;
 use std::io::Write;
 use std::slice;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{ClientError, Frontend, Stream, StreamOptions};
+use crate::{ClientError, Frontend, Stopwatch, Stream, StreamOptions};
 
 use super::cmd::Command;
 
@@ -621,6 +621,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_re
 
 fn call_future_complete_method(mut env: JNIEnv, future: GlobalRef, obj: JObject) {
     let s = JValueGen::from(obj);
+    let _stopwatch = Stopwatch::new("Future#complete");
     if let Err(_) = env.call_method(future, "complete", "(Ljava/lang/Object;)Z", &[s.borrow()]) {
         error!("Failed to call future complete method");
     }
@@ -899,12 +900,16 @@ fn call_future_complete_exceptionally_method(
 
     if let Ok(obj) = obj {
         let s = JValueGen::from(obj);
-        if let Err(_) = env.call_method(
-            future,
-            "completeExceptionally",
-            "(Ljava/lang/Throwable;)Z",
-            &[s.borrow()],
-        ) {
+        let _stopwatch = Stopwatch::new("Future#completeExceptionally");
+        if env
+            .call_method(
+                future,
+                "completeExceptionally",
+                "(Ljava/lang/Throwable;)Z",
+                &[s.borrow()],
+            )
+            .is_err()
+        {
             error!("Failed to call future completeExceptionally method");
         }
     } else {
