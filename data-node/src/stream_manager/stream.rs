@@ -97,19 +97,19 @@ impl Stream {
             .iter()
             .any(|range: &Range| range.metadata.index() == metadata.index());
         if !existed {
-            info!("Range does not exist, metadata={}", metadata);
-            return Err(ServiceError::NotFound(format!(
-                "Range does not exist, metadata={}",
-                metadata
-            )));
+            info!("Range does not exist, metadata={:#?}. Create the sealed range on data-node directly", metadata);
+            self.create_range(metadata.clone())?;
+            // TODO: Data-node is probably having a sealed range with incomplete data. Schedule a task to clone it from peers.
         }
 
-        let range = self
-            .ranges
+        self.ranges
             .iter_mut()
             .find(|range: &&mut Range| range.metadata.index() == metadata.index())
-            .unwrap();
-        range.seal(metadata);
+            .and_then(|range| {
+                range.seal(metadata);
+                Some(())
+            });
+
         self.sort();
         Ok(())
     }

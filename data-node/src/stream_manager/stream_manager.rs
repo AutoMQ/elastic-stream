@@ -113,7 +113,18 @@ impl StreamManager {
         if let Some(stream) = self.streams.get_mut(&range.stream_id()) {
             stream.seal(range)
         } else {
-            Err(ServiceError::NotFound("Stream not found".to_owned()))
+            info!(
+                "Stream[id={}] is not found, fetch stream metadata from placement manager",
+                range.stream_id()
+            );
+            let stream_metadata = self
+                .fetcher
+                .describe_stream(range.stream_id() as u64)
+                .await?;
+            let mut stream = Stream::new(stream_metadata);
+            stream.create_range(range.clone())?;
+            self.streams.insert(range.stream_id(), stream);
+            Ok(())
         }
     }
 
