@@ -31,24 +31,30 @@ impl Range {
     }
 
     pub(crate) fn commit(&mut self, offset: u64) {
-        if let Some(ref mut committed) = self.committed {
-            if offset <= *committed {
-                warn!("Try to commit offset {}, which is less than current committed offset {}, range={}",
-                    offset, *committed, self.metadata);
-            } else {
-                trace!(
-                    "Committed offset of stream[id={}] changed from {} to {}",
-                    self.metadata.stream_id(),
-                    *committed,
-                    offset
-                );
-                *committed = offset;
-            }
-            return;
-        }
+        let offset = self
+            .window_mut()
+            .and_then(|window| Some(window.commit(offset)));
 
-        if offset >= self.metadata.start() {
-            self.committed = Some(offset);
+        if let Some(offset) = offset {
+            if let Some(ref mut committed) = self.committed {
+                if offset <= *committed {
+                    warn!("Try to commit offset {}, which is less than current committed offset {}, range={}",
+                        offset, *committed, self.metadata);
+                } else {
+                    trace!(
+                        "Committed offset of stream[id={}] changed from {} to {}",
+                        self.metadata.stream_id(),
+                        *committed,
+                        offset
+                    );
+                    *committed = offset;
+                }
+                return;
+            }
+
+            if offset >= self.metadata.start() {
+                self.committed = Some(offset);
+            }
         }
     }
 

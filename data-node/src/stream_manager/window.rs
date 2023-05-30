@@ -1,4 +1,4 @@
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashMap};
 
 use log::trace;
 use model::Batch;
@@ -11,6 +11,9 @@ pub(crate) struct Window<R> {
     next: u64,
 
     requests: BinaryHeap<R>,
+
+    /// Submitted request offset to batch size.
+    submitted: HashMap<u64, usize>,
 }
 
 impl<R> Window<R>
@@ -21,6 +24,7 @@ where
         Self {
             next,
             requests: BinaryHeap::new(),
+            submitted: HashMap::new(),
         }
     }
 
@@ -42,6 +46,7 @@ where
             return true;
         } else if request.offset() == self.next {
             self.next += request.len() as u64;
+            self.submitted.insert(request.offset(), request.len());
             return true;
         }
         false
@@ -55,10 +60,23 @@ where
         if let Some(request) = self.requests.peek() {
             if request.offset() == self.next {
                 self.next = request.offset() + request.len() as u64;
+                self.submitted.insert(request.offset(), request.len());
                 return self.requests.pop();
             }
         }
         None
+    }
+
+    pub(crate) fn commit(&mut self, offset: u64) -> u64 {
+        let mut res = offset;
+        self.submitted
+            .drain_filter(|k, _| k <= &offset)
+            .for_each(|(offset, len)| {
+                if offset + len as u64 > res {
+                    res = offset + len as u64;
+                }
+            });
+        res
     }
 }
 
@@ -142,6 +160,35 @@ mod tests {
         assert_eq!(4, window.next());
         assert!(window.requests.is_empty());
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_commit() -> Result<(), Box<dyn Error>> {
+        let mut window = super::Window::new(0);
+        let foo1 = Foo::new(0);
+        let foo2 = Foo::new(2);
+
+        if !window.fast_forward(&foo2) {
+            window.push(foo2);
+        }
+
+        // After fast-forward, an inflight batch entry is inserted.
+        assert!(window.fast_forward(&foo1));
+        // When commit, the offset should be amended if there is a corresponding inflight batch entry. 
+        // After the commit , the entry will be removed.
+        assert_eq!(2, window.commit(0));
+        assert_eq!(0, window.commit(0));
+        
+        // If there is no inflight batch entry, the commit offset should not be amended.
+        assert_eq!(2, window.commit(2));
+
+        // After popping a request, an inflight batch entry is inserted.
+        window.pop();
+        assert_eq!(4, window.commit(2));
+
+        // There is no inflight batch entry, so the commit offset should not be amended.
+        assert_eq!(4, window.commit(4));
         Ok(())
     }
 }

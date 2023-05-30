@@ -73,7 +73,7 @@ pub(crate) struct WriteTask {
 }
 
 impl WriteTask {
-    // Fetch the total length of the record, incuding the header.
+    // Fetch the total length of the record, including the header.
     pub(crate) fn total_len(&self) -> u32 {
         self.buffer.len() as u32 + 4 /* CRC */ + 3 /* Record Size */ + 1 /* Record Type */
     }
