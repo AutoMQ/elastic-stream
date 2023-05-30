@@ -42,6 +42,9 @@ lazy_static = {version = "1.4.0"}
 prometheus = {workspace = true}
 observation = {path = "../components/observation"}
 
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.5"
+
 [dev-dependencies]
 mockall = { workspace = true }
 test-util = { path = "../components/test-util" }
