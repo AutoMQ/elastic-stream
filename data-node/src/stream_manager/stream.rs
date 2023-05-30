@@ -42,8 +42,10 @@ impl Stream {
             .for_each(|range| range.commit(offset));
     }
 
-    pub(crate) fn create_range(&mut self, metadata: RangeMetadata) -> Result<(), ServiceError> {
-        self.verify_stream_id(&metadata)?;
+    pub(crate) fn create_range(&mut self, metadata: RangeMetadata) {
+        if self.verify_stream_id(&metadata).is_err() {
+            return;
+        }
 
         let res = self
             .ranges
@@ -52,14 +54,14 @@ impl Stream {
 
         if let Some(range) = res {
             if range.metadata == metadata {
-                trace!("No-op, when creating range with same metadata");
-                return Ok(());
+                trace!("No-op, when creating range with the same metadata");
+                return;
             } else {
                 error!(
                     "Attempting to create inconsistent range. Prior range-metadata={}, attempted range-metadata={:#?}",
                     range.metadata, metadata
                 );
-                return Err(ServiceError::AlreadyExisted);
+                return;
             }
         }
 
@@ -74,7 +76,6 @@ impl Stream {
 
         self.ranges.push(Range::new(metadata));
         self.sort();
-        Ok(())
     }
 
     // Sort ranges
@@ -98,8 +99,11 @@ impl Stream {
             .any(|range: &Range| range.metadata.index() == metadata.index());
         if !existed {
             info!("Range does not exist, metadata={:#?}. Create the sealed range on data-node directly", metadata);
-            self.create_range(metadata.clone())?;
-            // TODO: Data-node is probably having a sealed range with incomplete data. Schedule a task to clone it from peers.
+            return Err(ServiceError::NotFound(format!(
+                "Range[stream-id={}, range-index={}] is not found",
+                metadata.stream_id(),
+                metadata.index()
+            )));
         }
 
         self.ranges
@@ -124,6 +128,12 @@ impl Stream {
         self.ranges
             .iter_mut()
             .find(|range| range.metadata.index() == index)
+    }
+
+    pub(crate) fn has_range(&self, index: i32) -> bool {
+        self.ranges
+            .iter()
+            .any(|range| range.metadata.index() == index)
     }
 }
 
@@ -158,7 +168,7 @@ mod tests {
 
         let range = RangeMetadata::new(1, 0, 0, 0, None);
         let range = RangeMetadata::from(range);
-        stream.create_range(range)?;
+        stream.create_range(range);
 
         assert_eq!(stream.ranges.len(), 1);
 
@@ -176,7 +186,7 @@ mod tests {
 
         let range = RangeMetadata::new(1, 0, 0, 0, None);
         let range = RangeMetadata::from(range);
-        stream.create_range(range)?;
+        stream.create_range(range);
 
         stream.commit(2);
 
@@ -204,7 +214,7 @@ mod tests {
 
         let range = RangeMetadata::new(1, 0, 0, 0, None);
         let range = RangeMetadata::from(range);
-        stream.create_range(range)?;
+        stream.create_range(range);
 
         stream.commit(100);
         let mut metadata = RangeMetadata::new(1, 0, 0, 0, Some(50));

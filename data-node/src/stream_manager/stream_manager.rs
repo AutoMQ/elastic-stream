@@ -59,7 +59,7 @@ impl StreamManager {
             let entry = self.streams.entry(range.stream_id());
             match entry {
                 Entry::Occupied(mut occupied) => {
-                    occupied.get_mut().create_range(range)?;
+                    occupied.get_mut().create_range(range);
                     if let Some(offset) = committed {
                         occupied.get_mut().reset_commit(range_index, offset);
                     }
@@ -69,7 +69,7 @@ impl StreamManager {
                         "Failed to fetch stream metadata from placement manager during bootstrap",
                     );
                     let mut stream = Stream::new(metadata);
-                    stream.create_range(range)?;
+                    stream.create_range(range);
                     if let Some(offset) = committed {
                         stream.reset_commit(range_index, offset);
                     }
@@ -86,7 +86,7 @@ impl StreamManager {
 
         match self.streams.entry(range.stream_id()) {
             Entry::Occupied(mut occupied) => {
-                occupied.get_mut().create_range(range)?;
+                occupied.get_mut().create_range(range);
             }
             Entry::Vacant(vacant) => {
                 let metadata = self
@@ -94,7 +94,7 @@ impl StreamManager {
                     .describe_stream(range.stream_id() as u64)
                     .await?;
                 let mut stream = Stream::new(metadata);
-                stream.create_range(range)?;
+                stream.create_range(range);
                 vacant.insert(stream);
             }
         }
@@ -111,18 +111,45 @@ impl StreamManager {
 
     pub(crate) async fn seal(&mut self, range: &mut RangeMetadata) -> Result<(), ServiceError> {
         if let Some(stream) = self.streams.get_mut(&range.stream_id()) {
+            if !stream.has_range(range.index()) {
+                // Fetch all ranges of the stream from placement manager that are allocated to this node.
+                let ranges = self
+                    .fetcher
+                    .list_ranges(Some(self.store.id() as u32), Some(range.stream_id() as u64))
+                    .await?;
+                // Filter the missing ones
+                let ranges = ranges
+                    .into_iter()
+                    .filter(|r| !stream.has_range(r.index()))
+                    .collect::<Vec<_>>();
+                // Create the missing ranges in the stream
+                ranges.into_iter().for_each(|item| {
+                    stream.create_range(item.clone());
+                });
+            }
             stream.seal(range)
         } else {
             info!(
                 "Stream[id={}] is not found, fetch stream metadata from placement manager",
                 range.stream_id()
             );
+            // Describe the stream to get the stream metadata
             let stream_metadata = self
                 .fetcher
                 .describe_stream(range.stream_id() as u64)
                 .await?;
             let mut stream = Stream::new(stream_metadata);
-            stream.create_range(range.clone())?;
+            // Fetch all ranges of the stream from placement manager that are allocated to this node.
+            let ranges = self
+                .fetcher
+                .list_ranges(Some(self.store.id() as u32), Some(range.stream_id() as u64))
+                .await?;
+            // Create ranges in the stream
+            for item in ranges {
+                stream.create_range(item);
+            }
+            // Seal the range
+            stream.seal(range)?;
             self.streams.insert(range.stream_id(), stream);
             Ok(())
         }

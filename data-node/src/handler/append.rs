@@ -5,7 +5,7 @@ use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
 use log::{error, trace, warn};
-use model::{payload::Payload, record::flat_record::FlatRecordBatch, Batch};
+use model::payload::Payload;
 use protocol::rpc::header::{
     AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
 };
