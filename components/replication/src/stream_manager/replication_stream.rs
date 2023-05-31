@@ -431,7 +431,7 @@ impl StreamAppendContext {
 
 struct StreamAppendRequest {
     base_offset: u64,
-    payload: Rc<Bytes>,
+    payload: Bytes,
     context: StreamAppendContext,
     append_tx: RefCell<OnceCell<oneshot::Sender<Result<(), ReplicationError>>>>,
 }
@@ -447,7 +447,7 @@ impl StreamAppendRequest {
         let _ = append_tx_cell.set(append_tx);
         Self {
             base_offset,
-            payload: Rc::new(payload),
+            payload: payload,
             context,
             append_tx: RefCell::new(append_tx_cell),
         }

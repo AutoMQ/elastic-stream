@@ -164,13 +164,13 @@ impl ReplicationRange {
             .ok_or(ReplicationError::Internal)
     }
 
-    pub(crate) fn append(&self, payload: Rc<Bytes>, context: RangeAppendContext) {
+    pub(crate) fn append(&self, payload: Bytes, context: RangeAppendContext) {
         let record_batch = RecordBatch::new_builder()
             .with_stream_id(self.metadata.stream_id())
             .with_range_index(self.metadata.index())
             .with_base_offset(context.base_offset as i64)
             .with_last_offset_delta(context.count as i32)
-            .with_payload((*payload).clone())
+            .with_payload(payload)
             .build()
             .expect("valid record batch");
         let flat_record_batch: FlatRecordBatch = Into::into(record_batch);
