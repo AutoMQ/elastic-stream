@@ -7,7 +7,10 @@ use std::{
 
 use crate::{
     error::StoreError,
-    index::{driver::IndexDriver, record_handle::{RecordHandle, HandleExt}},
+    index::{
+        driver::IndexDriver,
+        record_handle::{HandleExt, RecordHandle},
+    },
     io::record::RecordType,
     io::segment::{LogSegment, Medium, SegmentDescriptor, Status},
 };

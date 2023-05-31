@@ -16,8 +16,8 @@ pub struct AppendRecordRequest {
     /// Number of nested record entries included in `buffer`.
     pub len: u16,
 
-    /// Buffer of a complete AppendEntry. 
-    /// 
+    /// Buffer of a complete AppendEntry.
+    ///
     /// # Layout
     /// +-------------------+-------------------+-------------------+------------------------------------------+
     /// |  Magic Code(1B)   |  Meta Len(4B)     |       Meta        |  Payload Len(4B) | Record Batch Payload  |

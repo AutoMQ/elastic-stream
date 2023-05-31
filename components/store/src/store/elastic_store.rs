@@ -1,6 +1,5 @@
 use std::{
     cell::RefCell,
-    io::Cursor,
     os::fd::{AsRawFd, RawFd},
     sync::Arc,
     thread::{Builder, JoinHandle},
@@ -22,7 +21,6 @@ use crate::{
     option::{ReadOptions, WriteOptions},
     AppendRecordRequest, AppendResult, FetchResult, Store,
 };
-use bytes::Buf;
 use client::PlacementManagerIdGenerator;
 use core_affinity::CoreId;
 use crossbeam::channel::Sender;
@@ -382,16 +380,9 @@ impl Store for ElasticStore {
     /// `Some(u64)` - If the max record offset is found;
     /// `None` - If there is no record of the given stream;
     fn max_record_offset(&self, stream_id: i64, range: u32) -> Result<Option<u64>, StoreError> {
-        self.indexer.retrieve_max_key(stream_id, range).map(|buf| {
-            if let Some(ref buf) = buf {
-                // Layout of the buffer is [stream-id: 8B][offset: 8B]
-                let mut cursor = Cursor::new(&buf[..]);
-                cursor.set_position(8);
-                Some(cursor.get_u64())
-            } else {
-                None
-            }
-        })
+        self.indexer
+            .retrieve_max_key(stream_id, range)
+            .map(|buf| buf.map(|entry| entry.max_offset()))
     }
 
     fn id(&self) -> i32 {

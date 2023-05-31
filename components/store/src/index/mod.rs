@@ -4,6 +4,7 @@ use tokio::sync::mpsc;
 
 pub(crate) mod compaction;
 pub(crate) mod driver;
+pub(crate) mod entry;
 pub(crate) mod indexer;
 pub(crate) mod record_handle;
 

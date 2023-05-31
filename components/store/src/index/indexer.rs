@@ -20,7 +20,11 @@ use tokio::sync::mpsc;
 
 use crate::error::StoreError;
 
-use super::{record_handle::{RecordHandle, HandleExt}, MinOffset};
+use super::{
+    entry::IndexEntry,
+    record_handle::{HandleExt, RecordHandle},
+    MinOffset,
+};
 
 const INDEX_COLUMN_FAMILY: &str = "index";
 const METADATA_COLUMN_FAMILY: &str = "metadata";
@@ -182,7 +186,7 @@ impl Indexer {
                     HandleExt::Hash(hash) => {
                         value_buf.put_u32(length_type);
                         value_buf.put_u64(hash);
-                    },
+                    }
                     HandleExt::BatchSize(len) => {
                         length_type |= 1;
                         value_buf.put_u32(length_type);
@@ -216,8 +220,10 @@ impl Indexer {
         max_offset: u64,
         max_bytes: u32,
     ) -> Result<Option<Vec<RecordHandle>>, StoreError> {
-        let left_key = self.retrieve_left_key(stream_id, range, offset)?;
-        let left_key = left_key.unwrap_or(self.build_index_key(stream_id, range, offset));
+        let left_key_entry = self.retrieve_left_key(stream_id, range, offset)?;
+        let left_key = left_key_entry
+            .map(|entry| entry.key())
+            .unwrap_or(self.build_index_key(stream_id, range, offset));
         let mut read_opts = ReadOptions::default();
         read_opts.set_iterate_lower_bound(&left_key[..]);
         read_opts.set_iterate_upper_bound((stream_id + 1).to_be_bytes());
@@ -228,6 +234,7 @@ impl Indexer {
         self.scan_record_handles_from(read_opts, max_bytes)
     }
 
+    #[cfg(test)]
     pub(crate) fn scan_record_handles(
         &self,
         stream_id: i64,
@@ -276,25 +283,20 @@ impl Indexer {
                         bytes_c += len;
                         let ty = length_type & 0xFF;
                         match ty {
-                            0 => {
-                                Some(RecordHandle {
-                                    wal_offset: offset,
-                                    len,
-                                    ext: HandleExt::Hash(rdr.get_u64()),
-                                })
-                            },
-                            1 => {
-                                Some(RecordHandle {
-                                    wal_offset: offset,
-                                    len,
-                                    ext: HandleExt::BatchSize(rdr.get_u16()),
-                                })
-                            }
+                            0 => Some(RecordHandle {
+                                wal_offset: offset,
+                                len,
+                                ext: HandleExt::Hash(rdr.get_u64()),
+                            }),
+                            1 => Some(RecordHandle {
+                                wal_offset: offset,
+                                len,
+                                ext: HandleExt::BatchSize(rdr.get_u16()),
+                            }),
                             _ => {
                                 unreachable!("Unsupported handle extension");
                             }
                         }
-
                     })
                     .collect();
 
@@ -392,7 +394,7 @@ impl Indexer {
         &self,
         stream_id: i64,
         range: u32,
-    ) -> Result<Option<Bytes>, StoreError> {
+    ) -> Result<Option<IndexEntry>, StoreError> {
         match self.db.cf_handle(INDEX_COLUMN_FAMILY) {
             Some(cf) => {
                 let mut read_opts = ReadOptions::default();
@@ -407,12 +409,10 @@ impl Indexer {
                 read_opts.set_iterate_upper_bound(upper.freeze());
 
                 let mut iter = self.db.iterator_cf_opt(cf, read_opts, IteratorMode::End);
-                if let Some(result) = iter.next() {
-                    let (max, _v) = result.map_err(|e| StoreError::RocksDB(e.into_string()))?;
-                    Ok(Some(Bytes::from(max)))
-                } else {
-                    Ok(None)
-                }
+                iter.next()
+                    .transpose()
+                    .map_err(|e| StoreError::RocksDB(e.into_string()))
+                    .map(|opt| opt.map(|(k, v)| IndexEntry::new(&*k, &*v)))
             }
             None => Err(StoreError::RocksDB(format!(
                 "No column family: `{}`",
@@ -430,16 +430,15 @@ impl Indexer {
         stream_id: i64,
         range: u32,
         offset: u64,
-    ) -> Result<Option<Bytes>, StoreError> {
+    ) -> Result<Option<IndexEntry>, StoreError> {
         let max_key = self.retrieve_max_key(stream_id, range)?;
-        if let Some(max_key) = max_key {
-            let (_, _, max_offset) = self.decompose_index_key(&max_key[..]);
-            if offset > max_offset {
+        if let Some(entry) = max_key {
+            if offset > entry.offset {
                 return Ok(None);
             }
 
-            if offset == max_offset {
-                return Ok(Some(max_key));
+            if offset == entry.offset {
+                return Ok(Some(entry));
             }
         } else {
             return Ok(None);
@@ -462,14 +461,10 @@ impl Indexer {
                 // Reverse scan from the offset, find a lower key
                 let mut reverse_itr = self.db.iterator_cf_opt(cf, read_opts, IteratorMode::End);
                 let lower_entry = reverse_itr.next();
-
-                if let Some(result) = lower_entry {
-                    let (lower, _v) = result.map_err(|e| StoreError::RocksDB(e.into_string()))?;
-
-                    Ok(Some(Bytes::from(lower)))
-                } else {
-                    Ok(None)
-                }
+                lower_entry
+                    .transpose()
+                    .map_err(|e| StoreError::RocksDB(e.into_string()))
+                    .map(|opt| opt.map(|(k, v)| IndexEntry::new(&*k, &*v)))
             }
             None => Err(StoreError::RocksDB(format!(
                 "No column family: `{}`",
@@ -484,17 +479,6 @@ impl Indexer {
         index_key.put_u32(range);
         index_key.put_u64(offset);
         index_key.freeze()
-    }
-
-    fn decompose_index_key(&self, index_key: &[u8]) -> (i64, u32, u64) {
-        let mut index_key = index_key;
-        let stream_id = index_key.get_i64();
-
-        // Range index
-        let range = index_key.get_u32();
-
-        let offset = index_key.get_u64();
-        (stream_id, range, offset)
     }
 }
 
@@ -661,7 +645,10 @@ mod tests {
         },
     };
 
-    use crate::index::{record_handle::{RecordHandle, HandleExt}, MinOffset};
+    use crate::index::{
+        record_handle::{HandleExt, RecordHandle},
+        MinOffset,
+    };
 
     struct SampleMinOffset {
         min: AtomicU64,
@@ -720,7 +707,7 @@ mod tests {
         let max_key = indexer.retrieve_max_key(stream_id, range).unwrap().unwrap();
         assert_eq!(
             (stream_id, range, start_offset + 1),
-            indexer.decompose_index_key(&max_key[..])
+            (max_key.stream_id as i64, max_key.range, max_key.offset)
         );
 
         //Case two: no max key
@@ -753,7 +740,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             (stream_id, range, left_offset),
-            indexer.decompose_index_key(&left_key[..])
+            (left_key.stream_id as i64, left_key.range, left_key.offset)
         );
 
         // Case two: the specific key is equal to the left key
@@ -763,7 +750,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             (stream_id, range, left_offset + 2),
-            indexer.decompose_index_key(&left_key[..])
+            (left_key.stream_id as i64, left_key.range, left_key.offset)
         );
 
         // Case three: no left key
@@ -779,7 +766,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             (stream_id, range, left_offset),
-            indexer.decompose_index_key(&left_key[..])
+            (left_key.stream_id as i64, left_key.range, left_key.offset)
         );
 
         // Case five: the biggest key
@@ -790,7 +777,7 @@ mod tests {
 
         assert_eq!(
             (stream_id, range, left_offset + 4),
-            indexer.decompose_index_key(&left_key[..])
+            (left_key.stream_id as i64, left_key.range, left_key.offset)
         );
 
         // Case six: the biggest key + 1

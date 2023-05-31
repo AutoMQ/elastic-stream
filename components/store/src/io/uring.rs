@@ -1,6 +1,6 @@
 use crate::error::{AppendError, StoreError};
 use crate::index::driver::IndexDriver;
-use crate::index::record_handle::{RecordHandle, HandleExt};
+use crate::index::record_handle::{HandleExt, RecordHandle};
 use crate::io::buf::{AlignedBufReader, AlignedBufWriter};
 use crate::io::context::Context;
 use crate::io::task::IoTask;

@@ -175,11 +175,11 @@ mod tests {
 
         // After fast-forward, an inflight batch entry is inserted.
         assert!(window.fast_forward(&foo1));
-        // When commit, the offset should be amended if there is a corresponding inflight batch entry. 
+        // When commit, the offset should be amended if there is a corresponding inflight batch entry.
         // After the commit , the entry will be removed.
         assert_eq!(2, window.commit(0));
         assert_eq!(0, window.commit(0));
-        
+
         // If there is no inflight batch entry, the commit offset should not be amended.
         assert_eq!(2, window.commit(2));
 
