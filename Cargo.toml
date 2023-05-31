@@ -48,6 +48,7 @@ flatbuffers = { git = "https://github.com/google/flatbuffers.git", tag = "v23.3.
 
 libc = "0.2"
 nix = "0.26"
+moka = { version = "0.11", features = ["future"] }
 
 # Logging
 log = "0.4"

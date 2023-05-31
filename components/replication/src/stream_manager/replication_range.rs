@@ -7,12 +7,15 @@ use crate::ReplicationError;
 use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use model::range::RangeMetadata;
 use model::record::{flat_record::FlatRecordBatch, RecordBatch};
+use std::cmp::min;
 use tokio::sync::broadcast;
 
-use super::{replication_stream::ReplicationStream, replicator::Replicator};
+use super::{
+    cache::RecordBatchCache, replication_stream::ReplicationStream, replicator::Replicator,
+};
 use protocol::rpc::header::SealKind;
 
 const CORRUPTED_FLAG: u32 = 1 << 0;
@@ -28,6 +31,8 @@ pub(crate) struct ReplicationRange {
     stream: Weak<ReplicationStream>,
 
     client: Weak<Client>,
+
+    cache: Rc<RecordBatchCache>,
 
     replicators: Rc<Vec<Rc<Replicator>>>,
 
@@ -46,6 +51,7 @@ impl ReplicationRange {
         open_for_write: bool,
         stream: Weak<ReplicationStream>,
         client: Weak<Client>,
+        cache: Rc<RecordBatchCache>,
     ) -> Rc<Self> {
         let confirm_offset = metadata.end().unwrap_or_else(|| metadata.start());
         let status = if metadata.end().is_some() {
@@ -63,6 +69,7 @@ impl ReplicationRange {
             open_for_write,
             stream,
             client,
+            cache,
             replicators: Rc::new(vec![]),
             confirm_offset: RefCell::new(confirm_offset),
             status: RefCell::new(status),
@@ -164,6 +171,13 @@ impl ReplicationRange {
             .expect("valid record batch");
         let flat_record_batch: FlatRecordBatch = Into::into(record_batch);
         let (flat_record_batch_bytes, _) = flat_record_batch.encode();
+        self.cache.insert(
+            self.metadata.stream_id() as u64,
+            self.metadata().index() as u32,
+            context.base_offset,
+            context.count,
+            flat_record_batch_bytes.clone(),
+        );
         for replica in (*self.replicators).iter() {
             replica.append(
                 flat_record_batch_bytes.clone(),
@@ -178,6 +192,29 @@ impl ReplicationRange {
         end_offset: u64,
         batch_max_bytes: u32,
     ) -> Result<Vec<Bytes>, ReplicationError> {
+        // try fetch from cache first, if cache cannot fulfill the request, then fetch from remote.
+        let stream_id = self.metadata.stream_id() as u64;
+        let range_index = self.metadata.index() as u32;
+        let mut next_start_offset = start_offset;
+        let end_offset = end_offset;
+        let mut next_batch_max_bytes = batch_max_bytes;
+        let mut fetch_data = vec![];
+        loop {
+            // cache hit the fetch range, return data from cache.
+            if next_start_offset >= end_offset || next_batch_max_bytes == 0 {
+                trace!(target: &self.log_ident,"Fetch [{}, {}) with batch_max_bytes[{}] fulfilled by cache", start_offset, end_offset, batch_max_bytes);
+                return Ok(fetch_data);
+            }
+            if let Some(cache_data) = self.cache.get(stream_id, range_index, next_start_offset) {
+                let mut data = cache_data.data.clone();
+                next_batch_max_bytes -= min(next_batch_max_bytes, data.len() as u32);
+                next_start_offset += cache_data.count as u64;
+                fetch_data.append(&mut data);
+            } else {
+                break;
+            }
+        }
+
         // TODO: select replica strategy.
         // - balance the read traffic.
         // - isolate unreadable (data less than expected, unaccessible) replica.
@@ -186,14 +223,15 @@ impl ReplicationRange {
                 continue;
             }
             let result = replicator
-                .fetch(start_offset, end_offset, batch_max_bytes)
+                .fetch(next_start_offset, end_offset, next_batch_max_bytes)
                 .await;
             match result {
-                Ok(payloads) => {
-                    return Ok(payloads);
+                Ok(mut payloads) => {
+                    fetch_data.append(&mut payloads);
+                    return Ok(fetch_data);
                 }
                 Err(e) => {
-                    warn!(target: &self.log_ident, "Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes} fail, err: {e}");
+                    warn!(target: &self.log_ident, "Fetch [{next_start_offset}, {end_offset}) with batch_max_bytes={next_batch_max_bytes} fail, err: {e}");
                     continue;
                 }
             }

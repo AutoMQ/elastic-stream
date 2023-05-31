@@ -1,6 +1,7 @@
 use crate::stream_manager::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
+use super::cache::RecordBatchCache;
 use super::replication_range::ReplicationRange;
 use bytes::Bytes;
 use client::Client;
@@ -24,6 +25,7 @@ pub(crate) struct ReplicationStream {
     epoch: u64,
     ranges: RefCell<BTreeMap<u64, Rc<ReplicationRange>>>,
     client: Weak<Client>,
+    cache: Rc<RecordBatchCache>,
     next_offset: RefCell<u64>,
     last_range: RefCell<Option<Rc<ReplicationRange>>>,
     /// #append send StreamAppendRequest to tx.
@@ -37,7 +39,12 @@ pub(crate) struct ReplicationStream {
 }
 
 impl ReplicationStream {
-    pub(crate) fn new(id: i64, epoch: u64, client: Weak<Client>) -> Rc<Self> {
+    pub(crate) fn new(
+        id: i64,
+        epoch: u64,
+        client: Weak<Client>,
+        cache: Rc<RecordBatchCache>,
+    ) -> Rc<Self> {
         let (append_requests_tx, append_requests_rx) = mpsc::channel(1024);
         let (append_tasks_tx, append_tasks_rx) = mpsc::channel(1024);
         let (shutdown_signal_tx, shutdown_signal_rx) = broadcast::channel(1);
@@ -48,6 +55,7 @@ impl ReplicationStream {
             epoch,
             ranges: RefCell::new(BTreeMap::new()),
             client,
+            cache,
             next_offset: RefCell::new(0),
             last_range: RefCell::new(Option::None),
             append_requests_tx,
@@ -96,6 +104,7 @@ impl ReplicationStream {
                         false,
                         self.weak_self.borrow().clone(),
                         self.client.clone(),
+                        self.cache.clone(),
                     ),
                 );
             });
@@ -269,6 +278,7 @@ impl ReplicationStream {
                 true,
                 self.weak_self.borrow().clone(),
                 self.client.clone(),
+                self.cache.clone(),
             );
             info!(target: &self.log_ident, "Create new range: {:?}", range.metadata());
             self.ranges.borrow_mut().insert(start_offset, range.clone());

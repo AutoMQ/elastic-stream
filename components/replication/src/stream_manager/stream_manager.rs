@@ -16,13 +16,14 @@ use crate::{
     ReplicationError,
 };
 
-use super::replication_stream::StreamAppendContext;
+use super::{cache::RecordBatchCache, replication_stream::StreamAppendContext};
 
 pub(crate) struct StreamManager {
     _config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Request>,
     client: Rc<Client>,
     streams: Rc<RefCell<HashMap<u64, Rc<ReplicationStream>>>>,
+    cache: Rc<RecordBatchCache>,
 }
 
 impl StreamManager {
@@ -30,11 +31,13 @@ impl StreamManager {
         let (shutdown, _rx) = broadcast::channel(1);
         let client = Rc::new(Client::new(Arc::clone(&config), shutdown));
         let streams = Rc::new(RefCell::new(HashMap::new()));
+        let cache = Rc::new(RecordBatchCache::new());
         Self {
             _config: config,
             rx,
             client,
             streams,
+            cache,
         }
     }
 
@@ -148,9 +151,11 @@ impl StreamManager {
     ) {
         let client = self.client.clone();
         let streams = self.streams.clone();
+        let cache = self.cache.clone();
         tokio_uring::spawn(async move {
             let client = Rc::downgrade(&client);
-            let stream = ReplicationStream::new(request.stream_id as i64, request.epoch, client);
+            let stream =
+                ReplicationStream::new(request.stream_id as i64, request.epoch, client, cache);
             if let Err(e) = stream.open().await {
                 let _ = tx.send(Err(e));
                 return;
