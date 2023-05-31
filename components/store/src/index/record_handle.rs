@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use bytes::Buf;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct RecordHandle {
@@ -20,7 +20,7 @@ pub(crate) enum HandleExt {
     Hash(u64),
 
     /// Number of the nested entries included in the pointed `Record`.
-    BatchSize(u16),
+    BatchSize(u32),
 }
 
 impl From<&[u8]> for RecordHandle {
@@ -44,10 +44,10 @@ impl From<&[u8]> for RecordHandle {
             }
             1 => {
                 debug_assert!(
-                    cursor.remaining() >= 2,
-                    "Extended field should be u16, number of nested entries"
+                    cursor.remaining() >= 4,
+                    "Extended field should be u32, number of nested entries"
                 );
-                HandleExt::BatchSize(cursor.get_u16())
+                HandleExt::BatchSize(cursor.get_u32())
             }
             _ => {
                 unreachable!("Unknown type");
@@ -58,5 +58,27 @@ impl From<&[u8]> for RecordHandle {
             len,
             ext,
         }
+    }
+}
+
+impl From<&RecordHandle> for Bytes {
+    fn from(handle: &RecordHandle) -> Self {
+        let mut value_buf = BytesMut::with_capacity(20);
+        value_buf.put_u64(handle.wal_offset);
+        let mut length_type = handle.len << 8;
+        match handle.ext {
+            HandleExt::Hash(hash) => {
+                value_buf.put_u32(length_type);
+                value_buf.put_u64(hash);
+            }
+            HandleExt::BatchSize(len) => {
+                // set type
+                length_type |= 1;
+                
+                value_buf.put_u32(length_type);
+                value_buf.put_u32(len);
+            }
+        };
+        value_buf.freeze()
     }
 }

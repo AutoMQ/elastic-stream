@@ -58,7 +58,7 @@ pub(crate) struct WriteTask {
     pub(crate) offset: i64,
 
     /// Number of nested record entries included in `buffer`.
-    pub(crate) len: u16,
+    pub(crate) len: u32,
 
     /// `Record` serialized.
     ///

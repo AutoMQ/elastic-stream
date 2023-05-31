@@ -215,7 +215,7 @@ impl Wal {
                     let handle = RecordHandle {
                         wal_offset: segment.wal_offset + file_pos - len as u64 - 8,
                         len: len as u32 + 8,
-                        ext: HandleExt::BatchSize(entry.len as u16),
+                        ext: HandleExt::BatchSize(entry.len),
                     };
                     trace!("Index RecordBatch[stream-id={}, range={}, base-offset={}, wal-offset={}, len={}]",
                            stream_id, range, offset, handle.wal_offset, handle.len);

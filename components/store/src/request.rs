@@ -14,7 +14,7 @@ pub struct AppendRecordRequest {
     pub offset: i64,
 
     /// Number of nested record entries included in `buffer`.
-    pub len: u16,
+    pub len: u32,
 
     /// Buffer of a complete AppendEntry.
     ///
@@ -30,7 +30,7 @@ impl Batch for AppendRecordRequest {
         self.offset as u64
     }
 
-    fn len(&self) -> u16 {
+    fn len(&self) -> u32 {
         self.len
     }
 }

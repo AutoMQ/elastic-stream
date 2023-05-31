@@ -55,7 +55,7 @@ impl Payload {
             stream_id: metadata.stream_id() as u64,
             index: metadata.range_index() as u32,
             offset: metadata.base_offset() as u64,
-            len: metadata.last_offset_delta() as u16,
+            len: metadata.last_offset_delta() as u32,
         };
 
         // Advance record batch metadata

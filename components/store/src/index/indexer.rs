@@ -20,11 +20,7 @@ use tokio::sync::mpsc;
 
 use crate::error::StoreError;
 
-use super::{
-    entry::IndexEntry,
-    record_handle::{HandleExt, RecordHandle},
-    MinOffset,
-};
+use super::{entry::IndexEntry, record_handle::RecordHandle, MinOffset};
 
 const INDEX_COLUMN_FAMILY: &str = "index";
 const METADATA_COLUMN_FAMILY: &str = "metadata";
@@ -178,21 +174,8 @@ impl Indexer {
                 key_buf.put_i64(stream_id);
                 key_buf.put_u32(range);
                 key_buf.put_u64(offset);
-
-                let mut value_buf = BytesMut::with_capacity(20);
-                value_buf.put_u64(handle.wal_offset);
-                let mut length_type = handle.len << 8;
-                match handle.ext {
-                    HandleExt::Hash(hash) => {
-                        value_buf.put_u32(length_type);
-                        value_buf.put_u64(hash);
-                    }
-                    HandleExt::BatchSize(len) => {
-                        length_type |= 1;
-                        value_buf.put_u32(length_type);
-                        value_buf.put_u16(len);
-                    }
-                }
+                
+                let value_buf = Into::<Bytes>::into(handle);
 
                 self.db
                     .put_cf_opt(cf, &key_buf[..], &value_buf[..], &self.write_opts)
@@ -276,27 +259,9 @@ impl Indexer {
                         if bytes_c >= max_bytes {
                             return None;
                         }
-                        let mut rdr = Cursor::new(&v[..]);
-                        let offset = rdr.get_u64();
-                        let length_type = rdr.get_u32();
-                        let len = length_type >> 8;
-                        bytes_c += len;
-                        let ty = length_type & 0xFF;
-                        match ty {
-                            0 => Some(RecordHandle {
-                                wal_offset: offset,
-                                len,
-                                ext: HandleExt::Hash(rdr.get_u64()),
-                            }),
-                            1 => Some(RecordHandle {
-                                wal_offset: offset,
-                                len,
-                                ext: HandleExt::BatchSize(rdr.get_u16()),
-                            }),
-                            _ => {
-                                unreachable!("Unsupported handle extension");
-                            }
-                        }
+                        let handle = Into::<RecordHandle>::into(&*v);
+                        bytes_c += handle.len;
+                        Some(handle)
                     })
                     .collect();
 

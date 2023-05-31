@@ -10,5 +10,5 @@ pub struct AppendEntry {
     pub offset: u64,
 
     /// Quantity of nested records
-    pub len: u16,
+    pub len: u32,
 }
