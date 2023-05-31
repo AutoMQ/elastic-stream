@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     error::StoreError,
-    index::{driver::IndexDriver, record_handle::RecordHandle},
+    index::{driver::IndexDriver, record_handle::{RecordHandle, HandleExt}},
     io::record::RecordType,
     io::segment::{LogSegment, Medium, SegmentDescriptor, Status},
 };
@@ -212,7 +212,7 @@ impl Wal {
                     let handle = RecordHandle {
                         wal_offset: segment.wal_offset + file_pos - len as u64 - 8,
                         len: len as u32 + 8,
-                        hash: 0,
+                        ext: HandleExt::BatchSize(entry.len as u16),
                     };
                     trace!("Index RecordBatch[stream-id={}, range={}, base-offset={}, wal-offset={}, len={}]",
                            stream_id, range, offset, handle.wal_offset, handle.len);

@@ -20,7 +20,7 @@ use tokio::sync::mpsc;
 
 use crate::error::StoreError;
 
-use super::{record_handle::RecordHandle, MinOffset};
+use super::{record_handle::{RecordHandle, HandleExt}, MinOffset};
 
 const INDEX_COLUMN_FAMILY: &str = "index";
 const METADATA_COLUMN_FAMILY: &str = "metadata";
@@ -177,9 +177,19 @@ impl Indexer {
 
                 let mut value_buf = BytesMut::with_capacity(20);
                 value_buf.put_u64(handle.wal_offset);
-                let length_type = handle.len << 8;
-                value_buf.put_u32(length_type);
-                value_buf.put_u64(handle.hash);
+                let mut length_type = handle.len << 8;
+                match handle.ext {
+                    HandleExt::Hash(hash) => {
+                        value_buf.put_u32(length_type);
+                        value_buf.put_u64(hash);
+                    },
+                    HandleExt::BatchSize(len) => {
+                        length_type |= 1;
+                        value_buf.put_u32(length_type);
+                        value_buf.put_u16(len);
+                    }
+                }
+
                 self.db
                     .put_cf_opt(cf, &key_buf[..], &value_buf[..], &self.write_opts)
                     .map_err(|e| StoreError::RocksDB(e.into_string()))?;
@@ -262,17 +272,29 @@ impl Indexer {
                         let mut rdr = Cursor::new(&v[..]);
                         let offset = rdr.get_u64();
                         let length_type = rdr.get_u32();
-                        let mut hash = 0;
-                        if length_type & 0xFF == 0 {
-                            hash = rdr.get_u64();
-                        }
                         let len = length_type >> 8;
                         bytes_c += len;
-                        Some(RecordHandle {
-                            wal_offset: offset,
-                            len,
-                            hash,
-                        })
+                        let ty = length_type & 0xFF;
+                        match ty {
+                            0 => {
+                                Some(RecordHandle {
+                                    wal_offset: offset,
+                                    len,
+                                    ext: HandleExt::Hash(rdr.get_u64()),
+                                })
+                            },
+                            1 => {
+                                Some(RecordHandle {
+                                    wal_offset: offset,
+                                    len,
+                                    ext: HandleExt::BatchSize(rdr.get_u16()),
+                                })
+                            }
+                            _ => {
+                                unreachable!("Unsupported handle extension");
+                            }
+                        }
+
                     })
                     .collect();
 
@@ -689,7 +711,7 @@ mod tests {
         let ptr = RecordHandle {
             wal_offset: 1024,
             len: 128,
-            hash: 10,
+            ext: HandleExt::Hash(10),
         };
         indexer.index(stream_id, range, start_offset, &ptr)?;
         indexer.index(stream_id, range, start_offset + 1, &ptr)?;
@@ -719,7 +741,7 @@ mod tests {
         let ptr = RecordHandle {
             wal_offset: 1024,
             len: 128,
-            hash: 10,
+            ext: HandleExt::Hash(10),
         };
         indexer.index(stream_id, range, left_offset, &ptr)?;
         indexer.index(stream_id, range, left_offset + 2, &ptr)?;
@@ -792,7 +814,7 @@ mod tests {
                 let ptr = RecordHandle {
                     wal_offset: n * 128,
                     len: 128,
-                    hash: 10,
+                    ext: HandleExt::Hash(10),
                 };
                 indexer.index(0, range, n * 10, &ptr)
             })
@@ -867,7 +889,7 @@ mod tests {
                 let ptr = RecordHandle {
                     wal_offset: n,
                     len: 128,
-                    hash: 10,
+                    ext: HandleExt::Hash(10),
                 };
                 indexer.index(0, range, n, &ptr)
             })
@@ -916,7 +938,7 @@ mod tests {
                 let ptr = RecordHandle {
                     wal_offset: n,
                     len: 128,
-                    hash: 10,
+                    ext: HandleExt::Hash(10),
                 };
                 indexer.index(0, range, n, &ptr)
             })

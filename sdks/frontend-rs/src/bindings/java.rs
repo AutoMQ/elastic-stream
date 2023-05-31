@@ -9,7 +9,7 @@ use std::ffi::c_void;
 use std::io::Write;
 use std::slice;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{ClientError, Frontend, Stopwatch, Stream, StreamOptions};
