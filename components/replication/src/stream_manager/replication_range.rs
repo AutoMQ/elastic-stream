@@ -26,6 +26,8 @@ const SEALED_FLAG: u32 = 1 << 2;
 pub(crate) struct ReplicationRange {
     log_ident: String,
 
+    weak_self: Weak<Self>,
+
     metadata: RangeMetadata,
 
     stream: Weak<ReplicationStream>,
@@ -65,6 +67,7 @@ impl ReplicationRange {
         let log_ident = format!("Range[{}#{}]", metadata.stream_id(), metadata.index());
         let mut this = Rc::new(Self {
             log_ident,
+            weak_self: Weak::new(),
             metadata,
             open_for_write,
             stream,
@@ -80,8 +83,9 @@ impl ReplicationRange {
         for replica_node in this.metadata.replica().iter() {
             replicators.push(Rc::new(Replicator::new(this.clone(), replica_node.clone())));
         }
-        // #Safty: the replicators only changed(init) in range new.
+        // #Safety: the weak_self/replicators only changed(init) in range new.
         unsafe {
+            Rc::get_mut_unchecked(&mut this).weak_self = Rc::downgrade(&this);
             Rc::get_mut_unchecked(&mut this).replicators = Rc::new(replicators);
         }
         info!(
@@ -292,6 +296,7 @@ impl ReplicationRange {
                         let replica_count = self.metadata.replica_count();
                         let ack_count = self.metadata.ack_count();
                         let log_ident = self.log_ident.clone();
+                        let range = self.weak_self.upgrade().clone();
                         tokio_uring::spawn(async move {
                             if Self::replicas_seal(
                                 &log_ident,
@@ -305,6 +310,8 @@ impl ReplicationRange {
                             {
                                 debug!("Failed to seal data-node after sealing placement-manager");
                             }
+                            // keep range alive until seal task complete.
+                            drop(range);
                         });
                         Ok(end_offset)
                     }
