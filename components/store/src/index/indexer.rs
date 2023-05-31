@@ -377,7 +377,7 @@ impl Indexer {
                 iter.next()
                     .transpose()
                     .map_err(|e| StoreError::RocksDB(e.into_string()))
-                    .map(|opt| opt.map(|(k, v)| IndexEntry::new(&*k, &*v)))
+                    .map(|opt| opt.map(|(k, v)| IndexEntry::new(&k, &v)))
             }
             None => Err(StoreError::RocksDB(format!(
                 "No column family: `{}`",
@@ -429,7 +429,7 @@ impl Indexer {
                 lower_entry
                     .transpose()
                     .map_err(|e| StoreError::RocksDB(e.into_string()))
-                    .map(|opt| opt.map(|(k, v)| IndexEntry::new(&*k, &*v)))
+                    .map(|opt| opt.map(|(k, v)| IndexEntry::new(&k, &v)))
             }
             None => Err(StoreError::RocksDB(format!(
                 "No column family: `{}`",

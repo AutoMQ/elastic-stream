@@ -84,3 +84,13 @@ prometheus = "0.13"
 
 serde = "1.0"
 serde_yaml = "0.9"
+
+[profile.release]
+opt-level = 2
+debug = false
+strip = "symbols"
+debug-assertions = false
+codegen-units = 1
+overflow-checks = true
+lto = true
+incremental = false

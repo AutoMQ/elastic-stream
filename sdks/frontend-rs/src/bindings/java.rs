@@ -114,15 +114,25 @@ async fn process_read_command(
             // Copy buffers to `DirectByteBuffer`
             let total = buffers.iter().map(|buf| buf.len()).sum();
             if let Ok(layout) = Layout::from_size_align(total, 1) {
+                // # Safety
+                // It should always be safe to allocate memory with alignment of 1 unless the system
+                // is running out of memory.
                 let ptr = unsafe { std::alloc::alloc(layout) };
                 let mut p = 0;
                 buffers.iter().for_each(|buf| {
+                    // # Safety
+                    // We are copying slices from store to continuous memory for DirectByteBuffer. This
+                    // is definitely a non-overlapping copy and thus safe.
+                    //
+                    // Note DirectByteBuffer is responsible of returning the allocated memory.
                     unsafe { std::ptr::copy_nonoverlapping(buf.as_ptr(), ptr.add(p), buf.len()) };
                     p += buf.len();
                 });
 
                 JENV.with(|cell| {
                     let mut env = get_thread_local_jenv(cell);
+                    // # Safety
+                    // Standard JNI call.
                     if let Ok(obj) = unsafe { env.new_direct_byte_buffer(ptr, total) } {
                         call_future_complete_method(env, future, JObject::from(obj));
                     } else {
@@ -254,7 +264,9 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
         .init();
     let java_vm = Arc::new(vm);
     let (tx, mut rx) = mpsc::unbounded_channel();
-    if let Err(_) = unsafe { TX.set(tx) } {
+    // # Safety
+    // Set OnceCell, expected to be safe.
+    if unsafe { TX.set(tx) }.is_err() {
         error!("Failed to set command channel sender");
     }
     let _ = std::thread::Builder::new()
@@ -345,6 +357,9 @@ pub extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_getFron
     }
 }
 
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_freeFrontend(
     mut _env: JNIEnv,
@@ -355,6 +370,9 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
     let _ = unsafe { Box::from_raw(ptr) };
 }
 
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_create(
     mut env: JNIEnv,
@@ -396,6 +414,10 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
         throw_exception(&mut env, "Failed to construct CreateStream command");
     };
 }
+
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_open(
     mut env: JNIEnv,
@@ -437,8 +459,9 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
     }
 }
 
-// Stream
-
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_freeStream(
     _env: JNIEnv,
@@ -449,6 +472,9 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_fr
     let _ = Box::from_raw(ptr);
 }
 
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_asyncClose(
     mut env: JNIEnv,
@@ -521,6 +547,9 @@ pub extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_startOffs
     }
 }
 
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_nextOffset(
     mut env: JNIEnv,
@@ -531,10 +560,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ne
     trace!("Started jni_Stream_nextOffset");
     let command = env.new_global_ref(future).map(|future| {
         let stream = unsafe { &mut *ptr };
-        Command::NextOffset {
-            stream: stream,
-            future: future,
-        }
+        Command::NextOffset { stream, future }
     });
     if let Ok(command) = command {
         if let Some(tx) = unsafe { TX.get() } {
@@ -560,6 +586,9 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ne
     }
 }
 
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_append(
     mut env: JNIEnv,
@@ -609,6 +638,9 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ap
     trace!("Finished jni_Stream_append");
 }
 
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_read(
     mut env: JNIEnv,
@@ -657,7 +689,10 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_re
 fn call_future_complete_method(mut env: JNIEnv, future: GlobalRef, obj: JObject) {
     let s = JValueGen::from(obj);
     let _stopwatch = Stopwatch::new("Future#complete");
-    if let Err(_) = env.call_method(future, "complete", "(Ljava/lang/Object;)Z", &[s.borrow()]) {
+    if env
+        .call_method(future, "complete", "(Ljava/lang/Object;)Z", &[s.borrow()])
+        .is_err()
+    {
         panic!("Failed to call future complete method");
     }
 }

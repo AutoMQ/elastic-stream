@@ -32,13 +32,3 @@ minitrace = { workspace = true }
 
 [lib]
 crate-type = ["cdylib", "lib"]
-
-
-[profile.release]
-opt-level = 2
-debug = false
-strip = "symbols"
-debug-assertions = false
-codegen-units = 1
-overflow-checks = true
-lto = true

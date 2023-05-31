@@ -41,10 +41,6 @@ uuid = { workspace = true }
 criterion = { workspace = true }
 test-util = { path = "../test-util" }
 
-
-[profile.bench]
-debug = true
-
 [[bench]]
 name = "benchmark"
 harness = false
