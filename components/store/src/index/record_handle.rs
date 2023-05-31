@@ -74,7 +74,7 @@ impl From<&RecordHandle> for Bytes {
             HandleExt::BatchSize(len) => {
                 // set type
                 length_type |= 1;
-                
+
                 value_buf.put_u32(length_type);
                 value_buf.put_u32(len);
             }

@@ -174,7 +174,7 @@ impl Indexer {
                 key_buf.put_i64(stream_id);
                 key_buf.put_u32(range);
                 key_buf.put_u64(offset);
-                
+
                 let value_buf = Into::<Bytes>::into(handle);
 
                 self.db
