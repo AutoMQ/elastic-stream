@@ -10,11 +10,18 @@ pub struct AppendRecordRequest {
     /// Range index
     pub range_index: i32,
 
+    /// Base offset of the nested record entries in `buffer`
     pub offset: i64,
 
-    pub len: usize,
+    /// Number of nested record entries included in `buffer`.
+    pub len: u16,
 
-    // Buffer of a complete AppendEntry 
+    /// Buffer of a complete AppendEntry. 
+    /// 
+    /// # Layout
+    /// +-------------------+-------------------+-------------------+------------------------------------------+
+    /// |  Magic Code(1B)   |  Meta Len(4B)     |       Meta        |  Payload Len(4B) | Record Batch Payload  |
+    /// +-------------------+-------------------+-------------------+------------------------------------------+
     pub buffer: bytes::Bytes,
 }
 
@@ -23,7 +30,7 @@ impl Batch for AppendRecordRequest {
         self.offset as u64
     }
 
-    fn len(&self) -> usize {
+    fn len(&self) -> u16 {
         self.len
     }
 }

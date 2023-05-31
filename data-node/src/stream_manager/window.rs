@@ -13,7 +13,7 @@ pub(crate) struct Window<R> {
     requests: BinaryHeap<R>,
 
     /// Submitted request offset to batch size.
-    submitted: HashMap<u64, usize>,
+    submitted: HashMap<u64, u16>,
 }
 
 impl<R> Window<R>
@@ -88,7 +88,7 @@ mod tests {
     #[derive(Debug)]
     struct Foo {
         offset: u64,
-        len: usize,
+        len: u16,
     }
 
     impl Batch for Foo {
@@ -96,7 +96,7 @@ mod tests {
             self.offset
         }
 
-        fn len(&self) -> usize {
+        fn len(&self) -> u16 {
             self.len
         }
     }

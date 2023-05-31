@@ -661,7 +661,7 @@ mod tests {
         },
     };
 
-    use crate::index::{record_handle::RecordHandle, MinOffset};
+    use crate::index::{record_handle::{RecordHandle, HandleExt}, MinOffset};
 
     struct SampleMinOffset {
         min: AtomicU64,
@@ -833,7 +833,7 @@ mod tests {
         handles.into_iter().enumerate().for_each(|(i, handle)| {
             assert_eq!(((i + 1) * 128) as u64, handle.wal_offset);
             assert_eq!(128, handle.len);
-            assert_eq!(10, handle.hash);
+            assert_eq!(HandleExt::Hash(10), handle.ext);
         });
 
         // Case two: scan from a left key
@@ -845,7 +845,7 @@ mod tests {
         handles.into_iter().enumerate().for_each(|(i, handle)| {
             assert_eq!(((i + 1) * 128) as u64, handle.wal_offset);
             assert_eq!(128, handle.len);
-            assert_eq!(10, handle.hash);
+            assert_eq!(HandleExt::Hash(10), handle.ext);
         });
 
         // Case three: scan from a key smaller than the smallest key
@@ -857,7 +857,7 @@ mod tests {
         handles.into_iter().enumerate().for_each(|(i, handle)| {
             assert_eq!(((i + 1) * 128) as u64, handle.wal_offset);
             assert_eq!(128, handle.len);
-            assert_eq!(10, handle.hash);
+            assert_eq!(HandleExt::Hash(10), handle.ext);
         });
 
         // Case four: scan from a key bigger than the biggest key
@@ -904,7 +904,7 @@ mod tests {
         handles.into_iter().enumerate().for_each(|(i, handle)| {
             assert_eq!(i as u64, handle.wal_offset);
             assert_eq!(128, handle.len);
-            assert_eq!(10, handle.hash);
+            assert_eq!(HandleExt::Hash(10), handle.ext);
         });
 
         // Case two: scan 0 bytes from the indexer

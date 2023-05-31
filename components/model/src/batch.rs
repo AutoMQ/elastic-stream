@@ -3,7 +3,7 @@ pub trait Batch {
     fn offset(&self) -> u64;
 
     /// Quantity of the internal nested records
-    fn len(&self) -> usize;
+    fn len(&self) -> u16;
 
     /// Indicate whether the batch is empty
     fn is_empty(&self) -> bool {

@@ -187,6 +187,7 @@ impl ElasticStore {
             stream_id: request.stream_id,
             range: request.range_index as u32,
             offset: request.offset,
+            len: request.len,
             buffer: request.buffer,
             observer,
             written_len: None,

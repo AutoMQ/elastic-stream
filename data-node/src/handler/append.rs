@@ -209,7 +209,7 @@ impl<'a> Append<'a> {
                 stream_id: entry.stream_id as i64,
                 range_index: entry.index as i32,
                 offset: entry.offset as i64,
-                len: entry.len as usize,
+                len: entry.len,
                 buffer: self.payload.slice(pos..pos + len),
             };
 

@@ -1,6 +1,6 @@
 use crate::error::{AppendError, StoreError};
 use crate::index::driver::IndexDriver;
-use crate::index::record_handle::RecordHandle;
+use crate::index::record_handle::{RecordHandle, HandleExt};
 use crate::io::buf::{AlignedBufReader, AlignedBufWriter};
 use crate::io::context::Context;
 use crate::io::task::IoTask;
@@ -1148,9 +1148,9 @@ impl IO {
 
     fn build_read_index(&mut self, wal_offset: u64, written_len: u32, task: &WriteTask) {
         let handle = RecordHandle {
-            hash: 0, // TODO: set hash for record handle
-            len: written_len,
             wal_offset,
+            len: written_len,
+            ext: HandleExt::BatchSize(task.len),
         };
         self.indexer
             .index(task.stream_id, task.range, task.offset as u64, handle);
@@ -1629,6 +1629,7 @@ mod tests {
                     stream_id: 0,
                     range: 0,
                     offset: 0,
+                    len: 1,
                     buffer: buffer.clone(),
                     observer: tx,
                     written_len: None,
@@ -1686,6 +1687,7 @@ mod tests {
                 stream_id: 0,
                 range: 0,
                 offset: 0,
+                len: 1,
                 buffer: bytes.clone(),
                 observer: tx,
                 written_len: None,
@@ -1706,6 +1708,7 @@ mod tests {
                 stream_id: 0,
                 range: 0,
                 offset: 0,
+                len: 1,
                 buffer: bytes.clone(),
                 observer: tx,
                 written_len: None,
@@ -1726,6 +1729,7 @@ mod tests {
                 stream_id: 0,
                 range: 0,
                 offset: 0,
+                len: 1,
                 buffer: bytes.clone(),
                 observer: tx,
                 written_len: None,
@@ -1769,6 +1773,7 @@ mod tests {
                     stream_id: 0,
                     range: 0,
                     offset: n,
+                    len: 1,
                     buffer: buffer.clone(),
                     observer: tx,
                     written_len: None,
@@ -1971,6 +1976,7 @@ mod tests {
                     stream_id: stream_id,
                     range: 0,
                     offset: start_offset + i as i64,
+                    len: 1,
                     buffer: buf.clone(),
                     observer: tx,
                     written_len: None,
