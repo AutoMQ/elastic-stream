@@ -572,6 +572,7 @@ mod tests {
 
     #[test]
     fn test_read_exact_at() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let cfg = config::Configuration::default();
         let config = Arc::new(cfg);
         let alignment = config.store.alignment;
@@ -662,6 +663,7 @@ mod tests {
 
     #[test]
     fn test_truncate_to() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let mut cfg = config::Configuration::default();
         cfg.store.alignment = 4096;
         let config = Arc::new(cfg);

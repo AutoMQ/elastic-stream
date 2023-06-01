@@ -39,6 +39,7 @@ pub fn create_random_path() -> io::Result<PathBuf> {
     wal_dir.push(uuid.simple().to_string());
     let db_path = wal_dir.as_path();
     fs::create_dir_all(db_path)?;
+    trace!("Created random path: {:#?}", db_path);
     Ok(wal_dir)
 }
 
