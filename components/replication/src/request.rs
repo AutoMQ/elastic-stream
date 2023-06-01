@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use model::RecordBatch;
 use std::time::Duration;
 use tokio::sync::oneshot;
 
@@ -7,8 +8,7 @@ use crate::ReplicationError;
 #[derive(Debug)]
 pub struct AppendRequest {
     pub stream_id: u64,
-    pub data: Bytes,
-    pub count: u32,
+    pub record_batch: RecordBatch,
 }
 
 #[derive(Debug)]

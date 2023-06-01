@@ -27,6 +27,10 @@ impl RecordBatch {
         self.metadata.range_index
     }
 
+    pub fn flags(&self) -> i16 {
+        self.metadata.flags
+    }
+
     pub fn base_timestamp(&self) -> i64 {
         self.metadata.base_timestamp
     }
@@ -35,12 +39,16 @@ impl RecordBatch {
         self.metadata.base_offset
     }
 
-    pub fn len(&self) -> usize {
+    pub fn last_offset_delta(&self) -> usize {
         self.metadata.last_offset_delta as usize
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.last_offset_delta() == 0
+    }
+
+    pub fn properties(&self) -> Option<&Vec<KeyValueT>> {
+        self.metadata.properties.as_ref()
     }
 
     pub fn payload(&self) -> Bytes {

@@ -12,11 +12,11 @@ use crate::{
         CreateStreamResponse, OpenStreamRequest, OpenStreamResponse, ReadRequest, ReadResponse,
         Request, TrimRequest,
     },
-    stream_manager::replication_stream::ReplicationStream,
+    stream::replication_stream::ReplicationStream,
     ReplicationError,
 };
 
-use super::{cache::RecordBatchCache, replication_stream::StreamAppendContext};
+use super::cache::RecordBatchCache;
 
 pub(crate) struct StreamManager {
     _config: Arc<Configuration>,
@@ -83,7 +83,7 @@ impl StreamManager {
         if let Some(stream) = stream {
             tokio_uring::spawn(async move {
                 let result = stream
-                    .append(request.data, StreamAppendContext::new(request.count))
+                    .append(request.record_batch)
                     .await
                     .map(|offset| AppendResponse { offset });
                 let _ = tx.send(result);

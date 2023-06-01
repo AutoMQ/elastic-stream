@@ -164,28 +164,39 @@ impl ReplicationRange {
             .ok_or(ReplicationError::Internal)
     }
 
-    pub(crate) fn append(&self, payload: Bytes, context: RangeAppendContext) {
-        let record_batch = RecordBatch::new_builder()
-            .with_stream_id(self.metadata.stream_id())
+    pub(crate) fn append(&self, record_batch: &RecordBatch, context: RangeAppendContext) {
+        let base_offset = context.base_offset;
+        let last_offset_delta = record_batch.last_offset_delta() as u32;
+        let mut record_batch_builder = RecordBatch::new_builder()
+            .with_stream_id(record_batch.stream_id())
+            // use current range index.
             .with_range_index(self.metadata.index())
-            .with_base_offset(context.base_offset as i64)
-            .with_last_offset_delta(context.count as i32)
-            .with_payload(payload)
-            .build()
-            .expect("valid record batch");
+            .with_flags(record_batch.flags())
+            // use base_offset from context.
+            .with_base_offset(base_offset as i64)
+            .with_last_offset_delta(record_batch.last_offset_delta() as i32)
+            .with_base_timestamp(record_batch.base_timestamp())
+            .with_payload(record_batch.payload());
+        if let Some(properties) = record_batch.properties() {
+            for kv in properties.iter() {
+                record_batch_builder =
+                    record_batch_builder.with_property(kv.key.clone(), kv.value.clone());
+            }
+        }
+        let record_batch = record_batch_builder.build().expect("valid record batch");
         let flat_record_batch: FlatRecordBatch = Into::into(record_batch);
         let (flat_record_batch_bytes, _) = flat_record_batch.encode();
         self.cache.insert(
             self.metadata.stream_id() as u64,
             self.metadata().index() as u32,
-            context.base_offset,
-            context.count,
+            base_offset,
+            last_offset_delta,
             flat_record_batch_bytes.clone(),
         );
         for replica in (*self.replicators).iter() {
             replica.append(
                 flat_record_batch_bytes.clone(),
-                context.base_offset + context.count as u64,
+                base_offset + last_offset_delta as u64,
             );
         }
     }
@@ -296,7 +307,7 @@ impl ReplicationRange {
                         let replica_count = self.metadata.replica_count();
                         let ack_count = self.metadata.ack_count();
                         let log_ident = self.log_ident.clone();
-                        let range = self.weak_self.upgrade().clone();
+                        let range = self.weak_self.upgrade();
                         tokio_uring::spawn(async move {
                             if Self::replicas_seal(
                                 &log_ident,
@@ -461,11 +472,10 @@ impl ReplicationRange {
 
 pub struct RangeAppendContext {
     base_offset: u64,
-    count: u32,
 }
 
 impl RangeAppendContext {
-    pub fn new(base_offset: u64, count: u32) -> Self {
-        Self { base_offset, count }
+    pub fn new(base_offset: u64) -> Self {
+        Self { base_offset }
     }
 }

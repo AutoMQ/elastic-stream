@@ -1,4 +1,4 @@
-use crate::stream_manager::replication_range::RangeAppendContext;
+use crate::stream::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
 use super::cache::RecordBatchCache;
@@ -7,6 +7,7 @@ use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
 use log::{error, info, trace, warn};
+use model::RecordBatch;
 use std::cell::OnceCell;
 use std::cell::RefCell;
 use std::cmp::{max, min};
@@ -164,17 +165,13 @@ impl ReplicationStream {
         *self.next_offset.borrow()
     }
 
-    pub(crate) async fn append(
-        &self,
-        payload: Bytes,
-        context: StreamAppendContext,
-    ) -> Result<u64, ReplicationError> {
+    pub(crate) async fn append(&self, record_batch: RecordBatch) -> Result<u64, ReplicationError> {
         if *self.closed.borrow() {
             warn!(target: &self.log_ident, "Keep append to a closed stream.");
             return Err(ReplicationError::AlreadyClosed);
         }
         let base_offset = *self.next_offset.borrow();
-        let count = context.count;
+        let count = record_batch.last_offset_delta();
         *self.next_offset.borrow_mut() = base_offset + count as u64;
 
         let (append_tx, append_rx) = oneshot::channel::<Result<(), ReplicationError>>();
@@ -183,8 +180,7 @@ impl ReplicationStream {
             .append_requests_tx
             .send(StreamAppendRequest::new(
                 base_offset,
-                payload,
-                context,
+                record_batch,
                 append_tx,
             ))
             .await
@@ -317,7 +313,7 @@ impl ReplicationStream {
         loop {
             tokio::select! {
                 Some(append_request) = append_requests_rx.recv() => {
-                    inflight.insert(append_request.base_offset, Rc::new(append_request));
+                    inflight.insert(append_request.base_offset(), Rc::new(append_request));
                 }
                 Some(_) = append_tasks_rx.recv() => {
                     // usaully send by range ack / delay retry
@@ -402,11 +398,11 @@ impl ReplicationStream {
                 let mut cursor = inflight.lower_bound(Included(&next_append_start_offset));
                 while let Some((base_offset, append_request)) = cursor.key_value() {
                     last_writable_range.append(
-                        append_request.payload.clone(),
-                        RangeAppendContext::new(*base_offset, append_request.context.count),
+                        &append_request.record_batch,
+                        RangeAppendContext::new(*base_offset),
                     );
                     trace!(target: log_ident, "Try append record[{base_offset}] to range[{range_index}]");
-                    next_append_start_offset = base_offset + append_request.context.count as u64;
+                    next_append_start_offset = base_offset + append_request.count() as u64;
                     cursor.move_next();
                 }
             }
@@ -419,38 +415,33 @@ impl ReplicationStream {
     }
 }
 
-pub(crate) struct StreamAppendContext {
-    count: u32,
-}
-
-impl StreamAppendContext {
-    pub(crate) fn new(count: u32) -> StreamAppendContext {
-        StreamAppendContext { count }
-    }
-}
-
 struct StreamAppendRequest {
     base_offset: u64,
-    payload: Bytes,
-    context: StreamAppendContext,
+    record_batch: RecordBatch,
     append_tx: RefCell<OnceCell<oneshot::Sender<Result<(), ReplicationError>>>>,
 }
 
 impl StreamAppendRequest {
     pub fn new(
         base_offset: u64,
-        payload: Bytes,
-        context: StreamAppendContext,
+        record_batch: RecordBatch,
         append_tx: oneshot::Sender<Result<(), ReplicationError>>,
     ) -> Self {
         let append_tx_cell = OnceCell::new();
         let _ = append_tx_cell.set(append_tx);
         Self {
             base_offset,
-            payload: payload,
-            context,
+            record_batch,
             append_tx: RefCell::new(append_tx_cell),
         }
+    }
+
+    pub fn base_offset(&self) -> u64 {
+        self.base_offset
+    }
+
+    pub fn count(&self) -> u32 {
+        self.record_batch.last_offset_delta() as u32
     }
 
     pub fn success(&self) {

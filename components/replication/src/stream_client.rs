@@ -8,7 +8,7 @@ use crate::{
         AppendRequest, AppendResponse, CloseStreamRequest, CreateStreamRequest, OpenStreamRequest,
         ReadRequest, ReadResponse, Request, TrimRequest,
     },
-    stream_manager::stream_manager::StreamManager,
+    stream::stream_manager::StreamManager,
     ReplicationError,
 };
 

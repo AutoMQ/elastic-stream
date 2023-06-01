@@ -108,6 +108,10 @@ impl FlatRecordBatch {
         })
     }
 
+    pub fn decode_to_record_batch(buf: &mut Bytes) -> Result<RecordBatch, DecodeError> {
+        FlatRecordBatch::init_from_buf(buf)?.decode()
+    }
+
     /// Encodes the flat_record_batch to a vector of bytes, which can be sent to the storage or network layer.
     ///
     /// # Return

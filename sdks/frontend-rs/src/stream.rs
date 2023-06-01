@@ -1,6 +1,6 @@
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use log::{error, info, trace};
-use protocol::flat_model::records::RecordBatchMeta;
+use model::record::flat_record::FlatRecordBatch;
 use replication::StreamClient;
 
 use crate::{AppendResult, ClientError};
@@ -37,21 +37,10 @@ impl Stream {
     ///
     /// `buffer` - Encoded representation of the `RecordBatch`. It contains exactly one append entry.
     pub async fn append(&self, mut buffer: Bytes) -> Result<AppendResult, ClientError> {
-        let magic_code = buffer.get_i8();
-        debug_assert_eq!(
-            magic_code,
-            model::record::flat_record::RecordMagic::Magic0 as i8
-        );
-
-        let metadata_length = buffer.get_i32() as usize;
-        let metadata = buffer.slice(..(metadata_length));
-        buffer.advance(metadata_length);
-
-        let record_batch = flatbuffers::root::<RecordBatchMeta>(&metadata[..]).map_err(|e| {
-            error!("Invalid record batch metadata: {e:#?}");
+        let record_batch = FlatRecordBatch::decode_to_record_batch(&mut buffer).map_err(|e| {
+            error!("Invalid record batch {e:#?}");
             ClientError::Internal("".to_owned())
         })?;
-
         trace!("RecordBatch to append: {record_batch:#?}");
 
         debug_assert_eq!(
@@ -59,22 +48,10 @@ impl Stream {
             record_batch.stream_id() as u64,
             "Stream ID should be identical"
         );
-
-        let payload_length = buffer.get_i32() as usize;
-        let payload = buffer.slice(..payload_length);
-        buffer.advance(payload_length);
-        debug_assert!(
-            buffer.is_empty(),
-            "We are expecting exactly one append entry"
-        );
-
-        let count = record_batch.last_offset_delta() as u32;
-
-        // TODO: Pass `RecordBatchMeta` along with payload
+        let count = record_batch.last_offset_delta();
         let request = replication::request::AppendRequest {
             stream_id: self.id,
-            data: payload,
-            count,
+            record_batch,
         };
 
         self.stream_client
