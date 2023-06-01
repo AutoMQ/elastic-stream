@@ -6,7 +6,7 @@ use std::{
 
 const IO_DEPTH: u32 = 4096;
 
-const FILE_SIZE: i64 = 10i64 * 1024 * 1024 * 1024;
+const FILE_SIZE: i64 = 1i64 * 1024 * 1024 * 1024;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("PID: {}", std::process::id());
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         cqe.result()
     };
     if fd < 0 {
-        panic!("Failed to open {file_path}");
+        panic!("Failed to open {file_path}, errno: {}", -fd);
     }
     println!("Opened {file_path} with fd={fd}");
 
