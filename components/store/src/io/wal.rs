@@ -541,28 +541,27 @@ impl Wal {
             }
         }
 
-        m.into_iter()
-            .flat_map(|(offset, result)| {
-                if self.inflight_control_tasks.remove(&offset).is_none() {
-                    error!(
-                        "`file_op` map should have a record for log segment with offset: {}",
-                        offset
-                    );
-                    return Err(StoreError::Internal(
-                        "file_op misses expected in-progress offset-status entry".to_owned(),
-                    ));
-                }
-                self.on_file_op_completion(offset, result)
-            })
-            .count();
+        m.into_iter().try_for_each(|(offset, result)| {
+            if self.inflight_control_tasks.remove(&offset).is_none() {
+                error!(
+                    "`file_op` map should have a record for log segment with offset: {}",
+                    offset
+                );
+                return Err(StoreError::Internal(
+                    "file_op misses expected in-progress offset-status entry".to_owned(),
+                ));
+            }
+            self.on_file_op_completion(offset, result)
+        })?;
 
         Ok(())
     }
 
+    /// TODO: Retry on failure
     fn on_file_op_completion(&mut self, offset: u64, result: i32) -> Result<(), StoreError> {
         let mut to_remove = vec![];
         if let Some(segment) = self.segment_file_of(offset) {
-            if -1 == result {
+            if result < 0 {
                 error!("LogSegment file operation failed: {}", segment);
                 return Err(StoreError::System(result));
             }
