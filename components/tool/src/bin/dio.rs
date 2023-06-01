@@ -2,6 +2,7 @@ use io_uring::{self, opcode, types, IoUring, register, Parameters};
 use std::{
     alloc::{self, Layout},
     error::Error,
+    ffi::CString,
 };
 
 const IO_DEPTH: u32 = 4096;
@@ -47,7 +48,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     check_io_uring(&probe, control_ring.params());
 
     let file_path = "/data/data0";
-    let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), file_path.as_ptr() as *const libc::c_char)
+    let c_file_path = CString::new(file_path).unwrap();
+    let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), c_file_path.as_ptr())
         .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC)
         .mode(libc::S_IRWXU | libc::S_IRWXG)
         .build()
@@ -106,12 +108,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         iov_len: buf_size as libc::size_t,
     }];
 
+    let mut probe = register::Probe::new();
     let submitter = uring.submitter();
     submitter.register_buffers(&bufs)?;
+    submitter.register_probe(&mut probe)?;
     submitter.register_files(&[fd])?;
     submitter.register_iowq_max_workers(&mut [2, 2])?;
 
     submitter.register_enable_rings()?;
+    check_io_uring(&probe, uring.params());
 
     const LATENCY_N: usize = 128;
     let mut latency = [0u16; LATENCY_N];
