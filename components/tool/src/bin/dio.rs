@@ -49,8 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     submitter.register_enable_rings()?;
     check_io_uring(&probe, control_ring.params());
 
-    let file_path = "/data/data0";
-    let c_file_path = CString::new(file_path).unwrap();
+    let file_path = "/data/data0000";
+    let c_file_path = CString::new(file_path.as_bytes()).unwrap();
     let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), c_file_path.as_ptr())
         .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC)
         .mode(libc::S_IRWXU | libc::S_IRWXG)
