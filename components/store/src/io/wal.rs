@@ -562,7 +562,10 @@ impl Wal {
         let mut to_remove = vec![];
         if let Some(segment) = self.segment_file_of(offset) {
             if result < 0 {
-                error!("LogSegment file operation failed: {}", segment);
+                error!(
+                    "LogSegment file operation failed: {}, errno: {}",
+                    segment, -result
+                );
                 return Err(StoreError::System(result));
             }
             match segment.status {
