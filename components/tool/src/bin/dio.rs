@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut control_ring = io_uring::IoUring::builder().dontfork().build(32)?;
     let file_path = "/data/data0";
-    let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), file_path.as_ptr())
+    let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), file_path.as_ptr() as *const libc::c_char)
         .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC)
         .mode(libc::S_IRWXU | libc::S_IRWXG)
         .build()
