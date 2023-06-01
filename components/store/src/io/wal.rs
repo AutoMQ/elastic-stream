@@ -562,9 +562,8 @@ impl Wal {
     fn on_file_op_completion(&mut self, offset: u64, result: i32) -> Result<(), StoreError> {
         let mut to_remove = vec![];
         if let Some(segment) = self.segment_file_of(offset) {
-            if -1 == result {
-                error!("LogSegment file operation failed: {}", segment);
-                return Err(StoreError::System(result));
+            if result < 0 {
+                panic!("File operation failed: {}", segment);
             }
             match segment.status {
                 Status::OpenAt => {
