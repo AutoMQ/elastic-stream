@@ -1,4 +1,4 @@
-use io_uring::{self, opcode, types, IoUring};
+use io_uring::{self, opcode, types, IoUring, register, Parameters};
 use std::{
     alloc::{self, Layout},
     error::Error,
@@ -8,10 +8,44 @@ const IO_DEPTH: u32 = 4096;
 
 const FILE_SIZE: i64 = 1i64 * 1024 * 1024 * 1024;
 
+fn check_io_uring(probe: &register::Probe, params: &Parameters)  {
+    if !params.is_feature_sqpoll_nonfixed() {
+        panic!("io_uring feature: IORING_FEAT_SQPOLL_NONFIXED is required. Current kernel version is too old");
+        
+    }
+    println!("io_uring has feature IORING_FEAT_SQPOLL_NONFIXED");
+
+    // io_uring should support never dropping completion events.
+    if !params.is_feature_nodrop() {
+        panic!("io_uring setup: IORING_SETUP_CQ_NODROP is required.");
+    }
+    println!("io_uring has feature IORING_SETUP_CQ_NODROP");
+
+    let codes = [
+        opcode::OpenAt::CODE,
+        opcode::Fallocate64::CODE,
+        opcode::Write::CODE,
+        opcode::Read::CODE,
+        opcode::Close::CODE,
+        opcode::UnlinkAt::CODE,
+    ];
+    for code in &codes {
+        if !probe.is_supported(*code) {
+            eprintln!("opcode {} is not supported", *code);
+        }
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     println!("PID: {}", std::process::id());
 
-    let mut control_ring = io_uring::IoUring::builder().dontfork().build(32)?;
+    let mut control_ring = io_uring::IoUring::builder().dontfork().setup_r_disabled().build(32)?;
+    let mut probe = register::Probe::new();
+    let submitter = control_ring.submitter();
+    submitter.register_probe(&mut probe)?;
+    submitter.register_enable_rings()?;
+    check_io_uring(&probe, control_ring.params());
+
     let file_path = "/data/data0";
     let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), file_path.as_ptr() as *const libc::c_char)
         .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC)
