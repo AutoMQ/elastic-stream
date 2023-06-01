@@ -563,7 +563,7 @@ impl Wal {
         let mut to_remove = vec![];
         if let Some(segment) = self.segment_file_of(offset) {
             if result < 0 {
-                panic!("File operation failed: {}", segment);
+                panic!("File operation failed: {}, errno: {}", segment, -result);
             }
             match segment.status {
                 Status::OpenAt => {
