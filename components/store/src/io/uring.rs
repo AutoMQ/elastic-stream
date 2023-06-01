@@ -163,10 +163,18 @@ impl IO {
         config: &Arc<config::Configuration>,
         indexer: Arc<IndexDriver>,
     ) -> Result<Self, StoreError> {
-        let control_ring = io_uring::IoUring::builder().dontfork().build(32).map_err(|e| {
+        let control_ring = io_uring::IoUring::builder().dontfork().setup_r_disabled().build(32).map_err(|e| {
             error!("Failed to build I/O Uring instance for write-ahead-log segment file management: {:#?}", e);
             StoreError::IoUring
         })?;
+
+        {
+            let mut probe = register::Probe::new();
+            let submitter = control_ring.submitter();
+            submitter.register_probe(&mut probe)?;
+            submitter.register_enable_rings()?;
+            check_io_uring(&probe, control_ring.params())?;
+        }
 
         let data_ring = io_uring::IoUring::builder()
             .dontfork()

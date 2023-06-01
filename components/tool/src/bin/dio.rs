@@ -1,4 +1,4 @@
-use io_uring::{self, opcode, types, IoUring, register, Parameters};
+use io_uring::{self, opcode, register, types, IoUring, Parameters};
 use std::{
     alloc::{self, Layout},
     error::Error,
@@ -9,10 +9,9 @@ const IO_DEPTH: u32 = 4096;
 
 const FILE_SIZE: i64 = 1i64 * 1024 * 1024 * 1024;
 
-fn check_io_uring(probe: &register::Probe, params: &Parameters)  {
+fn check_io_uring(probe: &register::Probe, params: &Parameters) {
     if !params.is_feature_sqpoll_nonfixed() {
         panic!("io_uring feature: IORING_FEAT_SQPOLL_NONFIXED is required. Current kernel version is too old");
-        
     }
     println!("io_uring has feature IORING_FEAT_SQPOLL_NONFIXED");
 
@@ -40,7 +39,10 @@ fn check_io_uring(probe: &register::Probe, params: &Parameters)  {
 fn main() -> Result<(), Box<dyn Error>> {
     println!("PID: {}", std::process::id());
 
-    let mut control_ring = io_uring::IoUring::builder().dontfork().setup_r_disabled().build(32)?;
+    let mut control_ring = io_uring::IoUring::builder()
+        .dontfork()
+        .setup_r_disabled()
+        .build(32)?;
     let mut probe = register::Probe::new();
     let submitter = control_ring.submitter();
     submitter.register_probe(&mut probe)?;
