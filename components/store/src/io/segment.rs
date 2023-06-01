@@ -119,8 +119,8 @@ impl Display for LogSegment {
         let path = self.path.to_str().map_err(|_| fmt::Error)?;
         write!(
             f,
-            "LogSegment {{ path: {}, offset: {}, size: {}, written: {}, time_range: {:?} }}",
-            path, self.wal_offset, self.size, self.written, self.time_range
+            "LogSegment {{ path: {}, offset: {}, size: {}, written: {}, status: {:?} }}",
+            path, self.wal_offset, self.size, self.written, self.status
         )
     }
 }
