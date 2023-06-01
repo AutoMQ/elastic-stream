@@ -4,8 +4,8 @@
 
 pub mod error;
 pub mod request;
-pub mod stream_client;
 mod stream;
+pub mod stream_client;
 
 pub use error::ReplicationError;
 pub use stream_client::StreamClient;
