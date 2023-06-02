@@ -18,6 +18,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration};
+use std::time::Instant;
 
 pub(crate) struct ReplicationStream {
     log_ident: String,
@@ -166,6 +167,7 @@ impl ReplicationStream {
     }
 
     pub(crate) async fn append(&self, record_batch: RecordBatch) -> Result<u64, ReplicationError> {
+        let start_timestamp = Instant::now();
         if *self.closed.borrow() {
             warn!(target: &self.log_ident, "Keep append to a closed stream.");
             return Err(ReplicationError::AlreadyClosed);
@@ -192,7 +194,7 @@ impl ReplicationStream {
         // await append result.
         match append_rx.await {
             Ok(result) => {
-                trace!(target: &self.log_ident, "Append new record with base_offset={base_offset} count={count}");
+                trace!(target: &self.log_ident, "Append new record with base_offset={base_offset} count={count} cost {}us", start_timestamp.elapsed().as_micros());
                 result.map(|_| base_offset)
             }
             Err(_) => Err(ReplicationError::AlreadyClosed),

@@ -895,6 +895,7 @@ impl CompositeSession {
         &self,
         buf: Vec<Bytes>,
     ) -> Result<Vec<AppendResultEntry>, ClientError> {
+        let start_timestamp = Instant::now();
         self.try_reconnect().await;
         let session = self
             .pick_session(self.lb_policy)
@@ -921,7 +922,7 @@ impl CompositeSession {
         }
 
         if let Some(response::Headers::Append { entries }) = response.headers {
-            trace!("Append entries {:?}", entries);
+            trace!("Append entries {:?} cost {}us", entries, start_timestamp.elapsed().as_micros());
             Ok(entries)
         } else {
             Err(ClientError::ClientInternal)
