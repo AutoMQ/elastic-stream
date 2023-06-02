@@ -112,6 +112,13 @@ var (
 			},
 		},
 	}
+	_unsupportedAction = Action{
+		newReq:  func() protocol.InRequest { return &protocol.EmptyRequest{} },
+		newResp: func() protocol.OutResponse { return &protocol.SystemErrorResponse{} },
+		act: func(_ Handler, _ protocol.InRequest, resp protocol.OutResponse) {
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeUNSUPPORTED_OPERATION, Message: "unsupported operation"})
+		},
+	}
 	_unknownAction = Action{
 		newReq:  func() protocol.InRequest { return &protocol.EmptyRequest{} },
 		newResp: func() protocol.OutResponse { return &protocol.SystemErrorResponse{} },
@@ -132,6 +139,11 @@ type Action struct {
 func GetAction(op operation.Operation) *Action {
 	if action, ok := _actionMap[op]; ok {
 		return &action
+	}
+	if op.Code == operation.OpAppend ||
+		op.Code == operation.OpFetch ||
+		op.Code == operation.OpTrimStream {
+		return &_unsupportedAction
 	}
 	return &_unknownAction
 }
