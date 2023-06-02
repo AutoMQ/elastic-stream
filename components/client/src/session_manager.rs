@@ -1,5 +1,6 @@
 use super::composite_session::CompositeSession;
 use crate::error::ClientError;
+use log::error;
 use std::{cell::UnsafeCell, collections::HashMap, rc::Rc, sync::Arc};
 use tokio::sync::broadcast;
 
@@ -51,7 +52,9 @@ impl SessionManager {
                 );
 
                 if lb_policy == super::lb_policy::LbPolicy::LeaderOnly {
-                    session.refresh_placement_manager_cluster().await;
+                    if session.refresh_placement_manager_cluster().await.is_err() {
+                        error!("Failed to refresh placement manager cluster for {target}");
+                    }
                 }
 
                 sessions.insert(target.to_owned(), Rc::clone(&session));

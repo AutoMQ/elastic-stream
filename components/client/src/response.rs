@@ -334,8 +334,10 @@ impl Response {
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<CreateStreamResponse>(buf) {
                 Ok(response) => {
-                    self.status = Into::<Status>::into(&response.status().unpack());
+                    let status_t = response.status().unpack();
+                    self.status = Into::<Status>::into(&status_t);
                     if self.status.code != ErrorCode::OK {
+                        warn!("Failed to create stream: {status_t:#?}");
                         return;
                     }
                     if let Some(stream) = response.stream() {

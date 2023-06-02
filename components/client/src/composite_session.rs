@@ -14,8 +14,8 @@ use observation::metrics::{
     sys_metrics::{DiskStatistics, MemoryStatistics},
     uring_metrics::UringStatistics,
 };
-use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
+use protocol::rpc::header::{ErrorCode, PlacementManagerCluster};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -95,6 +95,11 @@ impl CompositeSession {
         })
     }
 
+    /// Check if we need to refresh placement manager cluster topology and leadership.
+    /// 
+    /// # Returns
+    /// `true` - if the interval has elapsed or the cluster has only one node;
+    /// `false` - otherwise
     fn need_refresh_placement_manager_cluster(&self) -> bool {
         if self.target != self.config.placement_manager {
             return false;
@@ -114,6 +119,10 @@ impl CompositeSession {
             <= now
     }
 
+    /// Synchronize leadership of each placement manager node according to the specified description.
+    /// 
+    /// # Parameter
+    /// `nodes` - Placement manager nodes description from `DescribePlacementManagerClusterResponse`.
     fn refresh_leadership(&self, nodes: &[PlacementManagerNode]) {
         debug!("Refresh placement manager cluster leadership");
         // Sync leader/follower state
@@ -205,30 +214,33 @@ impl CompositeSession {
         self.refresh_leadership(nodes);
     }
 
-    pub(crate) async fn refresh_placement_manager_cluster(&self) {
-        match self.describe_placement_manager_cluster().await {
-            Ok(Some(nodes)) => {
+    pub(crate) async fn refresh_placement_manager_cluster(&self) -> Result<(), ClientError> {
+        match self.describe_placement_manager_cluster().await? {
+            Some(nodes) => {
                 self.refresh_sessions(&nodes).await;
+                Ok(())
             }
-            Ok(None) => {
-                warn!("Placement Manager Cluster is empty, no need to refresh sessions");
-            }
-            Err(e) => {
-                error!("Failed to describe placement manager cluster. {:?}", e);
+            None => {
+                warn!("Placement manager returns an unexpected empty cluster. Skip refreshing sessions");
+                Err(ClientError::ServerInternal)
             }
         }
     }
 
     async fn pick_session(&self, lb_policy: LbPolicy) -> Option<Session> {
         match lb_policy {
-            LbPolicy::LeaderOnly => match self.pick_leader_session() {
-                Some(session) => Some(session),
-                None => {
-                    trace!("No leader session found, try describe placement manager cluster again");
-                    self.refresh_placement_manager_cluster().await;
-                    self.pick_leader_session()
+            LbPolicy::LeaderOnly => {
+                match self.pick_leader_session() {
+                    Some(session) => Some(session),
+                    None => {
+                        trace!("No leader session found, try to describe placement manager cluster again");
+                        if self.refresh_placement_manager_cluster().await.is_ok() {
+                            return self.pick_leader_session();
+                        }
+                        None
+                    }
                 }
-            },
+            }
             LbPolicy::PickFirst => self
                 .sessions
                 .borrow()
@@ -259,7 +271,9 @@ impl CompositeSession {
         self.try_reconnect().await;
 
         if self.need_refresh_placement_manager_cluster() {
-            self.refresh_placement_manager_cluster().await;
+            if self.refresh_placement_manager_cluster().await.is_err() {
+                error!("Failed to refresh placement manager cluster");
+            }
         }
 
         let now = Instant::now();
@@ -321,94 +335,131 @@ impl CompositeSession {
         host: &str,
         timeout: Option<Duration>,
     ) -> Result<i32, ClientError> {
-        self.try_reconnect().await;
-        if let Some(session) = self.pick_session(LbPolicy::LeaderOnly).await {
-            let request = request::Request {
-                timeout: timeout.unwrap_or(self.config.client_io_timeout()),
-                headers: request::Headers::AllocateId {
-                    host: host.to_owned(),
-                },
-            };
-            let (tx, rx) = oneshot::channel();
-            if let Err(e) = session.write(request, tx).await {
-                error!(
-                    "Failed to send ID-allocation-request to {}. Cause: {:?}",
-                    self.target, e
-                );
-                return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+        loop {
+            self.try_reconnect().await;
+            if let Some(session) = self.pick_session(LbPolicy::LeaderOnly).await {
+                let request = request::Request {
+                    timeout: timeout.unwrap_or(self.config.client_io_timeout()),
+                    headers: request::Headers::AllocateId {
+                        host: host.to_owned(),
+                    },
+                };
+                let (tx, rx) = oneshot::channel();
+                if let Err(e) = session.write(request, tx).await {
+                    error!(
+                        "Failed to send ID-allocation-request to {}. Cause: {:?}",
+                        self.target, e
+                    );
+                    return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+                }
+
+                let response = rx.await.map_err(|e| {
+                    error!(
+                        "Internal error while allocating ID from {}. Cause: {:?}",
+                        self.target, e
+                    );
+                    ClientError::ClientInternal
+                })?;
+
+                if !response.ok() {
+                    if ErrorCode::PM_NOT_LEADER == response.status.code
+                        && self.refresh_leadership_on_demand(&response.status).await
+                    {
+                        continue;
+                    }
+                    error!(
+                        "Failed to allocate ID from {}. Status-Message: `{}`",
+                        self.target, response.status.message
+                    );
+                    // TODO: refine error handling
+                    return Err(ClientError::ServerInternal);
+                }
+
+                if let Some(response::Headers::AllocateId { id }) = response.headers {
+                    return Ok(id);
+                } else {
+                    unreachable!();
+                }
             }
+            return Err(ClientError::ClientInternal);
+        }
+    }
 
-            let response = rx.await.map_err(|e| {
-                error!(
-                    "Internal error while allocating ID from {}. Cause: {:?}",
-                    self.target, e
-                );
-                ClientError::ClientInternal
-            })?;
-
-            if !response.ok() {
-                error!(
-                    "Failed to allocate ID from {}. Status-Message: `{}`",
-                    self.target, response.status.message
-                );
-                // TODO: refine error handling
-                return Err(ClientError::ServerInternal);
-            }
-
-            if let Some(response::Headers::AllocateId { id }) = response.headers {
-                return Ok(id);
-            } else {
-                unreachable!();
+    async fn refresh_leadership_on_demand(&self, status: &model::Status) -> bool {
+        if let Some(ref details) = status.details {
+            if !details.is_empty() {
+                if let Ok(cluster) = flatbuffers::root::<PlacementManagerCluster>(&details[..]) {
+                    let nodes = cluster
+                        .unpack()
+                        .nodes
+                        .iter()
+                        .map(|node| Into::<PlacementManagerNode>::into(node))
+                        .collect::<Vec<_>>();
+                    if !nodes.is_empty() {
+                        self.refresh_sessions(&nodes).await;
+                        return true;
+                    }
+                }
             }
         }
-
-        Err(ClientError::ClientInternal)
+        self.refresh_placement_manager_cluster().await.is_ok()
     }
 
     pub(crate) async fn create_stream(
         &self,
         stream_metadata: StreamMetadata,
     ) -> Result<StreamMetadata, ClientError> {
-        self.try_reconnect().await;
-        let session = self
-            .pick_session(LbPolicy::LeaderOnly)
-            .await
-            .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
-        let (tx, rx) = oneshot::channel();
-        let request = request::Request {
-            timeout: self.config.client_io_timeout(),
-            headers: request::Headers::CreateStream { stream_metadata },
-        };
+        loop {
+            self.try_reconnect().await;
+            let session = self
+                .pick_session(LbPolicy::LeaderOnly)
+                .await
+                .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
+            let (tx, rx) = oneshot::channel();
+            let request = request::Request {
+                timeout: self.config.client_io_timeout(),
+                headers: request::Headers::CreateStream {
+                    stream_metadata: stream_metadata.clone(),
+                },
+            };
 
-        if let Err(ctx) = session.write(request, tx).await {
-            error!(
-                "Failed to send create-stream request to {}. Cause: {:?}",
-                self.target, ctx
-            );
-            return Err(ClientError::ConnectionRefused(self.target.to_owned()));
-        }
+            if let Err(ctx) = session.write(request, tx).await {
+                error!(
+                    "Failed to send create-stream request to {}. Cause: {:?}",
+                    self.target, ctx
+                );
+                return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+            }
 
-        let response = rx.await.map_err(|e| {
-            error!(
-                "Internal error while creating stream from {}. Cause: {:?}",
-                self.target, e
-            );
-            ClientError::ClientInternal
-        })?;
+            let response = rx.await.map_err(|e| {
+                error!(
+                    "Internal error while creating stream from {}. Cause: {:?}",
+                    self.target, e
+                );
+                ClientError::ClientInternal
+            })?;
 
-        if !response.ok() {
-            error!(
-                "Failed to create stream from {}. Status: `{:#?}`",
-                self.target, response.status
-            );
-            // TODO: refine error handling according to status code
-            return Err(ClientError::ClientInternal);
-        }
+            if !response.ok() {
+                if ErrorCode::PM_NOT_LEADER == response.status.code
+                    && self.refresh_leadership_on_demand(&response.status).await
+                {
+                    // Retry after refresh leadership
+                    continue;
+                }
 
-        if let Some(response::Headers::CreateStream { stream }) = response.headers {
-            Ok(stream)
-        } else {
-            unreachable!();
+                error!(
+                    "Failed to create stream from {}. Status: `{:#?}`",
+                    self.target, response.status
+                );
+                // TODO: refine error handling according to status code
+                return Err(ClientError::ClientInternal);
+            }
+
+            if let Some(response::Headers::CreateStream { stream }) = response.headers {
+                return Ok(stream);
+            } else {
+                unreachable!();
+            }
         }
     }
 
@@ -467,46 +518,55 @@ impl CompositeSession {
         &self,
         range: RangeMetadata,
     ) -> Result<RangeMetadata, ClientError> {
-        self.try_reconnect().await;
-        if let Some(session) = self.pick_session(self.lb_policy).await {
-            let (tx, rx) = oneshot::channel();
-            let stream_id = range.stream_id();
-            let request = request::Request {
-                timeout: self.config.client_io_timeout(),
-                headers: request::Headers::CreateRange { range },
-            };
+        loop {
+            self.try_reconnect().await;
+            if let Some(session) = self.pick_session(self.lb_policy).await {
+                let (tx, rx) = oneshot::channel();
+                let stream_id = range.stream_id();
+                let request = request::Request {
+                    timeout: self.config.client_io_timeout(),
+                    headers: request::Headers::CreateRange { range: range.clone() },
+                };
 
-            if let Err(ctx) = session.write(request, tx).await {
-                error!(
-                    "Failed to send create-range request to {}. Cause: {:?}",
-                    self.target, ctx
-                );
-                return Err(ClientError::ConnectionRefused(self.target.to_owned()));
-            }
+                if let Err(ctx) = session.write(request, tx).await {
+                    error!(
+                        "Failed to send create-range request to {}. Cause: {:?}",
+                        self.target, ctx
+                    );
+                    return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+                }
 
-            let response = rx.await.map_err(|e| {
-                error!(
-                    "Internal client error when creating range on {}. Cause: {:?}",
-                    self.target, e
-                );
-                ClientError::ClientInternal
-            })?;
+                let response = rx.await.map_err(|e| {
+                    error!(
+                        "Internal client error when creating range on {}. Cause: {:?}",
+                        self.target, e
+                    );
+                    ClientError::ClientInternal
+                })?;
 
-            if !response.ok() {
-                error!(
-                    "Failed to create range on {} for elastic-stream[id={}]: {response:#?}",
-                    self.target, stream_id
-                );
-                return Err(ClientError::CreateRange(response.status.code));
-            }
+                if !response.ok() {
+                    // Handle recoverable error
+                    if ErrorCode::PM_NOT_LEADER == response.status.code
+                        && self.refresh_leadership_on_demand(&response.status).await
+                    {
+                        continue;
+                    }
 
-            if let Some(response::Headers::CreateRange { range }) = response.headers {
-                Ok(range)
+                    error!(
+                        "Failed to create range on {} for elastic-stream[id={}]: {response:#?}",
+                        self.target, stream_id
+                    );
+                    return Err(ClientError::CreateRange(response.status.code));
+                }
+
+                if let Some(response::Headers::CreateRange { range }) = response.headers {
+                    return Ok(range);
+                } else {
+                    unreachable!();
+                }
             } else {
-                unreachable!();
+                return Err(ClientError::ClientInternal);
             }
-        } else {
-            Err(ClientError::ClientInternal)
         }
     }
 
@@ -588,6 +648,7 @@ impl CompositeSession {
             headers: request::Headers::DescribePlacementManager { data_node },
         };
 
+        // TODO: we shall broadcast describe cluster request to all known nodes.
         let mut request_sent = false;
         'outer: loop {
             for addr in &addrs {
@@ -922,9 +983,13 @@ impl CompositeSession {
         memory_statistics: &MemoryStatistics,
     ) -> Result<(), ClientError> {
         self.try_reconnect().await;
+
         if self.need_refresh_placement_manager_cluster() {
-            self.refresh_placement_manager_cluster().await;
+            if self.refresh_placement_manager_cluster().await.is_err() {
+                error!("Failed to refresh placement manager cluster");
+            }
         }
+
         // TODO: add disk_unindexed_data_size, range_missing_replica_cnt, range_active_cnt
         let extension = request::Headers::ReportMetrics {
             data_node: self.config.server.data_node(),
