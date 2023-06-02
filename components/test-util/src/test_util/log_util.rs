@@ -9,7 +9,7 @@ pub fn try_init_log() {
                 "{}:{} {} [{}] - {}",
                 record.file().unwrap_or("unknown"),
                 record.line().unwrap_or(0),
-                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
                 record.level(),
                 record.args()
             )

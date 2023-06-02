@@ -96,7 +96,7 @@ impl CompositeSession {
     }
 
     /// Check if we need to refresh placement manager cluster topology and leadership.
-    /// 
+    ///
     /// # Returns
     /// `true` - if the interval has elapsed or the cluster has only one node;
     /// `false` - otherwise
@@ -120,7 +120,7 @@ impl CompositeSession {
     }
 
     /// Synchronize leadership of each placement manager node according to the specified description.
-    /// 
+    ///
     /// # Parameter
     /// `nodes` - Placement manager nodes description from `DescribePlacementManagerClusterResponse`.
     fn refresh_leadership(&self, nodes: &[PlacementManagerNode]) {
@@ -525,7 +525,9 @@ impl CompositeSession {
                 let stream_id = range.stream_id();
                 let request = request::Request {
                     timeout: self.config.client_io_timeout(),
-                    headers: request::Headers::CreateRange { range: range.clone() },
+                    headers: request::Headers::CreateRange {
+                        range: range.clone(),
+                    },
                 };
 
                 if let Err(ctx) = session.write(request, tx).await {
