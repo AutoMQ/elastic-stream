@@ -24,6 +24,9 @@ pub enum ServiceError {
     #[error("Resource `{0}` is not found")]
     NotFound(String),
 
+    #[error("The append request is repeated")]
+    OffsetRepeated,
+
     #[error("Internal error: `{0}`")]
     Internal(String),
 }

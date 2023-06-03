@@ -15,7 +15,7 @@ use store::{
     Store,
 };
 
-use crate::stream_manager::StreamManager;
+use crate::{error::ServiceError, stream_manager::StreamManager};
 
 use super::util::{
     finish_response_builder, root_as_rpc_request, system_error_frame_bytes, MIN_BUFFER_SIZE,
@@ -97,7 +97,7 @@ impl<'a> Append<'a> {
         stream_manager: Rc<RefCell<StreamManager>>,
         response: &mut Frame,
     ) {
-        let to_store_requests = match self.build_store_requests(&stream_manager).await {
+        let to_store_requests = match self.build_store_requests() {
             Ok(requests) => requests,
             Err(err_code) => {
                 error!("Failed to build store requests. ErrorCode: {:?}", err_code);
@@ -111,8 +111,25 @@ impl<'a> Append<'a> {
         let futures: Vec<_> = to_store_requests
             .iter()
             .map(|req| {
-                let options = WriteOptions::default();
-                store.append(options, req.clone())
+                let result = async {
+                    if let Some(range) = stream_manager
+                        .borrow_mut()
+                        .get_range(req.stream_id, req.range_index)
+                    {
+                        if let Some(window) = range.window_mut() {
+                            let _ = window.wait_to_go(req).await?;
+                            let options = WriteOptions::default();
+                            let append_result = store.append(options, req.clone()).await?;
+                            return Ok::<AppendResult, AppendError>(append_result);
+                        }
+                    }
+                    warn!(
+                        "Target stream/range is not found. stream-id={}, range-index={}",
+                        req.stream_id, req.range_index
+                    );
+                    return Err::<AppendResult, AppendError>(AppendError::RangeNotFound);
+                };
+                Box::pin(result)
             })
             .collect();
 
@@ -190,9 +207,8 @@ impl<'a> Append<'a> {
         response.header = Some(res_header);
     }
 
-    async fn build_store_requests(
-        &self,
-        stream_manager: &Rc<RefCell<StreamManager>>,
+    fn build_store_requests(
+        &self
     ) -> Result<Vec<AppendRecordRequest>, ErrorCode> {
         let mut append_requests: Vec<AppendRecordRequest> = Vec::new();
         let mut pos = 0;
@@ -214,30 +230,6 @@ impl<'a> Append<'a> {
             };
 
             pos += len;
-
-            if let Some(range) = stream_manager
-                .borrow_mut()
-                .get_range(request.stream_id, request.range_index)
-            {
-                if let Some(window) = range.window_mut() {
-                    if window.fast_forward(&request) {
-                        append_requests.push(request);
-                        // Try to dispatch previously buffered requests that become continuous
-                        if let Some(req) = window.pop() {
-                            append_requests.push(req);
-                        }
-                    } else {
-                        // Buffer request whose previous has not arrived yet.
-                        window.push(request);
-                    }
-                }
-            } else {
-                warn!(
-                    "Target stream/range is not found. stream-id={}, range-index={}",
-                    request.stream_id, request.range_index
-                );
-                // TODO: propagate error.
-            }
         }
 
         Ok(append_requests)
@@ -251,20 +243,33 @@ impl<'a> Append<'a> {
             ),
             AppendError::ChannelRecv => (
                 ErrorCode::PM_NO_AVAILABLE_DN,
-                Some(AppendError::SubmissionQueue.to_string()),
+                Some(AppendError::ChannelRecv.to_string()),
             ),
-            AppendError::System(_) => (
+            AppendError::System(inner) => (
                 ErrorCode::PM_NO_AVAILABLE_DN,
-                Some(AppendError::SubmissionQueue.to_string()),
+                Some(AppendError::System(*inner).to_string()),
             ),
             AppendError::BadRequest => (
                 ErrorCode::BAD_REQUEST,
-                Some(AppendError::SubmissionQueue.to_string()),
+                Some(AppendError::BadRequest.to_string()),
             ),
             AppendError::Internal => (
-                ErrorCode::PM_NO_AVAILABLE_DN,
-                Some(AppendError::SubmissionQueue.to_string()),
+                ErrorCode::DN_INTERNAL_SERVER_ERROR,
+                Some(AppendError::Internal.to_string()),
             ),
+            _ => (
+                ErrorCode::DN_INTERNAL_SERVER_ERROR,
+                Some(AppendError::Internal.to_string()),
+            ),
+        }
+    }
+}
+
+impl From<ServiceError> for AppendError {
+    fn from(err: ServiceError) -> Self {
+        match err {
+            ServiceError::OffsetRepeated => AppendError::Repeated,
+            _ => AppendError::Internal,
         }
     }
 }

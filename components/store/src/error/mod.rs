@@ -102,6 +102,7 @@ pub enum FetchError {
 
 #[derive(Debug, Error)]
 pub enum AppendError {
+
     #[error("Failed to submit AppendRecordRequest")]
     SubmissionQueue,
 
@@ -113,6 +114,12 @@ pub enum AppendError {
 
     #[error("The request is illegal")]
     BadRequest,
+
+    #[error("The request is repeated")]
+    Repeated,
+
+    #[error("The specified range is not found")]
+    RangeNotFound,
 
     #[error("Internal error")]
     Internal,

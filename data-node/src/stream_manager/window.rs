@@ -1,30 +1,32 @@
-use std::collections::{BinaryHeap, HashMap};
+use std::{collections::{HashMap, BTreeMap}, cmp};
 
 use log::trace;
 use model::Batch;
+use tokio::sync::oneshot;
+
+use crate::error::ServiceError;
 
 /// Append Request Window ensures append requests of a stream range are dispatched to store in order.
 ///
 /// Note that `Window` is intended to be used by a thread-per-core scenario and is not thread-safe.
 #[derive(Debug)]
-pub(crate) struct Window<R> {
+pub(crate) struct Window {
+    /// The barrier offset
     next: u64,
 
-    requests: BinaryHeap<R>,
-
     /// Submitted request offset to batch size.
-    submitted: HashMap<u64, u32>,
+    submitted: BTreeMap<u64, u32>,
+
+    /// A queue of requests that are waiting for prior requests to be completed.
+    queue: HashMap<u64, oneshot::Sender<()>>,
 }
 
-impl<R> Window<R>
-where
-    R: Batch + Ord,
-{
+impl Window {
     pub(crate) fn new(next: u64) -> Self {
         Self {
             next,
-            requests: BinaryHeap::new(),
-            submitted: HashMap::new(),
+            submitted: BTreeMap::new(),
+            queue: HashMap::new(),
         }
     }
 
@@ -36,46 +38,73 @@ where
         self.next = next;
     }
 
-    pub(crate) fn fast_forward(&mut self, request: &R) -> bool {
+    /// Await append requests to be ready for dispatching.
+    ///
+    /// # Arguments
+    /// * `request` - the request to be dispatched.
+    ///
+    /// # Return
+    /// `Ok` if the request is ready to be dispatched, `Err` any error occurs.
+    pub(crate) async fn wait_to_go<R>(&mut self, request: &R) -> Result<(), ServiceError>
+    where
+        R: Batch + Ord,
+    {
         if request.offset() < self.next {
-            trace!(
-                "Retry request tolerated, offset={}, len={}",
-                request.offset(),
-                request.len()
-            );
-            return true;
-        } else if request.offset() == self.next {
+            // A retry request on a committed offset.
+            // This is possible when the client does not
+            // receive the response of the request due to network failure.
+            return Err(ServiceError::OffsetRepeated);
+        }
+
+        if request.offset() == self.next {
+            // Expected request to be dispatched, just advance the next offset and go.
             self.next += request.len() as u64;
             self.submitted.insert(request.offset(), request.len());
-            return true;
+            return Ok(());
         }
-        false
-    }
 
-    pub(crate) fn push(&mut self, request: R) {
-        self.requests.push(request);
-    }
-
-    pub(crate) fn pop(&mut self) -> Option<R> {
-        if let Some(request) = self.requests.peek() {
-            if request.offset() == self.next {
-                self.next = request.offset() + request.len() as u64;
-                self.submitted.insert(request.offset(), request.len());
-                return self.requests.pop();
-            }
+        // A further request that should be queued to wait for the prior requests to be completed.
+        let (tx, rx) = oneshot::channel();
+        self.queue.insert(request.offset(), tx);
+        trace!(
+            "Request queued, offset={}, len={}",
+            request.offset(),
+            request.len()
+        );
+        // Wait the channel to be notified.
+        match rx.await {
+            Ok(()) => Ok(()),
+            Err(e) => Err(ServiceError::Internal(e.to_string())),
         }
-        None
     }
 
+    /// Commits the offset of current completed request, and wake up the next request if possible.
+    ///
+    /// # Arguments
+    /// * `offset` - the offset of current completed request.
+    ///
+    /// # Return
+    /// * the next offset to be committed.
     pub(crate) fn commit(&mut self, offset: u64) -> u64 {
         let mut res = offset;
+
+        // Drain the submitted requests in ascending key order
         self.submitted
             .drain_filter(|k, _| k <= &offset)
             .for_each(|(offset, len)| {
                 if offset + len as u64 > res {
                     res = offset + len as u64;
                 }
+
+                // Try to wake up the subsequent request if exists.
+                if let Some(tx) = self.queue.remove(&res) {
+                    trace!("Request dequeued, offset={}, len={}", res, len);
+                    let _ = tx.send(());
+                }
             });
+        
+        // To avoid rollback the next offset, keep the larger one.
+        self.next = cmp::max(self.next, res);
         res
     }
 }
@@ -125,70 +154,5 @@ mod tests {
         fn new(offset: u64) -> Self {
             Self { offset, len: 2 }
         }
-    }
-
-    #[test]
-    fn test_new() -> Result<(), Box<dyn Error>> {
-        let mut window = super::Window::new(0);
-        let foo1 = Foo::new(0);
-        assert!(window.fast_forward(&foo1));
-        assert_eq!(2, window.next());
-        Ok(())
-    }
-
-    #[test]
-    fn test_push_pop() -> Result<(), Box<dyn Error>> {
-        let mut window = super::Window::new(0);
-        let foo1 = Foo::new(0);
-        let foo2 = Foo::new(2);
-
-        assert_eq!(false, window.fast_forward(&foo2));
-        window.push(foo2);
-        assert_eq!(None, window.pop());
-        assert_eq!(true, window.fast_forward(&foo1));
-        assert_eq!(Some(Foo::new(2)), window.pop());
-        assert_eq!(4, window.next());
-        assert!(window.requests.is_empty());
-
-        window.reset_next(0);
-        let foo1 = Foo::new(0);
-        let foo2 = Foo::new(2);
-        window.push(foo2);
-        window.push(foo1);
-        assert_eq!(Some(Foo::new(0)), window.pop());
-        assert_eq!(Some(Foo::new(2)), window.pop());
-        assert_eq!(4, window.next());
-        assert!(window.requests.is_empty());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_commit() -> Result<(), Box<dyn Error>> {
-        let mut window = super::Window::new(0);
-        let foo1 = Foo::new(0);
-        let foo2 = Foo::new(2);
-
-        if !window.fast_forward(&foo2) {
-            window.push(foo2);
-        }
-
-        // After fast-forward, an inflight batch entry is inserted.
-        assert!(window.fast_forward(&foo1));
-        // When commit, the offset should be amended if there is a corresponding inflight batch entry.
-        // After the commit , the entry will be removed.
-        assert_eq!(2, window.commit(0));
-        assert_eq!(0, window.commit(0));
-
-        // If there is no inflight batch entry, the commit offset should not be amended.
-        assert_eq!(2, window.commit(2));
-
-        // After popping a request, an inflight batch entry is inserted.
-        window.pop();
-        assert_eq!(4, window.commit(2));
-
-        // There is no inflight batch entry, so the commit offset should not be amended.
-        assert_eq!(4, window.commit(4));
-        Ok(())
     }
 }

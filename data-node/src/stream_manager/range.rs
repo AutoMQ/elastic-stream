@@ -10,7 +10,7 @@ pub(crate) struct Range {
 
     committed: Option<u64>,
 
-    window: Option<Window<AppendRecordRequest>>,
+    window: Option<Window>,
 }
 
 impl Range {
@@ -80,7 +80,7 @@ impl Range {
         }
     }
 
-    pub(crate) fn window_mut(&mut self) -> Option<&mut Window<AppendRecordRequest>> {
+    pub(crate) fn window_mut(&mut self) -> Option<&mut Window> {
         self.window.as_mut()
     }
 }
