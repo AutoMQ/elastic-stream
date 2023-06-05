@@ -10,21 +10,21 @@ const (
 	ClientRoleCLIENT_ROLE_UNSPECIFIED ClientRole = 0
 	ClientRoleCLIENT_ROLE_PM          ClientRole = 1
 	ClientRoleCLIENT_ROLE_DATA_NODE   ClientRole = 2
-	ClientRoleCLIENT_ROLE_CUSTOMER    ClientRole = 3
+	ClientRoleCLIENT_ROLE_FRONTEND    ClientRole = 3
 )
 
 var EnumNamesClientRole = map[ClientRole]string{
 	ClientRoleCLIENT_ROLE_UNSPECIFIED: "CLIENT_ROLE_UNSPECIFIED",
 	ClientRoleCLIENT_ROLE_PM:          "CLIENT_ROLE_PM",
 	ClientRoleCLIENT_ROLE_DATA_NODE:   "CLIENT_ROLE_DATA_NODE",
-	ClientRoleCLIENT_ROLE_CUSTOMER:    "CLIENT_ROLE_CUSTOMER",
+	ClientRoleCLIENT_ROLE_FRONTEND:    "CLIENT_ROLE_FRONTEND",
 }
 
 var EnumValuesClientRole = map[string]ClientRole{
 	"CLIENT_ROLE_UNSPECIFIED": ClientRoleCLIENT_ROLE_UNSPECIFIED,
 	"CLIENT_ROLE_PM":          ClientRoleCLIENT_ROLE_PM,
 	"CLIENT_ROLE_DATA_NODE":   ClientRoleCLIENT_ROLE_DATA_NODE,
-	"CLIENT_ROLE_CUSTOMER":    ClientRoleCLIENT_ROLE_CUSTOMER,
+	"CLIENT_ROLE_FRONTEND":    ClientRoleCLIENT_ROLE_FRONTEND,
 }
 
 func (v ClientRole) String() string {
