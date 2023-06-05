@@ -50,8 +50,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     submitter.register_enable_rings()?;
     check_io_uring(&probe, control_ring.params());
 
-    let file_path = "/data/data0";
-    let c_file_path = CString::new(file_path).unwrap();
+    let file_path = args.path;
+    let c_file_path = CString::new(file_path.clone()).unwrap();
     let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), c_file_path.as_ptr())
         .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC)
         .mode(libc::S_IRWXU | libc::S_IRWXG)
@@ -98,8 +98,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .setup_r_disabled()
         .build(args.qd)?;
 
-    let alignment = 4096;
-    let buf_size = 4096 * 4;
+    let alignment = args.bs as usize;
+    let buf_size = alignment * 4;
 
     let layout = Layout::from_size_align(buf_size, alignment)?;
     let ptr = unsafe { alloc::alloc(layout) };
