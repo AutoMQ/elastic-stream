@@ -318,7 +318,7 @@ impl ReplicationStream {
                     inflight.insert(append_request.base_offset(), Rc::new(append_request));
                 }
                 Some(_) = append_tasks_rx.recv() => {
-                    // usaully send by range ack / delay retry
+                    // usually send by range ack / delay retry
                 }
                 _ = shutdown_signal_rx.recv() => {
                     let inflight_count = inflight.len();

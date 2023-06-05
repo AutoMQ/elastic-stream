@@ -32,6 +32,7 @@ impl Replicator {
     /// `data_node` - The target data-node to replicate data to.
     pub(crate) fn new(range: Rc<ReplicationRange>, data_node: DataNode) -> Self {
         let metadata = range.metadata().clone();
+        let confirm_offset = metadata.start();
         Self {
             log_ident: format!(
                 "Replica[{}#{}-{}#{}]",
@@ -41,7 +42,7 @@ impl Replicator {
                 data_node.advertise_address
             ),
             range: Rc::downgrade(&range),
-            confirm_offset: Rc::new(RefCell::new(0)),
+            confirm_offset: Rc::new(RefCell::new(confirm_offset)),
             data_node,
             corrupted: Rc::new(RefCell::new(false)),
         }
