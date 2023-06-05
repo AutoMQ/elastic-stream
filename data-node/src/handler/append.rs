@@ -4,7 +4,7 @@ use codec::frame::Frame;
 use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
-use log::{error, trace, warn, info};
+use log::{error, info, trace, warn};
 use model::payload::Payload;
 use protocol::rpc::header::{
     AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
@@ -74,6 +74,16 @@ impl<'a> Append<'a> {
             }
         };
 
+        Payload::parse_append_entries(payload)
+            .map_err(|e| {
+                error!("Failed to parse append entries. Cause: {:?}", e);
+                ErrorCode::BAD_REQUEST
+            })?
+            .iter()
+            .for_each(|entry| {
+                info!("AppendRequest - {entry:#?}");
+            });
+
         Ok(Append {
             append_request,
             payload: payload.clone(),
@@ -116,7 +126,10 @@ impl<'a> Append<'a> {
                         .borrow_mut()
                         .get_range(req.stream_id, req.range_index)
                     {
-                        info!("check barrier {:?} record_offset={} record_count={}", range, req.offset, req.len);
+                        info!(
+                            "check barrier {:?} record_offset={} record_count={}",
+                            range, req.offset, req.len
+                        );
                         if let Some(window) = range.window_mut() {
                             let _ = window.check_barrier(req)?;
                             let options = WriteOptions::default();
