@@ -50,4 +50,5 @@
     },
     "terminal.integrated.cursorStyle": "line",
     "terminal.integrated.cursorBlinking": true,
+    "files.insertFinalNewline": true,
 }
