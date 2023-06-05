@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, fmt::{Display, Formatter, self}};
+use std::{
+    cmp::Ordering,
+    fmt::{self, Display, Formatter},
+};
 
 use model::Batch;
 

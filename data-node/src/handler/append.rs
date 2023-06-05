@@ -133,16 +133,17 @@ impl<'a> Append<'a> {
                         );
                         if let Some(window) = range.window_mut() {
                             let _ = window.check_barrier(req)?;
-                            let options = WriteOptions::default();
-                            let append_result = store.append(options, req.clone()).await?;
-                            return Ok(append_result);
                         }
+                    } else {
+                        warn!(
+                            "Target stream/range is not found. stream-id={}, range-index={}",
+                            req.stream_id, req.range_index
+                        );
+                        return Err(AppendError::RangeNotFound);
                     }
-                    warn!(
-                        "Target stream/range is not found. stream-id={}, range-index={}",
-                        req.stream_id, req.range_index
-                    );
-                    return Err(AppendError::RangeNotFound);
+                    let options = WriteOptions::default();
+                    let append_result = store.append(options, req.clone()).await?;
+                    return Ok(append_result);
                 };
                 Box::pin(result)
             })
