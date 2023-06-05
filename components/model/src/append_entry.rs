@@ -1,4 +1,4 @@
-use std::fmt::{Display, self};
+use std::fmt::{self, Display};
 
 #[derive(Debug, Clone, Default)]
 pub struct AppendEntry {
