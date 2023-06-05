@@ -29,7 +29,7 @@ pub(crate) struct Window {
     /// The barrier offset, the requests beyond this offset should be blocked.
     next: u64,
 
-    /// The committed offset means all requests before this offset are persisted to store.
+    /// The committed offset means all records prior to this offset are already persisted to store.
     committed: u64,
 
     /// Submitted request offset to batch size.
@@ -50,8 +50,9 @@ impl Window {
         self.next
     }
 
-    pub(crate) fn reset_next(&mut self, next: u64) {
-        self.next = next;
+    pub(crate) fn reset(&mut self, offset: u64) {
+        self.next = offset;
+        self.committed = offset;
     }
 
     /// Checks the request with the given offset is ready to be dispatched.
@@ -116,12 +117,7 @@ impl Window {
     pub(crate) fn commit(&mut self, offset: u64) -> u64 {
         let mut res = offset;
 
-        // In bootstrap phase, the submitted map is empty, so we just update the next and committed offset.
-        if self.submitted.is_empty() {
-            self.next = offset;
-            self.committed = offset;
-            return offset;
-        }
+        debug_assert!(!self.submitted.is_empty(), "Must check-barrier prior to commit");
 
         // TODO: below code is too defensive, we should find a more concise way to do this.
         if let Some((first_key, _len)) = self.submitted.first_key_value() {

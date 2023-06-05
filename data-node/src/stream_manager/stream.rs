@@ -39,7 +39,7 @@ impl Stream {
         self.ranges
             .iter_mut()
             .filter(|range| range.metadata.index() == range_index)
-            .for_each(|range| range.commit(offset));
+            .for_each(|range| range.reset(offset));
     }
 
     pub(crate) fn create_range(&mut self, metadata: RangeMetadata) {

@@ -30,6 +30,12 @@ impl Range {
         self.committed
     }
 
+    pub(crate) fn reset(&mut self, offset: u64) {
+        if let Some(window) = self.window_mut() {
+            window.reset(offset);
+        }
+    }
+
     pub(crate) fn commit(&mut self, offset: u64) {
         let offset = self
             .window_mut()
