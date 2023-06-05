@@ -1,6 +1,7 @@
 use super::composite_session::CompositeSession;
 use crate::error::ClientError;
 use log::error;
+use model::client_role::ClientRole;
 use std::{cell::UnsafeCell, collections::HashMap, rc::Rc, sync::Arc};
 use tokio::sync::broadcast;
 
@@ -24,6 +25,16 @@ impl SessionManager {
             config: Arc::clone(config),
             sessions,
             shutdown,
+        }
+    }
+
+    /// Broadcast keep-alive heartbeat to all composite sessions managed by current manager.
+    pub(crate) async fn broadcast_heartbeat(&self, role: ClientRole) {
+        let map = unsafe { &mut *self.sessions.get() };
+        let composite_sessions = map.iter().map(|(_k, v)| Rc::clone(v)).collect::<Vec<_>>();
+
+        for composite_session in composite_sessions {
+            composite_session.heartbeat(role).await;
         }
     }
 

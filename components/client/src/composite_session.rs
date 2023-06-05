@@ -41,7 +41,6 @@ pub(crate) struct CompositeSession {
     sessions: Rc<RefCell<HashMap<SocketAddr, Session>>>,
     shutdown: broadcast::Sender<()>,
     refresh_cluster_instant: RefCell<Instant>,
-    heartbeat_instant: RefCell<Instant>,
 }
 
 impl CompositeSession {
@@ -91,7 +90,6 @@ impl CompositeSession {
             sessions,
             shutdown,
             refresh_cluster_instant: RefCell::new(Instant::now()),
-            heartbeat_instant: RefCell::new(Instant::now()),
         })
     }
 
@@ -267,7 +265,7 @@ impl CompositeSession {
     }
 
     /// Broadcast heartbeat requests to all nested sessions.
-    pub(crate) async fn heartbeat(&self) -> Result<(), ClientError> {
+    pub(crate) async fn heartbeat(&self, role: ClientRole) {
         self.try_reconnect().await;
 
         if self.need_refresh_placement_manager_cluster() {
@@ -276,58 +274,14 @@ impl CompositeSession {
             }
         }
 
-        let now = Instant::now();
-        *self.heartbeat_instant.borrow_mut() = now;
-
-        let request = request::Request {
-            timeout: self.config.client_io_timeout(),
-            headers: request::Headers::Heartbeat {
-                client_id: self.config.client.client_id.clone(),
-                role: ClientRole::DataNode,
-                data_node: Some(self.config.server.data_node()),
-            },
-        };
-
-        let mut receivers = vec![];
+        for session in self
+            .sessions
+            .borrow()
+            .iter()
+            .map(|(_, session)| session.clone())
         {
-            let sessions = self
-                .sessions
-                .borrow()
-                .iter()
-                .map(|(_addr, session)| session.clone())
-                .collect::<Vec<_>>();
-
-            let futures = sessions
-                .iter()
-                .map(|session| {
-                    let (tx, rx) = oneshot::channel();
-                    receivers.push(rx);
-                    session.write(request.clone(), tx)
-                })
-                .collect::<Vec<_>>();
-
-            let _res: Vec<Result<(), InvocationContext>> = futures::future::join_all(futures).await;
+            session.heartbeat(role).await
         }
-
-        let res: Vec<Result<response::Response, oneshot::error::RecvError>> =
-            futures::future::join_all(receivers).await;
-
-        for item in res {
-            match item {
-                Ok(response) => {
-                    if !response.ok() {
-                        error!(
-                            "Failed to maintain heartbeat to {}. Status-Message: `{}`",
-                            self.target, response.status.message
-                        );
-                        // TODO: refine error handling
-                        return Err(ClientError::ServerInternal);
-                    }
-                }
-                Err(_e) => {}
-            }
-        }
-        Ok(())
     }
 
     pub(crate) async fn allocate_id(
@@ -555,7 +509,7 @@ impl CompositeSession {
                     }
 
                     error!(
-                        "Failed to create range on {} for elastic-stream[id={}]: {response:#?}",
+                        "Failed to create range on {} for Stream[id={}]: {response:#?}",
                         self.target, stream_id
                     );
                     return Err(ClientError::CreateRange(response.status.code));
@@ -924,7 +878,11 @@ impl CompositeSession {
         }
 
         if let Some(response::Headers::Append { entries }) = response.headers {
-            trace!("Append entries {:?} cost {}us", entries, start_timestamp.elapsed().as_micros());
+            trace!(
+                "Append entries {:?} cost {}us",
+                entries,
+                start_timestamp.elapsed().as_micros()
+            );
             Ok(entries)
         } else {
             Err(ClientError::ClientInternal)

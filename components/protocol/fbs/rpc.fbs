@@ -113,7 +113,7 @@ enum ClientRole : byte {
     CLIENT_ROLE_UNSPECIFIED = 0,
     CLIENT_ROLE_PM = 1,
     CLIENT_ROLE_DATA_NODE = 2,
-    CLIENT_ROLE_CUSTOMER = 3,
+    CLIENT_ROLE_FRONTEND = 3,
 }
 
 // The heartbeat is used to keep the connection alive.

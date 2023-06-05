@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 use client::Client;
 use config::Configuration;
 use log::warn;
-use model::stream::StreamMetadata;
+use model::{client_role::ClientRole, stream::StreamMetadata};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
 use super::cache::RecordBatchCache;
 
 pub(crate) struct StreamManager {
-    _config: Arc<Configuration>,
+    config: Arc<Configuration>,
     rx: mpsc::UnboundedReceiver<Request>,
     client: Rc<Client>,
     streams: Rc<RefCell<HashMap<u64, Rc<ReplicationStream>>>>,
@@ -33,7 +33,7 @@ impl StreamManager {
         let streams = Rc::new(RefCell::new(HashMap::new()));
         let cache = Rc::new(RecordBatchCache::new());
         Self {
-            _config: config,
+            config,
             rx,
             client,
             streams,
@@ -42,6 +42,9 @@ impl StreamManager {
     }
 
     pub(crate) fn spawn_loop(mut this: Self) {
+        let client = Rc::clone(&this.client);
+        let config = Arc::clone(&this.config);
+
         tokio_uring::spawn(async move {
             while let Some(request) = this.rx.recv().await {
                 match request {
@@ -70,6 +73,17 @@ impl StreamManager {
                         this.trim(request, tx);
                     }
                 }
+            }
+        });
+
+        // Spawn a task to broadcast heartbeat to servers.
+        // 
+        // TODO: watch ctrl-c signal to shutdown timely.
+        tokio_uring::spawn(async move {
+            let mut interval = tokio::time::interval(config.client_heartbeat_interval());
+            loop {
+                interval.tick().await;
+                client.broadcast_heartbeat(ClientRole::Frontend).await;
             }
         });
     }

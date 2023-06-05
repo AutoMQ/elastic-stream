@@ -5,8 +5,8 @@ use crate::{composite_session::CompositeSession, error::ClientError};
 use bytes::Bytes;
 use log::{error, trace, warn};
 use model::{
-    fetch::FetchRequestEntry, fetch::FetchResultEntry, range::RangeMetadata,
-    stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
+    client_role::ClientRole, fetch::FetchRequestEntry, fetch::FetchResultEntry,
+    range::RangeMetadata, stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
 };
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
@@ -89,12 +89,9 @@ impl Client {
     ///
     /// # Returns
     ///
-    pub async fn broadcast_heartbeat(&self, target: &str) -> Result<(), ClientError> {
+    pub async fn broadcast_heartbeat(&self, role: ClientRole) {
         let session_manager = unsafe { &mut *self.session_manager.get() };
-        let composite_session = session_manager.get_composite_session(target).await?;
-        trace!("Broadcast heartbeat to composite-channel={}", target);
-
-        composite_session.heartbeat().await
+        session_manager.broadcast_heartbeat(role).await;
     }
 
     pub async fn create_stream(
@@ -289,6 +286,7 @@ impl Client {
 mod tests {
     use bytes::BytesMut;
     use log::trace;
+    use model::client_role::ClientRole;
     use model::stream::StreamMetadata;
     use model::ListRangeCriteria;
     use model::{
@@ -324,7 +322,8 @@ mod tests {
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(Arc::clone(&config), tx);
-            client.broadcast_heartbeat(&config.placement_manager).await
+            client.broadcast_heartbeat(ClientRole::DataNode).await;
+            Ok(())
         })
     }
 

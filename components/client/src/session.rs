@@ -4,6 +4,7 @@ use codec::{
     frame::{Frame, OperationCode},
 };
 
+use model::client_role::ClientRole;
 use transport::connection::Connection;
 
 use log::{error, info, trace, warn};
@@ -109,13 +110,13 @@ impl Session {
                                 trace!( "Read a frame from channel={}", target);
                                 let inflight = unsafe { &mut *inflight_requests.get() };
                                 if frame.is_response() {
-                                    Session::handle_response(inflight, frame);
+                                    Session::handle_response(inflight, frame, target);
                                 } else {
                                     warn!( "Received an unexpected request frame from target={}", target);
                                 }
                             }
                             Ok(None) => {
-                                info!( "Connection to {} is closed", target);
+                                info!( "Connection to {} is closed by peer", target);
                                 if let Some(sessions) = sessions.upgrade() {
                                     let mut sessions = sessions.borrow_mut();
                                     if let Some(_session) = sessions.remove(&target) {
@@ -263,6 +264,46 @@ impl Session {
         Ok(())
     }
 
+    pub(crate) async fn heartbeat(&self, role: ClientRole) {
+        let last = self.idle_since.borrow().clone();
+        if Instant::now() - last < self.config.client_heartbeat_interval() {
+            return;
+        }
+
+        let request = request::Request {
+            timeout: self.config.client_io_timeout(),
+            headers: request::Headers::Heartbeat {
+                client_id: self.config.client.client_id.clone(),
+                data_node: if role == ClientRole::DataNode {
+                    Some(self.config.server.data_node())
+                } else {
+                    None
+                },
+                role,
+            },
+        };
+
+        let mut frame = Frame::new(OperationCode::Heartbeat);
+        frame.header = Some((&request).into());
+        match self.connection.write_frame(&frame).await {
+            Ok(_) => {
+                trace!(
+                    "Write request[opcode={}] bounded for {} using stream-id={} to socket buffer",
+                    frame.operation_code,
+                    self.connection.peer_address(),
+                    frame.stream_id,
+                );
+                *self.idle_since.borrow_mut() = Instant::now();
+            }
+            Err(e) => {
+                error!(
+                    "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}", 
+                    frame.operation_code, self.connection.peer_address(), e
+                );
+            }
+        }
+    }
+
     pub(crate) fn state(&self) -> NodeState {
         *self.state.borrow()
     }
@@ -278,13 +319,22 @@ impl Session {
         }
     }
 
-    fn handle_response(inflight: &mut HashMap<u32, InvocationContext>, frame: Frame) {
+    fn handle_response(
+        inflight: &mut HashMap<u32, InvocationContext>,
+        frame: Frame,
+        target: SocketAddr,
+    ) {
         let stream_id = frame.stream_id;
         trace!(
-            "Received {} response for stream-id={}",
+            "Received {} response for stream-id={} from {}",
             frame.operation_code,
-            stream_id
+            stream_id,
+            target
         );
+
+        if frame.operation_code == OperationCode::Heartbeat {
+            return;
+        }
 
         match inflight.remove(&stream_id) {
             Some(mut ctx) => {
@@ -293,10 +343,6 @@ impl Session {
                     response.on_system_error(&frame);
                 } else {
                     match frame.operation_code {
-                        OperationCode::Heartbeat => {
-                            response.on_heartbeat(&frame);
-                        }
-
                         OperationCode::ListRange => {
                             response.on_list_ranges(&frame);
                         }
@@ -361,6 +407,10 @@ impl Session {
 
                         OperationCode::DescribePlacementManager => {
                             response.on_describe_placement_manager(&frame);
+                        }
+
+                        OperationCode::Heartbeat => {
+                            unreachable!();
                         }
                     }
                 }

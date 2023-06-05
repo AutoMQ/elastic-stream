@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use jni::objects::{GlobalRef, JClass, JObject, JString, JValue, JValueGen, JMethodID};
+use jni::objects::{GlobalRef, JClass, JMethodID, JObject, JString, JValue, JValueGen};
 use jni::sys::{jint, jlong, JNINativeInterface_, JNI_VERSION_1_8};
 use jni::{JNIEnv, JavaVM};
 use log::{error, info, trace};
@@ -298,7 +298,9 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
                     let jlong_class = env.find_class(jlong_path).unwrap();
                     let jlong_class: GlobalRef = env.new_global_ref(jlong_class).unwrap();
                     let jlong_ctor = env.get_method_id(jlong_path, "<init>", "(J)V").unwrap();
-                    let future_complete_method = env.get_method_id(completable_future_path, "complete", "(Ljava/lang/Object;)Z").unwrap();
+                    let future_complete_method = env
+                        .get_method_id(completable_future_path, "complete", "(Ljava/lang/Object;)Z")
+                        .unwrap();
                     unsafe { STREAM_CLASS_CACHE.set(stream_class).unwrap() };
                     unsafe { STREAM_CTOR_CACHE.set(stream_ctor).unwrap() };
                     unsafe { VOID_CLASS_CACHE.set(void_class).unwrap() };
@@ -720,7 +722,16 @@ fn call_future_complete_method(mut env: JNIEnv, future: GlobalRef, obj: JObject)
     let s = JValueGen::from(obj);
     let _stopwatch = Stopwatch::new("Future#complete");
     let method = unsafe { FUTURE_COMPLETE_CACHE.get() }.unwrap();
-    if unsafe { env.call_method_unchecked(future, method, jni::signature::ReturnType::Primitive(jni::signature::Primitive::Boolean), &[s.as_jni()]) }.is_err() {
+    if unsafe {
+        env.call_method_unchecked(
+            future,
+            method,
+            jni::signature::ReturnType::Primitive(jni::signature::Primitive::Boolean),
+            &[s.as_jni()],
+        )
+    }
+    .is_err()
+    {
         panic!("Failed to call future complete method");
     }
 }
@@ -1032,13 +1043,17 @@ fn throw_exception(env: &mut JNIEnv, msg: &str) {
 
 fn complete_future_with_stream(future: GlobalRef, ptr: i64) {
     JENV.with(|cell| {
-        let mut env = get_thread_local_jenv(cell); 
-        let stream_class = unsafe { STREAM_CLASS_CACHE.get() }; 
-        let stream_ctor = unsafe {STREAM_CTOR_CACHE.get()};
+        let mut env = get_thread_local_jenv(cell);
+        let stream_class = unsafe { STREAM_CLASS_CACHE.get() };
+        let stream_ctor = unsafe { STREAM_CTOR_CACHE.get() };
         if let (Some(stream_class), Some(stream_ctor)) = (stream_class, stream_ctor) {
-            if let Ok(obj) =
-            unsafe { env.new_object_unchecked(stream_class, *stream_ctor, &[jni::objects::JValue::Long(ptr).as_jni()]) }
-            {
+            if let Ok(obj) = unsafe {
+                env.new_object_unchecked(
+                    stream_class,
+                    *stream_ctor,
+                    &[jni::objects::JValue::Long(ptr).as_jni()],
+                )
+            } {
                 call_future_complete_method(env, future, obj);
             } else {
                 panic!("Couldn't create Stream object");
@@ -1055,9 +1070,13 @@ fn complete_future_with_jlong(future: GlobalRef, value: i64) {
         let long_class = unsafe { JLONG_CLASS_CACHE.get() };
         let long_ctor = unsafe { JLONG_CTOR_CACHE.get() };
         if let (Some(long_class), Some(long_ctor)) = (long_class, long_ctor) {
-            if let Ok(obj) =
-                unsafe { env.new_object_unchecked(long_class, *long_ctor, &[jni::objects::JValue::Long(value).as_jni()]) }
-            {
+            if let Ok(obj) = unsafe {
+                env.new_object_unchecked(
+                    long_class,
+                    *long_ctor,
+                    &[jni::objects::JValue::Long(value).as_jni()],
+                )
+            } {
                 call_future_complete_method(env, future, obj);
             } else {
                 panic!("Failed to create Long object");
@@ -1072,7 +1091,7 @@ fn complete_future_with_void(future: GlobalRef) {
     JENV.with(|cell| {
         let mut env = get_thread_local_jenv(cell);
         let void_class = unsafe { VOID_CLASS_CACHE.get() };
-        let void_ctor = unsafe {VOID_CTOR_CACHE.get()};
+        let void_ctor = unsafe { VOID_CTOR_CACHE.get() };
         if let (Some(void_class), Some(void_ctor)) = (void_class, void_ctor) {
             if let Ok(obj) = unsafe { env.new_object_unchecked(void_class, *void_ctor, &[]) } {
                 call_future_complete_method(env, future, obj);

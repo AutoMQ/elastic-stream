@@ -13,6 +13,7 @@ use crate::{
 };
 use client::Client;
 use log::{debug, error, info, warn};
+use model::client_role::ClientRole;
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
     sys_metrics::{DiskStatistics, MemoryStatistics},
@@ -144,6 +145,7 @@ impl Worker {
             }
         });
     }
+
     fn heartbeat(&self, mut shutdown_rx: broadcast::Receiver<()>) {
         let client = Rc::clone(&self.client);
         let config = Arc::clone(&self.config.server_config);
@@ -157,7 +159,7 @@ impl Worker {
                     }
                     _ = interval.tick() => {
                         let _ = client
-                        .broadcast_heartbeat(&config.placement_manager)
+                        .broadcast_heartbeat(ClientRole::DataNode)
                         .await;
                     }
 
