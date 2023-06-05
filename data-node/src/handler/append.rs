@@ -121,6 +121,7 @@ impl<'a> Append<'a> {
         let futures: Vec<_> = to_store_requests
             .iter()
             .map(|req| {
+                info!("AppendRecordRequest - {:?}", req);
                 let result = async {
                     if let Some(range) = stream_manager
                         .borrow_mut()

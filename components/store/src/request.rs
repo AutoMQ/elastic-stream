@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, fmt::{Display, Formatter, self}};
 
 use model::Batch;
 
@@ -23,6 +23,16 @@ pub struct AppendRecordRequest {
     /// |  Magic Code(1B)   |  Meta Len(4B)     |       Meta        |  Payload Len(4B) | Record Batch Payload  |
     /// +-------------------+-------------------+-------------------+------------------------------------------+
     pub buffer: bytes::Bytes,
+}
+
+impl Display for AppendRecordRequest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AppendRecordRequest {{ stream_id: {}, range_index: {}, offset: {}, len: {} }}",
+            self.stream_id, self.range_index, self.offset, self.len
+        )
+    }
 }
 
 impl Batch for AppendRecordRequest {
