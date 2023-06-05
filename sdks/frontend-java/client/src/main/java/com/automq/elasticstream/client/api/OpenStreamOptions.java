@@ -5,6 +5,7 @@ import com.automq.elasticstream.client.utils.Arguments;
 public class OpenStreamOptions {
     private WriteMode writeMode = WriteMode.SINGLE;
     private ReadMode readMode = ReadMode.MULTIPLE;
+    private long epoch;
 
     public static Builder newBuilder() {
         return new Builder();
@@ -16,6 +17,10 @@ public class OpenStreamOptions {
 
     public ReadMode readMode() {
         return readMode;
+    }
+
+    public long epoch() {
+        return epoch;
     }
 
     public enum WriteMode {
@@ -58,6 +63,11 @@ public class OpenStreamOptions {
         public Builder readMode(ReadMode readMode) {
             Arguments.isNotNull(readMode, "ReadMode should be set with SINGLE or MULTIPLE");
             options.readMode = readMode;
+            return this;
+        }
+
+        public Builder epoch(long epoch) {
+            options.epoch = epoch;
             return this;
         }
 

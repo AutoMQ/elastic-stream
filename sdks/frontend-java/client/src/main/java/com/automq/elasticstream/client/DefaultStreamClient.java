@@ -20,12 +20,12 @@ public class DefaultStreamClient implements StreamClient {
     @Override
     public CompletableFuture<Stream> createAndOpenStream(CreateStreamOptions options) {
         return frontend.create(options.replicaCount(), options.replicaCount() / 2 + 1, Long.MAX_VALUE)
-                .thenCompose(streamId -> openStream(streamId, OpenStreamOptions.newBuilder().build()));
+                .thenCompose(streamId -> openStream(streamId, OpenStreamOptions.newBuilder().epoch(options.epoch()).build()));
     }
 
     @Override
     public CompletableFuture<Stream> openStream(long streamId, OpenStreamOptions options) {
-        return frontend.open(streamId, 0).thenApply(s -> new DefaultStream(streamId, s));
+        return frontend.open(streamId, options.epoch()).thenApply(s -> new DefaultStream(streamId, s));
     }
 
     public String toString() {
