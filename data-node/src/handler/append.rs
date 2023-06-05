@@ -117,17 +117,17 @@ impl<'a> Append<'a> {
                         .get_range(req.stream_id, req.range_index)
                     {
                         if let Some(window) = range.window_mut() {
-                            let _ = window.wait_to_go(req).await?;
+                            let _ = window.check_barrier(req)?;
                             let options = WriteOptions::default();
                             let append_result = store.append(options, req.clone()).await?;
-                            return Ok::<AppendResult, AppendError>(append_result);
+                            return Ok(append_result);
                         }
                     }
                     warn!(
                         "Target stream/range is not found. stream-id={}, range-index={}",
                         req.stream_id, req.range_index
                     );
-                    return Err::<AppendResult, AppendError>(AppendError::RangeNotFound);
+                    return Err(AppendError::RangeNotFound);
                 };
                 Box::pin(result)
             })
@@ -229,6 +229,7 @@ impl<'a> Append<'a> {
                 buffer: self.payload.slice(pos..pos + len),
             };
 
+            append_requests.push(request);
             pos += len;
         }
 
@@ -269,7 +270,7 @@ impl From<ServiceError> for AppendError {
     fn from(err: ServiceError) -> Self {
         match err {
             ServiceError::OffsetCommitted => AppendError::Committed,
-            ServiceError::OffsetInWindow => AppendError::Inflight,
+            ServiceError::OffsetInFlight => AppendError::Inflight,
             _ => AppendError::Internal,
         }
     }

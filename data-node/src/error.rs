@@ -27,8 +27,11 @@ pub enum ServiceError {
     #[error("The offset of the append request is already committed")]
     OffsetCommitted,
 
-    #[error("The offset of the append request is already in the write window")]
-    OffsetInWindow,
+    #[error("The offset of the append request is already in flight")]
+    OffsetInFlight,
+
+    #[error("The offset of the append request is out of order")]
+    OffsetOutOfOrder,
 
     #[error("Internal error: `{0}`")]
     Internal(String),
