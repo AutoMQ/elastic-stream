@@ -350,7 +350,7 @@ impl ReplicationStream {
                             Ok(end_offset) => {
                                 info!(target: log_ident, "Seal not writable last range[{range_index}] with end_offset={end_offset}.");
                                 // rewind back next append start offset and try append to new writable range in next round.
-                                next_append_start_offset = last_range.confirm_offset();
+                                next_append_start_offset = end_offset;
                                 if let Err(e) = stream.new_range(range_index + 1, end_offset).await
                                 {
                                     error!(target: log_ident, "Try create a new range fail, retry later, err[{e}]");

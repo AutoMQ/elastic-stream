@@ -207,9 +207,7 @@ impl<'a> Append<'a> {
         response.header = Some(res_header);
     }
 
-    fn build_store_requests(
-        &self
-    ) -> Result<Vec<AppendRecordRequest>, ErrorCode> {
+    fn build_store_requests(&self) -> Result<Vec<AppendRecordRequest>, ErrorCode> {
         let mut append_requests: Vec<AppendRecordRequest> = Vec::new();
         let mut pos = 0;
         while let (Some(entry), len) =
@@ -259,10 +257,7 @@ impl<'a> Append<'a> {
                 Some(AppendError::Internal.to_string()),
             ),
             // TODO: this is a workaround for now, return ok for a committed error to pass the test
-            AppendError::Committed => (
-                ErrorCode::OK,
-                None,
-            ),
+            AppendError::Committed => (ErrorCode::OK, None),
             _ => (
                 ErrorCode::DN_INTERNAL_SERVER_ERROR,
                 Some(AppendError::Internal.to_string()),

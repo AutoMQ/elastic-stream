@@ -77,7 +77,7 @@ impl StreamManager {
         });
 
         // Spawn a task to broadcast heartbeat to servers.
-        // 
+        //
         // TODO: watch ctrl-c signal to shutdown timely.
         tokio_uring::spawn(async move {
             let mut interval = tokio::time::interval(config.client_heartbeat_interval());

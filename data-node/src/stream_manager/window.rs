@@ -1,11 +1,7 @@
 use log::{error, warn};
-use std::{
-    cmp,
-    collections::BTreeMap,
-};
+use std::{cmp, collections::BTreeMap};
 
 use model::Batch;
-
 
 use crate::error::ServiceError;
 

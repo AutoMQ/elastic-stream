@@ -40,6 +40,7 @@ pub(crate) struct ReplicationRange {
 
     /// Exclusive confirm offset.
     confirm_offset: RefCell<u64>,
+    next_offset: RefCell<u64>,
     /// If range is created by current stream, then open_for_write is true.
     open_for_write: bool,
     /// Range status.
@@ -75,6 +76,7 @@ impl ReplicationRange {
             cache,
             replicators: Rc::new(vec![]),
             confirm_offset: RefCell::new(confirm_offset),
+            next_offset: RefCell::new(confirm_offset),
             status: RefCell::new(status),
             seal_task_tx: Rc::new(seal_task_tx),
         });
@@ -167,6 +169,12 @@ impl ReplicationRange {
     pub(crate) fn append(&self, record_batch: &RecordBatch, context: RangeAppendContext) {
         let base_offset = context.base_offset;
         let last_offset_delta = record_batch.last_offset_delta() as u32;
+        let next_offset = *self.next_offset.borrow();
+        if next_offset != base_offset {
+            error!(target: &self.log_ident, "Range append record batch with invalid base offset, expect: {}, actual: {}", next_offset, base_offset);
+            panic!("Range append record batch with invalid base offset");
+        }
+        *self.next_offset.borrow_mut() = context.base_offset + last_offset_delta as u64;
         let mut record_batch_builder = RecordBatch::new_builder()
             .with_stream_id(record_batch.stream_id())
             // use current range index.
