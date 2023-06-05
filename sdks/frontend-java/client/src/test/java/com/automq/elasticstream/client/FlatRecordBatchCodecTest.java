@@ -2,6 +2,9 @@ package com.automq.elasticstream.client;
 
 import com.automq.elasticstream.client.api.RecordBatch;
 import com.automq.elasticstream.client.api.RecordBatchWithContext;
+
+import io.grpc.netty.shaded.io.netty.buffer.Unpooled;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -24,7 +27,7 @@ public class FlatRecordBatchCodecTest {
         properties.put("k1", "v1");
         properties.put("k2", "v2");
         RecordBatch src = new DefaultRecordBatch(payload.length, 233, properties, buffer);
-        List<RecordBatchWithContext> list = FlatRecordBatchCodec.decode(FlatRecordBatchCodec.encode(123, src));
+        List<RecordBatchWithContext> list = FlatRecordBatchCodec.decode(FlatRecordBatchCodec.encode(123, src).nioBuffer());
         Assert.assertEquals(1, list.size());
         RecordBatchWithContext dst = list.get(0);
         Assert.assertEquals(src.count(), dst.count());

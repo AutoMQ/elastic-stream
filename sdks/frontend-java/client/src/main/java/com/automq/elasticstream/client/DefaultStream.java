@@ -6,6 +6,8 @@ import com.automq.elasticstream.client.api.RecordBatch;
 import com.automq.elasticstream.client.api.RecordBatchWithContext;
 import com.automq.elasticstream.client.api.Stream;
 
+import io.netty.buffer.ByteBuf;
+
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -44,8 +46,10 @@ public class DefaultStream implements Stream {
 
     @Override
     public CompletableFuture<AppendResult> append(RecordBatch recordBatch) {
-        ByteBuffer buf = FlatRecordBatchCodec.encode(streamId, recordBatch);
-        return jniStream.append(buf).thenApply(DefaultAppendResult::new);
+        ByteBuf buf = FlatRecordBatchCodec.encode(streamId, recordBatch);
+        CompletableFuture<AppendResult> cf = jniStream.append(buf.nioBuffer()).thenApply(DefaultAppendResult::new);
+        buf.release();
+        return cf;
     }
 
     @Override

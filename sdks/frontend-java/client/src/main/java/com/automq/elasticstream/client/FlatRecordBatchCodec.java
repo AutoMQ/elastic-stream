@@ -2,6 +2,7 @@ package com.automq.elasticstream.client;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import com.automq.elasticstream.client.api.RecordBatch;
 import com.automq.elasticstream.client.api.RecordBatchWithContext;
@@ -23,6 +24,7 @@ import java.util.List;
  */
 public class FlatRecordBatchCodec {
     private static final byte MAGIC_V0 = 0x22;
+    private static final PooledByteBufAllocator ALLOCATOR = PooledByteBufAllocator.DEFAULT;
 
     /**
      * Encode RecordBatch to storage format record.
@@ -30,7 +32,8 @@ public class FlatRecordBatchCodec {
      * @param recordBatch {@link RecordBatch}
      * @return storage format record bytes.
      */
-    public static ByteBuffer encode(long streamId, RecordBatch recordBatch) {
+    public static ByteBuf encode(long streamId, RecordBatch recordBatch) {
+
         int totalLength = 0;
 
         totalLength += 1; // magic
@@ -55,13 +58,12 @@ public class FlatRecordBatchCodec {
         totalLength += 4; // payload length
         totalLength += recordBatch.rawPayload().remaining(); // payload
 
-        ByteBuffer buf = ByteBuffer.allocateDirect(totalLength);
-        buf.put(MAGIC_V0); // magic
-        buf.putInt(metaBuf.remaining()); // meta length
-        buf.put(metaBuf); // RecordBatchMeta
-        buf.putInt(recordBatch.rawPayload().remaining()); // payload length
-        buf.put(recordBatch.rawPayload()); // payload
-        buf.flip();
+        ByteBuf buf = ALLOCATOR.directBuffer(totalLength);
+        buf.writeByte(MAGIC_V0); // magic
+        buf.writeInt(metaBuf.remaining()); // meta length
+        buf.writeBytes(metaBuf); // RecordBatchMeta
+        buf.writeInt(recordBatch.rawPayload().remaining()); // payload length
+        buf.writeBytes(recordBatch.rawPayload()); // payload
         return buf;
     }
 
