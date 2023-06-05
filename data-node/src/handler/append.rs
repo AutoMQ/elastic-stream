@@ -268,7 +268,8 @@ impl<'a> Append<'a> {
 impl From<ServiceError> for AppendError {
     fn from(err: ServiceError) -> Self {
         match err {
-            ServiceError::OffsetRepeated => AppendError::Repeated,
+            ServiceError::OffsetCommitted => AppendError::Committed,
+            ServiceError::OffsetInWindow => AppendError::Inflight,
             _ => AppendError::Internal,
         }
     }

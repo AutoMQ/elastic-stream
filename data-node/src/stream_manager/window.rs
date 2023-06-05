@@ -11,8 +11,11 @@ use crate::error::ServiceError;
 /// Note that `Window` is intended to be used by a thread-per-core scenario and is not thread-safe.
 #[derive(Debug)]
 pub(crate) struct Window {
-    /// The barrier offset
+    /// The barrier offset, the requests beyond this offset should be blocked.
     next: u64,
+
+    /// The committed offset means all requests before this offset are persisted to store.
+    committed: u64,
 
     /// Submitted request offset to batch size.
     submitted: BTreeMap<u64, u32>,
@@ -27,6 +30,8 @@ impl Window {
             next,
             submitted: BTreeMap::new(),
             queue: HashMap::new(),
+            // The initial commit offset is the same as the next offset.
+            committed: next,
         }
     }
 
@@ -49,17 +54,23 @@ impl Window {
     where
         R: Batch + Ord,
     {
-        if request.offset() < self.next {
+        if request.offset() < self.committed {
             // A retry request on a committed offset.
-            // This is possible when the client does not
-            // receive the response of the request due to network failure.
-            return Err(ServiceError::OffsetRepeated);
+            // The client could regard the request as success.
+            return Err(ServiceError::OffsetCommitted);
         }
+
+        if request.offset() < self.next {
+            // A retry request on a offset that is already in the write window.
+            // To avoid data loss, the client should await the request to be completed and retry if necessary.
+            return Err(ServiceError::OffsetInWindow);
+        }
+
+        self.submitted.insert(request.offset(), request.len());
 
         if request.offset() == self.next {
             // Expected request to be dispatched, just advance the next offset and go.
             self.next += request.len() as u64;
-            self.submitted.insert(request.offset(), request.len());
             return Ok(());
         }
 
@@ -78,17 +89,21 @@ impl Window {
         }
     }
 
-    /// Commits the offset of current completed request, and wake up the next request if possible.
+    /// Commits the request with the given offset, and wakes up the subsequent request if exists.
+    /// 
+    /// Note that this method will be called in the bootstrap phase to init the committed and next offset.
     ///
     /// # Arguments
-    /// * `offset` - the offset of current completed request.
+    /// * `offset` - the offset to be committed.
     ///
     /// # Return
-    /// * the next offset to be committed.
+    /// * the committed offset.
     pub(crate) fn commit(&mut self, offset: u64) -> u64 {
         let mut res = offset;
 
-        // Drain the submitted requests in ascending key order
+
+        // Drain the submitted requests in ascending key order, and commit all the requests before the given offset.
+        // Note: in the current thread per core scenario, the requests are committed in the same order as they are submitted.
         self.submitted
             .drain_filter(|k, _| k <= &offset)
             .for_each(|(offset, len)| {
@@ -105,6 +120,7 @@ impl Window {
         
         // To avoid rollback the next offset, keep the larger one.
         self.next = cmp::max(self.next, res);
+        self.committed = res;
         res
     }
 }
