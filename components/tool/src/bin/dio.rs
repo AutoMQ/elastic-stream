@@ -6,7 +6,6 @@ use std::{
     ffi::CString,
 };
 
-
 fn check_io_uring(probe: &register::Probe, params: &Parameters) {
     if !params.is_feature_sqpoll_nonfixed() {
         panic!("io_uring feature: IORING_FEAT_SQPOLL_NONFIXED is required. Current kernel version is too old");
@@ -134,7 +133,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
 
-            if offset >= file_size  {
+            if offset >= file_size {
                 break;
             }
 

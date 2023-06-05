@@ -924,7 +924,11 @@ impl CompositeSession {
         }
 
         if let Some(response::Headers::Append { entries }) = response.headers {
-            trace!("Append entries {:?} cost {}us", entries, start_timestamp.elapsed().as_micros());
+            trace!(
+                "Append entries {:?} cost {}us",
+                entries,
+                start_timestamp.elapsed().as_micros()
+            );
             Ok(entries)
         } else {
             Err(ClientError::ClientInternal)

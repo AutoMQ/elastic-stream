@@ -141,7 +141,7 @@ impl Stream {
 mod tests {
     use std::error::Error;
 
-    use model::{range::RangeMetadata, stream::StreamMetadata};
+    use model::{range::RangeMetadata, stream::StreamMetadata, Batch};
     use protocol::rpc::header::StreamT;
 
     #[test]
@@ -175,6 +175,22 @@ mod tests {
         Ok(())
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct Foo {
+        offset: u64,
+        len: u32,
+    }
+
+    impl Batch for Foo {
+        fn len(&self) -> u32 {
+            self.len
+        }
+
+        fn offset(&self) -> u64 {
+            self.offset
+        }
+    }
+
     #[test]
     fn test_commit() -> Result<(), Box<dyn Error>> {
         let mut stream = StreamT::default();
@@ -188,7 +204,13 @@ mod tests {
         let range = RangeMetadata::from(range);
         stream.create_range(range);
 
-        stream.commit(2);
+        stream.range_of(0).and_then(|range| {
+            range
+                .window_mut()
+                .and_then(|window| window.check_barrier(&Foo { offset: 0, len: 2 }).ok())
+        });
+
+        stream.commit(0);
 
         assert_eq!(
             stream
@@ -216,7 +238,18 @@ mod tests {
         let range = RangeMetadata::from(range);
         stream.create_range(range);
 
-        stream.commit(100);
+        stream.range_of(0).and_then(|range| {
+            range.window_mut().and_then(|window| {
+                window
+                    .check_barrier(&Foo {
+                        offset: 0,
+                        len: 100,
+                    })
+                    .ok()
+            })
+        });
+
+        stream.commit(0);
         let mut metadata = RangeMetadata::new(1, 0, 0, 0, Some(50));
         stream.seal(&mut metadata)?;
 

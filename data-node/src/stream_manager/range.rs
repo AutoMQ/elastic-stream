@@ -1,6 +1,5 @@
 use log::{trace, warn};
 use model::range::RangeMetadata;
-use store::AppendRecordRequest;
 
 use super::window::Window;
 
@@ -95,7 +94,7 @@ impl Range {
 mod tests {
     use std::error::Error;
 
-    use model::range::RangeMetadata;
+    use model::{range::RangeMetadata, Batch};
 
     #[test]
     fn test_new() -> Result<(), Box<dyn Error>> {
@@ -106,18 +105,32 @@ mod tests {
         Ok(())
     }
 
+    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+    struct Foo {
+        offset: u64,
+        len: u32,
+    }
+
+    impl Batch for Foo {
+        fn offset(&self) -> u64 {
+            self.offset
+        }
+
+        fn len(&self) -> u32 {
+            self.len
+        }
+    }
+
     #[test]
     fn test_commit() -> Result<(), Box<dyn Error>> {
         let metadata = RangeMetadata::new(0, 0, 0, 0, None);
         let mut range = super::Range::new(metadata);
-        range.commit(1);
-        assert_eq!(range.committed(), Some(1));
-
+        range
+            .window_mut()
+            .and_then(|window| window.check_barrier(&Foo { offset: 0, len: 1 }).ok());
         range.commit(0);
         assert_eq!(range.committed(), Some(1));
 
-        range.commit(2);
-        assert_eq!(range.committed(), Some(2));
         Ok(())
     }
 
@@ -125,6 +138,9 @@ mod tests {
     fn test_seal() -> Result<(), Box<dyn Error>> {
         let metadata = RangeMetadata::new(0, 0, 0, 0, None);
         let mut range = super::Range::new(metadata.clone());
+        range
+            .window_mut()
+            .and_then(|window| window.check_barrier(&Foo { offset: 0, len: 1 }).ok());
         range.commit(1);
 
         let mut metadata = RangeMetadata::new(0, 0, 0, 0, Some(1));

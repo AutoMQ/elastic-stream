@@ -14,11 +14,11 @@ use std::cmp::{max, min};
 use std::collections::BTreeMap;
 use std::ops::Bound::Included;
 use std::rc::{Rc, Weak};
+use std::time::Instant;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration};
-use std::time::Instant;
 
 pub(crate) struct ReplicationStream {
     log_ident: String,

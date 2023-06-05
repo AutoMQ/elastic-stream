@@ -1,11 +1,7 @@
 use log::{error, warn};
-use std::{
-    cmp,
-    collections::BTreeMap,
-};
+use std::{cmp, collections::BTreeMap};
 
 use model::Batch;
-
 
 use crate::error::ServiceError;
 
@@ -117,7 +113,10 @@ impl Window {
     pub(crate) fn commit(&mut self, offset: u64) -> u64 {
         let mut res = offset;
 
-        debug_assert!(!self.submitted.is_empty(), "Must check-barrier prior to commit");
+        debug_assert!(
+            !self.submitted.is_empty(),
+            "Must check-barrier prior to commit"
+        );
 
         // TODO: below code is too defensive, we should find a more concise way to do this.
         if let Some((first_key, _len)) = self.submitted.first_key_value() {
@@ -145,9 +144,8 @@ impl Window {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Ok;
     use model::Batch;
-    use std::{cmp::Ordering, error::Error};
+    use std::cmp::Ordering;
 
     #[derive(Debug)]
     struct Foo {

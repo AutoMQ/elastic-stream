@@ -102,7 +102,6 @@ pub enum FetchError {
 
 #[derive(Debug, Error)]
 pub enum AppendError {
-
     #[error("Failed to submit AppendRecordRequest")]
     SubmissionQueue,
 
