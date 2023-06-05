@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    rc::{Rc, Weak},
+    rc::{Rc, Weak}, time::Duration,
 };
 
 use super::replication_range::ReplicationRange;
@@ -11,6 +11,7 @@ use model::fetch::FetchRequestEntry;
 use model::DataNode;
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
+use tokio::time::sleep;
 
 /// Replicator is responsible for replicating data to a data-node of range replica.
 ///
@@ -80,6 +81,10 @@ impl Replicator {
                         info!(target: &log_ident, "Range is sealed, aborting replication");
                         break;
                     }
+                    if *corrupted.borrow() {
+                        range.try_ack();
+                        break;
+                    }
 
                     if attempts > 3 {
                         warn!(target: &log_ident, "Failed to append entries after 3 attempts, aborting replication");
@@ -100,12 +105,14 @@ impl Replicator {
                         if append_result_entries.len() != 1 {
                             error!(target: &log_ident, "Failed to append entries: unexpected number of entries returned. Retry...");
                             attempts += 1;
+                            sleep(Duration::from_millis(10)).await;
                             continue;
                         }
                         let status = &(append_result_entries[0].status);
                         if status.code != ErrorCode::OK {
                             warn!(target: &log_ident, "Failed to append entries: status code {status:?} is not OK. Retry...");
                             attempts += 1;
+                            sleep(Duration::from_millis(10)).await;
                             continue;
                         }
                         *offset.borrow_mut() = last_offset;
@@ -118,6 +125,7 @@ impl Replicator {
                         warn!(target: &log_ident, "Failed to append entries: {e}. Retry...");
                         attempts += 1;
                         // TODO: Retry immediately?
+                        sleep(Duration::from_millis(10)).await;
                         continue;
                     }
                 }
