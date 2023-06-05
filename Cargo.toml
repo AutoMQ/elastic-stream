@@ -34,7 +34,7 @@ crc32fast = { version= "1.3", features = ["nightly"]}
 derivative = "2.2"
 futures = { version = "0.3" }
 itertools = {version = "0.10.5" }
-lazy_static = "1.4.0"
+lazy_static = "1.4"
 io-uring = "0.5"
 tokio-uring = { git = "https://github.com/tokio-rs/tokio-uring.git", branch = "master", features = ["bytes"] }
 tokio = { version = "1", features = ["sync", "time", "macros"] }

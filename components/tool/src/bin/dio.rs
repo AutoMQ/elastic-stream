@@ -1,3 +1,4 @@
+use clap::Parser;
 use io_uring::{self, opcode, register, types, IoUring, Parameters};
 use std::{
     alloc::{self, Layout},
@@ -5,9 +6,6 @@ use std::{
     ffi::CString,
 };
 
-const IO_DEPTH: u32 = 4096;
-
-const FILE_SIZE: i64 = 1i64 * 1024 * 1024 * 1024;
 
 fn check_io_uring(probe: &register::Probe, params: &Parameters) {
     if !params.is_feature_sqpoll_nonfixed() {
@@ -37,7 +35,10 @@ fn check_io_uring(probe: &register::Probe, params: &Parameters) {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let args = tool::Args::parse();
     println!("PID: {}", std::process::id());
+
+    let file_size = args.size * 1024 * 1024 * 1024;
 
     let mut control_ring = io_uring::IoUring::builder()
         .dontfork()
@@ -70,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("Opened {file_path} with fd={fd}");
 
-    let sqe = opcode::Fallocate64::new(types::Fd(fd), FILE_SIZE)
+    let sqe = opcode::Fallocate64::new(types::Fd(fd), file_size as libc::off64_t)
         .offset(0)
         .mode(libc::FALLOC_FL_ZERO_RANGE)
         .build()
@@ -83,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         debug_assert_eq!(1, cqe.user_data(), "user-data is inconsistent");
         cq.sync();
         if cqe.result() >= 0 {
-            println!("Fallocate File[{file_path}, FD={fd}] to {} OK", FILE_SIZE);
+            println!("Fallocate File[{file_path}, FD={fd}] to {} OK", file_size);
         } else {
             panic!("Failed to fallocate, errno: {}", -cqe.result());
         }
@@ -95,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .setup_sqpoll_cpu(1)
         .dontfork()
         .setup_r_disabled()
-        .build(IO_DEPTH)?;
+        .build(args.qd)?;
 
     let alignment = 4096;
     let buf_size = 4096 * 4;
@@ -129,21 +130,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut seq = 0;
     loop {
         loop {
-            if writes >= IO_DEPTH {
+            if writes >= args.qd {
                 break;
             }
 
-            if offset >= FILE_SIZE {
+            if offset >= file_size  {
                 break;
             }
 
             let write_sqe =
                 opcode::WriteFixed::new(types::Fixed(0), ptr as *const u8, buf_size as u32, 0)
-                    .offset(offset)
+                    .offset(offset as libc::off64_t)
                     .build()
                     .user_data(seq);
             seq += 1;
-            offset += buf_size as i64;
+            offset += buf_size;
             unsafe { uring.submission().push(&write_sqe) }?;
             writes += 1;
         }
@@ -172,7 +173,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             cq.sync();
         }
 
-        if offset >= FILE_SIZE && writes == 0 {
+        if offset >= file_size && writes == 0 {
             println!("All writes are completed");
             break;
         }
