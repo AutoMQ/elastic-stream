@@ -1,5 +1,7 @@
-use bytes::{Bytes};
-use jni::objects::{GlobalRef, JClass, JObject, JString, JValue, JValueGen, JMethodID, JByteArray, AsJArrayRaw};
+use bytes::Bytes;
+use jni::objects::{
+    AsJArrayRaw, GlobalRef, JByteArray, JClass, JMethodID, JObject, JString, JValue, JValueGen,
+};
 use jni::sys::{jint, jlong, JNINativeInterface_, JNI_VERSION_1_8};
 use jni::{JNIEnv, JavaVM};
 use log::{error, info, trace};
@@ -126,7 +128,7 @@ async fn process_read_command(
                     {
                         buffers.iter().for_each(|buf| {
                             let slice = buf.as_ref();
-                            let slice: &[i8] = unsafe { 
+                            let slice: &[i8] = unsafe {
                                 std::slice::from_raw_parts(slice.as_ptr() as *const i8, slice.len())
                             };
                             let _ = env.set_byte_array_region(&byte_array, p as i32, slice);
@@ -141,7 +143,6 @@ async fn process_read_command(
                     );
                     error!("Failed to create byte array");
                 }
-                
             });
         }
         Err(err) => {
