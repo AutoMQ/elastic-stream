@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -63,7 +64,7 @@ type RaftCluster struct {
 	client  sbpClient.Client
 	// sealMus is used to protect the stream being sealed.
 	// Each mu is a 1-element semaphore channel controlling access to seal range. Write to lock it, and read to unlock.
-	sealMus map[int64]chan struct{}
+	sealMus cmap.ConcurrentMap[int64, chan struct{}]
 
 	lg *zap.Logger
 }
@@ -113,7 +114,7 @@ func (c *RaftCluster) Start(s Server) error {
 	c.sAlloc = s.IDAllocator(_streamIDAllocKey, uint64(endpoint.MinStreamID), _streamIDStep)
 	c.dnAlloc = s.IDAllocator(_dataNodeIDAllocKey, uint64(endpoint.MinDataNodeID), _dataNodeIDStep)
 	c.client = s.SbpClient()
-	c.sealMus = make(map[int64]chan struct{})
+	c.sealMus = cmap.NewWithCustomShardingFunction[int64, chan struct{}](func(key int64) uint32 { return uint32(key) })
 
 	err := c.loadInfo()
 	if err != nil {

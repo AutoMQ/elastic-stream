@@ -261,11 +261,13 @@ func (c *RaftCluster) getLastRange(ctx context.Context, streamID int64) (*rpcfb.
 }
 
 func (c *RaftCluster) sealMu(streamID int64) chan struct{} {
-	if sealMu, ok := c.sealMus[streamID]; ok {
-		return sealMu
-	}
-	c.sealMus[streamID] = make(chan struct{}, 1)
-	return c.sealMus[streamID]
+	sealMu := c.sealMus.Upsert(streamID, nil, func(exist bool, valueInMap, _ chan struct{}) chan struct{} {
+		if exist {
+			return valueInMap
+		}
+		return make(chan struct{}, 1)
+	})
+	return sealMu
 }
 
 // sealRangeLocked seals a range and saves it to the storage.
