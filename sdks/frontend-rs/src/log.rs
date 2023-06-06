@@ -69,9 +69,27 @@ pub fn init_log() {
         )
         .logger(
             Logger::builder()
+                .appender("client")
+                .additive(false)
+                .build("codec", log::LevelFilter::Trace),
+        )
+        .logger(
+            Logger::builder()
+                .appender("client")
+                .additive(false)
+                .build("transport", log::LevelFilter::Trace),
+        )
+        .logger(
+            Logger::builder()
                 .appender("replication")
                 .additive(false)
                 .build("replication", log::LevelFilter::Trace),
+        )
+        .logger(
+            Logger::builder()
+                .appender("replication")
+                .additive(false)
+                .build("frontend", log::LevelFilter::Trace),
         )
         .build(
             Root::builder()
