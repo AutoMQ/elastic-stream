@@ -158,7 +158,7 @@ mod tests {
         range
             .window_mut()
             .and_then(|window| window.check_barrier(&Foo { offset: 0, len: 1 }).ok());
-        range.commit(1);
+        range.commit(0);
 
         let mut metadata = RangeMetadata::new(0, 0, 0, 0, Some(1));
         range.seal(&mut metadata);
