@@ -1,11 +1,10 @@
-use bytes::{Bytes};
-use jni::objects::{GlobalRef, JClass, JObject, JString, JValue, JValueGen, JMethodID, JByteArray, AsJArrayRaw};
+use bytes::Bytes;
+use jni::objects::{GlobalRef, JClass, JMethodID, JObject, JString, JValue, JValueGen};
 use jni::sys::{jint, jlong, JNINativeInterface_, JNI_VERSION_1_8};
 use jni::{JNIEnv, JavaVM};
 use log::{error, info, trace};
 use std::cell::{OnceCell, RefCell};
 use std::ffi::c_void;
-use std::io::Write;
 use std::slice;
 use std::sync::Arc;
 use std::time::Duration;
@@ -126,7 +125,7 @@ async fn process_read_command(
                     {
                         buffers.iter().for_each(|buf| {
                             let slice = buf.as_ref();
-                            let slice: &[i8] = unsafe { 
+                            let slice: &[i8] = unsafe {
                                 std::slice::from_raw_parts(slice.as_ptr() as *const i8, slice.len())
                             };
                             let _ = env.set_byte_array_region(&byte_array, p as i32, slice);
@@ -141,7 +140,6 @@ async fn process_read_command(
                     );
                     error!("Failed to create byte array");
                 }
-                
             });
         }
         Err(err) => {
@@ -240,20 +238,7 @@ async fn process_create_stream_command(
 /// This function could be only called by java vm when onload this lib.
 #[no_mangle]
 pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
-    env_logger::builder()
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "{}:{} {} [{}] - {} {}",
-                record.file().unwrap_or("unknown"),
-                record.line().unwrap_or(0),
-                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
-                record.level(),
-                record.target(),
-                record.args()
-            )
-        })
-        .init();
+    crate::init_log();
     let java_vm = Arc::new(vm);
     let (tx, mut rx) = mpsc::unbounded_channel();
     // # Safety

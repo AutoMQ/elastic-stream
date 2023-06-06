@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
-    rc::{Rc, Weak}, time::Duration,
+    rc::{Rc, Weak},
+    time::Duration,
 };
 
 use super::replication_range::ReplicationRange;

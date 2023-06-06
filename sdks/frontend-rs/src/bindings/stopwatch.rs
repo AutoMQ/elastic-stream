@@ -29,7 +29,7 @@ mod tests {
 
     #[test]
     fn test_stopwatch() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        test_util::try_init_log();
         let _stopwatch = Stopwatch::new("test");
     }
 }
