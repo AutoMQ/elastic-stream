@@ -7,16 +7,40 @@ appenders:
       pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}"
 
   store:
-    kind: file
+    kind: rolling_file
     path: "log/store.log"
+    append: true
     encoder:
       pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}"
+    policy:
+      kind: compound
+      trigger:
+        kind: size
+        limit: 10 mb
+      roller:
+        kind: fixed_window
+        pattern: archive/store.{}.log
+        count: 10
+        base: 0   
 
   data-node:
-    kind: file
+    kind: rolling_file
     path: "log/data-node.log"
+    append: true
     encoder:
       pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}"
+    policy:
+      kind: compound
+      trigger:
+        kind: size
+        limit: 10 mb
+      roller:
+      roller:
+        kind: fixed_window
+        pattern: archive/data-node.{}.log
+        count: 10
+        base: 0   
+
 
 root:
   level: trace 
