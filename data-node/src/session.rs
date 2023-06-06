@@ -1,4 +1,9 @@
-use std::{cell::RefCell, net::SocketAddr, rc::Rc, sync::Arc};
+use std::{
+    cell::{RefCell, UnsafeCell},
+    net::SocketAddr,
+    rc::Rc,
+    sync::Arc,
+};
 
 use config::Configuration;
 use log::{info, trace, warn};
@@ -17,7 +22,7 @@ pub(crate) struct Session {
     stream: TcpStream,
     addr: SocketAddr,
     store: Rc<ElasticStore>,
-    stream_manager: Rc<RefCell<StreamManager>>,
+    stream_manager: Rc<UnsafeCell<StreamManager>>,
     connection_tracker: Rc<RefCell<ConnectionTracker>>,
 }
 
@@ -27,7 +32,7 @@ impl Session {
         stream: TcpStream,
         addr: SocketAddr,
         store: Rc<ElasticStore>,
-        stream_manager: Rc<RefCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
     ) -> Self {
         Self {
@@ -56,7 +61,7 @@ impl Session {
 
     async fn process0(
         store: Rc<ElasticStore>,
-        stream_manager: Rc<RefCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
         peer_address: SocketAddr,
         stream: TcpStream,

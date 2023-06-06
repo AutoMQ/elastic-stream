@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::UnsafeCell, rc::Rc};
 
 use bytes::Bytes;
 use codec::frame::Frame;
@@ -30,7 +30,7 @@ impl<'a> Heartbeat<'a> {
     pub(crate) async fn apply(
         &self,
         _store: Rc<ElasticStore>,
-        _stream_manager: Rc<RefCell<StreamManager>>,
+        _stream_manager: Rc<UnsafeCell<StreamManager>>,
         response: &mut Frame,
     ) {
         trace!("Prepare heartbeat response header for {:?}", self.request);

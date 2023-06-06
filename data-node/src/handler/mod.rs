@@ -19,7 +19,7 @@ use bytes::Bytes;
 use codec::frame::Frame;
 use log::{trace, warn};
 use protocol::rpc::header::{StatusT, SystemErrorT};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::UnsafeCell, rc::Rc};
 use store::ElasticStore;
 
 /// Representation of the incoming request.
@@ -39,7 +39,7 @@ pub struct ServerCall {
     /// Note this store is `!Send` as it follows thread-per-core pattern.
     pub(crate) store: Rc<ElasticStore>,
 
-    pub(crate) stream_manager: Rc<RefCell<StreamManager>>,
+    pub(crate) stream_manager: Rc<UnsafeCell<StreamManager>>,
 }
 
 impl ServerCall {

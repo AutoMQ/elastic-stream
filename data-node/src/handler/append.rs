@@ -3,13 +3,13 @@ use codec::frame::Frame;
 
 use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
-use futures::future::join_all;
+use futures::future::{self, join_all};
 use log::{error, info, trace, warn};
 use model::payload::Payload;
 use protocol::rpc::header::{
     AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
 };
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::UnsafeCell, rc::Rc};
 use store::{
     error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, ElasticStore,
     Store,
@@ -104,7 +104,7 @@ impl<'a> Append<'a> {
     pub(crate) async fn apply(
         &self,
         store: Rc<ElasticStore>,
-        stream_manager: Rc<RefCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager>>,
         response: &mut Frame,
     ) {
         let to_store_requests = match self.build_store_requests() {
@@ -123,8 +123,7 @@ impl<'a> Append<'a> {
             .map(|req| {
                 info!("AppendRecordRequest - {}", req);
                 let result = async {
-                    if let Some(range) = stream_manager
-                        .borrow_mut()
+                    if let Some(range) = unsafe { &mut *stream_manager.get() }
                         .get_range(req.stream_id, req.range_index)
                     {
                         info!(
@@ -165,8 +164,7 @@ impl<'a> Append<'a> {
             .map(|res| {
                 match res {
                     Ok(result) => {
-                        if let Err(e) = stream_manager
-                            .borrow_mut()
+                        if let Err(e) = unsafe { &mut *stream_manager.get() }
                             .commit(result.stream_id, result.offset as u64)
                         {
                             warn!(

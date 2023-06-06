@@ -9,7 +9,7 @@ use protocol::rpc::header::{
     ErrorCode, FetchRequest, FetchResponse, FetchResponseArgs, FetchResultEntry,
     FetchResultEntryArgs, Status, StatusArgs,
 };
-use std::{cell::RefCell, pin::Pin, rc::Rc};
+use std::{cell::UnsafeCell, pin::Pin, rc::Rc};
 use store::{error::FetchError, option::ReadOptions, ElasticStore, FetchResult, Store};
 
 use crate::stream_manager::StreamManager;
@@ -53,10 +53,10 @@ impl<'a> Fetch<'a> {
     pub(crate) async fn apply(
         &self,
         store: Rc<ElasticStore>,
-        stream_manager: Rc<RefCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager>>,
         response: &mut Frame,
     ) {
-        let store_requests = self.build_store_requests(stream_manager.clone());
+        let store_requests = self.build_store_requests(unsafe { &mut *stream_manager.get() });
         let futures = store_requests
             .into_iter()
             .map(|fetch_option| match fetch_option {
@@ -172,7 +172,7 @@ impl<'a> Fetch<'a> {
     /// TODO: this method is out of sync with new replication protocol.
     fn build_store_requests(
         &self,
-        stream_manager: Rc<RefCell<StreamManager>>,
+        stream_manager: &mut StreamManager,
     ) -> Vec<Result<ReadOptions, FetchError>> {
         self.fetch_request
             .entries()
@@ -185,10 +185,7 @@ impl<'a> Fetch<'a> {
 
                 // If the stream-range exists and contains the requested offset, build the read options
                 // FIXME: Use range_manager instead of stream_manager
-                if let Some(_) = stream_manager
-                    .borrow_mut()
-                    .get_range(stream_id, range_index)
-                {
+                if let Some(_) = stream_manager.get_range(stream_id, range_index) {
                     return Ok(ReadOptions {
                         stream_id: stream_id,
                         range: range_index as u32,
