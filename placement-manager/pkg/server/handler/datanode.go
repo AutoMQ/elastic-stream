@@ -70,7 +70,7 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			resp.Error(h.notLeaderError(ctx))
+			// It's ok to ignore this error, as all pm nodes will receive this request.
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
