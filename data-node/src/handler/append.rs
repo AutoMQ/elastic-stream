@@ -74,16 +74,6 @@ impl<'a> Append<'a> {
             }
         };
 
-        Payload::parse_append_entries(payload)
-            .map_err(|e| {
-                error!("Failed to parse append entries. Cause: {:?}", e);
-                ErrorCode::BAD_REQUEST
-            })?
-            .iter()
-            .for_each(|entry| {
-                info!("AppendRequest - {entry}");
-            });
-
         Ok(Append {
             append_request,
             payload: payload.clone(),
@@ -126,10 +116,6 @@ impl<'a> Append<'a> {
                     if let Some(range) = unsafe { &mut *stream_manager.get() }
                         .get_range(req.stream_id, req.range_index)
                     {
-                        info!(
-                            "check barrier {} record_offset={} record_count={}",
-                            range, req.offset, req.len
-                        );
                         if let Some(window) = range.window_mut() {
                             let _ = window.check_barrier(req)?;
                         }
