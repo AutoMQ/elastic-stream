@@ -8,7 +8,7 @@ appenders:
 
   store:
     kind: rolling_file
-    path: "log/store.log"
+    path: "logs/store.log"
     append: true
     encoder:
       pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}"
@@ -16,16 +16,16 @@ appenders:
       kind: compound
       trigger:
         kind: size
-        limit: 10 mb
+        limit: 16 mb
       roller:
         kind: fixed_window
-        pattern: archive/store.{}.log
+        pattern: logs/archive/store.{}.log
         count: 10
-        base: 0   
+        base: 0
 
   data-node:
     kind: rolling_file
-    path: "log/data-node.log"
+    path: "logs/data-node.log"
     append: true
     encoder:
       pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}"
@@ -33,14 +33,13 @@ appenders:
       kind: compound
       trigger:
         kind: size
-        limit: 10 mb
+        limit: 16 mb
       roller:
       roller:
         kind: fixed_window
-        pattern: archive/data-node.{}.log
+        pattern: logs/archive/data-node.{}.log
         count: 10
-        base: 0   
-
+        base: 0
 
 root:
   level: trace 
@@ -54,6 +53,31 @@ loggers:
       - store
     additive: false
   data_node:
+    level: trace
+    appenders:
+      - data-node
+    additive: false
+  codec:
+    level: trace
+    appenders:
+      - data-node
+    additive: false
+  transport:
+    level: trace
+    appenders:
+      - data-node
+    additive: false
+  config:
+    level: trace
+    appenders:
+      - data-node
+    additive: false
+  client:
+    level: trace
+    appenders:
+      - data-node
+    additive: false
+  util:
     level: trace
     appenders:
       - data-node

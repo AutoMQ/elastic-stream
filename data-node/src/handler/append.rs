@@ -4,7 +4,7 @@ use codec::frame::Frame;
 use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
-use log::{error, info, trace, warn};
+use log::{error, trace, warn};
 use model::payload::Payload;
 use protocol::rpc::header::{
     AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,

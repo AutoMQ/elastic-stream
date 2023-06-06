@@ -297,7 +297,7 @@ impl CompositeSession {
                     headers: request::Headers::AllocateId {
                         host: host.to_owned(),
                     },
-                    body: None
+                    body: None,
                 };
                 let (tx, rx) = oneshot::channel();
                 if let Err(e) = session.write(request, tx).await {
@@ -376,7 +376,7 @@ impl CompositeSession {
                 headers: request::Headers::CreateStream {
                     stream_metadata: stream_metadata.clone(),
                 },
-                body: None
+                body: None,
             };
 
             if let Err(ctx) = session.write(request, tx).await {
@@ -432,7 +432,7 @@ impl CompositeSession {
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
             headers: request::Headers::DescribeStream { stream_id },
-            body: None
+            body: None,
         };
 
         let (tx, rx) = oneshot::channel();
@@ -485,7 +485,7 @@ impl CompositeSession {
                     headers: request::Headers::CreateRange {
                         range: range.clone(),
                     },
-                    body: None
+                    body: None,
                 };
 
                 if let Err(ctx) = session.write(request, tx).await {
@@ -539,7 +539,7 @@ impl CompositeSession {
             let request = request::Request {
                 timeout: self.config.client_io_timeout(),
                 headers: request::Headers::ListRange { criteria },
-                body: None
+                body: None,
             };
             let (tx, rx) = oneshot::channel();
             if let Err(_ctx) = session.write(request, tx).await {
@@ -607,7 +607,7 @@ impl CompositeSession {
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
             headers: request::Headers::DescribePlacementManager { data_node },
-            body: None
+            body: None,
         };
 
         // TODO: we shall broadcast describe cluster request to all known nodes.

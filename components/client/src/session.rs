@@ -282,7 +282,7 @@ impl Session {
                 },
                 role,
             },
-            body: None
+            body: None,
         };
 
         let mut frame = Frame::new(OperationCode::Heartbeat);

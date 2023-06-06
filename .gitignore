@@ -6,6 +6,6 @@ components/protocol/src/generated/
 placement-manager/default.*
 benchmark/logs/
 sdks/java/flatc
-log/
+log
 logs
 default.pm*
