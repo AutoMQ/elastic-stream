@@ -372,7 +372,7 @@ impl Response {
                     }
                     if let Some(stream) = response.stream() {
                         let metadata = Into::<StreamMetadata>::into(stream.unpack());
-                        info!("Describe stream={:?} on {}", metadata, ctx.target());
+                        debug!("Describe stream={:?} on {}", metadata, ctx.target());
                         self.headers = Some(Headers::DescribeStream { stream: metadata });
                     } else {
                         // Expected stream metadata is missing
