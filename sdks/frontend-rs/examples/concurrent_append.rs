@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         let stream = frontend.open(stream_id, 0).await?;
 
         info!("Step1: append 10-record batch");
-        let futures = (0..10)
+        let futures = (0..256)
             .map(|i| {
                 let payload = Bytes::from(format!("Hello World {i:0>8}!"));
                 let record_batch = RecordBatch::new_builder()
