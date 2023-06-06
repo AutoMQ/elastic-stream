@@ -115,33 +115,29 @@ impl Window {
     /// # Return
     /// * the committed offset.
     pub(crate) fn commit(&mut self, offset: u64) -> u64 {
-        let mut res = offset;
+        // The given offset to commit should be equal to the `committed` offset.
+        debug_assert!(
+            offset == self.committed,
+            "Unexpected commit call, the offset should be equal to the committed offset, offset: {}, committed: {}",
+            offset,
+            self.committed);
 
+        // The submitted map should not be empty.    
         debug_assert!(
             !self.submitted.is_empty(),
             "Must check-barrier prior to commit"
         );
 
-        // TODO: below code is too defensive, we should find a more concise way to do this.
-        if let Some((first_key, _len)) = self.submitted.first_key_value() {
-            if *first_key != offset {
-                // Unexpected commit call, the offset should be the first key of the submitted map.
-                error!("Unexpected commit call, the offset should be the first key of the submitted map, offset: {}, first_key: {}", offset, first_key);
-            }
+        if let Some((first_key, len)) = self.submitted.pop_first() {
+            debug_assert!(
+                first_key == offset,
+                "Unexpected commit call, the offset should be the first key of the submitted map, offset: {}, first_key: {}",
+                offset,
+                first_key);
+            
+            self.committed = offset + len as u64;
         }
 
-        // Drain the submitted requests in ascending key order, and commit all the requests before the given offset.
-        // Note: in the current thread per core scenario, the requests are committed in the same order as they are submitted.
-        self.submitted
-            .drain_filter(|k, _| k <= &offset)
-            .for_each(|(offset, len)| {
-                if offset + len as u64 > res {
-                    res = offset + len as u64;
-                }
-            });
-
-        // To avoid rollback the commit offset, keep the larger one.
-        self.committed = cmp::max(self.committed, res);
         self.committed
     }
 }
