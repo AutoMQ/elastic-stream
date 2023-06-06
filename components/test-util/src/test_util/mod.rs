@@ -74,7 +74,7 @@ fn serve_describe_placement_manager_cluster(
     frame: &mut Frame,
     port: u16,
 ) {
-    trace!("Received: {:#?}", request);
+    trace!("Received: {:?}", request);
     let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
     let mut resp = DescribePlacementManagerClusterResponseT::default();
     {

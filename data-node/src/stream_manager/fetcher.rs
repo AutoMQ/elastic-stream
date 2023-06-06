@@ -89,7 +89,7 @@ impl Fetcher {
                 })
                 .inspect(|metadata| {
                     trace!(
-                        "Received stream-metadata={:#?} from placement manager for stream-id={}",
+                        "Received stream-metadata={:?} from placement manager for stream-id={}",
                         metadata,
                         stream_id,
                     );

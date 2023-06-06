@@ -657,7 +657,7 @@ mod tests {
 
     fn create_wal(cfg: &Arc<config::Configuration>) -> Result<Wal, StoreError> {
         let control_ring = io_uring::IoUring::builder().dontfork().build(32).map_err(|e| {
-            error!( "Failed to build I/O Uring instance for write-ahead-log segment file management: {:#?}", e);
+            error!( "Failed to build I/O Uring instance for write-ahead-log segment file management: {:?}", e);
             StoreError::IoUring
         })?;
 

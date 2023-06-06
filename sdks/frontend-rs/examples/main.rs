@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .append(vec_bytes_to_bytes(flat_record_batch_bytes))
                 .await?;
             assert_eq!(i * 10, append_result.base_offset as i32);
-            info!("Append result: {:#?}", append_result);
+            info!("Append result: {:?}", append_result);
         }
 
         info!("Step2: read 10 record batch one by one");
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 record.payload(),
                 Bytes::from(format!("Hello World {i:0>8}!", i = i))
             );
-            info!("Fetch [{start}, {end}) result: {:#?}", record);
+            info!("Fetch [{start}, {end}) result: {:?}", record);
         }
 
         info!("Step3: cross read 10 record batch");
@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Bytes::from(format!("Hello World {i:0>8}!", i = i + j))
                 );
             }
-            info!("Fetch [{start}, {end}) result: {:#?}", records);
+            info!("Fetch [{start}, {end}) result: {:?}", records);
         }
 
         info!("Step4: reopen stream");
@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .append(vec_bytes_to_bytes(flat_record_batch_bytes))
                 .await?;
             assert_eq!(offset * 10, append_result.base_offset as i32);
-            info!("Append result: {:#?}", append_result);
+            info!("Append result: {:?}", append_result);
         }
 
         info!("Step6: read 20 record batch one by one");
@@ -115,7 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 record.payload(),
                 Bytes::from(format!("Hello World {i:0>8}!", i = i))
             );
-            info!("Fetch [{start}, {end}) result: {:#?}", record);
+            info!("Fetch [{start}, {end}) result: {:?}", record);
         }
         info!("All test task success");
 

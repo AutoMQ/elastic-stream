@@ -164,7 +164,7 @@ impl IO {
         indexer: Arc<IndexDriver>,
     ) -> Result<Self, StoreError> {
         let control_ring = io_uring::IoUring::builder().dontfork().build(32).map_err(|e| {
-            error!("Failed to build I/O Uring instance for write-ahead-log segment file management: {:#?}", e);
+            error!("Failed to build I/O Uring instance for write-ahead-log segment file management: {:?}", e);
             StoreError::IoUring
         })?;
 
@@ -176,7 +176,7 @@ impl IO {
             .setup_r_disabled()
             .build(config.store.uring.queue_depth)
             .map_err(|e| {
-                error!("Failed to build polling I/O Uring instance: {:#?}", e);
+                error!("Failed to build polling I/O Uring instance: {:?}", e);
                 StoreError::IoUring
             })?;
 

@@ -58,7 +58,7 @@ impl Stream {
                 return;
             } else {
                 error!(
-                    "Attempting to create inconsistent range. Prior range-metadata={}, attempted range-metadata={:#?}",
+                    "Attempting to create inconsistent range. Prior range-metadata={}, attempted range-metadata={:?}",
                     range.metadata, metadata
                 );
                 return;
@@ -68,7 +68,7 @@ impl Stream {
         if let Some(range) = self.ranges.iter().rev().next() {
             if range.metadata.index() > metadata.index() {
                 warn!(
-                    "Attempting to create a range which should have been sealed: {:#?}. Last range on current node: {:#?}",
+                    "Attempting to create a range which should have been sealed: {:?}. Last range on current node: {:?}",
                     metadata, range.metadata
                 );
             }
@@ -98,7 +98,7 @@ impl Stream {
             .iter()
             .any(|range: &Range| range.metadata.index() == metadata.index());
         if !existed {
-            info!("Range does not exist, metadata={:#?}. Create the sealed range on data-node directly", metadata);
+            info!("Range does not exist, metadata={:?}. Create the sealed range on data-node directly", metadata);
             return Err(ServiceError::NotFound(format!(
                 "Range[stream-id={}, range-index={}] is not found",
                 metadata.stream_id(),

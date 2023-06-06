@@ -404,7 +404,7 @@ impl CompositeSession {
                 }
 
                 error!(
-                    "Failed to create stream from {}. Status: `{:#?}`",
+                    "Failed to create stream from {}. Status: `{:?}`",
                     self.target, response.status
                 );
                 // TODO: refine error handling according to status code
@@ -454,7 +454,7 @@ impl CompositeSession {
 
         if !response.ok() {
             error!(
-                "Failed to describe stream[stream-id={stream_id}] from {}. Status: `{:#?}`",
+                "Failed to describe stream[stream-id={stream_id}] from {}. Status: `{:?}`",
                 self.target, response.status
             );
             // TODO: refine error handling according to status code

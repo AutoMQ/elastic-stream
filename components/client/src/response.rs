@@ -342,7 +342,7 @@ impl Response {
                     }
                     if let Some(stream) = response.stream() {
                         let metadata = Into::<StreamMetadata>::into(stream.unpack());
-                        info!("Created {:#?} on {}", metadata, ctx.target());
+                        info!("Created {:?} on {}", metadata, ctx.target());
                         self.headers = Some(Headers::CreateStream { stream: metadata });
                     } else {
                         // Expected stream metadata is missing

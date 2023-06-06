@@ -253,7 +253,7 @@ impl Session {
             }
             Err(e) => {
                 error!(
-                    "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}", 
+                    "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}",
                     frame.operation_code, self.connection.peer_address(), e
                 );
                 if let Some(ctx) = inflight_requests.remove(&frame.stream_id) {
@@ -299,7 +299,7 @@ impl Session {
             }
             Err(e) => {
                 error!(
-                    "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}", 
+                    "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}",
                     frame.operation_code, self.connection.peer_address(), e
                 );
             }
@@ -314,7 +314,7 @@ impl Session {
         let current = *self.state.borrow();
         if current != state {
             info!(
-                "Node-state of {} is changed: {:#?} --> {:#?}",
+                "Node-state of {} is changed: {:?} --> {:?}",
                 self.target, current, state
             );
             *self.state.borrow_mut() = state;
