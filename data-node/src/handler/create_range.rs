@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{cell::UnsafeCell, rc::Rc};
 
 use bytes::Bytes;
@@ -69,5 +70,11 @@ impl<'a> CreateRange<'a> {
         builder.finish(resp, None);
         let data = builder.finished_data();
         response.header = Some(Bytes::copy_from_slice(data));
+    }
+}
+
+impl<'a> fmt::Display for CreateRange<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.request)
     }
 }

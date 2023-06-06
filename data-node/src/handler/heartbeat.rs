@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, rc::Rc};
+use std::{cell::UnsafeCell, fmt, rc::Rc};
 
 use bytes::Bytes;
 use codec::frame::Frame;
@@ -52,5 +52,11 @@ impl<'a> Heartbeat<'a> {
         response.header = Some(Bytes::copy_from_slice(data));
 
         trace!("Heartbeat response header built");
+    }
+}
+
+impl<'a> fmt::Display for Heartbeat<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.request)
     }
 }

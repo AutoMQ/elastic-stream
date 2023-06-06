@@ -9,7 +9,7 @@ use protocol::rpc::header::{
     ErrorCode, FetchRequest, FetchResponse, FetchResponseArgs, FetchResultEntry,
     FetchResultEntryArgs, Status, StatusArgs,
 };
-use std::{cell::UnsafeCell, pin::Pin, rc::Rc};
+use std::{cell::UnsafeCell, fmt, pin::Pin, rc::Rc};
 use store::{error::FetchError, option::ReadOptions, ElasticStore, FetchResult, Store};
 
 use crate::stream_manager::StreamManager;
@@ -214,5 +214,11 @@ impl<'a> Fetch<'a> {
             FetchError::RangeNotFound => (ErrorCode::RANGE_NOT_FOUND, Some(err.to_string())),
             FetchError::BadRequest => (ErrorCode::BAD_REQUEST, Some(err.to_string())),
         }
+    }
+}
+
+impl<'a> fmt::Display for Fetch<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Fetch[{:?}]", self.fetch_request)
     }
 }
