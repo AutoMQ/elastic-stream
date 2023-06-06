@@ -111,7 +111,7 @@ impl<'a> Append<'a> {
         let futures: Vec<_> = to_store_requests
             .iter()
             .map(|req| {
-                info!("AppendRecordRequest - {}", req);
+                trace!("{}", req);
                 let result = async {
                     if let Some(range) = unsafe { &mut *stream_manager.get() }
                         .get_range(req.stream_id, req.range_index)
