@@ -72,7 +72,7 @@ func (c *RaftCluster) ListRange(ctx context.Context, criteria *rpcfb.ListRangeCr
 func (c *RaftCluster) listRangeOnDataNodeInStream(ctx context.Context, streamID int64, dataNodeID int32) ([]*rpcfb.RangeT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", streamID), zap.Int32("data-node-id", dataNodeID), traceutil.TraceLogField(ctx))
 
-	logger.Info("start to list ranges on data node in stream")
+	logger.Debug("start to list ranges on data node in stream")
 	rangeIDs, err := c.storage.GetRangeIDsByDataNodeAndStream(ctx, streamID, dataNodeID)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (c *RaftCluster) listRangeOnDataNodeInStream(ctx context.Context, streamID 
 		return nil, err
 	}
 
-	logger.Info("finish listing ranges on data node in stream", zap.Int("range-cnt", len(ranges)))
+	logger.Debug("finish listing ranges on data node in stream", zap.Int("range-cnt", len(ranges)))
 	return ranges, nil
 }
 
@@ -91,9 +91,9 @@ func (c *RaftCluster) listRangeOnDataNodeInStream(ctx context.Context, streamID 
 func (c *RaftCluster) listRangeInStream(ctx context.Context, streamID int64) ([]*rpcfb.RangeT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
 
-	logger.Info("start to list ranges in stream")
+	logger.Debug("start to list ranges in stream")
 	ranges, err := c.storage.GetRangesByStream(ctx, streamID)
-	logger.Info("finish listing ranges in stream", zap.Int("range-cnt", len(ranges)), zap.Error(err))
+	logger.Debug("finish listing ranges in stream", zap.Int("range-cnt", len(ranges)), zap.Error(err))
 
 	return ranges, err
 }
@@ -102,7 +102,7 @@ func (c *RaftCluster) listRangeInStream(ctx context.Context, streamID int64) ([]
 func (c *RaftCluster) listRangeOnDataNode(ctx context.Context, dataNodeID int32) ([]*rpcfb.RangeT, error) {
 	logger := c.lg.With(zap.Int32("data-node-id", dataNodeID), traceutil.TraceLogField(ctx))
 
-	logger.Info("start to list ranges on data node")
+	logger.Debug("start to list ranges on data node")
 	rangeIDs, err := c.storage.GetRangeIDsByDataNode(ctx, dataNodeID)
 	if err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func (c *RaftCluster) listRangeOnDataNode(ctx context.Context, dataNodeID int32)
 		return nil, err
 	}
 
-	logger.Info("finish listing ranges on data node", zap.Int("range-cnt", len(ranges)))
+	logger.Debug("finish listing ranges on data node", zap.Int("range-cnt", len(ranges)))
 	return ranges, nil
 }
 

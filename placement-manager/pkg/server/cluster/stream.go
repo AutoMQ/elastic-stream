@@ -98,9 +98,9 @@ func (c *RaftCluster) UpdateStream(ctx context.Context, stream *rpcfb.StreamT) (
 func (c *RaftCluster) DescribeStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
 
-	logger.Info("start to describe stream")
+	logger.Debug("start to describe stream")
 	stream, err := c.storage.GetStream(ctx, streamID)
-	logger.Info("finish describing stream", zap.Error(err))
+	logger.Debug("finish describing stream", zap.Error(err))
 	if err != nil {
 		if errors.Is(err, kv.ErrTxnFailed) {
 			return nil, ErrNotLeader
