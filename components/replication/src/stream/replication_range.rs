@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    rc::{Rc, Weak},
+    rc::{Rc, Weak}, cmp::Ordering,
 };
 
 use crate::ReplicationError;
@@ -65,7 +65,7 @@ impl ReplicationRange {
 
         let (seal_task_tx, _) = broadcast::channel::<Result<u64, ReplicationError>>(1);
 
-        let log_ident = format!("Range[{}#{}]", metadata.stream_id(), metadata.index());
+        let log_ident = format!("Range[{}#{}] ", metadata.stream_id(), metadata.index());
         let mut this = Rc::new(Self {
             log_ident,
             weak_self: Weak::new(),
@@ -171,7 +171,7 @@ impl ReplicationRange {
         let last_offset_delta = record_batch.last_offset_delta() as u32;
         let next_offset = *self.next_offset.borrow();
         if next_offset != base_offset {
-            error!(target: &self.log_ident, "Range append record batch with invalid base offset, expect: {}, actual: {}", next_offset, base_offset);
+            error!("{}Range append record batch with invalid base offset, expect: {}, actual: {}", self.log_ident, next_offset, base_offset);
             panic!("Range append record batch with invalid base offset");
         }
         *self.next_offset.borrow_mut() = context.base_offset + last_offset_delta as u64;
@@ -204,6 +204,7 @@ impl ReplicationRange {
         for replica in (*self.replicators).iter() {
             replica.append(
                 flat_record_batch_bytes.clone(),
+                base_offset,
                 base_offset + last_offset_delta as u64,
             );
         }
@@ -225,7 +226,7 @@ impl ReplicationRange {
         loop {
             // cache hit the fetch range, return data from cache.
             if next_start_offset >= end_offset || next_batch_max_bytes == 0 {
-                trace!(target: &self.log_ident,"Fetch [{}, {}) with batch_max_bytes[{}] fulfilled by cache", start_offset, end_offset, batch_max_bytes);
+                trace!("{}Fetch [{}, {}) with batch_max_bytes[{}] fulfilled by cache", self.log_ident, start_offset, end_offset, batch_max_bytes);
                 return Ok(fetch_data);
             }
             if let Some(cache_data) = self.cache.get(stream_id, range_index, next_start_offset) {
@@ -254,7 +255,7 @@ impl ReplicationRange {
                     return Ok(fetch_data);
                 }
                 Err(e) => {
-                    warn!(target: &self.log_ident, "Fetch [{next_start_offset}, {end_offset}) with batch_max_bytes={next_batch_max_bytes} fail, err: {e}");
+                    warn!("{}Fetch [{next_start_offset}, {end_offset}) with batch_max_bytes={next_batch_max_bytes} fail, err: {e}", self.log_ident);
                     continue;
                 }
             }
@@ -270,19 +271,23 @@ impl ReplicationRange {
         match self.calculate_confirm_offset() {
             Ok(new_confirm_offset) => {
                 let mut confirm_offset = self.confirm_offset.borrow_mut();
-                if new_confirm_offset == *confirm_offset {
-                    return;
-                } else if new_confirm_offset < *confirm_offset {
-                    panic!("Range confirm offset should not decrease, current confirm_offset=[{}], new_confirm_offset=[{}]", *confirm_offset, new_confirm_offset);
-                } else {
-                    *confirm_offset = new_confirm_offset;
+                match new_confirm_offset.cmp(&confirm_offset) {
+                    Ordering::Equal => {
+                        return;
+                    }
+                    Ordering::Less => {
+                        panic!("Range confirm offset should not decrease, current confirm_offset=[{}], new_confirm_offset=[{}]", *confirm_offset, new_confirm_offset);
+                    }
+                    Ordering::Greater => {
+                        *confirm_offset = new_confirm_offset;
+                    }
                 }
                 if let Some(stream) = self.stream.upgrade() {
                     stream.try_ack();
                 }
             }
             Err(err) => {
-                warn!(target: &self.log_ident, "Calculate confirm offset fail, current confirm_offset=[{}], err: {err}", self.confirm_offset());
+                warn!("{}Calculate confirm offset fail, current confirm_offset=[{}], err: {err}", self.log_ident, self.confirm_offset());
                 self.mark_corrupted();
                 if let Some(stream) = self.stream.upgrade() {
                     stream.try_ack();
@@ -299,7 +304,7 @@ impl ReplicationRange {
         if self.is_sealing() {
             // if range is sealing, wait for seal task to complete.
             self.seal_task_tx.subscribe().recv().await.map_err(|_| {
-                error!(target: &self.log_ident, "Seal task channel closed");
+                error!("{}Seal task channel closed", self.log_ident);
                 ReplicationError::Internal
             })?
         } else {
@@ -310,7 +315,7 @@ impl ReplicationRange {
                 // 1. call placement manager to seal range
                 match self.placement_manager_seal(end_offset).await {
                     Ok(_) => {
-                        info!(target: &self.log_ident, "The range is created by current stream, then directly seal with memory confirm_offset=[{}]", end_offset);
+                        info!("{}The range is created by current stream, then directly seal with memory confirm_offset=[{}]", self.log_ident, end_offset);
                         self.mark_sealed();
                         let _ = self.seal_task_tx.send(Ok(end_offset));
                         // 2. spawn task to async seal range replicas
@@ -338,7 +343,7 @@ impl ReplicationRange {
                         Ok(end_offset)
                     }
                     Err(e) => {
-                        error!(target: &self.log_ident, "Request pm seal fail, err: {e}");
+                        error!("{}Request pm seal fail, err: {e}", self.log_ident);
                         self.erase_sealing();
                         Err(ReplicationError::Internal)
                     }
@@ -358,7 +363,7 @@ impl ReplicationRange {
                 {
                     Ok(end_offset) => {
                         // 2. call placement manager to seal range.
-                        info!(target: &self.log_ident, "The range is created by other stream, then seal replicas to calculate end_offset=[{}]", end_offset);
+                        info!("{}The range is created by other stream, then seal replicas to calculate end_offset=[{}]", self.log_ident, end_offset);
                         match self.placement_manager_seal(end_offset).await {
                             Ok(_) => {
                                 self.mark_sealed();
@@ -367,7 +372,7 @@ impl ReplicationRange {
                                 Ok(end_offset)
                             }
                             Err(e) => {
-                                error!(target: &self.log_ident, "Request pm seal fail, err: {e}");
+                                error!("{}Request pm seal fail, err: {e}", self.log_ident);
                                 self.erase_sealing();
                                 Err(ReplicationError::Internal)
                             }
@@ -392,7 +397,7 @@ impl ReplicationRange {
             {
                 Ok(_) => Ok(()),
                 Err(e) => {
-                    error!(target: &self.log_ident, "Request pm seal with end_offset[{end_offset}] fail, err: {e}");
+                    error!("{}Request pm seal with end_offset[{end_offset}] fail, err: {e}", self.log_ident);
                     Err(ReplicationError::Internal)
                 }
             }
@@ -439,7 +444,7 @@ impl ReplicationRange {
             .nth((replica_count - ack_count) as usize)
             .copied()
             .ok_or(ReplicationError::SealReplicaNotEnough);
-        info!(target: log_ident, "Replicas seal with end_offsets={end_offsets:#?} and final end_offset={end_offset:#?}");
+        info!("{}Replicas seal with end_offsets={end_offsets:#?} and final end_offset={end_offset:#?}", log_ident);
         end_offset
     }
 

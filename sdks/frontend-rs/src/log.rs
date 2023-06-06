@@ -16,7 +16,7 @@ use log4rs::{
 pub fn init_log() {
     let console_appender = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
         )))
         .build();
 
@@ -24,15 +24,15 @@ pub fn init_log() {
     let file_size = 1024 * 1024 * 16;
 
     let client_roller = FixedWindowRoller::builder()
-        .build("archive/client.log.{}", 10)
+        .build("logs/archive/client.log.{}", 10)
         .expect("Failed to build fixed window roller for client");
 
     let client_appender = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
         )))
         .build(
-            "log/client.log",
+            "logs/client.log",
             Box::new(CompoundPolicy::new(
                 Box::new(SizeTrigger::new(file_size)),
                 Box::new(client_roller),
@@ -41,15 +41,15 @@ pub fn init_log() {
         .expect("Failed to build rolling file appender for client");
 
     let replication_roller = FixedWindowRoller::builder()
-        .build("archive/replication.log.{}", 10)
+        .build("logs/archive/replication.log.{}", 10)
         .expect("Failed to build fixed window roller for replication");
 
     let replication_appender = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
         )))
         .build(
-            "log/replication.log",
+            "logs/replication.log",
             Box::new(CompoundPolicy::new(
                 Box::new(SizeTrigger::new(file_size)),
                 Box::new(replication_roller),

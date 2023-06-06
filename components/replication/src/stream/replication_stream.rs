@@ -51,7 +51,7 @@ impl ReplicationStream {
         let (append_tasks_tx, append_tasks_rx) = mpsc::channel(1024);
         let (shutdown_signal_tx, shutdown_signal_rx) = broadcast::channel(1);
         let this = Rc::new(Self {
-            log_ident: format!("Stream[{id}]"),
+            log_ident: format!("Stream[{id}] "),
             weak_self: RefCell::new(Weak::new()),
             id,
             epoch,
@@ -85,14 +85,14 @@ impl ReplicationStream {
     }
 
     pub(crate) async fn open(&self) -> Result<(), ReplicationError> {
-        info!(target: &self.log_ident, "Opening...");
+        info!("{}Opening...", self.log_ident);
         let client = self.client.upgrade().ok_or(ReplicationError::Internal)?;
         // 1. load all ranges
         client
             .list_ranges(model::ListRangeCriteria::new(None, Some(self.id as u64)))
             .await
             .map_err(|e| {
-                error!(target: &self.log_ident, "Failed to list ranges from placement-manager: {e}");
+                error!("{}Failed to list ranges from placement-manager: {e}", self.log_ident);
                 ReplicationError::Internal
             })?
             .into_iter()
@@ -125,7 +125,7 @@ impl ReplicationStream {
                     *self.next_offset.borrow_mut() = confirm_offset;
                 }
                 Err(e) => {
-                    error!(target:&self.log_ident, "Failed to seal range[{range_index}], {e}");
+                    error!("{}Failed to seal range[{range_index}], {e}", self.log_ident);
                     return Err(ReplicationError::Internal);
                 }
             }
@@ -133,7 +133,7 @@ impl ReplicationStream {
         let range_count = self.ranges.borrow().len();
         let start_offset = self.start_offset();
         let next_offset = self.next_offset();
-        info!(target: &self.log_ident, "Opened with range_count={range_count} start_offset={start_offset} next_offset={next_offset}");
+        info!("{}Opened with range_count={range_count} start_offset={start_offset} next_offset={next_offset}", self.log_ident);
         Ok(())
     }
 
@@ -142,7 +142,7 @@ impl ReplicationStream {
     /// 2. await append task to stop.
     /// 3. close all ranges.
     pub async fn close(&self) {
-        info!(target: &self.log_ident, "Closing...");
+        info!("{}Closing...", self.log_ident);
         *self.closed.borrow_mut() = true;
         let _ = self.shutdown_signal_tx.send(());
         // TODO: await append task to stop.
@@ -150,7 +150,7 @@ impl ReplicationStream {
         if let Some(range) = last_range {
             let _ = range.seal().await;
         }
-        info!(target: &self.log_ident, "Closed...");
+        info!("{}Closed...", self.log_ident);
     }
 
     pub fn start_offset(&self) -> u64 {
@@ -169,7 +169,7 @@ impl ReplicationStream {
     pub(crate) async fn append(&self, record_batch: RecordBatch) -> Result<u64, ReplicationError> {
         let start_timestamp = Instant::now();
         if *self.closed.borrow() {
-            warn!(target: &self.log_ident, "Keep append to a closed stream.");
+            warn!("{}Keep append to a closed stream.", self.log_ident);
             return Err(ReplicationError::AlreadyClosed);
         }
         let base_offset = *self.next_offset.borrow();
@@ -188,13 +188,13 @@ impl ReplicationStream {
             .await
             .is_err()
         {
-            warn!(target: &self.log_ident, "Send to append request channel fail.");
+            warn!("{}Send to append request channel fail.", self.log_ident);
             return Err(ReplicationError::AlreadyClosed);
         }
         // await append result.
         match append_rx.await {
             Ok(result) => {
-                trace!(target: &self.log_ident, "Append new record with base_offset={base_offset} count={count} cost {}us", start_timestamp.elapsed().as_micros());
+                trace!("{}Append new record with base_offset={base_offset} count={count} cost {}us", self.log_ident, start_timestamp.elapsed().as_micros());
                 result.map(|_| base_offset)
             }
             Err(_) => Err(ReplicationError::AlreadyClosed),
@@ -207,7 +207,7 @@ impl ReplicationStream {
         end_offset: u64,
         batch_max_bytes: u32,
     ) -> Result<Vec<Bytes>, ReplicationError> {
-        trace!(target: &self.log_ident, "Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes}");
+        trace!("{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes}", self.log_ident);
         if start_offset == end_offset {
             return Ok(Vec::new());
         }
@@ -278,7 +278,7 @@ impl ReplicationStream {
                 self.client.clone(),
                 self.cache.clone(),
             );
-            info!(target: &self.log_ident, "Create new range: {:?}", range.metadata());
+            info!("{}Create new range: {:?}", range.metadata(), self.log_ident);
             self.ranges.borrow_mut().insert(start_offset, range.clone());
             *self.last_range.borrow_mut() = Some(range);
             Ok(())
@@ -322,7 +322,7 @@ impl ReplicationStream {
                 }
                 _ = shutdown_signal_rx.recv() => {
                     let inflight_count = inflight.len();
-                    info!(target: log_ident, "Receive shutdown signal, then quick fail {inflight_count} inflight requests with AlreadyClosed err.");
+                    info!("{}Receive shutdown signal, then quick fail {inflight_count} inflight requests with AlreadyClosed err.", log_ident);
                     for (_, append_request) in inflight.iter() {
                         append_request.fail(ReplicationError::AlreadyClosed);
                     }
@@ -331,7 +331,7 @@ impl ReplicationStream {
             }
             if *closed.borrow() {
                 let inflight_count = inflight.len();
-                info!(target: log_ident, "Detect closed mark, then quick fail {inflight_count} inflight requests with AlreadyClosed err.");
+                info!("{}Detect closed mark, then quick fail {inflight_count} inflight requests with AlreadyClosed err.", log_ident);
                 for (_, append_request) in inflight.iter() {
                     append_request.fail(ReplicationError::AlreadyClosed);
                 }
@@ -344,16 +344,16 @@ impl ReplicationStream {
                 Some(last_range) => {
                     let range_index = last_range.metadata().index();
                     if !last_range.is_writable() {
-                        info!(target: log_ident, "The last range[{range_index}] is not writable, try create a new range.");
+                        info!("{}The last range[{range_index}] is not writable, try create a new range.", log_ident);
                         // if last range is not writable, try to seal it and create a new range and retry append in next round.
                         match last_range.seal().await {
                             Ok(end_offset) => {
-                                info!(target: log_ident, "Seal not writable last range[{range_index}] with end_offset={end_offset}.");
+                                info!("{}Seal not writable last range[{range_index}] with end_offset={end_offset}.", log_ident);
                                 // rewind back next append start offset and try append to new writable range in next round.
                                 next_append_start_offset = end_offset;
                                 if let Err(e) = stream.new_range(range_index + 1, end_offset).await
                                 {
-                                    error!(target: log_ident, "Try create a new range fail, retry later, err[{e}]");
+                                    error!("{}Try create a new range fail, retry later, err[{e}]", log_ident);
                                     // delay retry to avoid busy loop
                                     sleep(Duration::from_millis(1000)).await;
                                 }
@@ -369,9 +369,9 @@ impl ReplicationStream {
                     last_range
                 }
                 None => {
-                    info!(target: log_ident, "The stream don't have any range, then try new a range.");
+                    info!("{}The stream don't have any range, then try new a range.", log_ident);
                     if let Err(e) = stream.new_range(0, 0).await {
-                        error!(target: log_ident, "New a range from absent fail, retry later, err[{e}]");
+                        error!("{}New a range from absent fail, retry later, err[{e}]", log_ident);
                         // delay retry to avoid busy loop
                         sleep(Duration::from_millis(1000)).await;
                     }
@@ -389,7 +389,7 @@ impl ReplicationStream {
                         // if base offset is less than confirm offset, it means append request is already success.
                         append_request.success();
                         ack_count += 1;
-                        trace!(target: log_ident, "Ack append request with base_offset={base_offset}, confirm_offset={confirm_offset}");
+                        trace!("{}Ack append request with base_offset={base_offset}, confirm_offset={confirm_offset}", log_ident);
                     }
                 }
                 for _ in 0..ack_count {
@@ -403,7 +403,7 @@ impl ReplicationStream {
                         &append_request.record_batch,
                         RangeAppendContext::new(*base_offset),
                     );
-                    trace!(target: log_ident, "Try append record[{base_offset}] to range[{range_index}]");
+                    trace!("{}Try append record[{base_offset}] to range[{range_index}]", log_ident);
                     next_append_start_offset = base_offset + append_request.count() as u64;
                     cursor.move_next();
                 }
