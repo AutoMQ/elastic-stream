@@ -10,12 +10,20 @@ use protocol::rpc::header::{
     HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT,
     ReportMetricsRequestT, SealKind, SealRangeRequestT,
 };
+use std::fmt;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct Request {
     pub timeout: Duration,
     pub headers: Headers,
+    pub body: Option<Vec<Bytes>>,
+}
+
+impl fmt::Display for Request {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.headers)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -55,9 +63,7 @@ pub enum Headers {
         range: RangeMetadata,
     },
 
-    Append {
-        buf: Vec<Bytes>,
-    },
+    Append,
 
     Fetch {
         entries: Vec<FetchRequestEntry>,
@@ -180,7 +186,7 @@ impl From<&Request> for Bytes {
                 builder.finish(request, None);
             }
 
-            Headers::Append { buf: _ } => {
+            Headers::Append => {
                 let mut request = AppendRequestT::default();
                 request.timeout_ms = req.timeout.as_millis() as i32;
                 let request = request.pack(&mut builder);

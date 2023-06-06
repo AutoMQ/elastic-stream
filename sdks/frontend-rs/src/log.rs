@@ -16,7 +16,7 @@ use log4rs::{
 pub fn init_log() {
     let console_appender = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}",
         )))
         .build();
 
@@ -29,7 +29,7 @@ pub fn init_log() {
 
     let client_appender = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}",
         )))
         .build(
             "log/client.log",
@@ -46,7 +46,7 @@ pub fn init_log() {
 
     let replication_appender = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}",
         )))
         .build(
             "log/replication.log",
@@ -76,7 +76,7 @@ pub fn init_log() {
         .build(
             Root::builder()
                 .appender("stdout")
-                .build(log::LevelFilter::Warn),
+                .build(log::LevelFilter::Trace),
         )
         .expect("Failed to build log4rs config");
 

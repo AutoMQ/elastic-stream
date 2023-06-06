@@ -179,7 +179,7 @@ impl Session {
         request: request::Request,
         response_observer: oneshot::Sender<response::Response>,
     ) -> Result<(), InvocationContext> {
-        trace!("Sending {:#?} to {:?}", request, self.target);
+        trace!("Sending {} to {}", request, self.target);
 
         // Update last read/write instant.
         *self.idle_since.borrow_mut() = Instant::now();
@@ -222,9 +222,8 @@ impl Session {
                 frame.operation_code = OperationCode::SealRange;
             }
 
-            request::Headers::Append { buf, .. } => {
+            request::Headers::Append => {
                 frame.operation_code = OperationCode::Append;
-                frame.payload = Some(buf.clone());
             }
 
             request::Headers::Fetch { .. } => {
@@ -236,8 +235,10 @@ impl Session {
             }
         };
 
+        frame.payload = request.body.clone();
+
         let inflight_requests = unsafe { &mut *self.inflight_requests.get() };
-        let context = InvocationContext::new(self.target, request, response_observer);
+        let context = InvocationContext::new(self.target, request.clone(), response_observer);
         inflight_requests.insert(frame.stream_id, context);
 
         // Write frame to network
@@ -281,6 +282,7 @@ impl Session {
                 },
                 role,
             },
+            body: None
         };
 
         let mut frame = Frame::new(OperationCode::Heartbeat);
