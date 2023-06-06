@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::UnsafeCell, rc::Rc};
 
 use codec::frame::{Frame, OperationCode};
 use log::error;
@@ -97,7 +97,7 @@ impl<'a> Command<'a> {
     pub(crate) async fn apply(
         &self,
         store: Rc<ElasticStore>,
-        stream_manager: Rc<RefCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager>>,
         response: &mut Frame,
     ) {
         match self {

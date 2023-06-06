@@ -1,7 +1,5 @@
 use bytes::Bytes;
-use jni::objects::{
-    AsJArrayRaw, GlobalRef, JByteArray, JClass, JMethodID, JObject, JString, JValue, JValueGen,
-};
+use jni::objects::{GlobalRef, JClass, JMethodID, JObject, JString, JValue, JValueGen};
 use jni::sys::{jint, jlong, JNINativeInterface_, JNI_VERSION_1_8};
 use jni::{JNIEnv, JavaVM};
 use log::{error, info, trace};

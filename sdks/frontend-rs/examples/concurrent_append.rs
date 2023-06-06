@@ -49,8 +49,8 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
                 stream.append(vec_bytes_to_bytes(flat_record_batch_bytes))
             })
             .collect::<Vec<_>>();
-            futures::future::join_all(futures).await;
-            println!("It works");
+        futures::future::join_all(futures).await;
+        println!("It works");
         Ok(())
     })
 }

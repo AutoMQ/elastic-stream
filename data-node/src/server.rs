@@ -5,7 +5,7 @@ use crate::{
 };
 use config::Configuration;
 use log::{error, info, warn};
-use std::{cell::RefCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
+use std::{cell::UnsafeCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
 use store::ElasticStore;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -71,8 +71,10 @@ pub fn launch(
                     ));
 
                     let fetcher = Fetcher::Channel { sender: tx };
-                    let stream_manager =
-                        Rc::new(RefCell::new(StreamManager::new(fetcher, Rc::clone(&store))));
+                    let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(
+                        fetcher,
+                        Rc::clone(&store),
+                    )));
                     let mut worker =
                         Worker::new(worker_config, store, stream_manager, client, None);
                     worker.serve(shutdown_tx)
@@ -107,8 +109,10 @@ pub fn launch(
                 };
                 let store = Rc::new(store);
 
-                let stream_manager =
-                    Rc::new(RefCell::new(StreamManager::new(fetcher, Rc::clone(&store))));
+                let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(
+                    fetcher,
+                    Rc::clone(&store),
+                )));
 
                 let mut worker =
                     Worker::new(worker_config, store, stream_manager, client, Some(channels));

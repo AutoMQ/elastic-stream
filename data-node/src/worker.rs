@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell,
+    cell::{RefCell, UnsafeCell},
     error::Error,
     rc::Rc,
     sync::Arc,
@@ -34,7 +34,7 @@ use util::metrics::http_serve;
 pub(crate) struct Worker {
     config: WorkerConfig,
     store: Rc<ElasticStore>,
-    stream_manager: Rc<RefCell<StreamManager>>,
+    stream_manager: Rc<UnsafeCell<StreamManager>>,
     client: Rc<Client>,
     channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
 }
@@ -43,7 +43,7 @@ impl Worker {
     pub fn new(
         config: WorkerConfig,
         store: Rc<ElasticStore>,
-        stream_manager: Rc<RefCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager>>,
         client: Rc<Client>,
         channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
     ) -> Self {
@@ -92,8 +92,7 @@ impl Worker {
                         }
                     };
 
-                self.stream_manager
-                    .borrow_mut()
+                unsafe { &mut *self.stream_manager.get() }
                     .start()
                     .await
                     .expect("Failed to bootstrap stream ranges from placement managers");
