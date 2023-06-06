@@ -289,7 +289,7 @@ impl<'a> fmt::Display for Append<'a> {
                 result.and_then(|_| {
                     write!(
                         f,
-                        "AppendEntry: stream-id={}, range-index={}, offset={}, len={}\n",
+                        "AppendEntry: stream-id={}, range-index={}, offset={}, len={}",
                         entry.stream_id, entry.index, entry.offset, entry.len
                     )
                 })
