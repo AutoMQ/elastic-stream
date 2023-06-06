@@ -42,7 +42,7 @@ tokio-util = "0.7"
 crossbeam = "0.8"
 num_cpus = "1"
 thiserror = "1.0"
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.0", features = ["derive", "env"] }
 num_enum = "0.5"
 
 flatbuffers = { git = "https://github.com/google/flatbuffers.git", tag = "v23.3.3" }

@@ -7,11 +7,11 @@ use std::{fs::File, path::Path};
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     /// Path to the configuration file in YAML format.
-    #[arg(short, long)]
+    #[arg(short, long, env="DATA_NODE_CONFIG")]
     config: String,
 
     /// Path to the log4rs configuration file in YAML format.
-    #[arg(short, long)]
+    #[arg(short, long, env="DATA_NODE_LOG_CONFIG")]
     log: String,
 }
 
