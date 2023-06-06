@@ -389,8 +389,8 @@ impl ReplicationStream {
                         // if base offset is less than confirm offset, it means append request is already success.
                         append_request.success();
                         ack_count += 1;
+                        trace!(target: log_ident, "Ack append request with base_offset={base_offset}, confirm_offset={confirm_offset}");
                     }
-                    trace!(target: log_ident, "Ack append request with base_offset={base_offset}, confirm_offset={confirm_offset}");
                 }
                 for _ in 0..ack_count {
                     inflight.pop_first();

@@ -115,7 +115,10 @@ impl Replicator {
                             sleep(Duration::from_millis(10)).await;
                             continue;
                         }
-                        *offset.borrow_mut() = last_offset;
+                        let mut confirm_offset = offset.borrow_mut();
+                        if *confirm_offset < last_offset {
+                            *confirm_offset = last_offset;
+                        }
                         break;
                     }
                     Err(e) => {
