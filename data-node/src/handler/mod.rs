@@ -65,7 +65,7 @@ impl ServerCall {
             Ok(cmd) => {
                 // Log the `cmd` object.
                 trace!(
-                    "Command of frame[stream-id={}]: {:?}",
+                    "Command of frame[stream-id={}]: {}",
                     self.request.stream_id,
                     cmd
                 );

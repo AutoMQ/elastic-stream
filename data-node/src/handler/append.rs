@@ -3,13 +3,13 @@ use codec::frame::Frame;
 
 use chrono::prelude::*;
 use flatbuffers::FlatBufferBuilder;
-use futures::future::{self, join_all};
+use futures::future::join_all;
 use log::{error, info, trace, warn};
 use model::payload::Payload;
 use protocol::rpc::header::{
     AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
 };
-use std::{cell::UnsafeCell, rc::Rc};
+use std::{cell::UnsafeCell, fmt, rc::Rc};
 use store::{
     error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, ElasticStore,
     Store,
@@ -127,7 +127,7 @@ impl<'a> Append<'a> {
                         .get_range(req.stream_id, req.range_index)
                     {
                         info!(
-                            "check barrier {:?} record_offset={} record_count={}",
+                            "check barrier {} record_offset={} record_count={}",
                             range, req.offset, req.len
                         );
                         if let Some(window) = range.window_mut() {
@@ -287,6 +287,27 @@ impl From<ServiceError> for AppendError {
             ServiceError::OffsetInFlight => AppendError::Inflight,
             ServiceError::OffsetOutOfOrder => AppendError::OutOfOrder,
             _ => AppendError::Internal,
+        }
+    }
+}
+
+impl<'a> fmt::Display for Append<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match Payload::parse_append_entries(&self.payload) {
+            Err(e) => write!(
+                f,
+                "Failed to decode append entries from payload. Cause: {:?}",
+                e
+            ),
+            Ok(entries) => entries.iter().fold(Ok(()), |result, entry| {
+                result.and_then(|_| {
+                    write!(
+                        f,
+                        "AppendEntry: stream-id={}, range-index={}, offset={}, len={}\n",
+                        entry.stream_id, entry.index, entry.offset, entry.len
+                    )
+                })
+            }),
         }
     }
 }

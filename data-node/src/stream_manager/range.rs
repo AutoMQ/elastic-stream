@@ -1,3 +1,5 @@
+use std::fmt;
+
 use log::{trace, warn};
 use model::range::RangeMetadata;
 
@@ -87,6 +89,21 @@ impl Range {
 
     pub(crate) fn window_mut(&mut self) -> Option<&mut Window> {
         self.window.as_mut()
+    }
+}
+
+impl fmt::Display for Range {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Range[stream-id={}, range-index={}], committed={:?}, next={}",
+            self.metadata.stream_id(),
+            self.metadata.index(),
+            self.window
+                .as_ref()
+                .map_or(self.committed.unwrap_or(0), |win| { win.committed() }),
+            self.window.as_ref().map_or(0, |window| window.next())
+        )
     }
 }
 

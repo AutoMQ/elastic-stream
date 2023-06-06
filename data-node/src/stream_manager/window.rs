@@ -46,6 +46,10 @@ impl Window {
         self.next
     }
 
+    pub(crate) fn committed(&self) -> u64 {
+        self.committed
+    }
+
     pub(crate) fn reset(&mut self, offset: u64) {
         self.next = offset;
         self.committed = offset;
