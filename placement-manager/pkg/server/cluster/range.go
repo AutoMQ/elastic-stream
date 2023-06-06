@@ -162,6 +162,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 	select {
 	case mu <- struct{}{}:
 	case <-ctx.Done():
+		logger.Warn("timeout to acquire stream lock")
 		return nil, ctx.Err()
 	}
 	defer func() {
@@ -222,6 +223,7 @@ func (c *RaftCluster) CreateRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.
 	select {
 	case mu <- struct{}{}:
 	case <-ctx.Done():
+		logger.Warn("timeout to acquire stream lock")
 		return nil, ctx.Err()
 	}
 	defer func() {
