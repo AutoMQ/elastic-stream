@@ -268,11 +268,14 @@ impl ReplicationRange {
             return;
         }
         match self.calculate_confirm_offset() {
-            Ok(confirm_offset) => {
-                if confirm_offset == *self.confirm_offset.borrow() {
+            Ok(new_confirm_offset) => {
+                let mut confirm_offset = self.confirm_offset.borrow_mut();
+                if new_confirm_offset == *confirm_offset {
                     return;
+                } else if new_confirm_offset < *confirm_offset {
+                    panic!("Range confirm offset should not decrease, current confirm_offset=[{}], new_confirm_offset=[{}]", *confirm_offset, new_confirm_offset);
                 } else {
-                    *(self.confirm_offset.borrow_mut()) = confirm_offset;
+                    *confirm_offset = new_confirm_offset;
                 }
                 if let Some(stream) = self.stream.upgrade() {
                     stream.try_ack();
