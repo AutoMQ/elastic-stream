@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
-    rc::{Rc, Weak}, cmp::Ordering,
+    cmp::Ordering,
+    rc::{Rc, Weak},
 };
 
 use crate::ReplicationError;
@@ -171,7 +172,10 @@ impl ReplicationRange {
         let last_offset_delta = record_batch.last_offset_delta() as u32;
         let next_offset = *self.next_offset.borrow();
         if next_offset != base_offset {
-            error!("{}Range append record batch with invalid base offset, expect: {}, actual: {}", self.log_ident, next_offset, base_offset);
+            error!(
+                "{}Range append record batch with invalid base offset, expect: {}, actual: {}",
+                self.log_ident, next_offset, base_offset
+            );
             panic!("Range append record batch with invalid base offset");
         }
         *self.next_offset.borrow_mut() = context.base_offset + last_offset_delta as u64;
@@ -226,7 +230,13 @@ impl ReplicationRange {
         loop {
             // cache hit the fetch range, return data from cache.
             if next_start_offset >= end_offset || next_batch_max_bytes == 0 {
-                trace!("{}Fetch [{}, {}) with batch_max_bytes[{}] fulfilled by cache", self.log_ident, start_offset, end_offset, batch_max_bytes);
+                trace!(
+                    "{}Fetch [{}, {}) with batch_max_bytes[{}] fulfilled by cache",
+                    self.log_ident,
+                    start_offset,
+                    end_offset,
+                    batch_max_bytes
+                );
                 return Ok(fetch_data);
             }
             if let Some(cache_data) = self.cache.get(stream_id, range_index, next_start_offset) {
@@ -287,7 +297,11 @@ impl ReplicationRange {
                 }
             }
             Err(err) => {
-                warn!("{}Calculate confirm offset fail, current confirm_offset=[{}], err: {err}", self.log_ident, self.confirm_offset());
+                warn!(
+                    "{}Calculate confirm offset fail, current confirm_offset=[{}], err: {err}",
+                    self.log_ident,
+                    self.confirm_offset()
+                );
                 self.mark_corrupted();
                 if let Some(stream) = self.stream.upgrade() {
                     stream.try_ack();
@@ -397,7 +411,10 @@ impl ReplicationRange {
             {
                 Ok(_) => Ok(()),
                 Err(e) => {
-                    error!("{}Request pm seal with end_offset[{end_offset}] fail, err: {e}", self.log_ident);
+                    error!(
+                        "{}Request pm seal with end_offset[{end_offset}] fail, err: {e}",
+                        self.log_ident
+                    );
                     Err(ReplicationError::Internal)
                 }
             }

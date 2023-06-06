@@ -92,7 +92,10 @@ impl ReplicationStream {
             .list_ranges(model::ListRangeCriteria::new(None, Some(self.id as u64)))
             .await
             .map_err(|e| {
-                error!("{}Failed to list ranges from placement-manager: {e}", self.log_ident);
+                error!(
+                    "{}Failed to list ranges from placement-manager: {e}",
+                    self.log_ident
+                );
                 ReplicationError::Internal
             })?
             .into_iter()
@@ -194,7 +197,11 @@ impl ReplicationStream {
         // await append result.
         match append_rx.await {
             Ok(result) => {
-                trace!("{}Append new record with base_offset={base_offset} count={count} cost {}us", self.log_ident, start_timestamp.elapsed().as_micros());
+                trace!(
+                    "{}Append new record with base_offset={base_offset} count={count} cost {}us",
+                    self.log_ident,
+                    start_timestamp.elapsed().as_micros()
+                );
                 result.map(|_| base_offset)
             }
             Err(_) => Err(ReplicationError::AlreadyClosed),
@@ -207,7 +214,10 @@ impl ReplicationStream {
         end_offset: u64,
         batch_max_bytes: u32,
     ) -> Result<Vec<Bytes>, ReplicationError> {
-        trace!("{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes}", self.log_ident);
+        trace!(
+            "{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes}",
+            self.log_ident
+        );
         if start_offset == end_offset {
             return Ok(Vec::new());
         }
@@ -353,7 +363,10 @@ impl ReplicationStream {
                                 next_append_start_offset = end_offset;
                                 if let Err(e) = stream.new_range(range_index + 1, end_offset).await
                                 {
-                                    error!("{}Try create a new range fail, retry later, err[{e}]", log_ident);
+                                    error!(
+                                        "{}Try create a new range fail, retry later, err[{e}]",
+                                        log_ident
+                                    );
                                     // delay retry to avoid busy loop
                                     sleep(Duration::from_millis(1000)).await;
                                 }
@@ -369,9 +382,15 @@ impl ReplicationStream {
                     last_range
                 }
                 None => {
-                    info!("{}The stream don't have any range, then try new a range.", log_ident);
+                    info!(
+                        "{}The stream don't have any range, then try new a range.",
+                        log_ident
+                    );
                     if let Err(e) = stream.new_range(0, 0).await {
-                        error!("{}New a range from absent fail, retry later, err[{e}]", log_ident);
+                        error!(
+                            "{}New a range from absent fail, retry later, err[{e}]",
+                            log_ident
+                        );
                         // delay retry to avoid busy loop
                         sleep(Duration::from_millis(1000)).await;
                     }
@@ -403,7 +422,10 @@ impl ReplicationStream {
                         &append_request.record_batch,
                         RangeAppendContext::new(*base_offset),
                     );
-                    trace!("{}Try append record[{base_offset}] to range[{range_index}]", log_ident);
+                    trace!(
+                        "{}Try append record[{base_offset}] to range[{range_index}]",
+                        log_ident
+                    );
                     next_append_start_offset = base_offset + append_request.count() as u64;
                     cursor.move_next();
                 }

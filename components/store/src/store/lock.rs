@@ -7,7 +7,7 @@ use std::{
 use crate::error::StoreError;
 use byteorder::{BigEndian, ReadBytesExt};
 use client::IdGenerator;
-use log::{error, info};
+use log::{error, info, warn};
 use nix::fcntl::{flock, FlockArg};
 
 pub(crate) struct Lock {
@@ -25,9 +25,35 @@ impl Lock {
         let (fd, id) = if lock_file_path.as_path().exists() {
             let mut file = OpenOptions::new()
                 .read(true)
+                .write(true)
                 .open(lock_file_path.as_path())?;
-            let id = file.read_i32::<BigEndian>()?;
-            (file.into_raw_fd(), id)
+            match file.metadata() {
+                Ok(metadata) => {
+                    if metadata.len() >= 4 {
+                        let id = file.read_i32::<BigEndian>()?;
+                        (file.into_raw_fd(), id)
+                    } else {
+                        warn!(
+                            "LOCK file has only {} bytes. Generate a new data-node ID from PM now",
+                            metadata.len()
+                        );
+                        let id: i32 = match id_generator.generate() {
+                            Ok(id) => id,
+                            Err(_e) => {
+                                error!("Failed to acquire data-node ID from placement-manager");
+                                return Err(StoreError::Configuration(String::from(
+                                    "Failed to acquire data-node ID",
+                                )));
+                            }
+                        };
+                        file.write_all(&id.to_be_bytes())?;
+                        file.sync_all()?;
+                        info!("data-node ID is: {id}");
+                        (file.into_raw_fd(), id)
+                    }
+                }
+                Err(e) => return Err(StoreError::IO(e)),
+            }
         } else {
             let mut file = OpenOptions::new()
                 .create(true)
@@ -38,6 +64,7 @@ impl Lock {
             let id: i32 = match id_generator.generate() {
                 Ok(id) => id,
                 Err(_e) => {
+                    error!("Failed to acquire data-node ID from placement-manager");
                     return Err(StoreError::Configuration(String::from(
                         "Failed to acquire data-node ID",
                     )));
@@ -45,11 +72,12 @@ impl Lock {
             };
             file.write_all(&id.to_be_bytes())?;
             file.sync_all()?;
+            info!("data-node ID is: {id}");
             (file.into_raw_fd(), id)
         };
 
         info!(
-            "Acquiring store lock: {:?}, id={}",
+            "Acquiring store lock: {:?}, data-node ID={}",
             lock_file_path.as_path(),
             id
         );
@@ -59,7 +87,7 @@ impl Lock {
             StoreError::AcquireLock
         })?;
 
-        info!("Store lock acquired. ID={}", id);
+        info!("Store lock acquired. data-node ID={}", id);
 
         Ok(Self { fd, id })
     }

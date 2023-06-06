@@ -55,7 +55,12 @@ impl Replicator {
         *self.confirm_offset.borrow()
     }
 
-    pub(crate) fn append(&self, flat_record_batch_bytes: Vec<Bytes>, base_offset: u64, last_offset: u64) {
+    pub(crate) fn append(
+        &self,
+        flat_record_batch_bytes: Vec<Bytes>,
+        base_offset: u64,
+        last_offset: u64,
+    ) {
         let client = if let Some(range) = self.range.upgrade() {
             if let Some(client) = range.client() {
                 client
@@ -64,7 +69,10 @@ impl Replicator {
                 return;
             }
         } else {
-            warn!("{}ReplicationRange was dropped, aborting replication", self.log_ident);
+            warn!(
+                "{}ReplicationRange was dropped, aborting replication",
+                self.log_ident
+            );
             return;
         };
         let offset = Rc::clone(&self.confirm_offset);
@@ -165,7 +173,10 @@ impl Replicator {
                     Ok(result) => {
                         let status = result.status;
                         if status.code != ErrorCode::OK {
-                            warn!("{}Failed to fetch entries: status {:?}", self.log_ident, status);
+                            warn!(
+                                "{}Failed to fetch entries: status {:?}",
+                                self.log_ident, status
+                            );
                             Err(ReplicationError::Internal)
                         } else {
                             Ok(result.data.unwrap_or_default())
@@ -178,7 +189,10 @@ impl Replicator {
                 Err(ReplicationError::Internal)
             }
         } else {
-            warn!("{}ReplicationRange was dropped, aborting fetch", self.log_ident);
+            warn!(
+                "{}ReplicationRange was dropped, aborting fetch",
+                self.log_ident
+            );
             Err(ReplicationError::Internal)
         }
     }
@@ -203,7 +217,10 @@ impl Replicator {
                 {
                     Ok(metadata) => {
                         let end_offset = metadata.end().ok_or(ReplicationError::Internal)?;
-                        warn!("{}Seal replica success with end_offset {end_offset}", self.log_ident);
+                        warn!(
+                            "{}Seal replica success with end_offset {end_offset}",
+                            self.log_ident
+                        );
                         *self.confirm_offset.borrow_mut() = end_offset;
                         Ok(end_offset)
                     }
