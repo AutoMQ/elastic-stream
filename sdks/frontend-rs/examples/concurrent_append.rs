@@ -1,25 +1,12 @@
 use bytes::{Bytes, BytesMut};
 use frontend::{Frontend, StreamOptions};
-use log::{info, LevelFilter};
+use log::info;
 use model::{record::flat_record::FlatRecordBatch, RecordBatch};
-use std::{error::Error, io::Write};
+use std::error::Error;
 use tokio::time::Duration;
 
 fn main() -> Result<(), Box<dyn Error + 'static>> {
-    env_logger::Builder::new()
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "{}:{} {} [{}] - {}",
-                record.file().unwrap_or("unknown"),
-                record.line().unwrap_or(0),
-                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
-                record.level(),
-                record.args()
-            )
-        })
-        .filter_level(LevelFilter::Trace)
-        .init();
+    frontend::init_log();
     tokio_uring::start(async {
         let frontend = Frontend::new("127.0.0.1:12378")?;
         let stream_id = frontend

@@ -1,5 +1,5 @@
 use log::{error, warn};
-use std::{cmp, collections::BTreeMap};
+use std::collections::BTreeMap;
 
 use model::Batch;
 
@@ -122,7 +122,7 @@ impl Window {
             offset,
             self.committed);
 
-        // The submitted map should not be empty.    
+        // The submitted map should not be empty.
         debug_assert!(
             !self.submitted.is_empty(),
             "Must check-barrier prior to commit"
@@ -134,7 +134,7 @@ impl Window {
                 "Unexpected commit call, the offset should be the first key of the submitted map, offset: {}, first_key: {}",
                 offset,
                 first_key);
-            
+
             self.committed = offset + len as u64;
         }
 
