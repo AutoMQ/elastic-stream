@@ -10,7 +10,9 @@ codec = { path = "../codec" }
 bytes = { workspace = true }
 log = { workspace = true }
 tokio-uring = { workspace = true }
+local-sync = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true}
 cargo-llvm-cov = { workspace = true }
+test-util = { path = "../test-util" }
