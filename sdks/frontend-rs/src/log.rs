@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use log4rs::{
     append::{
         console::ConsoleAppender,
@@ -57,6 +59,9 @@ pub fn init_log() {
         )
         .expect("Failed to build rolling file appender for replication");
 
+    let level = log::LevelFilter::from_str(&std::env::var("ES_SDK_LOG").unwrap_or_default())
+        .unwrap_or_else(|_| log::LevelFilter::Warn);
+
     let config = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(console_appender)))
         .appender(Appender::builder().build("client", Box::new(client_appender)))
@@ -65,37 +70,33 @@ pub fn init_log() {
             Logger::builder()
                 .appender("client")
                 .additive(false)
-                .build("client", log::LevelFilter::Trace),
+                .build("client", level),
         )
         .logger(
             Logger::builder()
                 .appender("client")
                 .additive(false)
-                .build("codec", log::LevelFilter::Trace),
+                .build("codec", level),
         )
         .logger(
             Logger::builder()
                 .appender("client")
                 .additive(false)
-                .build("transport", log::LevelFilter::Trace),
+                .build("transport", level),
         )
         .logger(
             Logger::builder()
                 .appender("replication")
                 .additive(false)
-                .build("replication", log::LevelFilter::Trace),
+                .build("replication", level),
         )
         .logger(
             Logger::builder()
                 .appender("replication")
                 .additive(false)
-                .build("frontend", log::LevelFilter::Trace),
+                .build("frontend", level),
         )
-        .build(
-            Root::builder()
-                .appender("stdout")
-                .build(log::LevelFilter::Info),
-        )
+        .build(Root::builder().appender("stdout").build(level))
         .expect("Failed to build log4rs config");
 
     log4rs::init_config(config).expect("Failed to init log4rs config");
