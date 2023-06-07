@@ -24,7 +24,7 @@ impl Range {
             window: if metadata.is_sealed() {
                 None
             } else {
-                Some(Window::new(log_ident.clone(), metadata.start()))
+                Some(Window::new(log_ident, metadata.start()))
             },
             metadata,
             committed: None,
@@ -72,9 +72,10 @@ impl Range {
 
     pub(crate) fn seal(&mut self, metadata: &mut RangeMetadata) {
         let end = self.committed.unwrap_or(self.metadata.start());
-        metadata
-            .end()
-            .map(|end_offset| self.metadata.set_end(end_offset));
+        if let Some(end_offset) = metadata.end() {
+            self.metadata.set_end(end_offset)
+        };
+
         metadata.set_end(end);
 
         // Drop window once the range is sealed.

@@ -7,7 +7,7 @@ use log::{error, info};
 use model::range::RangeMetadata;
 use store::{ElasticStore, Store};
 
-use crate::error::{self, ServiceError};
+use crate::error::ServiceError;
 
 use super::{fetcher::Fetcher, range::Range, stream::Stream};
 

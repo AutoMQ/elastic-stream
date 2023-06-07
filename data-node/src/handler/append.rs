@@ -87,7 +87,7 @@ impl Append {
                         .get_range(req.stream_id, req.range_index)
                     {
                         if let Some(window) = range.window_mut() {
-                            let _ = window.check_barrier(req)?;
+                            window.check_barrier(req)?;
                         } else {
                             warn!(
                                 "try append to sealed range[{}#{}]",
