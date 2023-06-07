@@ -130,28 +130,32 @@ impl Session {
             let peer_address = channel.peer_address().to_owned();
             loop {
                 match rx.recv().await {
-                    Some(frame) => match channel.write_frame(&frame).await {
-                        Ok(_) => {
-                            // Update last write instant
-                            idle_handler.on_write();
-                            trace!(
-                                "Response frame[stream-id={}, opcode={}] written to {}",
-                                frame.stream_id,
-                                frame.operation_code,
-                                peer_address
-                            );
-                        }
-                        Err(e) => {
-                            warn!(
+                    Some(frame) => {
+                        let stream_id = frame.stream_id;
+                        let opcode = frame.operation_code;
+                        match channel.write_frame(frame).await {
+                            Ok(_) => {
+                                // Update last write instant
+                                idle_handler.on_write();
+                                trace!(
+                                    "Response frame[stream-id={}, opcode={}] written to {}",
+                                    stream_id,
+                                    opcode,
+                                    peer_address
+                                );
+                            }
+                            Err(e) => {
+                                warn!(
                                 "Failed to write response frame[stream-id={}, opcode={}] to {}. Cause: {:?}",
-                                frame.stream_id,
-                                frame.operation_code,
+                                stream_id,
+                                opcode,
                                 peer_address,
                                 e
                             );
-                            break;
+                                break;
+                            }
                         }
-                    },
+                    }
                     None => {
                         info!(
                             "Channel to receive responses from handlers has been closed. Peer[address={}] should have already closed the read-half of the connection",

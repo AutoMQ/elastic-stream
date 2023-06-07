@@ -21,7 +21,6 @@ mod tests {
     #[test]
     fn test_mpsc() -> Result<(), Box<dyn Error>> {
         tokio_uring::start(async move {
-
             let (tx, mut rx) = local_sync::mpsc::unbounded::channel();
             for i in 0..10 {
                 let tx = tx.clone();
@@ -31,7 +30,10 @@ mod tests {
             }
 
             for _ in 0..10 {
-                trace!("Received {}", rx.recv().await.expect("Should receive a value"));
+                trace!(
+                    "Received {}",
+                    rx.recv().await.expect("Should receive a value")
+                );
             }
 
             Ok(())

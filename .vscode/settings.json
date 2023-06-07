@@ -33,6 +33,7 @@
         "oneshot",
         "overcommit",
         "rocksdb",
+        "SPSC",
         "SQPOLL",
         "squeue",
         "struct",

@@ -242,21 +242,23 @@ impl Session {
         inflight_requests.insert(frame.stream_id, context);
 
         // Write frame to network
-        match self.connection.write_frame(&frame).await {
+        let stream_id = frame.stream_id;
+        let opcode = frame.operation_code;
+        match self.connection.write_frame(frame).await {
             Ok(_) => {
                 trace!(
                     "Write request[opcode={}] bounded for {} using stream-id={} to socket buffer",
-                    frame.operation_code,
+                    opcode,
                     self.connection.peer_address(),
-                    frame.stream_id,
+                    stream_id,
                 );
             }
             Err(e) => {
                 error!(
                     "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}",
-                    frame.operation_code, self.connection.peer_address(), e
+                    opcode, self.connection.peer_address(), e
                 );
-                if let Some(ctx) = inflight_requests.remove(&frame.stream_id) {
+                if let Some(ctx) = inflight_requests.remove(&stream_id) {
                     return Err(ctx);
                 }
             }
@@ -287,20 +289,22 @@ impl Session {
 
         let mut frame = Frame::new(OperationCode::Heartbeat);
         frame.header = Some((&request).into());
-        match self.connection.write_frame(&frame).await {
+        let stream_id = frame.stream_id;
+        let opcode = frame.operation_code;
+        match self.connection.write_frame(frame).await {
             Ok(_) => {
                 trace!(
                     "Write request[opcode={}] bounded for {} using stream-id={} to socket buffer",
-                    frame.operation_code,
+                    opcode,
                     self.connection.peer_address(),
-                    frame.stream_id,
+                    stream_id,
                 );
                 *self.idle_since.borrow_mut() = Instant::now();
             }
             Err(e) => {
                 error!(
                     "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}",
-                    frame.operation_code, self.connection.peer_address(), e
+                    opcode, self.connection.peer_address(), e
                 );
             }
         }

@@ -299,17 +299,18 @@ pub async fn run_listener() -> u16 {
                                 }
                             }
 
-                            match channel.write_frame(&response_frame).await {
+                            let opcode = response_frame.operation_code;
+                            match channel.write_frame(response_frame).await {
                                 Ok(_) => {
                                     trace!(
                                         "TestServer writes the `{}` response back directly",
-                                        response_frame.operation_code
+                                        opcode
                                     );
                                 }
                                 Err(e) => {
                                     error!(
                                         "TestServer failed to process `{}`. Cause: {:?}",
-                                        response_frame.operation_code, e
+                                        opcode, e
                                     );
                                 }
                             };

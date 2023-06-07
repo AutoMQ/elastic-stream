@@ -1,27 +1,146 @@
 use bytes::{Buf, BytesMut};
+use local_sync::{mpsc, oneshot};
 use log::{error, info, trace, warn};
 use std::cell::UnsafeCell;
 use std::io::Cursor;
+use std::rc::Rc;
 use tokio_uring::net::TcpStream;
 
 use codec::error::FrameError;
 use codec::frame::Frame;
 
+use crate::WriteTask;
+
 const BUFFER_SIZE: usize = 4 * 1024;
 
 pub struct Connection {
-    stream: TcpStream,
+
+    /// Underlying TCP stream.
+    stream: Rc<TcpStream>,
+    
+    /// Read buffer for this connection.
     buffer: UnsafeCell<BytesMut>,
+
     peer_address: String,
+
+    /// Write buffer for this connection.
+    /// 
+    /// Writes from concurrent coroutines are serialized by this MPSC channel.
+    tx: mpsc::unbounded::Tx<WriteTask>,
 }
 
 impl Connection {
     pub fn new(stream: TcpStream, peer_address: &str) -> Self {
+        let stream = Rc::new(stream);
+        let (tx, mut rx) = mpsc::unbounded::channel();
+
+        let write_stream = Rc::clone(&stream);
+        let target_address = peer_address.to_owned();
+        tokio_uring::spawn(async move {
+            loop {
+                match rx.recv().await {
+                    Some(task) => {
+                        Self::write(&write_stream, task, &target_address).await;
+                    }
+                    None => {
+                        log::info!(
+                            "Connection to {} should be closed, stop write coroutine loop",
+                            &target_address
+                        );
+                        break;
+                    }
+                }
+            }
+        });
+
         Self {
             stream,
             buffer: UnsafeCell::new(BytesMut::with_capacity(BUFFER_SIZE)),
             peer_address: peer_address.to_owned(),
+            tx,
         }
+    }
+
+    async fn write(stream: &Rc<TcpStream>, task: WriteTask, peer_address: &str) {
+        let mut buffers = match task.frame.encode().map_err(|e| {
+            // TODO: handle the encode error
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to encode frame. Cause: {:?}", e),
+            )
+        }) {
+            Ok(buffers) => buffers,
+            Err(e) => {
+                error!("Failed to encode Frame[stream-id={}]", task.frame.stream_id);
+                let _ = task.observer.send(Err(e));
+                return;
+            }
+        };
+
+        let total = buffers.iter().map(|b| b.len()).sum::<usize>();
+        trace!("Get {} bytes to write to: {}", total, peer_address);
+        let mut remaining = total;
+        loop {
+            let (res, _buffers) = stream.writev(buffers).await;
+            buffers = _buffers;
+            match res {
+                Ok(mut n) => {
+                    debug_assert!(n <= remaining, "Data written to socket buffer should be less than or equal to remaining bytes to write");
+                    if n == remaining {
+                        if remaining == total {
+                            // First time to write
+                            trace!("Wrote {}/{} bytes to {}", n, total, peer_address);
+                        } else {
+                            // Last time of writing: the remaining are all written.
+                            remaining -= n;
+                            trace!(
+                                "Wrote {}/{} bytes to {}. Overall, {}/{} is written.",
+                                n,
+                                total,
+                                peer_address,
+                                total - remaining,
+                                total
+                            );
+                        }
+                        break;
+                    } else {
+                        remaining -= n;
+                        trace!(
+                            "Wrote {} bytes to {}. Overall, {}/{} is written",
+                            n,
+                            peer_address,
+                            total - remaining,
+                            total,
+                        );
+                        // Drain/advance buffers that are already written.
+                        buffers.drain_filter(|buffer| {
+                            if buffer.len() <= n {
+                                n -= buffer.len();
+                                // Remove it
+                                true
+                            } else {
+                                if n > 0 {
+                                    buffer.advance(n);
+                                    n = 0;
+                                }
+                                // Keep the buffer slice
+                                false
+                            }
+                        });
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to write Frame[stream-id={}] to {peer_address}",
+                        task.frame.stream_id
+                    );
+                    let _ = task.observer.send(Err(e));
+                    return;
+                }
+            };
+        }
+
+        let _ = task.observer.send(Ok(()));
     }
 
     pub fn peer_address(&self) -> &str {
@@ -166,75 +285,31 @@ impl Connection {
         }
     }
 
-    pub async fn write_frame(&self, frame: &Frame) -> Result<(), std::io::Error> {
-        let mut buffers = frame.encode().map_err(|e| {
-            // TODO: handle the encode error
+    pub async fn write_frame(&self, frame: Frame) -> Result<(), std::io::Error> {
+        let (tx, rx) = oneshot::channel();
+        let task = WriteTask {
+            frame,
+            observer: tx,
+        };
+        self.tx.send(task).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
-                format!("Failed to encode frame. Cause: {:?}", e),
+                format!(
+                    "Connection's internal SPSC channel is closed. Cause: {:?}",
+                    e
+                ),
             )
         })?;
 
-        let total = buffers.iter().map(|b| b.len()).sum::<usize>();
-        trace!("Get {} bytes to write to: {}", total, self.peer_address);
-        let mut remaining = total;
-        loop {
-            let (res, _buffers) = self.stream.writev(buffers).await;
-            buffers = _buffers;
-            match res {
-                Ok(mut n) => {
-                    debug_assert!(n <= remaining, "Data written to socket buffer should be less than or equal to remaining bytes to write");
-                    if n == remaining {
-                        if remaining == total {
-                            // First time to write
-                            trace!("Wrote {}/{} bytes to {}", n, total, self.peer_address);
-                        } else {
-                            // Last time of writing: the remaining are all written.
-                            remaining -= n;
-                            trace!(
-                                "Wrote {}/{} bytes to {}. Overall, {}/{} is written.",
-                                n,
-                                total,
-                                self.peer_address,
-                                total - remaining,
-                                total
-                            );
-                        }
-                        break;
-                    } else {
-                        remaining -= n;
-                        trace!(
-                            "Wrote {} bytes to {}. Overall, {}/{} is written",
-                            n,
-                            self.peer_address,
-                            total - remaining,
-                            total,
-                        );
-                        // Drain/advance buffers that are already written.
-                        buffers.drain_filter(|buffer| {
-                            if buffer.len() <= n {
-                                n -= buffer.len();
-                                // Remove it
-                                true
-                            } else {
-                                if n > 0 {
-                                    buffer.advance(n);
-                                    n = 0;
-                                }
-                                // Keep the buffer slice
-                                false
-                            }
-                        });
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to write Frame[stream-id={}]", frame.stream_id);
-                    return Err(e);
-                }
-            };
-        }
-
-        Ok(())
+        rx.await.map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!(
+                    "Connection's internal SPSC channel is closed. Cause: {:?}",
+                    e
+                ),
+            )
+        })?
     }
 
     pub fn close(&self) -> std::io::Result<()> {
@@ -340,7 +415,7 @@ mod tests {
                     payload.push(buf.freeze());
                 });
                 frame.payload = Some(payload);
-                connection.write_frame(&frame).await.unwrap();
+                connection.write_frame(frame).await.unwrap();
             }
 
             let total = counter_rx.await.unwrap();
