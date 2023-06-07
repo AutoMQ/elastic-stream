@@ -41,7 +41,7 @@ impl Stream {
             error!("Invalid record batch {e:?}");
             ClientError::Internal("".to_owned())
         })?;
-        trace!("RecordBatch to append: {record_batch:?}");
+        trace!("RecordBatch to append: {record_batch}");
 
         debug_assert_eq!(
             self.id,

@@ -4,11 +4,18 @@ use bytes::Bytes;
 use chrono::prelude::*;
 use protocol::flat_model::records::{KeyValueT, RecordBatchMetaT};
 use std::collections::HashMap;
+use std::fmt::{self};
 
 #[derive(Debug, Clone)]
 pub struct RecordBatch {
     metadata: RecordBatchMetaT,
     payload: Bytes,
+}
+
+impl fmt::Display for RecordBatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ metadata: {:?} }}", self.metadata)
+    }
 }
 
 impl RecordBatch {
