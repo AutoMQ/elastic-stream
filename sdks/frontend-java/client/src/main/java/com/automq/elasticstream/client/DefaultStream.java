@@ -48,7 +48,9 @@ public class DefaultStream implements Stream {
     public CompletableFuture<AppendResult> append(RecordBatch recordBatch) {
         ByteBuf buf = FlatRecordBatchCodec.encode(streamId, recordBatch);
         CompletableFuture<AppendResult> cf = jniStream.append(buf.nioBuffer()).thenApply(DefaultAppendResult::new);
-        buf.release();
+        cf.whenComplete((rst, ex) -> {
+            buf.release();
+        });
         return cf;
     }
 

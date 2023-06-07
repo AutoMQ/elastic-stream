@@ -2,8 +2,9 @@ package com.automq.elasticstream.client.examples;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.sql.Time;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import com.automq.elasticstream.client.DefaultRecordBatch;
@@ -26,15 +27,26 @@ public class Main {
         long streamId = stream.streamId();
 
         System.out.println("Step1: append 10 records to stream:" + streamId);
-        for (int i = 0; i < 10; i++) {
+        int count = 10;
+        CountDownLatch latch = new CountDownLatch(count);
+        for (int i = 0; i < count; i++) {
+            int index = i;
             byte[] payload = String.format("hello world %03d", i).getBytes(StandardCharsets.UTF_8);
             ByteBuffer buffer = ByteBuffer.wrap(payload);
-            AppendResult appendResult = stream
-                    .append(new DefaultRecordBatch(10, 0, Collections.emptyMap(), buffer)).get();
-            long offset = appendResult.baseOffset();
-            System.out.println("append record result offset:" + offset);
-            assertEquals(i * 10, offset);
+            long startNanos = System.nanoTime();
+            CompletableFuture<AppendResult> cf = stream
+                    .append(new DefaultRecordBatch(10, 0, Collections.emptyMap(), buffer));
+            System.out.println("append " + index + " async cost:" + (System.nanoTime() - startNanos) / 1000 + "us");
+            cf.whenComplete((rst, ex) -> {
+                if (ex == null) {
+                    long offset = rst.baseOffset();
+                    assertEquals(index * 10, offset);
+                    System.out.println("append "+ index + " callback cost:" + (System.nanoTime() - startNanos) / 1000 + "us");
+                }
+                latch.countDown();
+            });
         }
+        latch.await();
 
         System.out.println("Step2: read 10 record batch one by one");
         for (int i = 0; i < 10; i++) {
