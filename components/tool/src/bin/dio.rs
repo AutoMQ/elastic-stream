@@ -166,6 +166,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
 
+            #[allow(clippy::while_let_on_iterator)]
             while let Some(_entry) = cq.next() {
                 writes -= 1;
             }

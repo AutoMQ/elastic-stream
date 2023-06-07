@@ -512,6 +512,9 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_as
     }
 }
 
+/// # Safety
+///
+/// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_startOffset(
     mut env: JNIEnv,

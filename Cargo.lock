@@ -1055,6 +1055,7 @@ dependencies = [
  "client",
  "codec",
  "config",
+ "criterion",
  "flatbuffers",
  "futures",
  "jni",

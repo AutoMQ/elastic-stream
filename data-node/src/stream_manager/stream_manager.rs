@@ -133,7 +133,7 @@ impl StreamManager {
                     .collect::<Vec<_>>();
                 // Create the missing ranges in the stream
                 ranges.into_iter().for_each(|item| {
-                    stream.create_range(item.clone());
+                    stream.create_range(item);
                 });
             }
             stream.seal(range)

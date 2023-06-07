@@ -6,9 +6,7 @@ use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
 use log::{error, trace, warn};
 use model::payload::Payload;
-use protocol::rpc::header::{
-    AppendRequest, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
-};
+use protocol::rpc::header::{AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs};
 use std::{cell::UnsafeCell, fmt, rc::Rc};
 use store::{
     error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, ElasticStore,
@@ -17,15 +15,10 @@ use store::{
 
 use crate::{error::ServiceError, stream_manager::StreamManager};
 
-use super::util::{
-    finish_response_builder, root_as_rpc_request, system_error_frame_bytes, MIN_BUFFER_SIZE,
-};
+use super::util::{finish_response_builder, system_error_frame_bytes, MIN_BUFFER_SIZE};
 
 #[derive(Debug)]
-pub(crate) struct Append<'a> {
-    /// The append request already parsed by flatbuffers
-    append_request: AppendRequest<'a>,
-
+pub(crate) struct Append {
     // Layout of the request payload
     // +-------------------+-------------------+-------------------+-------------------+
     // |  AppendEntry 1    |  AppendEntry 2    |  AppendEntry 3    |        ...        |
@@ -38,30 +31,8 @@ pub(crate) struct Append<'a> {
     payload: Bytes,
 }
 
-impl<'a> Append<'a> {
+impl Append {
     pub(crate) fn parse_frame(request: &Frame) -> Result<Append, ErrorCode> {
-        let request_buf = match request.header {
-            Some(ref buf) => buf,
-            None => {
-                warn!(
-                    "AppendRequest[stream-id={}] received without payload",
-                    request.stream_id
-                );
-                return Err(ErrorCode::BAD_REQUEST);
-            }
-        };
-
-        let append_request = match root_as_rpc_request::<AppendRequest>(request_buf) {
-            Ok(request) => request,
-            Err(e) => {
-                warn!(
-                    "AppendRequest[stream-id={}] received with invalid payload. Cause: {:?}",
-                    request.stream_id, e
-                );
-                return Err(ErrorCode::BAD_REQUEST);
-            }
-        };
-
         let payload = match request.payload {
             // For append frame, the payload must be a single buffer
             Some(ref buf) if buf.len() == 1 => buf.first().ok_or(ErrorCode::BAD_REQUEST)?,
@@ -75,7 +46,6 @@ impl<'a> Append<'a> {
         };
 
         Ok(Append {
-            append_request,
             payload: payload.clone(),
         })
     }
@@ -134,7 +104,7 @@ impl<'a> Append<'a> {
                     }
                     let options = WriteOptions::default();
                     let append_result = store.append(options, req.clone()).await?;
-                    return Ok(append_result);
+                    Ok(append_result)
                 };
                 Box::pin(result)
             })
@@ -285,7 +255,7 @@ impl From<ServiceError> for AppendError {
     }
 }
 
-impl<'a> fmt::Display for Append<'a> {
+impl fmt::Display for Append {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match Payload::parse_append_entries(&self.payload) {
             Err(e) => write!(

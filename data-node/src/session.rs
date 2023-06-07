@@ -75,12 +75,12 @@ impl Session {
         // as possible.
         connection_tracker
             .borrow_mut()
-            .insert(peer_address.clone(), tx.clone());
+            .insert(peer_address, tx.clone());
         let channel = Rc::new(Connection::new(stream, &peer_address.to_string()));
 
         let idle_handler = connection_handler::idle::IdleHandler::new(
             Rc::downgrade(&channel),
-            peer_address.clone(),
+            peer_address,
             Arc::clone(&server_config),
             Rc::clone(&connection_tracker),
         );

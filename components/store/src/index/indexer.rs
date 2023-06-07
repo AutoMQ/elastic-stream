@@ -349,6 +349,7 @@ impl Indexer {
     }
 
     /// Compaction is synchronous and should execute in its own thread.
+    #[allow(dead_code)]
     pub(crate) fn compact(&self) {
         if let Some(cf) = self.db.cf_handle(INDEX_COLUMN_FAMILY) {
             self.db.compact_range_cf(cf, None::<&[u8]>, None::<&[u8]>);

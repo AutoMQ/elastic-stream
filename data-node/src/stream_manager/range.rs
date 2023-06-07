@@ -31,6 +31,7 @@ impl Range {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn committed(&self) -> Option<u64> {
         self.committed
     }
@@ -42,9 +43,7 @@ impl Range {
     }
 
     pub(crate) fn commit(&mut self, offset: u64) {
-        let offset = self
-            .window_mut()
-            .and_then(|window| Some(window.commit(offset)));
+        let offset = self.window_mut().map(|window| window.commit(offset));
 
         if let Some(offset) = offset {
             if let Some(ref mut committed) = self.committed {

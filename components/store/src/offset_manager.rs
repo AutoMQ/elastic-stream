@@ -14,6 +14,7 @@ impl WalOffsetManager {
     }
 
     /// Advance WAL min-offset once a segment file is deleted.
+    #[allow(dead_code)]
     fn set_min_offset(&self, min: u64) {
         self.min.store(min, Ordering::Relaxed);
     }

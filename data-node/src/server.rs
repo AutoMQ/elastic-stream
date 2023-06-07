@@ -49,7 +49,7 @@ pub fn launch(
         .map(|core_id| {
             let server_config = config.clone();
             let store = store.clone();
-            let core_id = core_id.clone();
+            let core_id = *core_id;
             let (tx, rx) = mpsc::unbounded_channel();
             channels.push(rx);
 
@@ -84,12 +84,11 @@ pub fn launch(
 
     // Build primary worker
     {
-        let core_id = core_ids
+        let core_id = *core_ids
             .get(available_core_len - config.server.concurrency)
-            .expect("At least one core should be reserved for primary node")
-            .clone();
-        let server_config = config.clone();
-        let shutdown_tx = shutdown.clone();
+            .expect("At least one core should be reserved for primary node");
+        let server_config = config;
+        let shutdown_tx = shutdown;
         let handle = thread::Builder::new()
             .name("DataNode[Primary]".to_owned())
             .spawn(move || {

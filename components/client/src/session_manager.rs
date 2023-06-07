@@ -62,10 +62,10 @@ impl SessionManager {
                     .await?,
                 );
 
-                if lb_policy == super::lb_policy::LbPolicy::LeaderOnly {
-                    if session.refresh_placement_manager_cluster().await.is_err() {
-                        error!("Failed to refresh placement manager cluster for {target}");
-                    }
+                if lb_policy == super::lb_policy::LbPolicy::LeaderOnly
+                    && session.refresh_placement_manager_cluster().await.is_err()
+                {
+                    error!("Failed to refresh placement manager cluster for {target}");
                 }
 
                 sessions.insert(target.to_owned(), Rc::clone(&session));

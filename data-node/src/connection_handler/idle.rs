@@ -43,11 +43,11 @@ impl IdleHandler {
     }
 
     fn read_idle(&self) -> bool {
-        self.last_read.borrow().clone() + self.config.connection_idle_duration() < Instant::now()
+        *self.last_read.borrow() + self.config.connection_idle_duration() < Instant::now()
     }
 
     fn write_idle(&self) -> bool {
-        self.last_write.borrow().clone() + self.config.connection_idle_duration() < Instant::now()
+        *self.last_write.borrow() + self.config.connection_idle_duration() < Instant::now()
     }
 
     fn read_elapsed(&self) -> Duration {
@@ -73,7 +73,7 @@ impl IdleHandler {
                     Some(channel) => {
                         if handler.read_idle() && handler.write_idle() {
                             conn_tracker.borrow_mut().remove(&addr);
-                            if let Ok(_) = channel.close() {
+                            if channel.close().is_ok() {
                                 info!(
                                     "Close connection to {} since read has been idle for {}ms and write has been idle for {}ms",
                                     channel.peer_address(),

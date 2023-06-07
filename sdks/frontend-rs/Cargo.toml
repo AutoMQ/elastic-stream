@@ -29,6 +29,11 @@ log4rs = { workspace = true }
 [dev-dependencies]
 test-util = { path = "../../components/test-util" }
 minitrace = { workspace = true }
+criterion = { version = "0.4", features = ["html_reports"] }
 
 [lib]
 crate-type = ["cdylib", "lib"]
+
+[[bench]]
+name = "sample_benchmark"
+harness = false

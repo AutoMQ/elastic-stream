@@ -107,7 +107,7 @@ impl Window {
         self.submitted.insert(request.offset(), request.len());
         // Expected request to be dispatched, just advance the next offset and go.
         self.next += request.len() as u64;
-        return Ok(());
+        Ok(())
     }
 
     /// Commits the request with the given offset, and wakes up the subsequent request if exists.

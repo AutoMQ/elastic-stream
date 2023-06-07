@@ -266,7 +266,7 @@ impl Session {
     }
 
     pub(crate) async fn heartbeat(&self, role: ClientRole) {
-        let last = self.idle_since.borrow().clone();
+        let last = *self.idle_since.borrow();
         if Instant::now() - last < self.config.client_heartbeat_interval() {
             return;
         }

@@ -268,18 +268,19 @@ impl CompositeSession {
     pub(crate) async fn heartbeat(&self, role: ClientRole) {
         self.try_reconnect().await;
 
-        if self.need_refresh_placement_manager_cluster() {
-            if self.refresh_placement_manager_cluster().await.is_err() {
-                error!("Failed to refresh placement manager cluster");
-            }
+        if self.need_refresh_placement_manager_cluster()
+            && self.refresh_placement_manager_cluster().await.is_err()
+        {
+            error!("Failed to refresh placement manager cluster");
         }
 
-        for session in self
+        let sessions = self
             .sessions
             .borrow()
             .iter()
             .map(|(_, session)| session.clone())
-        {
+            .collect::<Vec<_>>();
+        for session in sessions {
             session.heartbeat(role).await
         }
     }
@@ -348,7 +349,7 @@ impl CompositeSession {
                         .unpack()
                         .nodes
                         .iter()
-                        .map(|node| Into::<PlacementManagerNode>::into(node))
+                        .map(Into::<PlacementManagerNode>::into)
                         .collect::<Vec<_>>();
                     if !nodes.is_empty() {
                         self.refresh_sessions(&nodes).await;
@@ -954,10 +955,10 @@ impl CompositeSession {
     ) -> Result<(), ClientError> {
         self.try_reconnect().await;
 
-        if self.need_refresh_placement_manager_cluster() {
-            if self.refresh_placement_manager_cluster().await.is_err() {
-                error!("Failed to refresh placement manager cluster");
-            }
+        if self.need_refresh_placement_manager_cluster()
+            && self.refresh_placement_manager_cluster().await.is_err()
+        {
+            error!("Failed to refresh placement manager cluster");
         }
 
         // TODO: add disk_unindexed_data_size, range_missing_replica_cnt, range_active_cnt

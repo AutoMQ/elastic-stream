@@ -167,6 +167,7 @@ impl AlignedBuf {
 
     /// Generate a mutable slice from the buffer.
     /// Since it's aimed to be written, the upper bound is equal to the capacity.
+    #[allow(clippy::mut_from_ref)]
     pub(crate) fn slice_mut<R>(&self, range: R) -> &mut [u8]
     where
         R: RangeBounds<usize>,

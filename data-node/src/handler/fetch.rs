@@ -185,9 +185,9 @@ impl<'a> Fetch<'a> {
 
                 // If the stream-range exists and contains the requested offset, build the read options
                 // FIXME: Use range_manager instead of stream_manager
-                if let Some(_) = stream_manager.get_range(stream_id, range_index) {
+                if stream_manager.get_range(stream_id, range_index).is_some() {
                     return Ok(ReadOptions {
-                        stream_id: stream_id,
+                        stream_id,
                         range: range_index as u32,
                         offset: req.fetch_offset(),
                         max_offset: req.end_offset() as u64,
@@ -196,7 +196,7 @@ impl<'a> Fetch<'a> {
                     });
                 }
                 // Cannot find the range in the current data node
-                return Err(FetchError::RangeNotFound);
+                Err(FetchError::RangeNotFound)
             })
             .collect()
     }

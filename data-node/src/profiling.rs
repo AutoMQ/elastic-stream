@@ -98,7 +98,6 @@ pub(crate) fn generate_flame_graph(
 
 fn sweep_expired(report_path: &Path, config: &Arc<Configuration>) -> std::io::Result<()> {
     let mut entries = std::fs::read_dir(report_path)?
-        .into_iter()
         .flatten()
         .filter(|entry| {
             let file_name = entry.file_name();

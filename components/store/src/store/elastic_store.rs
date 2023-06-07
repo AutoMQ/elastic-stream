@@ -49,12 +49,14 @@ pub struct ElasticStore {
     /// The reference to index driver, which is used to communicate with index module.
     indexer: Arc<IndexDriver>,
 
+    #[allow(dead_code)]
     wal_offset_manager: Arc<WalOffsetManager>,
 
     /// Expose underlying I/O Uring FD so that its worker pool may be shared with
     /// server layer I/O Uring instances.
     sharing_uring: RawFd,
 
+    #[allow(dead_code)]
     join_handles: Arc<util::HandleJoiner>,
 }
 

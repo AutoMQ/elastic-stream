@@ -29,7 +29,7 @@ fn main() {
     let tx = shutdown_tx.clone();
     ctrlc::set_handler(move || {
         println!("Received shutdown signal");
-        if let Err(_) = tx.send(()) {
+        if tx.send(()).is_err() {
             eprintln!("Could not send shutdown signal to shutdown channel");
         }
     })

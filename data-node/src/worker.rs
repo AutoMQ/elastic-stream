@@ -36,6 +36,7 @@ pub(crate) struct Worker {
     store: Rc<ElasticStore>,
     stream_manager: Rc<UnsafeCell<StreamManager>>,
     client: Rc<Client>,
+    #[allow(dead_code)]
     channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
 }
 

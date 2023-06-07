@@ -81,7 +81,6 @@ fn serve_describe_placement_manager_cluster(
         let mut cluster = PlacementManagerClusterT::default();
 
         cluster.nodes = (0..1)
-            .into_iter()
             .map(|i| {
                 let mut node = PlacementManagerNodeT::default();
                 node.is_leader = i == 0;
@@ -158,7 +157,7 @@ pub async fn run_listener() -> u16 {
                                             trace!("Start to sleep...");
                                             tokio::time::sleep(Duration::from_millis(500)).await;
                                             trace!("Heartbeat sleep completed");
-                                            serve_heartbeat(&&heartbeat, &mut response_frame);
+                                            serve_heartbeat(&heartbeat, &mut response_frame);
                                         } else {
                                             error!("Failed to decode heartbeat request header");
                                         }
@@ -170,7 +169,7 @@ pub async fn run_listener() -> u16 {
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) = flatbuffers::root::<ListRangeRequest>(buf)
                                         {
-                                            serve_list_ranges(&&req, &mut response_frame);
+                                            serve_list_ranges(&req, &mut response_frame);
                                         } else {
                                             error!("Failed to decode list-range-request header");
                                         }
@@ -182,7 +181,7 @@ pub async fn run_listener() -> u16 {
                                     if let Some(buf) = frame.header.as_ref() {
                                         match flatbuffers::root::<IdAllocationRequest>(buf) {
                                             Ok(request) => {
-                                                allocate_id(&&request, &mut response_frame);
+                                                allocate_id(&request, &mut response_frame);
                                             }
                                             Err(_e) => {
                                                 error!(
@@ -377,7 +376,7 @@ fn serve_create_stream(req: &CreateStreamRequest, response_frame: &mut Frame) {
 
 fn serve_create_range(request: &CreateRangeRequest, response_frame: &mut Frame) {
     let mut response = CreateRangeResponseT::default();
-    response.status = Box::new(StatusT::default());
+    response.status = Box::<StatusT>::default();
     response.status.as_mut().code = ErrorCode::OK;
     response.range = Some(Box::new(request.range().unpack()));
 
@@ -432,7 +431,7 @@ fn serve_seal_range(req: &SealRangeRequest, response_frame: &mut Frame) {
     let mut status_ok = StatusT::default();
     status_ok.code = ErrorCode::OK;
     status_ok.message = Some(String::from("OK"));
-    response.status = Box::new(status_ok.clone());
+    response.status = Box::new(status_ok);
 
     match request.kind {
         SealKind::DATA_NODE => {}

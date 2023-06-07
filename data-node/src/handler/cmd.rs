@@ -14,7 +14,7 @@ use super::{
 
 #[derive(Debug)]
 pub(crate) enum Command<'a> {
-    Append(Append<'a>),
+    Append(Append),
     Fetch(Fetch<'a>),
     CreateRange(CreateRange<'a>),
     SealRange(SealRange<'a>),
