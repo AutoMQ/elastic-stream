@@ -1133,6 +1133,7 @@ impl IO {
     fn acknowledge_to_observer(&mut self, wal_offset: u64, task: WriteTask) {
         let append_result = AppendResult {
             stream_id: task.stream_id,
+            range_index: task.range,
             offset: task.offset,
             wal_offset,
         };

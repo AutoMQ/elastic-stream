@@ -151,7 +151,7 @@ impl<'a> Append<'a> {
                 match res {
                     Ok(result) => {
                         if let Err(e) = unsafe { &mut *stream_manager.get() }
-                            .commit(result.stream_id, result.offset as u64)
+                            .commit(result.stream_id, result.range_index as i32, result.offset as u64)
                         {
                             warn!(
                                 "Failed to ack offset on store completion to stream manager: {:?}",

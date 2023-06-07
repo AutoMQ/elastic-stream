@@ -1,6 +1,6 @@
 use bytes::{Bytes, BytesMut};
 use frontend::{Frontend, StreamOptions};
-use log::{info, trace};
+use log::info;
 use model::{record::flat_record::FlatRecordBatch, RecordBatch};
 use tokio::time::{sleep, Duration};
 

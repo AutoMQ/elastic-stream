@@ -84,12 +84,6 @@ impl Stream {
             .sort_by(|a, b| a.metadata.index().cmp(&b.metadata.index()));
     }
 
-    pub(crate) fn commit(&mut self, offset: u64) {
-        if let Some(range) = self.ranges.last_mut() {
-            range.commit(offset);
-        }
-    }
-
     pub(crate) fn seal(&mut self, metadata: &mut RangeMetadata) -> Result<(), ServiceError> {
         self.verify_stream_id(&metadata)?;
 
@@ -116,12 +110,6 @@ impl Stream {
 
         self.sort();
         Ok(())
-    }
-
-    pub(crate) fn range_of(&mut self, offset: u64) -> Option<&mut Range> {
-        self.ranges
-            .iter_mut()
-            .find(|range| range.metadata.contains(offset))
     }
 
     pub(crate) fn get_range(&mut self, index: i32) -> Option<&mut Range> {
@@ -192,40 +180,6 @@ mod tests {
     }
 
     #[test]
-    fn test_commit() -> Result<(), Box<dyn Error>> {
-        let mut stream = StreamT::default();
-        stream.stream_id = 1;
-        stream.replica = 1;
-        stream.retention_period_ms = 1000;
-        let stream_metadata = StreamMetadata::from(stream);
-        let mut stream = super::Stream::new(stream_metadata);
-
-        let range = RangeMetadata::new(1, 0, 0, 0, None);
-        let range = RangeMetadata::from(range);
-        stream.create_range(range);
-
-        stream.range_of(0).and_then(|range| {
-            range
-                .window_mut()
-                .and_then(|window| window.check_barrier(&Foo { offset: 0, len: 2 }).ok())
-        });
-
-        stream.commit(0);
-
-        assert_eq!(
-            stream
-                .ranges
-                .iter()
-                .next()
-                .expect("Range should exist")
-                .committed(),
-            Some(2)
-        );
-
-        Ok(())
-    }
-
-    #[test]
     fn test_seal() -> Result<(), Box<dyn Error>> {
         let mut stream = StreamT::default();
         stream.stream_id = 1;
@@ -238,18 +192,14 @@ mod tests {
         let range = RangeMetadata::from(range);
         stream.create_range(range);
 
-        stream.range_of(0).and_then(|range| {
-            range.window_mut().and_then(|window| {
-                window
-                    .check_barrier(&Foo {
-                        offset: 0,
-                        len: 100,
-                    })
-                    .ok()
-            })
+        let range = stream.get_range(0).expect("The first range should exist");
+        range.window_mut().and_then(|window| {
+            window.check_barrier(&Foo {
+                offset: 0,
+                len: 100,
+            }).ok()
         });
-
-        stream.commit(0);
+        range.commit(0);
         let mut metadata = RangeMetadata::new(1, 0, 0, 0, Some(50));
         stream.seal(&mut metadata)?;
 
@@ -260,9 +210,6 @@ mod tests {
             .expect("The first range should exist")
             .committed();
         assert_eq!(committed, Some(100));
-        assert!(stream.range_of(50).is_none());
-        assert!(stream.range_of(49).is_some());
-
         Ok(())
     }
 }
