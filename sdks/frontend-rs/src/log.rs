@@ -94,7 +94,7 @@ pub fn init_log() {
         .build(
             Root::builder()
                 .appender("stdout")
-                .build(log::LevelFilter::Trace),
+                .build(log::LevelFilter::Info),
         )
         .expect("Failed to build log4rs config");
 
