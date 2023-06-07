@@ -11,6 +11,7 @@ import io.netty.buffer.ByteBuf;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import sun.nio.ch.DirectBuffer;
 
 public class DefaultStream implements Stream {
     private final long streamId;
@@ -76,5 +77,12 @@ public class DefaultStream implements Stream {
     @Override
     public CompletableFuture<Void> destroy() {
         throw new UnsupportedOperationException();
+    }
+
+    public void test(ByteBuffer buffer) {
+        DirectBuffer buf = (DirectBuffer)buffer;
+        long address = buf.address();
+        int len = buffer.limit();
+        jniStream.test(streamId, address, len, new CompletableFuture<>());
     }
 }

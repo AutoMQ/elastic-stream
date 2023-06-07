@@ -36,6 +36,9 @@ public class Stream extends ElasticStreamObject {
     private native void read(long ptr, long start_offset, long end_offset, int batch_max_bytes, CompletableFuture<byte[]> future);
     private native void asyncClose(long ptr, CompletableFuture<Void> future);
     private native long freeStream(long ptr);
+
+    public native void test(long prt, long address, int len, CompletableFuture<Void> future);
+
     @Override
     public void close() {
         freeStream(this.ptr);

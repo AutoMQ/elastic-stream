@@ -463,6 +463,49 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
 /// # Safety
 ///
 /// Expose `C` API to Java
+///
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_test(
+    mut env: JNIEnv,
+    _class: JClass,
+    ptr: *mut Stream,
+    address: jlong,
+    len: jint,
+    future: JObject,
+) {
+    // let future = env.new_global_ref(future);
+    // do nothing
+    // let buf = env.get_direct_buffer_address((&data).into());
+    // let len = env.get_direct_buffer_capacity((&data).into());
+    // let buf = Bytes::copy_from_slice(slice::from_raw_parts(buf.unwrap(), len.unwrap()));
+    let void_class = unsafe { VOID_CLASS_CACHE.get() };
+    let void_ctor = unsafe { VOID_CTOR_CACHE.get() };
+    if let (Some(void_class), Some(void_ctor)) = (void_class, void_ctor) {
+        if let Ok(obj) = unsafe { env.new_object_unchecked(void_class, *void_ctor, &[]) } {
+            // let obj = env.auto_local(obj);
+            // let s = JValueGen::from(&obj);
+            // let _stopwatch = Stopwatch::new("Future#complete");
+            // let method = unsafe { FUTURE_COMPLETE_CACHE.get() }.unwrap();
+            // if unsafe {
+            //     env.call_method_unchecked(
+            //         future,
+            //         method,
+            //         jni::signature::ReturnType::Primitive(jni::signature::Primitive::Boolean),
+            //         &[s.as_jni()],
+            //     )
+            // }
+            // .is_err()
+            // {
+            //     panic!("Failed to call future complete method");
+            // }
+        } else {
+            panic!("Failed to create Void object");
+        }
+    } else {
+        panic!("Failed to find Void class");
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_freeStream(
     _env: JNIEnv,
