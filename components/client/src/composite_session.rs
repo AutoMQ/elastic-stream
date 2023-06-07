@@ -720,7 +720,7 @@ impl CompositeSession {
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
             let request = ctx.request();
-            error!("Failed to seal range {request:?}");
+            error!("Failed to seal range {request}");
             return Err(ClientError::ClientInternal);
         }
 
@@ -876,7 +876,7 @@ impl CompositeSession {
         if let Err(ctx) = session.write(request, tx).await {
             let request = ctx.request();
             // TODO: decode append info from flat_record_batch_bytes to provide readable information.
-            error!("Failed to append {request:?}");
+            error!("Failed to append {request}");
             return Err(ClientError::ClientInternal);
         }
 
@@ -919,7 +919,7 @@ impl CompositeSession {
         let (tx, rx) = oneshot::channel();
         if let Err(ctx) = session.write(request, tx).await {
             let request = ctx.request();
-            error!("Failed to fetch {request:?} to {}", self.target);
+            error!("Failed to fetch {request} to {}", self.target);
             return Err(ClientError::ClientInternal);
         }
 
