@@ -513,7 +513,7 @@ impl CompositeSession {
                     }
 
                     error!(
-                        "Failed to create range on {} for Stream[id={}]: {response:#?}",
+                        "Failed to create range on {} for Stream[id={}]: {response:?}",
                         self.target, stream_id
                     );
                     return Err(ClientError::CreateRange(response.status.code));

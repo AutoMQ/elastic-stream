@@ -306,7 +306,7 @@ impl Response {
         if let Some(ref buf) = frame.header {
             match flatbuffers::root::<DescribePlacementManagerClusterResponse>(buf) {
                 Ok(response) => {
-                    debug!("Received {response:#?}");
+                    debug!("Received {response:?}");
                     self.status = Into::<Status>::into(&response.status().unpack());
                     if ErrorCode::OK != self.status.code {
                         return;
@@ -337,7 +337,7 @@ impl Response {
                     let status_t = response.status().unpack();
                     self.status = Into::<Status>::into(&status_t);
                     if self.status.code != ErrorCode::OK {
-                        warn!("Failed to create stream: {status_t:#?}");
+                        warn!("Failed to create stream: {status_t:?}");
                         return;
                     }
                     if let Some(stream) = response.stream() {

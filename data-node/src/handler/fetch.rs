@@ -45,7 +45,7 @@ impl<'a> Fetch<'a> {
                 return Err(ErrorCode::BAD_REQUEST);
             }
         };
-        trace!("Received {fetch_request:#?}");
+        trace!("Received {fetch_request:?}");
         Ok(Fetch { fetch_request })
     }
 

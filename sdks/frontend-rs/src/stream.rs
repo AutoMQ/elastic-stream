@@ -38,10 +38,10 @@ impl Stream {
     /// `buffer` - Encoded representation of the `RecordBatch`. It contains exactly one append entry.
     pub async fn append(&self, mut buffer: Bytes) -> Result<AppendResult, ClientError> {
         let record_batch = FlatRecordBatch::decode_to_record_batch(&mut buffer).map_err(|e| {
-            error!("Invalid record batch {e:#?}");
+            error!("Invalid record batch {e:?}");
             ClientError::Internal("".to_owned())
         })?;
-        trace!("RecordBatch to append: {record_batch:#?}");
+        trace!("RecordBatch to append: {record_batch:?}");
 
         debug_assert_eq!(
             self.id,
@@ -135,7 +135,7 @@ impl Drop for Stream {
                 }
 
                 Err(e) => {
-                    error!("Failed to close stream[id={stream_id}]. Cause: {e:#?}");
+                    error!("Failed to close stream[id={stream_id}]. Cause: {e:?}");
                 }
             }
         });

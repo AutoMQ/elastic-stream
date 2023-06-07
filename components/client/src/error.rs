@@ -41,7 +41,7 @@ pub enum ClientError {
     #[error("Client internal error")]
     ClientInternal,
 
-    #[error("Client fails to receive response from server within {timeout:#?}")]
+    #[error("Client fails to receive response from server within {timeout:?}")]
     RpcTimeout { timeout: Duration },
 }
 

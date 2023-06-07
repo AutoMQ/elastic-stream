@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ring.submit_and_wait(1)?;
         let mut cq = ring.completion();
         if let Some(cqe) = cq.next() {
-            println!("{cqe:#?}");
+            println!("{cqe:?}");
             fd = cqe.result();
         }
     }
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let mut cq = ring.completion();
         for cqe in cq.by_ref() {
-            println!("{cqe:#?}");
+            println!("{cqe:?}");
         }
         cq.sync();
     }
@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         uring.submit_and_wait(1)?;
         let mut cq = uring.completion();
         for cqe in cq.by_ref() {
-            println!("{cqe:#?}");
+            println!("{cqe:?}");
         }
         cq.sync();
 
@@ -114,7 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         uring.submit_and_wait(1)?;
         let mut cq = uring.completion();
         for cqe in cq.by_ref() {
-            println!("{cqe:#?}");
+            println!("{cqe:?}");
         }
         cq.sync();
 

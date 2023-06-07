@@ -30,7 +30,7 @@ impl Frontend {
     }
 
     pub async fn create(&self, options: StreamOptions) -> Result<u64, ClientError> {
-        info!("Creating stream {options:#?}");
+        info!("Creating stream {options:?}");
         let stream_id = self
             .stream_client
             .create_stream(options.replica, options.ack, options.retention)
