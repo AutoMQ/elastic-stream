@@ -14,17 +14,16 @@ use crate::WriteTask;
 const BUFFER_SIZE: usize = 4 * 1024;
 
 pub struct Connection {
-
     /// Underlying TCP stream.
     stream: Rc<TcpStream>,
-    
+
     /// Read buffer for this connection.
     buffer: UnsafeCell<BytesMut>,
 
     peer_address: String,
 
     /// Write buffer for this connection.
-    /// 
+    ///
     /// Writes from concurrent coroutines are serialized by this MPSC channel.
     tx: mpsc::unbounded::Tx<WriteTask>,
 }
@@ -32,14 +31,20 @@ pub struct Connection {
 impl Connection {
     pub fn new(stream: TcpStream, peer_address: &str) -> Self {
         let stream = Rc::new(stream);
-        let (tx, mut rx) = mpsc::unbounded::channel();
+        let (tx, mut rx) = mpsc::unbounded::channel::<WriteTask>();
 
         let write_stream = Rc::clone(&stream);
         let target_address = peer_address.to_owned();
         tokio_uring::spawn(async move {
+            log::trace!("Start write coroutine loop for {}", &target_address);
             loop {
                 match rx.recv().await {
                     Some(task) => {
+                        log::trace!(
+                            "Write-frame-task[stream-id={}] received, start writing to {}",
+                            task.frame.stream_id,
+                            &target_address
+                        );
                         Self::write(&write_stream, task, &target_address).await;
                     }
                     None => {
@@ -63,7 +68,6 @@ impl Connection {
 
     async fn write(stream: &Rc<TcpStream>, task: WriteTask, peer_address: &str) {
         let mut buffers = match task.frame.encode().map_err(|e| {
-            // TODO: handle the encode error
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to encode frame. Cause: {:?}", e),
@@ -292,6 +296,7 @@ impl Connection {
             observer: tx,
         };
         self.tx.send(task).map_err(|e| {
+            warn!("Failed to send frame to connection's internal SPSC channel. Cause: {:?}", e);
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!(
@@ -302,10 +307,11 @@ impl Connection {
         })?;
 
         rx.await.map_err(|e| {
+            warn!("Failed to receive acknowledgement from oneshot channel. Cause: {:?}", e);
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!(
-                    "Connection's internal SPSC channel is closed. Cause: {:?}",
+                    "Connection's internal oneshot channel is closed. Cause: {:?}",
                     e
                 ),
             )
@@ -392,6 +398,7 @@ mod tests {
 
     #[test]
     fn test_write_frame() -> Result<(), Box<dyn Error>> {
+        test_util::try_init_log();
         let (counter_tx, counter_rx) = tokio::sync::oneshot::channel();
         let (port_tx, port_rx) = tokio::sync::oneshot::channel();
 
@@ -416,6 +423,7 @@ mod tests {
                 });
                 frame.payload = Some(payload);
                 connection.write_frame(frame).await.unwrap();
+                connection.close().unwrap();
             }
 
             let total = counter_rx.await.unwrap();
