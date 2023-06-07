@@ -134,8 +134,8 @@ mod tests {
 
         // write 1GB of random data to the file
         let one_gb: usize = 1024 * 1024 * 1024;
-        let mut buf = vec![0; one_gb];
-        writer.write_all(&mut buf).unwrap();
+        let buf = vec![0; one_gb];
+        writer.write_all(&buf).unwrap();
         writer.flush().unwrap();
         match fs::remove_file(path) {
             Ok(_) => trace!("File successfully removed."),

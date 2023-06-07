@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_encode_and_decode_of_flat_batch() {
-        let stream_id = 1 as i64;
+        let stream_id = 1_i64;
 
         let batch = RecordBatchBuilder::default()
             .with_stream_id(stream_id)
@@ -250,6 +250,6 @@ mod tests {
         bytes_mut.put_i32(10); // Data
 
         let result = FlatRecordBatch::init_from_buf(&mut bytes_mut.freeze());
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 }

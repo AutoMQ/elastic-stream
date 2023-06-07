@@ -302,20 +302,12 @@ mod tests {
                     let (mut stream, _addr) = listener.accept().await.unwrap();
                     let mut read = 0;
                     let mut buf = BytesMut::with_capacity(1024);
-                    loop {
-                        match stream.read_buf(&mut buf).await {
-                            Ok(n) => {
-                                if 0 == n {
-                                    break;
-                                }
-                                read += n;
-                                buf.clear();
-                            }
-
-                            Err(_e) => {
-                                break;
-                            }
+                    while let Ok(n) = stream.read_buf(&mut buf).await {
+                        if 0 == n {
+                            break;
                         }
+                        read += n;
+                        buf.clear();
                     }
                     counter.send(read).unwrap();
                 });
@@ -342,7 +334,7 @@ mod tests {
                 let connection = super::Connection::new(tcp_stream, &address);
                 let mut frame = codec::frame::Frame::new(codec::frame::OperationCode::AllocateId);
                 let mut payload = vec![];
-                (0..8).into_iter().for_each(|_| {
+                (0..8).for_each(|_| {
                     let mut buf = BytesMut::with_capacity(1024 * 1024);
                     buf.resize(1024 * 1024, 8u8);
                     payload.push(buf.freeze());

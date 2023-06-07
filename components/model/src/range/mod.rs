@@ -207,11 +207,11 @@ mod tests {
     #[test]
     fn test_take_slot() {
         let mut range = RangeMetadata::new(0, 0, 0, 0, None);
-        assert_eq!(range.is_sealed(), false);
+        assert!(!range.is_sealed());
 
         // Double seal should return the same offset.
         range.set_end(100);
-        assert_eq!(range.is_sealed(), true);
+        assert!(range.is_sealed());
         assert_eq!(range.end(), Some(100));
     }
 
@@ -219,14 +219,14 @@ mod tests {
     fn test_contains() {
         // Test a sealed range that contains a given offset.
         let range = RangeMetadata::new(0, 0, 0, 0, Some(10));
-        assert_eq!(range.contains(0), true);
-        assert_eq!(range.contains(1), true);
-        assert_eq!(range.contains(11), false);
+        assert!(range.contains(0));
+        assert!(range.contains(1));
+        assert!(!range.contains(11));
 
         // Test a open range that contains a given offset.
         let range = RangeMetadata::new(0, 0, 0, 10, None);
-        assert_eq!(range.contains(0), false);
-        assert_eq!(range.contains(11), true);
-        assert_eq!(range.contains(21), true);
+        assert!(!range.contains(0));
+        assert!(range.contains(11));
+        assert!(range.contains(21));
     }
 }

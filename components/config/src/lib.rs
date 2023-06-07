@@ -436,7 +436,7 @@ mod tests {
         let mut set = std::collections::HashSet::new();
         for _ in 0..100 {
             let client_id = super::client_id();
-            assert_eq!(false, set.contains(&client_id));
+            assert!(!set.contains(&client_id));
             set.insert(client_id);
         }
         assert_eq!(100, set.len());

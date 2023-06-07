@@ -35,7 +35,7 @@ mod tests {
     #[test]
     fn test_crc32_as_ref() {
         let payload = String::from("abcdef");
-        let checksum = super::crc32(&payload);
+        let checksum = super::crc32(payload);
         assert_eq!(1267612143, checksum);
     }
 
