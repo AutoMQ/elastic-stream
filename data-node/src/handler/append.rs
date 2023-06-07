@@ -118,6 +118,12 @@ impl<'a> Append<'a> {
                     {
                         if let Some(window) = range.window_mut() {
                             let _ = window.check_barrier(req)?;
+                        } else {
+                            warn!(
+                                "try append to sealed range[{}#{}]",
+                                req.stream_id, req.range_index
+                            );
+                            return Err(AppendError::BadRequest);
                         }
                     } else {
                         warn!(
@@ -150,9 +156,11 @@ impl<'a> Append<'a> {
             .map(|res| {
                 match res {
                     Ok(result) => {
-                        if let Err(e) = unsafe { &mut *stream_manager.get() }
-                            .commit(result.stream_id, result.range_index as i32, result.offset as u64)
-                        {
+                        if let Err(e) = unsafe { &mut *stream_manager.get() }.commit(
+                            result.stream_id,
+                            result.range_index as i32,
+                            result.offset as u64,
+                        ) {
                             warn!(
                                 "Failed to ack offset on store completion to stream manager: {:?}",
                                 e

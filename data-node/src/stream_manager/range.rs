@@ -1,12 +1,14 @@
 use std::fmt;
 
-use log::{trace, warn};
+use log::{info, trace, warn};
 use model::range::RangeMetadata;
 
 use super::window::Window;
 
 #[derive(Debug)]
 pub(crate) struct Range {
+    log_ident: String,
+
     pub(crate) metadata: RangeMetadata,
 
     committed: Option<u64>,
@@ -16,11 +18,13 @@ pub(crate) struct Range {
 
 impl Range {
     pub(crate) fn new(metadata: RangeMetadata) -> Self {
+        let log_ident = format!("Range[{}#{}] ", metadata.stream_id(), metadata.index());
         Self {
+            log_ident: log_ident.clone(),
             window: if metadata.is_sealed() {
                 None
             } else {
-                Some(Window::new(metadata.start()))
+                Some(Window::new(log_ident.clone(), metadata.start()))
             },
             metadata,
             committed: None,
@@ -45,12 +49,14 @@ impl Range {
         if let Some(offset) = offset {
             if let Some(ref mut committed) = self.committed {
                 if offset <= *committed {
-                    warn!("Try to commit offset {}, which is less than current committed offset {}, range={}",
-                        offset, *committed, self.metadata);
+                    warn!(
+                        "{}Try to commit offset {}, which is less than current committed offset {}",
+                        self.log_ident, offset, *committed
+                    );
                 } else {
                     trace!(
-                        "Committed offset of stream[id={}] changed from {} to {}",
-                        self.metadata.stream_id(),
+                        "{}Committed offset changed from {} to {}",
+                        self.log_ident,
                         *committed,
                         offset
                     );
@@ -66,15 +72,19 @@ impl Range {
     }
 
     pub(crate) fn seal(&mut self, metadata: &mut RangeMetadata) {
-        let end = metadata
+        let end = self.committed.unwrap_or(self.metadata.start());
+        metadata
             .end()
-            .unwrap_or(self.committed.unwrap_or(self.metadata.start()));
-        self.metadata.set_end(end);
+            .map(|end_offset| self.metadata.set_end(end_offset));
         metadata.set_end(end);
 
         // Drop window once the range is sealed.
         self.window.take();
 
+        info!(
+            "{}Range sealed, request metadata={}, the range end={}",
+            self.log_ident, metadata, end
+        );
         if !self.data_complete() {
             // TODO: spawn a task to replica data from peers.
         }

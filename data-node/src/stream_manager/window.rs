@@ -22,6 +22,7 @@ use crate::error::ServiceError;
 /// * The other requests should be responded with a `ServiceError::OffsetInWindow`.
 #[derive(Debug)]
 pub(crate) struct Window {
+    log_ident: String,
     /// The barrier offset, the requests beyond this offset should be blocked.
     next: u64,
 
@@ -33,8 +34,9 @@ pub(crate) struct Window {
 }
 
 impl Window {
-    pub(crate) fn new(next: u64) -> Self {
+    pub(crate) fn new(log_ident: String, next: u64) -> Self {
         Self {
+            log_ident,
             next,
             submitted: BTreeMap::new(),
             // The initial commit offset is the same as the next offset.
@@ -70,7 +72,8 @@ impl Window {
             // A retry request on a committed offset.
             // The client could regard the request as success.
             warn!(
-                "Try to append request on committed offset {}, current committed={:?}",
+                "{}Try to append request on committed offset {}, current committed={:?}",
+                self.log_ident,
                 request.offset(),
                 self.committed
             );
@@ -81,7 +84,8 @@ impl Window {
             // A retry request on a offset that is already in the write window.
             // To avoid data loss, the client should await the request to be completed and retry if necessary.
             warn!(
-                "Try to append request on offset {}, which is in the write window, current next={:?}",
+                "{}Try to append request on offset {}, which is in the write window, current next={:?}",
+                self.log_ident,
                 request.offset(),
                 self.next
             );
@@ -92,7 +96,8 @@ impl Window {
             // A request on a offset that is beyond the write window.
             // The client should promise the order of the requests.
             error!(
-                "Try to append request on offset {}, which is beyond the write window, current next={:?}",
+                "{}Try to append request on offset {}, which is beyond the write window, current next={:?}",
+                self.log_ident,
                 request.offset(),
                 self.next
             );
@@ -110,7 +115,7 @@ impl Window {
     /// Note that this method will be called in the bootstrap phase to init the committed and next offset.
     ///
     /// # Arguments
-    /// * `offset` - the offset to be committed.
+    /// * `offset` - the base offset of record batch to be committed.
     ///
     /// # Return
     /// * the committed offset.
@@ -118,20 +123,23 @@ impl Window {
         // The given offset to commit should be equal to the `committed` offset.
         debug_assert!(
             offset == self.committed,
-            "Unexpected commit call, the offset should be equal to the committed offset, offset: {}, committed: {}",
+            "{}Unexpected commit call, the offset should be equal to the committed offset, offset: {}, committed: {}",
+            self.log_ident,
             offset,
             self.committed);
 
         // The submitted map should not be empty.
         debug_assert!(
             !self.submitted.is_empty(),
-            "Must check-barrier prior to commit"
+            "{}Must check-barrier prior to commit",
+            self.log_ident
         );
 
         if let Some((first_key, len)) = self.submitted.pop_first() {
             debug_assert!(
                 first_key == offset,
-                "Unexpected commit call, the offset should be the first key of the submitted map, offset: {}, first_key: {}",
+                "{}Unexpected commit call, the offset should be the first key of the submitted map, offset: {}, first_key: {}",
+                self.log_ident,
                 offset,
                 first_key);
 
@@ -191,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let mut window = super::Window::new(0);
+        let mut window = super::Window::new(String::from(""), 0);
         let foo1 = Foo::new(0);
         assert!(window.check_barrier(&foo1).is_ok());
         assert_eq!(2, window.next());
@@ -200,7 +208,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_check_barrier() {
-        let mut window = super::Window::new(0);
+        let mut window = super::Window::new(String::from(""), 0);
         let foo1 = Foo::new(0);
         let foo2 = Foo::new(2);
 

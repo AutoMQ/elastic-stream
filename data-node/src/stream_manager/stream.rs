@@ -86,30 +86,17 @@ impl Stream {
 
     pub(crate) fn seal(&mut self, metadata: &mut RangeMetadata) -> Result<(), ServiceError> {
         self.verify_stream_id(&metadata)?;
-
-        let existed = self
-            .ranges
-            .iter()
-            .any(|range: &Range| range.metadata.index() == metadata.index());
-        if !existed {
+        if let Some(range) = self.get_range(metadata.index()) {
+            range.seal(metadata);
+            return Ok(());
+        } else {
             info!("Range does not exist, metadata={:?}. Create the sealed range on data-node directly", metadata);
             return Err(ServiceError::NotFound(format!(
-                "Range[stream-id={}, range-index={}] is not found",
+                "Range[{}#{}] is not found",
                 metadata.stream_id(),
                 metadata.index()
             )));
         }
-
-        self.ranges
-            .iter_mut()
-            .find(|range: &&mut Range| range.metadata.index() == metadata.index())
-            .and_then(|range| {
-                range.seal(metadata);
-                Some(())
-            });
-
-        self.sort();
-        Ok(())
     }
 
     pub(crate) fn get_range(&mut self, index: i32) -> Option<&mut Range> {
@@ -194,10 +181,12 @@ mod tests {
 
         let range = stream.get_range(0).expect("The first range should exist");
         range.window_mut().and_then(|window| {
-            window.check_barrier(&Foo {
-                offset: 0,
-                len: 100,
-            }).ok()
+            window
+                .check_barrier(&Foo {
+                    offset: 0,
+                    len: 100,
+                })
+                .ok()
         });
         range.commit(0);
         let mut metadata = RangeMetadata::new(1, 0, 0, 0, Some(50));

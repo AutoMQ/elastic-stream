@@ -461,7 +461,10 @@ impl ReplicationRange {
             .nth((replica_count - ack_count) as usize)
             .copied()
             .ok_or(ReplicationError::SealReplicaNotEnough);
-        info!("{}Replicas seal with end_offsets={end_offsets:?} and final end_offset={end_offset:?}", log_ident);
+        info!(
+            "{}Replicas seal with end_offsets={end_offsets:?} and final end_offset={end_offset:?}",
+            log_ident
+        );
         end_offset
     }
 

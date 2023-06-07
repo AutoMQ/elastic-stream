@@ -3,11 +3,11 @@ use std::{
     rc::Rc,
 };
 
-use log::{info, error};
+use log::{error, info};
 use model::range::RangeMetadata;
 use store::{ElasticStore, Store};
 
-use crate::error::{ServiceError, self};
+use crate::error::{self, ServiceError};
 
 use super::{fetcher::Fetcher, range::Range, stream::Stream};
 
@@ -101,13 +101,20 @@ impl StreamManager {
         Ok(())
     }
 
-    pub(crate) fn commit(&mut self, stream_id: i64, range_index: i32, offset: u64) -> Result<(), ServiceError> {
+    pub(crate) fn commit(
+        &mut self,
+        stream_id: i64,
+        range_index: i32,
+        offset: u64,
+    ) -> Result<(), ServiceError> {
         if let Some(range) = self.get_range(stream_id, range_index) {
             range.commit(offset);
             Ok(())
         } else {
             error!("Commit fail, range[{stream_id}#{range_index}] is not found");
-            Err(ServiceError::NotFound(format!("range[{stream_id}#{range_index}]")))
+            Err(ServiceError::NotFound(format!(
+                "range[{stream_id}#{range_index}]"
+            )))
         }
     }
 
