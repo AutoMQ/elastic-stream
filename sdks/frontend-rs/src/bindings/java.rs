@@ -611,7 +611,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_ap
             // # Safety
             // Java caller guarantees that `buf` will remain valid until `Future#complete` is called.
             // As a result, we can safely treat the slice as 'static.
-            let slice = unsafe {std::slice::from_raw_parts(buf, len)};
+            let slice = unsafe { slice::from_raw_parts(buf, len) };
             let buf = Bytes::from_static(slice);
             Ok(Command::Append {
                 stream,
