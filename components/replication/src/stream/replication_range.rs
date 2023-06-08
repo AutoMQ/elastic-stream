@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     cmp::Ordering,
-    rc::{Rc, Weak},
+    rc::{Rc, Weak}, time::Instant,
 };
 
 use crate::ReplicationError;
@@ -251,6 +251,7 @@ impl ReplicationRange {
             }
         }
 
+        let now = Instant::now();
         // TODO: select replica strategy.
         // - balance the read traffic.
         // - isolate unreadable (data less than expected, unaccessible) replica.
@@ -264,6 +265,10 @@ impl ReplicationRange {
             match result {
                 Ok(mut payloads) => {
                     fetch_data.append(&mut payloads);
+                    let elapse = now.elapsed().as_millis();
+                    if elapse > 10 {
+                        warn!("{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes[{batch_max_bytes}] cost too much time, elapse: {elapse}ms", self.log_ident);
+                    }
                     return Ok(fetch_data);
                 }
                 Err(e) => {
