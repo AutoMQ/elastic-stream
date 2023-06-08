@@ -155,6 +155,16 @@ fn check_io_uring(probe: &register::Probe, params: &Parameters) -> Result<(), St
     Ok(())
 }
 
+/// A simple macro_rule to log amount of time used to await completion of submitted IO tasks.
+macro_rules! log_disk_perf {
+    ($level:tt, $elapsed:expr) => {
+        $level!(
+            "io_uring_enter waited {}ms to reap completed data CQE(s)",
+            $elapsed
+        );
+    };
+}
+
 impl IO {
     /// Create new `IO` instance.
     ///
@@ -880,10 +890,16 @@ impl IO {
         loop {
             match self.data_ring.submit_and_wait(wanted) {
                 Ok(_reaped) => {
-                    trace!(
-                        "io_uring_enter waited {}us to reap completed data CQE(s)",
-                        now.elapsed().as_micros()
-                    );
+                    let elapsed = now.elapsed().as_millis();
+                    if elapsed <= 1 {
+                        log_disk_perf!(trace, elapsed);
+                    } else if elapsed <= 5 {
+                        log_disk_perf!(debug, elapsed);
+                    } else if elapsed <= 10 {
+                        log_disk_perf!(info, elapsed);
+                    } else {
+                        log_disk_perf!(warn, elapsed);
+                    }
                     break;
                 }
                 Err(e) => {

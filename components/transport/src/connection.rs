@@ -296,7 +296,10 @@ impl Connection {
             observer: tx,
         };
         self.tx.send(task).map_err(|e| {
-            warn!("Failed to send frame to connection's internal SPSC channel. Cause: {:?}", e);
+            warn!(
+                "Failed to send frame to connection's internal SPSC channel. Cause: {:?}",
+                e
+            );
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!(
@@ -307,7 +310,10 @@ impl Connection {
         })?;
 
         rx.await.map_err(|e| {
-            warn!("Failed to receive acknowledgement from oneshot channel. Cause: {:?}", e);
+            warn!(
+                "Failed to receive acknowledgement from oneshot channel. Cause: {:?}",
+                e
+            );
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!(
