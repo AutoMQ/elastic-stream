@@ -56,6 +56,11 @@ log = "0.4"
 env_logger = "0.10"
 log4rs = "1.2"
 
+# Tracing
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tracing-appender = "0.2"
+
 # RocksDB
 rocksdb = { version = "0.20", default-features = false, features = ["jemalloc"] }
 
@@ -88,6 +93,9 @@ serde_yaml = "0.9"
 
 local-sync = "0.1"
 
+[profile.dev]
+panic = "unwind"
+
 [profile.release]
 opt-level = 2
 debug = false
@@ -99,5 +107,14 @@ lto = true
 incremental = false
 panic = "abort"
 
-[profile.dev]
-panic = "abort"
+[profile.perf]
+inherits = "release"
+opt-level = 2
+debug = true
+strip = "none"
+debug-assertions = false
+overflow-checks = false
+codegen-units = 1
+lto = true
+incremental = false
+panic = "unwind"
