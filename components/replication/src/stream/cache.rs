@@ -76,3 +76,33 @@ impl CacheValue {
         Self { count, data }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::stream::cache::RecordBatchCache;
+    use bytes::Bytes;
+    use std::error::Error;
+
+    #[test]
+    fn test_cache_insert_get() -> Result<(), Box<dyn Error>> {
+        let cache = RecordBatchCache::new();
+        let stream_id = 1;
+        let range_index = 0;
+        for i in 0..100 {
+            let base_offset = i * 10;
+            let count = 10;
+            let data = vec![Bytes::from(format!("data{}", i))];
+            cache.insert(stream_id, range_index, base_offset, count, data.clone());
+            let cache_value = cache.get(stream_id, range_index, base_offset).unwrap();
+            assert_eq!(cache_value.count, count);
+            assert_eq!(cache_value.data, data);
+        }
+        for i in 0..100 {
+            let base_offset = i * 10;
+            let cache_value = cache.get(stream_id, range_index, base_offset).unwrap();
+            assert_eq!(cache_value.count, 10);
+            assert_eq!(cache_value.data, vec![Bytes::from(format!("data{}", i))]);
+        }
+        Ok(())
+    }
+}

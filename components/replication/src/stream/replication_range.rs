@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::ReplicationError;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use client::Client;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
@@ -203,7 +203,9 @@ impl ReplicationRange {
             self.metadata().index() as u32,
             base_offset,
             last_offset_delta,
-            flat_record_batch_bytes.clone(),
+            // deep copy record batch bytes cause of replication directly use the bytes passed from frontend which
+            // will be reused in future appends.
+            vec![vec_bytes_to_bytes(&flat_record_batch_bytes)],
         );
         for replica in (*self.replicators).iter() {
             replica.append(
@@ -514,4 +516,16 @@ impl RangeAppendContext {
     pub fn new(base_offset: u64) -> Self {
         Self { base_offset }
     }
+}
+
+fn vec_bytes_to_bytes(vec_bytes: &Vec<Bytes>) -> Bytes {
+    let mut size = 0;
+    for bytes in vec_bytes.iter() {
+        size += bytes.len();
+    }
+    let mut bytes_mut = BytesMut::with_capacity(size);
+    for bytes in vec_bytes {
+        bytes_mut.extend_from_slice(&bytes[..]);
+    }
+    bytes_mut.freeze()
 }

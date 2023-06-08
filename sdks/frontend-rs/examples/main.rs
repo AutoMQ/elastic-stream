@@ -1,5 +1,6 @@
 use bytes::{Bytes, BytesMut};
 use frontend::{Frontend, StreamOptions};
+use futures::{FutureExt, future::join_all};
 use log::info;
 use model::{record::flat_record::FlatRecordBatch, RecordBatch};
 use tokio::time::{sleep, Duration};
@@ -19,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let stream = frontend.open(stream_id, 0).await?;
 
         info!("Step1: append 10-record batch");
+        let mut append_tasks = vec![];
         for i in 0..10 {
             let payload = Bytes::from(format!("Hello World {i:0>8}!"));
             let record_batch = RecordBatch::new_builder()
@@ -31,12 +33,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap();
             let flat_record_batch: FlatRecordBatch = Into::into(record_batch);
             let (flat_record_batch_bytes, _) = flat_record_batch.encode();
-            let append_result = stream
-                .append(vec_bytes_to_bytes(flat_record_batch_bytes))
-                .await?;
-            assert_eq!(i * 10, append_result.base_offset as i32);
-            info!("Append result: {:?}", append_result);
+            let index = i;
+            let future = stream
+                .append(vec_bytes_to_bytes(flat_record_batch_bytes)).map(move |rst| {
+                    let rst = rst.unwrap();
+                    assert_eq!(index * 10, rst.base_offset as i32);
+                    info!("Append result: {:?}", rst);
+                });
+            append_tasks.push(future);
         }
+        join_all(append_tasks).await;
 
         info!("Step2: read 10 record batch one by one");
         for i in 0..10 {
