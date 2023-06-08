@@ -93,9 +93,11 @@ async fn process_close_stream_command(stream: &mut Stream, future: GlobalRef) {
 
 async fn process_append_command(stream: &mut Stream, buf: Bytes, future: GlobalRef) {
     trace!("Start processing append command");
+    let _stopwatch_all = Stopwatch::new("append#all", Duration::from_millis(20));
     let result = stream.append(buf).await;
     match result {
         Ok(result) => {
+            let _stopwatch_callback = Stopwatch::new("append#callback", Duration::from_millis(1));
             let base_offset = result.base_offset;
             complete_future_with_jlong(future, base_offset);
         }
@@ -113,9 +115,11 @@ async fn process_read_command(
     future: GlobalRef,
 ) {
     trace!("Start processing read command");
+    let _stopwatch_all = Stopwatch::new("read#all", Duration::from_millis(10));
     let result = stream.read(start_offset, end_offset, batch_max_bytes).await;
     match result {
         Ok(buffers) => {
+            let _stopwatch_callback = Stopwatch::new("read#callback", Duration::from_millis(1));
             let total: usize = buffers.iter().map(|buf| buf.len()).sum();
             JENV.with(|cell| {
                 let env = get_thread_local_jenv(cell);
@@ -697,7 +701,7 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Stream_re
 fn call_future_complete_method(mut env: JNIEnv, future: GlobalRef, obj: JObject) {
     let obj = env.auto_local(obj);
     let s = JValueGen::from(&obj);
-    let _stopwatch = Stopwatch::new("Future#complete");
+    let _stopwatch = Stopwatch::new("Future#complete", Duration::from_millis(1));
     let method = unsafe { FUTURE_COMPLETE_CACHE.get() }.unwrap();
     if unsafe {
         env.call_method_unchecked(
@@ -985,7 +989,7 @@ fn call_future_complete_exceptionally_method(
 
     if let Ok(obj) = obj {
         let s = JValueGen::from(obj);
-        let _stopwatch = Stopwatch::new("Future#completeExceptionally");
+        let _stopwatch = Stopwatch::new("Future#completeExceptionally", Duration::from_millis(1));
         if env
             .call_method(
                 future,
