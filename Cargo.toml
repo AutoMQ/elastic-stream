@@ -97,7 +97,7 @@ local-sync = "0.1"
 panic = "unwind"
 
 [profile.release]
-opt-level = 2
+opt-level = 3
 debug = false
 strip = "symbols"
 debug-assertions = false
@@ -109,8 +109,8 @@ panic = "abort"
 
 [profile.perf]
 inherits = "release"
-opt-level = 2
-debug = true
+opt-level = 3
+debug = false
 strip = "none"
 debug-assertions = false
 overflow-checks = false

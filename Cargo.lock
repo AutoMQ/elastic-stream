@@ -1025,6 +1025,7 @@ dependencies = [
  "replication",
  "test-util",
  "thiserror",
+ "tikv-jemallocator",
  "tokio",
  "tokio-uring",
  "util",

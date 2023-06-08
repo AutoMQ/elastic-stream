@@ -7,6 +7,13 @@ use model::{record::flat_record::FlatRecordBatch, RecordBatch};
 use rand::RngCore;
 use tokio::time;
 
+#[cfg(not(target_env = "msvc"))]
+use tikv_jemallocator::Jemalloc;
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     const PM_ADDR: &str = "192.168.123.128:12378";
     const REPLICA_CNT: u8 = 1;
