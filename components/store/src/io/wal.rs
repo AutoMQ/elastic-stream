@@ -17,7 +17,7 @@ use crate::{
 
 use io_uring::{opcode, squeue, types};
 use log::{debug, error, info, trace, warn};
-use model::{payload::Payload};
+use model::payload::Payload;
 use percentage::Percentage;
 
 /// A WalCache holds the configurations of cache management, and supports count the usage of the memory.
@@ -295,10 +295,19 @@ impl Wal {
     }
 
     pub(crate) fn check_expired_segment(&mut self) {
-        let max_segment_file_num = self.config.store.total_segment_file_size / self.config.store.segment_size;
-        let cur_segment_file_num = self.segments.iter().filter(|segment| segment.status == Status::Read).count() as u64;
+        let max_segment_file_num =
+            self.config.store.total_segment_file_size / self.config.store.segment_size;
+        let cur_segment_file_num = self
+            .segments
+            .iter()
+            .filter(|segment| segment.status == Status::Read)
+            .count() as u64;
         if cur_segment_file_num > max_segment_file_num {
-            self.segments.iter_mut().filter(|segment| segment.status == Status::Read).take((cur_segment_file_num - max_segment_file_num) as usize).for_each(|segment| segment.status = Status::Close);
+            self.segments
+                .iter_mut()
+                .filter(|segment| segment.status == Status::Read)
+                .take((cur_segment_file_num - max_segment_file_num) as usize)
+                .for_each(|segment| segment.status = Status::Close);
         }
     }
 
@@ -315,9 +324,10 @@ impl Wal {
                     .contains_key(&segment.wal_offset)
             })
             .collect();
-        
+
         for segment in to_close {
-            self.inflight_control_tasks.insert(segment.wal_offset, segment.status);
+            self.inflight_control_tasks
+                .insert(segment.wal_offset, segment.status);
             if let Some(sd) = segment.sd.as_ref() {
                 let sqe = opcode::Close::new(types::Fd(sd.fd))
                     .build()

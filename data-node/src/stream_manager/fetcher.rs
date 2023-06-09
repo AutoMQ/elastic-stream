@@ -79,6 +79,4 @@ impl Fetcher {
 
         unimplemented!("Describe stream from peer worker is not implemented yet")
     }
-
 }
-
