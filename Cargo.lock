@@ -1021,6 +1021,7 @@ dependencies = [
  "model",
  "num_cpus",
  "protocol",
+ "rand",
  "replication",
  "test-util",
  "thiserror",

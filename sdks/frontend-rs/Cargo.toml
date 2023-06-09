@@ -26,6 +26,8 @@ chrono = { workspace = true }
 minstant = { workspace = true }
 log4rs = { workspace = true }
 crossbeam = { workspace = true }
+rand = { workspace = true }
+
 [dev-dependencies]
 test-util = { path = "../../components/test-util" }
 minitrace = { workspace = true }
