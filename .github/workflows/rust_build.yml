@@ -86,6 +86,8 @@ jobs:
         args: --all-features -- -D warnings
     - name: Build
       run: cargo build
+    - name: Code Format Check
+      run: cargo fmt --all -- --check
   test:
     strategy:
       matrix:

@@ -224,9 +224,9 @@ pub struct Store {
     pub uring: Uring,
 
     pub rocksdb: RocksDB,
-    
+
     #[serde(rename = "total-segment-file-size")]
-    pub total_segment_file_size: u64, 
+    pub total_segment_file_size: u64,
 }
 
 impl Default for Store {
