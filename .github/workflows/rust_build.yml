@@ -73,6 +73,10 @@ jobs:
     - name: Install Deps
       run: |
         ./scripts/install_deps.sh
+    - name: Check Code Format
+      uses: mbrobbel/rustfmt-check@master
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
     - name: Install Clippy
       uses: actions-rs/toolchain@v1
       with:
