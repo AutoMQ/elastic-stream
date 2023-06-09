@@ -73,6 +73,12 @@ jobs:
     - name: Install Deps
       run: |
         ./scripts/install_deps.sh
+    - name: Install Latest Nightly
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
     - name: Check Code Format
       uses: mbrobbel/rustfmt-check@master
       with:
