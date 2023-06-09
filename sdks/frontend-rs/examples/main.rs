@@ -1,6 +1,6 @@
 use bytes::{Bytes, BytesMut};
 use frontend::{Frontend, StreamOptions};
-use futures::{FutureExt, future::join_all};
+use futures::{future::join_all, FutureExt};
 use log::info;
 use model::{record::flat_record::FlatRecordBatch, RecordBatch};
 use tokio::time::{sleep, Duration};
@@ -35,7 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let (flat_record_batch_bytes, _) = flat_record_batch.encode();
             let index = i;
             let future = stream
-                .append(vec_bytes_to_bytes(flat_record_batch_bytes)).map(move |rst| {
+                .append(vec_bytes_to_bytes(flat_record_batch_bytes))
+                .map(move |rst| {
                     let rst = rst.unwrap();
                     assert_eq!(index * 10, rst.base_offset as i32);
                     info!("Append result: {:?}", rst);

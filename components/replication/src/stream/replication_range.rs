@@ -1,7 +1,8 @@
 use std::{
     cell::RefCell,
     cmp::Ordering,
-    rc::{Rc, Weak}, time::Instant,
+    rc::{Rc, Weak},
+    time::Instant,
 };
 
 use crate::ReplicationError;
