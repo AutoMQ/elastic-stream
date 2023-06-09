@@ -14,6 +14,16 @@ use tikv_jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
+const PM_ADDR: &str = "192.168.123.143:12378";
+const REPLICA_CNT: u8 = 2;
+const ACK_CNT: u8 = 1;
+
+const BATCH_SIZE: usize = 1 * 1024 * 1024;
+const RATE: u64 = 100;
+const MAX_APPEND_INFLIGHT: u32 = 2;
+
+const APPEND_WARN_THRESHOLD_MS: u64 = 500;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     frontend::init_log();
     tokio_uring::start(async {
@@ -26,13 +36,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn t() -> Result<(), Box<dyn std::error::Error>> {
-    const PM_ADDR: &str = "192.168.123.143:12378";
-    const REPLICA_CNT: u8 = 2;
-    const ACK_CNT: u8 = 1;
-
-    const BATCH_SIZE: usize = 1 * 1024 * 1024;
-    const RATE: u64 = 100;
-
     let frontend = Frontend::new(PM_ADDR)?;
     let stream_id = frontend
         .create(StreamOptions {
@@ -88,7 +91,12 @@ async fn t() -> Result<(), Box<dyn std::error::Error>> {
             });
             *cnt -= 1;
         });
-        time::sleep_until(start + time::Duration::from_nanos(interval_ns) * i).await;
+        loop {
+            time::sleep_until(start + time::Duration::from_nanos(interval_ns) * i).await;
+            if unsafe { *cnt.get() } < MAX_APPEND_INFLIGHT {
+                break;
+            }
+        }
     }
 }
 
@@ -103,7 +111,7 @@ async fn append(
     }
     let append_result = stream.append(bytes).await?;
     let time_used = start.elapsed();
-    if time_used > time::Duration::from_millis(10) {
+    if time_used > time::Duration::from_millis(APPEND_WARN_THRESHOLD_MS) {
         warn!(
             "[{}] Append result: {:?}, used {:?}",
             index, append_result, time_used
