@@ -3,8 +3,6 @@ package com.automq.elasticstream.client;
 import com.automq.elasticstream.client.api.RecordBatch;
 import com.automq.elasticstream.client.api.RecordBatchWithContext;
 
-import io.grpc.netty.shaded.io.netty.buffer.Unpooled;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;

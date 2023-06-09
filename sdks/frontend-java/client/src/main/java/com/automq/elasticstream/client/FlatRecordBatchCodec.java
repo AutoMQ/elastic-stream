@@ -26,6 +26,7 @@ import java.util.Map;
  */
 public class FlatRecordBatchCodec {
     private static final byte MAGIC_V0 = 0x22;
+    private static final ThreadLocal<ByteBuffer> META_BUF = ThreadLocal.withInitial(() -> ByteBuffer.allocate(4096));
     private static final PooledByteBufAllocator ALLOCATOR = PooledByteBufAllocator.DEFAULT;
 
     /**
@@ -40,48 +41,7 @@ public class FlatRecordBatchCodec {
 
         totalLength += 1; // magic
 
-        // encode RecordBatchMeta
-        FlatBufferBuilder metaBuilder = new FlatBufferBuilder();
-        RecordBatchMetaT recordBatchMetaT = new RecordBatchMetaT();
-        recordBatchMetaT.setStreamId(streamId);
-        recordBatchMetaT.setLastOffsetDelta(recordBatch.count());
-        recordBatchMetaT.setBaseTimestamp(recordBatch.baseTimestamp());
-        recordBatchMetaT.setProperties(recordBatch.properties().entrySet().stream().map(entry -> {
-            KeyValueT kv = new KeyValueT();
-            kv.setKey(entry.getKey());
-            kv.setValue(entry.getValue());
-            return kv;
-        }).toArray(KeyValueT[]::new));
-        metaBuilder.finish(RecordBatchMeta.pack(metaBuilder, recordBatchMetaT));
-        ByteBuffer metaBuf = metaBuilder.dataBuffer();
-        totalLength += 4; // meta length
-        totalLength += metaBuf.remaining(); // RecordBatchMeta
-
-        totalLength += 4; // payload length
-        totalLength += recordBatch.rawPayload().remaining(); // payload
-
-        ByteBuf buf = ALLOCATOR.directBuffer(totalLength);
-        buf.writeByte(MAGIC_V0); // magic
-        buf.writeInt(metaBuf.remaining()); // meta length
-        buf.writeBytes(metaBuf); // RecordBatchMeta
-        buf.writeInt(recordBatch.rawPayload().remaining()); // payload length
-        buf.writeBytes(recordBatch.rawPayload()); // payload
-        return buf;
-    }
-
-    /**
-     * Encode RecordBatch to storage format record.
-     *
-     * @param recordBatch {@link RecordBatch}
-     * @return storage format record bytes.
-     */
-    public static ByteBuf encode2(long streamId, RecordBatch recordBatch) {
-
-        int totalLength = 0;
-
-        totalLength += 1; // magic
-
-        FlatBufferBuilder metaBuilder = new FlatBufferBuilder();
+        FlatBufferBuilder metaBuilder = new FlatBufferBuilder(META_BUF.get());
 
         Integer propsVector = null;
         int propsSize = recordBatch.properties().size();
@@ -106,7 +66,7 @@ public class FlatRecordBatchCodec {
             RecordBatchMeta.addProperties(metaBuilder, propsVector);
         }
         int ptr = RecordBatchMeta.endRecordBatchMeta(metaBuilder);
-        metaBuilder.finish(ptr, null);
+        metaBuilder.finish(ptr);
 
         // The data in this ByteBuffer does NOT start at 0, but at buf.position().
         // The number of bytes is buf.remaining().
@@ -124,6 +84,8 @@ public class FlatRecordBatchCodec {
         buf.writeBytes(metaBuf); // RecordBatchMeta
         buf.writeInt(recordBatch.rawPayload().remaining()); // payload length
         buf.writeBytes(recordBatch.rawPayload()); // payload
+
+        META_BUF.get().clear();
         return buf;
     }
 
