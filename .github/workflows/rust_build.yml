@@ -79,10 +79,6 @@ jobs:
           toolchain: nightly
           override: true
           components: rustfmt, clippy
-    - name: Check Code Format
-      uses: mbrobbel/rustfmt-check@master
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
     - name: Install Clippy
       uses: actions-rs/toolchain@v1
       with:
@@ -96,6 +92,10 @@ jobs:
         args: --all-features -- -D warnings
     - name: Build
       run: cargo build
+    - name: Check Code Format
+      uses: mbrobbel/rustfmt-check@master
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
   test:
     strategy:
       matrix:
