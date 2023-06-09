@@ -17,6 +17,7 @@ impl RecordBatchCache {
         Self { cache }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn insert(
         &self,
         stream_id: u64,
@@ -72,6 +73,7 @@ pub(crate) struct CacheValue {
 }
 
 impl CacheValue {
+    #[allow(dead_code)]
     pub(crate) fn new(count: u32, data: Vec<Bytes>) -> Self {
         Self { count, data }
     }

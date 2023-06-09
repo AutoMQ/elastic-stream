@@ -524,6 +524,7 @@ impl RangeAppendContext {
     }
 }
 
+#[allow(dead_code)]
 fn vec_bytes_to_bytes(vec_bytes: &Vec<Bytes>) -> Bytes {
     let mut size = 0;
     for bytes in vec_bytes.iter() {
