@@ -18,7 +18,7 @@ use log4rs::{
 pub fn init_log() {
     let console_appender = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} {T} | {({l}):5.5} | {f}:{L} — {m}{n}",
         )))
         .build();
 
@@ -31,7 +31,7 @@ pub fn init_log() {
 
     let client_appender = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} {T} | {({l}):5.5} | {f}:{L} — {m}{n}",
         )))
         .build(
             "logs/client.log",
@@ -48,7 +48,7 @@ pub fn init_log() {
 
     let replication_appender = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
-            "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {m}{n}",
+            "{d(%Y-%m-%d %H:%M:%S%.3f)} {T} | {({l}):5.5} | {f}:{L} — {m}{n}",
         )))
         .build(
             "logs/replication.log",

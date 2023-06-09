@@ -289,7 +289,9 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
     unsafe { JLONG_CTOR_CACHE.set(jlong_ctor).unwrap() };
     unsafe { FUTURE_COMPLETE_CACHE.set(future_complete_method).unwrap() };
 
-    let cpu_sum = num_cpus::get();
+    // Callback thread number is between [2, 4].
+    let cpu_sum = std::cmp::max(std::cmp::min(num_cpus::get(), 4), 2);
+
     (0..cpu_sum).for_each(|i| {
         let java_vm_clone = java_vm.clone();
         let callback_rx_clone = callback_rx.clone();
@@ -310,11 +312,13 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
                                 future,
                                 base_offset,
                             } => {
-                                let _stopwatch = Stopwatch::new("Append#callback", Duration::from_millis(1));
+                                let _stopwatch =
+                                    Stopwatch::new("Append#callback", Duration::from_millis(1));
                                 complete_future_with_jlong(future, base_offset);
                             }
                             CallbackCommand::Read { future, buffers } => {
-                                let _stopwatch = Stopwatch::new("Read#callback", Duration::from_millis(1));
+                                let _stopwatch =
+                                    Stopwatch::new("Read#callback", Duration::from_millis(1));
                                 complete_future_with_byte_array(future, buffers);
                             }
                             CallbackCommand::CreateStream { future, stream_id } => {

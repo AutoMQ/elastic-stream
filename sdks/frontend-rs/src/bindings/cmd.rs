@@ -53,14 +53,36 @@ pub enum Command<'a> {
     },
 }
 
-
-pub enum CallbackCommand<> {
-    Append { future: GlobalRef, base_offset: i64 },
-    Read { future: GlobalRef, buffers: Vec<Bytes> },
-    CreateStream {future: GlobalRef, stream_id: i64},
-    OpenStream {future: GlobalRef, ptr: i64},
-    StartOffset {future: GlobalRef, offset: i64},
-    NextOffset {future: GlobalRef, offset: i64},
-    CloseStream {future: GlobalRef},
-    ClientError {future: GlobalRef, err: ClientError},
+pub enum CallbackCommand {
+    Append {
+        future: GlobalRef,
+        base_offset: i64,
+    },
+    Read {
+        future: GlobalRef,
+        buffers: Vec<Bytes>,
+    },
+    CreateStream {
+        future: GlobalRef,
+        stream_id: i64,
+    },
+    OpenStream {
+        future: GlobalRef,
+        ptr: i64,
+    },
+    StartOffset {
+        future: GlobalRef,
+        offset: i64,
+    },
+    NextOffset {
+        future: GlobalRef,
+        offset: i64,
+    },
+    CloseStream {
+        future: GlobalRef,
+    },
+    ClientError {
+        future: GlobalRef,
+        err: ClientError,
+    },
 }
