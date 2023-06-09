@@ -51,7 +51,7 @@ impl<'a> SealRange<'a> {
         let range = request.range;
         let mut range = Into::<RangeMetadata>::into(&*range);
 
-        match manager.seal(&mut range).await {
+        match manager.seal(&mut range) {
             Ok(_) => {
                 status.code = ErrorCode::OK;
                 status.message = Some(String::from("OK"));

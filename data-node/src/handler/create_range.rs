@@ -49,7 +49,7 @@ impl<'a> CreateRange<'a> {
 
         let range = request.range;
         let range: RangeMetadata = Into::<RangeMetadata>::into(&*range);
-        if let Err(e) = manager.create_range(range.clone()).await {
+        if let Err(e) = manager.create_range(range.clone()) {
             error!("Failed to create range: {:?}", e);
             let mut status = StatusT::default();
             // TODO: Map service error to the corresponding error code.

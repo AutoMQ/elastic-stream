@@ -1,10 +1,11 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
     rc::Rc,
+    time::Duration,
 };
 
 use log::{error, info};
-use model::range::RangeMetadata;
+use model::{range::RangeMetadata, stream::StreamMetadata};
 use store::{ElasticStore, Store};
 
 use crate::error::ServiceError;
@@ -81,7 +82,7 @@ impl StreamManager {
     }
 
     /// Create a new range for the specified stream.
-    pub(crate) async fn create_range(&mut self, range: RangeMetadata) -> Result<(), ServiceError> {
+    pub(crate) fn create_range(&mut self, range: RangeMetadata) -> Result<(), ServiceError> {
         info!("Create range={:?}", range);
 
         match self.streams.entry(range.stream_id()) {
@@ -89,10 +90,12 @@ impl StreamManager {
                 occupied.get_mut().create_range(range);
             }
             Entry::Vacant(vacant) => {
-                let metadata = self
-                    .fetcher
-                    .describe_stream(range.stream_id() as u64)
-                    .await?;
+                let metadata = StreamMetadata {
+                    stream_id: Some(range.stream_id() as u64),
+                    replica: 0,
+                    ack_count: 0,
+                    retention_period: Duration::from_secs(1),
+                };
                 let mut stream = Stream::new(metadata);
                 stream.create_range(range);
                 vacant.insert(stream);
@@ -118,23 +121,10 @@ impl StreamManager {
         }
     }
 
-    pub(crate) async fn seal(&mut self, range: &mut RangeMetadata) -> Result<(), ServiceError> {
+    pub(crate) fn seal(&mut self, range: &mut RangeMetadata) -> Result<(), ServiceError> {
         if let Some(stream) = self.streams.get_mut(&range.stream_id()) {
             if !stream.has_range(range.index()) {
-                // Fetch all ranges of the stream from placement manager that are allocated to this node.
-                let ranges = self
-                    .fetcher
-                    .list_ranges(Some(self.store.id() as u32), Some(range.stream_id() as u64))
-                    .await?;
-                // Filter the missing ones
-                let ranges = ranges
-                    .into_iter()
-                    .filter(|r| !stream.has_range(r.index()))
-                    .collect::<Vec<_>>();
-                // Create the missing ranges in the stream
-                ranges.into_iter().for_each(|item| {
-                    stream.create_range(item);
-                });
+                stream.create_range(range.clone());
             }
             stream.seal(range)
         } else {
@@ -142,21 +132,14 @@ impl StreamManager {
                 "Stream[id={}] is not found, fetch stream metadata from placement manager",
                 range.stream_id()
             );
-            // Describe the stream to get the stream metadata
-            let stream_metadata = self
-                .fetcher
-                .describe_stream(range.stream_id() as u64)
-                .await?;
+            let stream_metadata = StreamMetadata {
+                stream_id: Some(range.stream_id() as u64),
+                replica: 0,
+                ack_count: 0,
+                retention_period: Duration::from_secs(1),
+            };
             let mut stream = Stream::new(stream_metadata);
-            // Fetch all ranges of the stream from placement manager that are allocated to this node.
-            let ranges = self
-                .fetcher
-                .list_ranges(Some(self.store.id() as u32), Some(range.stream_id() as u64))
-                .await?;
-            // Create ranges in the stream
-            for item in ranges {
-                stream.create_range(item);
-            }
+            stream.create_range(range.clone());
             // Seal the range
             stream.seal(range)?;
             self.streams.insert(range.stream_id(), stream);
