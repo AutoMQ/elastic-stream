@@ -16,7 +16,6 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 import com.automq.elasticstream.client.DefaultRecordBatch;
-import com.automq.elasticstream.client.FlatRecordBatchCodec;
 import com.automq.elasticstream.client.api.Client;
 import com.automq.elasticstream.client.api.CreateStreamOptions;
 import com.automq.elasticstream.client.api.RecordBatch;
