@@ -20,7 +20,8 @@ use super::cache::RecordBatchCache;
 
 /// `StreamManager` is intended to be used in thread-per-core usage case. It is NOT `Send`.
 pub(crate) struct StreamManager {
-    client: Rc<Client>,
+    clients: Vec<Rc<Client>>,
+    round_robin: usize,
     streams: Rc<RefCell<HashMap<u64, Rc<ReplicationStream>>>>,
     cache: Rc<RecordBatchCache>,
 }
@@ -28,17 +29,29 @@ pub(crate) struct StreamManager {
 impl StreamManager {
     pub(crate) fn new(config: Arc<Configuration>) -> Self {
         let (shutdown, _rx) = broadcast::channel(1);
-        let client = Rc::new(Client::new(Arc::clone(&config), shutdown));
         let streams = Rc::new(RefCell::new(HashMap::new()));
         let cache = Rc::new(RecordBatchCache::new());
 
-        Self::schedule_heartbeat(&client, config.client_heartbeat_interval());
+        let mut clients = vec![];
+        for _ in 0..config.replication.connection_pool_size {
+            let client = Rc::new(Client::new(Arc::clone(&config), shutdown.clone()));
+            Self::schedule_heartbeat(&client, config.client_heartbeat_interval());
+            clients.push(client);
+        }
 
         Self {
-            client,
+            clients,
+            round_robin: 0,
             streams,
             cache,
         }
+    }
+
+    fn route_client(&mut self) -> Result<Rc<Client>, ReplicationError> {
+        debug_assert!(!self.clients.is_empty(), "Clients should NOT be empty");
+        let index = self.round_robin % self.clients.len();
+        self.round_robin += 1;
+        self.clients.get(index).cloned().ok_or(ReplicationError::Internal)
     }
 
     fn schedule_heartbeat(client: &Rc<Client>, interval: std::time::Duration) {
@@ -108,7 +121,14 @@ impl StreamManager {
             ack_count: request.ack_count,
             retention_period: request.retention_period,
         };
-        let client = self.client.clone();
+
+        let client = match self.route_client() {
+            Ok(client) => client,
+            Err(e) => {
+                let _ = tx.send(Err(e));
+                return;
+            }
+        };
         tokio_uring::spawn(async move {
             let result = client
                 .create_stream(metadata)
@@ -130,7 +150,13 @@ impl StreamManager {
         request: OpenStreamRequest,
         tx: oneshot::Sender<Result<OpenStreamResponse, ReplicationError>>,
     ) {
-        let client = self.client.clone();
+        let client = match self.route_client() {
+            Ok(client) => client,
+            Err(e) => {
+                let _ = tx.send(Err(e));
+                return;
+            }
+        };
         let streams = self.streams.clone();
         let cache = self.cache.clone();
         tokio_uring::spawn(async move {

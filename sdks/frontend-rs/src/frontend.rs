@@ -17,10 +17,11 @@ pub struct Frontend {
 impl Frontend {
     pub fn new(access_point: &str) -> Result<Self, ClientError> {
         info!("New frontend with access-point: {access_point}");
-        let config = Configuration {
+        let mut config = Configuration {
             placement_manager: access_point.to_owned(),
             ..Default::default()
         };
+        config.replication.connection_pool_size = 3;
         let config = Arc::new(config);
         let stream_client = StreamClient::new(Arc::clone(&config));
         Ok(Self {

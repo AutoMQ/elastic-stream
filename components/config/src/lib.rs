@@ -398,6 +398,12 @@ impl Configuration {
                 std::fs::create_dir_all(metadata)?;
             }
         }
+
+        if self.replication.connection_pool_size == 0 {
+            // If connection-pool-size is 0, use processor number as default
+            self.replication.connection_pool_size = num_cpus::get();
+        }
+
         Ok(())
     }
 
