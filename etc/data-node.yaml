@@ -86,3 +86,6 @@ store:
     create-if-missing: true
     # Flush index entries of record-batch every `flush_threshold`
     flush-threshold: 32768
+
+replication:
+  connection-pool-size: 3

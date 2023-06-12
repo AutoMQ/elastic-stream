@@ -301,6 +301,21 @@ impl Default for RocksDB {
     }
 }
 
+/// Configurable items of the replication layer.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Replication {
+    #[serde(rename = "connection-pool-size")]
+    pub connection_pool_size: usize,
+}
+
+impl Default for Replication {
+    fn default() -> Self {
+        Self {
+            connection_pool_size: 3,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Configuration {
     /// Unit of time in milliseconds.
@@ -314,6 +329,8 @@ pub struct Configuration {
     pub server: Server,
 
     pub store: Store,
+
+    pub replication: Replication,
 }
 
 impl Default for Configuration {
@@ -324,6 +341,7 @@ impl Default for Configuration {
             client: Default::default(),
             server: Default::default(),
             store: Default::default(),
+            replication: Default::default(),
         }
     }
 }
@@ -431,6 +449,8 @@ mod tests {
         assert_eq!(1, config.server.concurrency);
         assert_eq!(128, config.server.uring.queue_depth);
         assert_eq!(32768, config.store.rocksdb.flush_threshold);
+
+        assert_eq!(3, config.replication.connection_pool_size);
         Ok(())
     }
 
