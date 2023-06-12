@@ -7,7 +7,6 @@ import io.netty.buffer.Unpooled;
 import com.automq.elasticstream.client.api.RecordBatch;
 import com.automq.elasticstream.client.api.RecordBatchWithContext;
 import com.automq.elasticstream.client.flatc.records.KeyValue;
-import com.automq.elasticstream.client.flatc.records.KeyValueT;
 import com.automq.elasticstream.client.flatc.records.RecordBatchMeta;
 import com.automq.elasticstream.client.flatc.records.RecordBatchMetaT;
 

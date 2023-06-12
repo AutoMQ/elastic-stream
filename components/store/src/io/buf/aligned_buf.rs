@@ -93,8 +93,8 @@ impl AlignedBuf {
     /// `true` if the cache hit partially;
     /// `false` if the cache has no overlap with the specified region.
     pub(crate) fn covers_partial(&self, wal_offset: u64, len: u32) -> bool {
-        self.wal_offset <= wal_offset + len as u64
-            && wal_offset <= self.wal_offset + self.limit() as u64
+        self.wal_offset < wal_offset + len as u64
+            && wal_offset < self.wal_offset + self.limit() as u64
     }
 
     pub(crate) fn limit(&self) -> usize {
@@ -271,6 +271,20 @@ mod tests {
 
         let payload = std::str::from_utf8(buf.slice(12..))?;
         assert_eq!(payload, msg);
+        Ok(())
+    }
+
+    #[test]
+    fn test_covers_partial() -> Result<(), Box<dyn Error>> {
+        let alignment = 4096;
+        let buf = AlignedBuf::new(4096, 128, alignment)?;
+        let record: [u8; 128] = [0; 128];
+        buf.write_buf(4096, &record);
+        assert!(!buf.covers_partial(0, 4096));
+        assert!(buf.covers_partial(4096, 4096));
+        assert!(buf.covers_partial(4096, 64));
+        assert!(buf.covers_partial(4096, 128));
+        assert!(!buf.covers_partial(4096 + 128, 128));
         Ok(())
     }
 

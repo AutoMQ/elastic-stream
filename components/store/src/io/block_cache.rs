@@ -58,9 +58,9 @@ impl Entry {
             buf.covers_partial(entry_range.wal_offset, entry_range.len)
         } else if let Some(loading_entry_range) = &self.entry_range {
             // When comparing with a loading entry, we should consider the aligned length
-            loading_entry_range.wal_offset <= entry_range.wal_offset + entry_range.len as u64
+            loading_entry_range.wal_offset < entry_range.wal_offset + entry_range.len as u64
                 && entry_range.wal_offset
-                    <= loading_entry_range.wal_offset + loading_entry_range.len as u64
+                    < loading_entry_range.wal_offset + loading_entry_range.len as u64
         } else {
             false
         }
