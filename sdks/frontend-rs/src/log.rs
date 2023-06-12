@@ -60,7 +60,7 @@ pub fn init_log() {
         .expect("Failed to build rolling file appender for replication");
 
     let level = log::LevelFilter::from_str(&std::env::var("ES_SDK_LOG").unwrap_or_default())
-        .unwrap_or(log::LevelFilter::Warn);
+        .unwrap_or(log::LevelFilter::Info);
 
     let config = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(console_appender)))
