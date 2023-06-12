@@ -51,7 +51,10 @@ impl StreamManager {
         debug_assert!(!self.clients.is_empty(), "Clients should NOT be empty");
         let index = self.round_robin % self.clients.len();
         self.round_robin += 1;
-        self.clients.get(index).cloned().ok_or(ReplicationError::Internal)
+        self.clients
+            .get(index)
+            .cloned()
+            .ok_or(ReplicationError::Internal)
     }
 
     fn schedule_heartbeat(client: &Rc<Client>, interval: std::time::Duration) {
