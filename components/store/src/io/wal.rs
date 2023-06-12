@@ -146,7 +146,7 @@ impl Wal {
         // Ensure `pos` falls into WAL data range covered by `segment`.
         debug_assert!(*pos >= segment.wal_offset, "Invalid WAL offset");
         debug_assert!(
-            *pos < segment.wal_offset + segment.size as u64,
+            *pos < segment.wal_offset + segment.size,
             "Invalid WAL offset"
         );
 
