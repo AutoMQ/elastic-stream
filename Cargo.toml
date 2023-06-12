@@ -52,7 +52,7 @@ nix = "0.26"
 moka = { version = "0.11", features = ["future"] }
 
 # Logging
-log = "0.4"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
 env_logger = "0.10"
 log4rs = "1.2"
 
