@@ -57,6 +57,11 @@ loggers:
     appenders:
       - data-node
     additive: false
+  model:
+    level: trace
+    appenders:
+      - data-node
+    additive: false
   codec:
     level: trace
     appenders:

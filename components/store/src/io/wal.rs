@@ -143,6 +143,13 @@ impl Wal {
         pos: &mut u64,
         indexer: &Arc<IndexDriver>,
     ) -> Result<bool, StoreError> {
+        // Ensure `pos` falls into WAL data range covered by `segment`.
+        debug_assert!(*pos >= segment.wal_offset, "Invalid WAL offset");
+        debug_assert!(
+            *pos < segment.wal_offset + segment.size as u64,
+            "Invalid WAL offset"
+        );
+
         let mut file_pos = *pos - segment.wal_offset;
         let mut meta_buf = [0; 4];
 
@@ -244,7 +251,7 @@ impl Wal {
         indexer: Arc<IndexDriver>,
     ) -> Result<u64, StoreError> {
         let mut pos = offset;
-        info!("Start to recover WAL segment files");
+        info!("Start to recover WAL segment files from {pos}");
         let mut need_scan = true;
         for segment in self.segments.iter_mut() {
             if segment.wal_offset + segment.size <= offset {
