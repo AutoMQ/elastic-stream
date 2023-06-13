@@ -9,6 +9,7 @@ use crate::io::wal::Wal;
 use crate::io::write_window::WriteWindow;
 use crate::AppendResult;
 use crate::BufSlice;
+use minstant::Instant;
 use observation::metrics::uring_metrics::{
     UringStatistics, COMPLETED_READ_IO, COMPLETED_WRITE_IO, INFLIGHT_IO, IO_DEPTH, PENDING_TASK,
     READ_BYTES_TOTAL, READ_IO_LATENCY, WRITE_BYTES_TOTAL, WRITE_IO_LATENCY,
@@ -540,7 +541,7 @@ impl IO {
                             Arc::new(buf),
                             read_offset,
                             read_len,
-                            minstant::Instant::now(),
+                            Instant::now(),
                         );
 
                         let sqe = opcode::Read::new(types::Fd(sd.fd), ptr, read_len)
@@ -656,7 +657,7 @@ impl IO {
                         // The pointer will be set into user_data of uring.
                         // When the uring io completes, the pointer will be used to retrieve the `Context`.
                         let context =
-                            Context::write_ctx(opcode::Write::CODE, buf, buf_wal_offset, buf_limit, minstant::Instant::now());
+                            Context::write_ctx(opcode::Write::CODE, buf, buf_wal_offset, buf_limit, Instant::now());
 
                         // Note we have to write the whole page even if the page is partially filled.
                         let sqe = opcode::Write::new(types::Fd(sd.fd), ptr, buf_capacity)
@@ -886,7 +887,7 @@ impl IO {
             wanted = self.inflight;
         }
 
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         loop {
             match self.data_ring.submit_and_wait(wanted) {
                 Ok(_reaped) => {

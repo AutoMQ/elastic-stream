@@ -118,6 +118,7 @@ async fn process_append_command(stream: &mut Stream, buf: Bytes, future: GlobalR
     };
     trace!("Append command finished");
 }
+
 async fn process_read_command(
     stream: &mut Stream,
     start_offset: i64,
