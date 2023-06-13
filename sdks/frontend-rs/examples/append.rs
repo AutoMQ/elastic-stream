@@ -25,6 +25,7 @@ struct Args {
     payload_size: usize,
 }
 
+/// Example program to kickoff append workload.
 fn main() -> Result<(), Box<dyn Error + 'static>> {
     let args = Args::parse();
     frontend::init_log();
