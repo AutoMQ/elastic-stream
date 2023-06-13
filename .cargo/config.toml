@@ -1,2 +1,5 @@
 [registries.crates-io]
 protocol = "sparse"
+
+[env]
+ROCKSDB_LIB_DIR="/usr/local/lib"
