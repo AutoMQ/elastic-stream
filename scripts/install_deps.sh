@@ -13,16 +13,10 @@ try_install_flatc() {
     fi
 }
 
-try_install_sccache() {
-    if [ ! -f /usr/local/bin/sccache ]; then
-        wget -O sccache.tar.gz https://github.com/mozilla/sccache/releases/download/v0.3.3/sccache-v0.3.3-x86_64-unknown-linux-musl.tar.gz
-        tar -xzvf sccache.tar.gz
-        sudo mv sccache-v0.3.3-x86_64-unknown-linux-musl/sccache /usr/local/bin/
-        rm sccache.tar.gz
-        rm -fr sccache-v0.3.3-x86_64-unknown-linux-musl
-    else
-        echo "sccache exists"
-    fi
+try_install_rocksdb() {
+    wget https://github.com/lizhanhui/rocksdb/releases/download/rocksdb-v8.1.2/rocksdb.deb
+    ./try_install.sh rocksdb.deb
 }
 
 try_install_flatc
+try_install_rocksdb
