@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,6 +35,7 @@ import java.util.function.Consumer;
  */
 class StreamBench {
     private final StreamClient streamClient;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     public StreamBench(String endpoint, AppendTaskConfig appendTaskConfig, FetchTaskConfig fetchTaskConfig) {
         Client client = Client.builder().endpoint(endpoint + ":12378").kvEndpoint(endpoint + ":12379").build();
@@ -207,11 +210,11 @@ class StreamBench {
             Stream stream = streams.get(currentStreamIndex);
             long appendStartNano = System.nanoTime();
             stream.append(new DefaultRecordBatch(10, 233, Collections.emptyMap(), payload.duplicate()))
-                    .thenAccept(rst -> {
+                    .thenAcceptAsync(rst -> {
                         count.incrementAndGet();
                         costNanos.addAndGet(System.nanoTime() - appendStartNano);
                         confirmEventListener.accept(new ConfirmEvent(stream, currentStreamIndex, rst.baseOffset() + 10));
-                    });
+                    }, executor);
         }
         doneSignal.set(true);
     }
