@@ -64,8 +64,7 @@ impl Indexer {
         index_cf_opts.set_compression_type(DBCompressionType::None);
         {
             // 128MiB block cache
-            let cache = rocksdb::Cache::new_lru_cache(128 << 20)
-                .map_err(|e| StoreError::RocksDB(e.into_string()))?;
+            let cache = rocksdb::Cache::new_lru_cache(128 << 20);
             let mut table_opts = BlockBasedOptions::default();
             table_opts.set_block_cache(&cache);
             table_opts.set_block_size(128 << 10);
@@ -184,6 +183,7 @@ impl Indexer {
                 let prev = self.count.fetch_add(1, Ordering::Relaxed);
                 if prev + 1 >= self.flush_threshold {
                     self.flush(false)?;
+                    info!("Advanced WAL checkpoint to {}", handle.wal_offset);
                     self.count.store(0, Ordering::Relaxed);
                 }
                 Ok(())
@@ -343,9 +343,17 @@ impl Indexer {
         info!("AtomicFlush RocksDB column families");
         let mut flush_opt = FlushOptions::default();
         flush_opt.set_wait(wait);
-        self.db
-            .flush_opt(&flush_opt)
-            .map_err(|e| StoreError::RocksDB(e.into_string()))
+        if let Some((index, metadata)) = self
+            .db
+            .cf_handle(INDEX_COLUMN_FAMILY)
+            .zip(self.db.cf_handle(METADATA_COLUMN_FAMILY))
+        {
+            self.db
+                .flush_cfs_opt(&[index, metadata], &flush_opt)
+                .map_err(|e| StoreError::RocksDB(e.into_string()))
+        } else {
+            unreachable!("index or metadata column family handle is not found")
+        }
     }
 
     /// Compaction is synchronous and should execute in its own thread.
