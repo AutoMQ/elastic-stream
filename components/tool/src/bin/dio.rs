@@ -3,7 +3,8 @@ use io_uring::{self, opcode, register, types, IoUring, Parameters};
 use std::{
     alloc::{self, Layout},
     error::Error,
-    ffi::CString, ops::IndexMut,
+    ffi::CString,
+    ops::IndexMut,
 };
 
 fn check_io_uring(probe: &register::Probe, params: &Parameters) {
@@ -37,7 +38,7 @@ fn check_io_uring(probe: &register::Probe, params: &Parameters) {
 /// # Arguments
 /// `histogram` - Histogram of table
 /// `value` - An observed record in nano seconds
-fn observe(histogram: &mut[usize], value: u64) {
+fn observe(histogram: &mut [usize], value: u64) {
     // target slot index
     let mut target = (value / 1000 / 1000) as usize;
     if target >= histogram.len() {
