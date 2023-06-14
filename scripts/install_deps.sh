@@ -15,7 +15,7 @@ try_install_flatc() {
 
 try_install_rocksdb() {
     if [ ! -f rocksdb.deb ]; then
-        wget https://github.com/lizhanhui/rocksdb/releases/download/rocksdb-v8.1.2/rocksdb.deb
+        wget https://github.com/lizhanhui/rocksdb/releases/download/rocksdb-v8.1.3/rocksdb.deb
     fi
     ./try_install.sh rocksdb.deb
 }
