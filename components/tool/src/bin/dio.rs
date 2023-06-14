@@ -3,7 +3,7 @@ use io_uring::{self, opcode, register, types, IoUring, Parameters};
 use std::{
     alloc::{self, Layout},
     error::Error,
-    ffi::CString,
+    ffi::CString, ops::IndexMut,
 };
 
 fn check_io_uring(probe: &register::Probe, params: &Parameters) {
@@ -33,9 +33,36 @@ fn check_io_uring(probe: &register::Probe, params: &Parameters) {
     }
 }
 
+/// Frequency of each latency slot
+/// # Arguments
+/// `histogram` - Histogram of table
+/// `value` - An observed record in nano seconds
+fn observe(histogram: &mut[usize], value: u64) {
+    // target slot index
+    let mut target = (value / 1000 / 1000) as usize;
+    if target >= histogram.len() {
+        target = histogram.len() - 1;
+    }
+
+    *histogram.index_mut(target) += 1;
+}
+
+fn print_histogram(stats: &[usize]) {
+    stats.iter().enumerate().for_each(|(idx, n)| {
+        if *n != 0 {
+            println!("[{}ms, {}ms): {n}", idx, idx + 1);
+        }
+    });
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args = tool::Args::parse();
     println!("PID: {}", std::process::id());
+    if minstant::is_tsc_available() {
+        println!("TSC is available");
+    } else {
+        eprintln!("TSC is NOT available");
+    }
 
     let file_size = args.size * 1024 * 1024 * 1024;
 
@@ -120,13 +147,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     submitter.register_enable_rings()?;
     check_io_uring(&probe, uring.params());
 
-    const LATENCY_N: usize = 128;
-    let mut latency = [0u16; LATENCY_N];
-    let mut latency_index = 0_usize;
+    const HISTOGRAM_N: usize = 101;
+
+    let mut histogram = [0usize; HISTOGRAM_N];
 
     let mut writes = 0;
     let mut offset = 0;
-    let mut seq = 0;
+    let anchor = minstant::Anchor::new();
     loop {
         loop {
             if writes >= args.qd {
@@ -141,24 +168,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 opcode::WriteFixed::new(types::Fixed(0), ptr as *const u8, buf_size as u32, 0)
                     .offset(offset as libc::off64_t)
                     .build()
-                    .user_data(seq);
-            seq += 1;
+                    .user_data(minstant::Instant::now().as_unix_nanos(&anchor));
             offset += buf_size;
             unsafe { uring.submission().push(&write_sqe) }?;
             writes += 1;
         }
 
-        let start = std::time::Instant::now();
         let _ = uring.submit_and_wait(1)?;
-        // calculate latency
-        let elapsed = start.elapsed().as_micros();
-        latency[latency_index] = elapsed as u16;
-        latency_index += 1;
-        if latency_index + 1 >= LATENCY_N {
-            latency_index = 0;
-            let sum: u64 = latency.iter().map(|v| *v as u64).sum();
-            println!("AVG submit_and_wait latency: {}us", sum / LATENCY_N as u64);
-        }
 
         let mut cq = uring.completion();
         loop {
@@ -167,8 +183,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
 
             #[allow(clippy::while_let_on_iterator)]
-            while let Some(_entry) = cq.next() {
+            while let Some(entry) = cq.next() {
                 writes -= 1;
+                let start = entry.user_data();
+                let elapsed = minstant::Instant::now().as_unix_nanos(&anchor) - start;
+                observe(&mut histogram, elapsed);
             }
             cq.sync();
         }
@@ -178,6 +197,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
     }
+
+    print_histogram(&histogram);
 
     for buf in &bufs {
         unsafe { alloc::dealloc(buf.iov_base as *mut u8, layout) };

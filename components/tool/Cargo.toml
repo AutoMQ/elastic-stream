@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 clap = { workspace = true }
 libc = { workspace = true }
+minstant = { workspace = true }
 io-uring = { workspace = true }
