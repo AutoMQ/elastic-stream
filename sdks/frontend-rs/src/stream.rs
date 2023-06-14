@@ -15,6 +15,10 @@ impl Stream {
         Self { id, stream_client }
     }
 
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
     pub async fn start_offset(&self) -> Result<i64, ClientError> {
         self.stream_client
             .start_offset(self.id)

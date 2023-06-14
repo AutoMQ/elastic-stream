@@ -28,6 +28,11 @@ log4rs = { workspace = true }
 crossbeam = { workspace = true }
 minitrace = { workspace = true }
 minitrace-jaeger = "0.4.1"
+rand = { workspace = true }
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.5"
+
 [dev-dependencies]
 test-util = { path = "../../components/test-util" }
 criterion = { version = "0.4", features = ["html_reports"] }
