@@ -4,8 +4,9 @@ import io.netty.util.internal.NativeLibraryLoader;
 import io.netty.util.internal.PlatformDependent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+
 public class Frontend extends ElasticStreamObject {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Frontend.class);
@@ -42,6 +43,11 @@ public class Frontend extends ElasticStreamObject {
     private native void open(long ptr, long id, long epoch, CompletableFuture<Stream> future);
     private native long getFrontend(String access_point);
     private native void freeFrontend(long ptr);
+
+    public static native ByteBuffer allocateDirect(int size);
+
+    public static native void freeMemory(long ptr, int size);
+
     @Override
     public void close() {
         freeFrontend(this.ptr);

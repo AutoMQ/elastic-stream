@@ -18,6 +18,7 @@ try_install_rocksdb() {
         wget https://github.com/lizhanhui/rocksdb/releases/download/rocksdb-v8.1.3/rocksdb.deb
     fi
     ./try_install.sh rocksdb.deb
+    rm -f rocksdb.deb
 }
 
 BASEDIR=$(dirname "$0")

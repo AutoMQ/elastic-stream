@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use jni::objects::{GlobalRef, JClass, JMethodID, JObject, JString, JValue, JValueGen};
+use jni::objects::{GlobalRef, JClass, JMethodID, JObject, JString, JValue, JValueGen, JByteBuffer};
 use jni::sys::{jint, jlong, JNINativeInterface_, JNI_VERSION_1_8};
 use jni::{JNIEnv, JavaVM};
 use log::{error, info, trace};
@@ -483,6 +483,42 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
 
 /// # Safety
 ///
+/// Expose `C` API to Java to free memory that is allocated in JNI
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_allocateDirect<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass,
+    size: i32,
+) -> JByteBuffer<'local> {
+    // Safety: we use `alignment = 1` so it is power of 2.
+    let layout = unsafe { Layout::from_size_align_unchecked(size as usize, 1) };
+
+    // Safety: Java caller guarantee that the DirectByteBuffer is allocated by JNI when fetch records
+    // and the backing memory segment is NOT deallocated before.
+    let ptr = unsafe { std::alloc::alloc_zeroed(layout) };
+    env.new_direct_byte_buffer(ptr, size as usize).unwrap()
+}
+
+/// # Safety
+///
+/// Expose `C` API to Java to free memory that is allocated in JNI
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_freeMemory(
+    mut _env: JNIEnv,
+    _class: JClass,
+    ptr: *mut u8,
+    size: i32,
+) {
+    // Safety: we use `alignment = 1` so it is power of 2.
+    let layout = unsafe { Layout::from_size_align_unchecked(size as usize, 1) };
+
+    // Safety: Java caller guarantee that the DirectByteBuffer is allocated by JNI when fetch records
+    // and the backing memory segment is NOT deallocated before.
+    unsafe { std::alloc::dealloc(ptr, layout) };
+}
+
+/// # Safety
+///
 /// Expose `C` API to Java
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_create(
@@ -844,6 +880,7 @@ fn call_future_complete_method(mut env: JNIEnv, future: GlobalRef, obj: JObject)
         panic!("Failed to call future complete method");
     }
 }
+
 fn call_future_complete_exceptionally_method(
     env: &mut JNIEnv,
     future: GlobalRef,
@@ -1172,6 +1209,7 @@ fn complete_future_with_stream(future: GlobalRef, ptr: i64) {
         }
     });
 }
+
 #[minitrace::trace("complete_future_with_jlong()")]
 fn complete_future_with_jlong(future: GlobalRef, value: i64) {
     JENV.with(|cell| {
@@ -1215,6 +1253,7 @@ fn complete_future_with_void(future: GlobalRef) {
         }
     });
 }
+
 #[allow(unused)]
 fn complete_future_with_byte_array(future: GlobalRef, buffers: Vec<Bytes>) {
     let total: usize = buffers.iter().map(|buf| buf.len()).sum();
@@ -1250,6 +1289,7 @@ fn complete_future_with_error(future: GlobalRef, err: ClientError) {
         call_future_complete_exceptionally_method(&mut env, future, err);
     });
 }
+
 #[minitrace::trace("complete_future_with_direct_byte_buffer()")]
 fn complete_future_with_direct_byte_buffer(future: GlobalRef, buffers: Vec<Bytes>) {
     // Copy buffers to `DirectByteBuffer`
