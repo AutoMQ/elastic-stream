@@ -1,5 +1,7 @@
 use bytes::Bytes;
-use jni::objects::{GlobalRef, JClass, JMethodID, JObject, JString, JValue, JValueGen, JByteBuffer};
+use jni::objects::{
+    GlobalRef, JByteBuffer, JClass, JMethodID, JObject, JString, JValue, JValueGen,
+};
 use jni::sys::{jint, jlong, JNINativeInterface_, JNI_VERSION_1_8};
 use jni::{JNIEnv, JavaVM};
 use log::{error, info, trace};
@@ -485,7 +487,9 @@ pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_
 ///
 /// Expose `C` API to Java to free memory that is allocated in JNI
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_allocateDirect<'local>(
+pub unsafe extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_allocateDirect<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass,
     size: i32,
