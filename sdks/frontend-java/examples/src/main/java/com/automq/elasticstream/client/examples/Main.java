@@ -62,6 +62,7 @@ public class Main {
             System.out.println("fetch record result offset[" + recordBatch.baseOffset() + ","
                 + recordBatch.lastOffset() + "]" + " payload:" + payloadStr + ".");
             assertEquals(String.format("hello world %03d", i), payloadStr);
+            fetchResult.free();
         }
 
         System.out.println("Step3: cross read 10 record batch");
@@ -80,6 +81,7 @@ public class Main {
                 System.out.println("fetch record result offset[" + recordBatch.baseOffset() + ","
                     + recordBatch.lastOffset() + "]" + " payload:" + payloadStr + ".");
             }
+            fetchResult.free();
         }
 
         System.out.println("Step4: reopen stream");
@@ -112,6 +114,7 @@ public class Main {
             System.out.println("fetch record result offset[" + recordBatch.baseOffset() + ","
                 + recordBatch.lastOffset() + "]" + " payload:" + payloadStr + ".");
             assertEquals(String.format("hello world %03d", i), payloadStr);
+            fetchResult.free();
         }
 
         while(true) {

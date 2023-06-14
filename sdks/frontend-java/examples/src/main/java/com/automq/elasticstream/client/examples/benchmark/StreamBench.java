@@ -153,6 +153,7 @@ class StreamBench {
 
             RecordBatchWithContext last = fetchResult.recordBatchList().get(fetchResult.recordBatchList().size() - 1);
             nextPullOffsetRef.set(last.lastOffset());
+            fetchResult.free();
 
             long now = System.currentTimeMillis();
             if (now - lastLogTimestamp > 1000) {

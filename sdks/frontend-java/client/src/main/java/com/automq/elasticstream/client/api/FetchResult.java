@@ -11,4 +11,8 @@ public interface FetchResult {
      */
     List<RecordBatchWithContext> recordBatchList();
 
+    /**
+     * Free fetch result backend memory.
+     */
+    default void free() {};
 }
