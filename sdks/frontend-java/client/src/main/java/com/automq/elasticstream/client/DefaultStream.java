@@ -8,7 +8,6 @@ import com.automq.elasticstream.client.api.Stream;
 
 import io.netty.buffer.ByteBuf;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 

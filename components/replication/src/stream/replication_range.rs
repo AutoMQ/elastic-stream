@@ -199,16 +199,15 @@ impl ReplicationRange {
         let record_batch = record_batch_builder.build().expect("valid record batch");
         let flat_record_batch: FlatRecordBatch = Into::into(record_batch);
         let (flat_record_batch_bytes, _) = flat_record_batch.encode();
-        // FIXME: OOM
-        // self.cache.insert(
-        //     self.metadata.stream_id() as u64,
-        //     self.metadata().index() as u32,
-        //     base_offset,
-        //     last_offset_delta,
-        //     // deep copy record batch bytes cause of replication directly use the bytes passed from frontend which
-        //     // will be reused in future appends.
-        //     vec![vec_bytes_to_bytes(&flat_record_batch_bytes)],
-        // );
+        self.cache.insert(
+            self.metadata.stream_id() as u64,
+            self.metadata().index() as u32,
+            base_offset,
+            last_offset_delta,
+            // deep copy record batch bytes cause of replication directly use the bytes passed from frontend which
+            // will be reused in future appends.
+            vec![vec_bytes_to_bytes(&flat_record_batch_bytes)],
+        );
         for replica in (*self.replicators).iter() {
             replica.append(
                 flat_record_batch_bytes.clone(),

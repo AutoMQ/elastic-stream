@@ -30,7 +30,7 @@ impl StreamManager {
     pub(crate) fn new(config: Arc<Configuration>) -> Self {
         let (shutdown, _rx) = broadcast::channel(1);
         let streams = Rc::new(RefCell::new(HashMap::new()));
-        let cache = Rc::new(RecordBatchCache::new());
+        let cache = Rc::new(RecordBatchCache::new(Self::get_max_cache_size()));
 
         let mut clients = vec![];
         for _ in 0..config.replication.connection_pool_size {
@@ -238,5 +238,18 @@ impl StreamManager {
         } else {
             let _ = tx.send(Err(ReplicationError::StreamNotExist));
         }
+    }
+
+    fn get_max_cache_size() -> usize {
+        // get max cache size (MB) from system env
+        std::env::var("ES_MAX_CACHE_SIZE")
+            .unwrap_or_else(|_| "2048".to_string())
+            .parse::<usize>()
+            .unwrap_or_else(|_| {
+                warn!("Failed to parse MAX_CACHE_SIZE, use default value 2048");
+                2048
+            })
+            * 1024
+            * 1024
     }
 }
