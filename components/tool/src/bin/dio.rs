@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let file_path = args.path;
     let c_file_path = CString::new(file_path.clone()).unwrap();
     let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), c_file_path.as_ptr())
-        .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC)
+        .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC | libc::O_NOATIME)
         .mode(libc::S_IRWXU | libc::S_IRWXG)
         .build()
         .user_data(0);
@@ -117,13 +117,46 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let mut uring = IoUring::builder()
-        .setup_iopoll()
-        .setup_sqpoll(2000)
-        .setup_sqpoll_cpu(1)
-        .dontfork()
-        .setup_r_disabled()
-        .build(args.qd)?;
+    let mut defer_task_run = true;
+    let mut coop_task_run = true;
+    let mut uring = loop {
+        let mut builder = IoUring::builder();
+        builder
+            .setup_iopoll()
+            .setup_sqpoll(2000)
+            .setup_sqpoll_cpu(1)
+            .dontfork()
+            .setup_r_disabled();
+
+        if defer_task_run {
+            builder.setup_defer_taskrun().setup_single_issuer();
+        }
+
+        if coop_task_run {
+            builder.setup_coop_taskrun();
+        }
+
+        match builder.build(args.qd) {
+            Ok(ring) => break ring,
+            Err(e) => {
+                if let Some(errno) = e.raw_os_error() {
+                    if errno == libc::EINVAL {
+                        if defer_task_run {
+                            defer_task_run = false;
+                            eprintln!("Disable defer_task_run and single_issuer");
+                            continue;
+                        }
+
+                        if coop_task_run {
+                            coop_task_run = false;
+                            eprintln!("Disable coop_task_run");
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+    };
 
     let alignment = args.bs as usize;
     let buf_size = alignment * 4;
@@ -168,6 +201,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let write_sqe =
                 opcode::WriteFixed::new(types::Fixed(0), ptr as *const u8, buf_size as u32, 0)
                     .offset(offset as libc::off64_t)
+                    .rw_flags(libc::RWF_NOWAIT)
                     .build()
                     .user_data(minstant::Instant::now().as_unix_nanos(&anchor));
             offset += buf_size;
@@ -175,7 +209,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             writes += 1;
         }
 
-        let _ = uring.submit_and_wait(1)?;
+        let _ = if writes >= args.qd {
+            uring.submit_and_wait(1)?
+        } else {
+            uring.submit_and_wait(0)?
+        };
 
         let mut cq = uring.completion();
         loop {
