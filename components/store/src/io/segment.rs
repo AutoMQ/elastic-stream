@@ -137,6 +137,9 @@ impl Display for Status {
             Self::Fallocate64 => {
                 write!(f, "fallocate")
             }
+            Self::Fsync => {
+                write!(f, "fsync")
+            }
             Self::ReadWrite => {
                 write!(f, "read|write")
             }
