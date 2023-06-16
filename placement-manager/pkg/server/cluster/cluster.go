@@ -61,6 +61,7 @@ type RaftCluster struct {
 	dnAlloc id.Allocator // data node id allocator
 	member  Member
 	cache   *cache.Cache
+	nodeIdx atomic.Uint64
 	client  sbpClient.Client
 	// sealMus is used to protect the stream being sealed.
 	// Each mu is a 1-element semaphore channel controlling access to seal range. Write to lock it, and read to unlock.
