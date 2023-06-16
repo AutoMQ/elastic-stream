@@ -101,6 +101,9 @@ pub(crate) enum Status {
     // Given `LogSegmentFile` are fixed in length, it would accelerate IO performance if space is pre-allocated.
     Fallocate64,
 
+    // Sync the file metadata after create/fallocate
+    Fsync,
+
     // Now the segment file is ready for read/write.
     ReadWrite,
 

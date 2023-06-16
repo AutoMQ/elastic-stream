@@ -287,7 +287,7 @@ impl Wal {
         let status = segment.status;
         self.inflight_control_tasks.insert(offset, status);
         let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), segment.path.as_ptr())
-            .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC)
+            .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT)
             .mode(libc::S_IRWXU | libc::S_IRWXG)
             .build()
             .user_data(offset);
@@ -625,10 +625,30 @@ impl Wal {
                     self.inflight_control_tasks
                         .insert(offset, Status::Fallocate64);
                 }
+
                 Status::Fallocate64 => {
+                    // Sync file metadata
                     info!("Fallocate of LogSegmentFile `{}` completed", segment);
+                    segment.status = Status::Fsync;
+                    info!("About to fsync LogSegmentFile: `{}`", segment);
+
+                    let sqe = opcode::Fsync::new(types::Fd(segment.sd.as_ref().unwrap().fd))
+                        .build()
+                        .user_data(segment.wal_offset);
+                    unsafe {
+                        self.control_ring.submission().push(&sqe).map_err(|e| {
+                            error!("Failed to submit Fsync SQE to io_uring SQ: {:?}", e);
+                            StoreError::IoUring
+                        })
+                    }?;
+                    self.inflight_control_tasks.insert(offset, Status::Fsync);
+                }
+
+                Status::Fsync => {
+                    info!("Fsync of LogSegmentFile `{}` completed", segment);
                     segment.status = Status::ReadWrite;
                 }
+
                 Status::Close => {
                     info!("LogSegmentFile: `{}` is closed", segment);
                     segment.sd = None;
