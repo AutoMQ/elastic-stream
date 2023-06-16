@@ -129,15 +129,15 @@ impl Session {
                 }
 
                 let inflight = unsafe { &mut *inflight_requests.get() };
-                inflight.extract_if(|stream_id, ctx| {
+                inflight.retain(|stream_id, ctx| {
                     if ctx.is_closed() {
                         info!(
                             "Caller has cancelled request[stream-id={}], potentially due to timeout",
                             stream_id
                         );
                     }
-                    ctx.is_closed()
-                }).count();
+                    !ctx.is_closed()
+                });
             }
             trace!("Read loop for session[target={}] completed", target);
         });
