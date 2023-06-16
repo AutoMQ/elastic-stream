@@ -425,48 +425,56 @@ impl CompositeSession {
         &self,
         stream_id: u64,
     ) -> Result<StreamMetadata, ClientError> {
-        self.try_reconnect().await;
-        let session = self
-            .pick_session(LbPolicy::PickFirst)
-            .await
-            .ok_or(ClientError::ClientInternal)?;
+        loop {
+            self.try_reconnect().await;
+            let session = self
+                .pick_session(LbPolicy::PickFirst)
+                .await
+                .ok_or(ClientError::ClientInternal)?;
 
-        let request = request::Request {
-            timeout: self.config.client_io_timeout(),
-            headers: request::Headers::DescribeStream { stream_id },
-            body: None,
-        };
+            let request = request::Request {
+                timeout: self.config.client_io_timeout(),
+                headers: request::Headers::DescribeStream { stream_id },
+                body: None,
+            };
 
-        let (tx, rx) = oneshot::channel();
-        if let Err(ctx) = session.write(request, tx).await {
-            error!(
-                "Failed to send describe-stream request to {}. Cause: {:?}",
-                self.target, ctx
-            );
-            return Err(ClientError::ConnectionRefused(self.target.to_owned()));
-        }
+            let (tx, rx) = oneshot::channel();
+            if let Err(ctx) = session.write(request, tx).await {
+                error!(
+                    "Failed to send describe-stream request to {}. Cause: {:?}",
+                    self.target, ctx
+                );
+                return Err(ClientError::ConnectionRefused(self.target.to_owned()));
+            }
 
-        let response = rx.await.map_err(|e| {
-            error!(
-                "Internal error while describing stream from {}. Cause: {:?}",
-                self.target, e
-            );
-            ClientError::ClientInternal
-        })?;
+            let response = rx.await.map_err(|e| {
+                error!(
+                    "Internal error while describing stream from {}. Cause: {:?}",
+                    self.target, e
+                );
+                ClientError::ClientInternal
+            })?;
 
-        if !response.ok() {
-            error!(
-                "Failed to describe stream[stream-id={stream_id}] from {}. Status: `{:?}`",
-                self.target, response.status
-            );
-            // TODO: refine error handling according to status code
-            return Err(ClientError::ServerInternal);
-        }
+            if !response.ok() {
+                if ErrorCode::PM_NOT_LEADER == response.status.code
+                    && self.refresh_leadership_on_demand(&response.status).await
+                {
+                    // Retry after refresh leadership
+                    continue;
+                }
 
-        if let Some(response::Headers::DescribeStream { stream }) = response.headers {
-            Ok(stream)
-        } else {
-            unreachable!();
+                error!(
+                    "Failed to describe stream[stream-id={stream_id}] from {}. Status: `{:?}`",
+                    self.target, response.status
+                );
+                return Err(ClientError::ClientInternal);
+            }
+
+            if let Some(response::Headers::DescribeStream { stream }) = response.headers {
+                return Ok(stream);
+            } else {
+                unreachable!();
+            }
         }
     }
 
