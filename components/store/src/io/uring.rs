@@ -1,4 +1,4 @@
-use crate::error::{AppendError, StoreError};
+use crate::error::{AppendError, FetchError, StoreError};
 use crate::index::driver::IndexDriver;
 use crate::index::record_handle::{HandleExt, RecordHandle};
 use crate::io::buf::{AlignedBufReader, AlignedBufWriter};
@@ -724,8 +724,13 @@ impl IO {
                     let segment = match self.wal.segment_file_of(task.wal_offset) {
                         Some(segment) => segment,
                         None => {
-                            // Consume io_task directly
-                            todo!("Return error to caller directly")
+                            warn!(
+                                "Try to read WAL: [{}, {}], but there is no segment file covering",
+                                task.wal_offset,
+                                task.wal_offset + task.len as u64
+                            );
+                            let _ = task.observer.send(Err(FetchError::BadRequest));
+                            continue;
                         }
                     };
 
