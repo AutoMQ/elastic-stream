@@ -1,7 +1,7 @@
 #![feature(result_option_inspect)]
 #![feature(try_find)]
-#![feature(hash_drain_filter)]
-#![feature(btree_drain_filter)]
+#![feature(hash_extract_if)]
+#![feature(btree_extract_if)]
 
 pub(crate) mod cli;
 pub(crate) mod connection_tracker;

@@ -1,4 +1,4 @@
-#![feature(btree_drain_filter)]
+#![feature(btree_extract_if)]
 #![feature(btree_cursors)]
 #![feature(get_mut_unchecked)]
 

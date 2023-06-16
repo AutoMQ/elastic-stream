@@ -465,7 +465,7 @@ impl BlockCache {
     where
         F: Fn(&Entry) -> bool,
     {
-        self.entries.drain_filter(|_k, v| {
+        self.entries.retain(|_k, v| {
             let entry = unsafe { &*v.get() };
             if pred(entry) {
                 info!(
@@ -476,9 +476,9 @@ impl BlockCache {
 
                 // Decrease the cache size.
                 self.cache_size -= entry.capacity();
-                true
-            } else {
                 false
+            } else {
+                true
             }
         });
     }

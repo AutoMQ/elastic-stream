@@ -117,20 +117,22 @@ impl Connection {
                             total,
                         );
                         // Drain/advance buffers that are already written.
-                        buffers.drain_filter(|buffer| {
-                            if buffer.len() <= n {
-                                n -= buffer.len();
-                                // Remove it
-                                true
-                            } else {
-                                if n > 0 {
-                                    buffer.advance(n);
-                                    n = 0;
+                        buffers
+                            .extract_if(|buffer| {
+                                if buffer.len() <= n {
+                                    n -= buffer.len();
+                                    // Remove it
+                                    true
+                                } else {
+                                    if n > 0 {
+                                        buffer.advance(n);
+                                        n = 0;
+                                    }
+                                    // Keep the buffer slice
+                                    false
                                 }
-                                // Keep the buffer slice
-                                false
-                            }
-                        });
+                            })
+                            .count();
                     }
                 }
                 Err(e) => {

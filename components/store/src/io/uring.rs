@@ -588,7 +588,7 @@ impl IO {
         // Add previously blocked entries.
 
         self.blocked
-            .drain_filter(|offset, _entry| !self.barrier.borrow().contains(offset))
+            .extract_if(|offset, _entry| !self.barrier.borrow().contains(offset))
             .for_each(|(_, entry)| {
                 // Trace log submit of previously blocked write to WAL.
                 {

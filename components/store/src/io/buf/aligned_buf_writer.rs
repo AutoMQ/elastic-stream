@@ -210,7 +210,7 @@ impl AlignedBufWriter {
     /// If the backing buffer is full, it will be drained;
     /// If it is partially filled, its `Arc` reference will be cloned.
     pub(crate) fn take(&mut self) -> Vec<Arc<AlignedBuf>> {
-        let mut items: Vec<_> = self.full.drain_filter(|buf| 0 == buf.remaining()).collect();
+        let mut items: Vec<_> = self.full.extract_if(|buf| 0 == buf.remaining()).collect();
 
         if let Some(ref buf) = self.current {
             if buf.has_data() {

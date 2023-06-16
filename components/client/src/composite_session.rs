@@ -167,15 +167,15 @@ impl CompositeSession {
         // Remove sessions that are no longer valid
         self.sessions
         .borrow_mut()
-        .drain_filter(|k, _v| !addrs.contains(k))
+        .extract_if(|k, _v| !addrs.contains(k))
         .for_each(|(k, _v)| {
-            self.endpoints.borrow_mut().drain_filter(|e| {
-                e == &k
+            self.endpoints.borrow_mut().retain(|e| {
+                e != &k
             });
             info!("Session to {} will be disconnected because latest Placement Manager Cluster does not contain it any more", k);
         });
 
-        addrs.drain_filter(|addr| self.sessions.borrow().contains_key(addr));
+        addrs.retain(|addr| !self.sessions.borrow().contains_key(addr));
 
         addrs.iter().for_each(|addr| {
             trace!(
