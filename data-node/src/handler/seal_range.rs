@@ -7,7 +7,10 @@ use model::range::RangeMetadata;
 use protocol::rpc::header::{ErrorCode, RangeT, SealRangeRequest, SealRangeResponseT, StatusT};
 use store::Store;
 
-use crate::{error::ServiceError, stream_manager::StreamManager};
+use crate::{
+    error::ServiceError,
+    stream_manager::{fetcher::PlacementFetcher, StreamManager},
+};
 
 use super::util::root_as_rpc_request;
 
@@ -41,7 +44,7 @@ impl<'a> SealRange<'a> {
         response: &mut Frame,
     ) where
         S: Store,
-        F: crate::stream_manager::fetcher::Fetch,
+        F: PlacementFetcher,
     {
         let request = self.request.unpack();
         let mut builder = flatbuffers::FlatBufferBuilder::new();

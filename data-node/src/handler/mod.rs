@@ -13,7 +13,7 @@ mod util;
 use self::cmd::Command;
 use crate::{
     metrics::{APPEND_LATENCY, FETCH_LATENCY},
-    stream_manager::{fetcher::Fetch, StreamManager},
+    stream_manager::{fetcher::PlacementFetcher, StreamManager},
 };
 use bytes::Bytes;
 use codec::frame::Frame;
@@ -45,7 +45,7 @@ pub struct ServerCall<S, F> {
 impl<S, F> ServerCall<S, F>
 where
     S: Store,
-    F: Fetch,
+    F: PlacementFetcher,
 {
     /// Serve the incoming request
     ///

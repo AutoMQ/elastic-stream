@@ -9,7 +9,7 @@ use std::{
 use crate::{
     connection_tracker::ConnectionTracker,
     stream_manager::{
-        fetcher::{Fetch, FetchRangeTask},
+        fetcher::{FetchRangeTask, PlacementFetcher},
         StreamManager,
     },
     worker_config::WorkerConfig,
@@ -46,7 +46,7 @@ pub(crate) struct Worker<S, F> {
 impl<S, F> Worker<S, F>
 where
     S: Store + 'static,
-    F: Fetch + 'static,
+    F: PlacementFetcher + 'static,
 {
     pub fn new(
         config: WorkerConfig,

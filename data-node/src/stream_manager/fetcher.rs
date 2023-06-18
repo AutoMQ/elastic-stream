@@ -16,67 +16,77 @@ pub struct FetchRangeTask {
     pub tx: oneshot::Sender<Result<Vec<RangeMetadata>, ServiceError>>,
 }
 
-pub trait Fetch {
+pub trait PlacementFetcher {
     async fn bootstrap(&mut self, node_id: u32) -> Result<Vec<RangeMetadata>, ServiceError>;
 
     async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ServiceError>;
 }
 
-pub(crate) enum Fetcher {
-    /// If a `Node` of `DataNode` is playing primary role, it is carrying the responsibility of communicating with
-    /// `PlacementManager`.
-    ///
-    /// Primary `Node` fetches ranges of a stream for itself or on behalf of other `Node`s.
-    PlacementClient { client: Rc<Client> },
-
-    /// Non-primary `Node`s acquires ranges of a stream through delegating to the primary node.
-    Channel {
-        #[allow(dead_code)]
-        sender: mpsc::UnboundedSender<FetchRangeTask>,
-    },
+pub(crate) struct PlacementClient {
+    client: Rc<Client>,
 }
 
-impl Fetch for Fetcher {
+impl PlacementClient {
+    pub(crate) fn new(client: Rc<Client>) -> Self {
+        Self { client }
+    }
+}
+
+impl PlacementFetcher for PlacementClient {
     async fn bootstrap(&mut self, node_id: u32) -> Result<Vec<RangeMetadata>, ServiceError> {
-        if let Fetcher::PlacementClient { client } = self {
-            return client
-                .list_ranges(model::ListRangeCriteria::new(Some(node_id), None))
-                .await
-                .map_err(|_e| {
-                    error!("Failed to list ranges by data node from placement manager");
-                    ServiceError::AcquireRange
-                })
-                .inspect(|ranges| {
-                    trace!(
-                        "Received list ranges response for current data node: {:?}",
-                        ranges
-                    );
-                });
-        }
-        Err(ServiceError::AcquireRange)
+        self.client
+            .list_ranges(model::ListRangeCriteria::new(Some(node_id), None))
+            .await
+            .map_err(|_e| {
+                error!("Failed to list ranges by data node from placement manager");
+                ServiceError::AcquireRange
+            })
+            .inspect(|ranges| {
+                trace!(
+                    "Received list ranges response for current data node: {:?}",
+                    ranges
+                );
+            })
     }
 
     async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ServiceError> {
-        if let Fetcher::PlacementClient { client } = self {
-            return client
-                .describe_stream(stream_id)
-                .await
-                .map_err(|_e| {
-                    error!(
-                        "Failed to get stream={} metadata from placement manager",
-                        stream_id
-                    );
-                    ServiceError::DescribeStream
-                })
-                .inspect(|metadata| {
-                    trace!(
-                        "Received stream-metadata={:?} from placement manager for stream-id={}",
-                        metadata,
-                        stream_id,
-                    );
-                });
-        }
+        self.client
+            .describe_stream(stream_id)
+            .await
+            .map_err(|_e| {
+                error!(
+                    "Failed to get stream={} metadata from placement manager",
+                    stream_id
+                );
+                ServiceError::DescribeStream
+            })
+            .inspect(|metadata| {
+                trace!(
+                    "Received stream-metadata={:?} from placement manager for stream-id={}",
+                    metadata,
+                    stream_id,
+                );
+            })
+    }
+}
 
-        unimplemented!("Describe stream from peer worker is not implemented yet")
+pub(crate) struct DelegatePlacementClient {
+    #[allow(dead_code)]
+    sender: mpsc::UnboundedSender<FetchRangeTask>,
+}
+
+impl DelegatePlacementClient {
+    pub(crate) fn new(sender: mpsc::UnboundedSender<FetchRangeTask>) -> Self {
+        Self { sender }
+    }
+}
+
+impl PlacementFetcher for DelegatePlacementClient {
+    async fn bootstrap(&mut self, _node_id: u32) -> Result<Vec<RangeMetadata>, ServiceError> {
+        todo!()
+    }
+
+    async fn describe_stream(&self, _stream_id: u64) -> Result<StreamMetadata, ServiceError> {
+        todo!()
     }
 }

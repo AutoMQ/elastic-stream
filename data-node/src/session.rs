@@ -16,7 +16,7 @@ use crate::{
     connection_handler,
     connection_tracker::ConnectionTracker,
     handler::ServerCall,
-    stream_manager::{fetcher::Fetch, StreamManager},
+    stream_manager::{fetcher::PlacementFetcher, StreamManager},
 };
 
 pub(crate) struct Session<S, F> {
@@ -31,7 +31,7 @@ pub(crate) struct Session<S, F> {
 impl<S, F> Session<S, F>
 where
     S: Store + 'static,
-    F: Fetch + 'static,
+    F: PlacementFetcher + 'static,
 {
     pub(crate) fn new(
         config: Arc<Configuration>,

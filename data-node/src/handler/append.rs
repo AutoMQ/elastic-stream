@@ -10,7 +10,10 @@ use protocol::rpc::header::{AppendResponseArgs, AppendResultEntryArgs, ErrorCode
 use std::{cell::UnsafeCell, fmt, rc::Rc};
 use store::{error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, Store};
 
-use crate::{error::ServiceError, stream_manager::StreamManager};
+use crate::{
+    error::ServiceError,
+    stream_manager::{fetcher::PlacementFetcher, StreamManager},
+};
 
 use super::util::{finish_response_builder, system_error_frame_bytes, MIN_BUFFER_SIZE};
 
@@ -65,7 +68,7 @@ impl Append {
         response: &mut Frame,
     ) where
         S: Store,
-        F: crate::stream_manager::fetcher::Fetch,
+        F: PlacementFetcher,
     {
         let to_store_requests = match self.build_store_requests() {
             Ok(requests) => requests,

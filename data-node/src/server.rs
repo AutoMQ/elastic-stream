@@ -1,5 +1,8 @@
 use crate::{
-    stream_manager::{fetcher::Fetcher, StreamManager},
+    stream_manager::{
+        fetcher::{DelegatePlacementClient, PlacementClient},
+        StreamManager,
+    },
     worker::Worker,
     worker_config::WorkerConfig,
 };
@@ -70,7 +73,7 @@ pub fn launch(
                         shutdown_tx.clone(),
                     ));
 
-                    let fetcher = Fetcher::Channel { sender: tx };
+                    let fetcher = DelegatePlacementClient::new(tx);
                     let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(
                         fetcher,
                         Rc::clone(&store),
@@ -103,9 +106,7 @@ pub fn launch(
                     Arc::clone(&server_config),
                     shutdown_tx.clone(),
                 ));
-                let fetcher = Fetcher::PlacementClient {
-                    client: Rc::clone(&client),
-                };
+                let fetcher = PlacementClient::new(Rc::clone(&client));
                 let store = Rc::new(store);
 
                 let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(

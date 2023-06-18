@@ -10,7 +10,7 @@ use store::Store;
 
 use crate::error::ServiceError;
 
-use super::{fetcher::Fetch, range::Range, stream::Stream};
+use super::{fetcher::PlacementFetcher, range::Range, stream::Stream};
 
 pub(crate) struct StreamManager<S, F> {
     streams: HashMap<i64, Stream>,
@@ -23,7 +23,7 @@ pub(crate) struct StreamManager<S, F> {
 impl<S, F> StreamManager<S, F>
 where
     S: Store,
-    F: Fetch,
+    F: PlacementFetcher,
 {
     pub(crate) fn new(fetcher: F, store: Rc<S>) -> Self {
         Self {

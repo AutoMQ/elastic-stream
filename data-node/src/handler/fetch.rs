@@ -12,7 +12,7 @@ use protocol::rpc::header::{
 use std::{cell::UnsafeCell, fmt, pin::Pin, rc::Rc};
 use store::{error::FetchError, option::ReadOptions, FetchResult, Store};
 
-use crate::stream_manager::StreamManager;
+use crate::stream_manager::{fetcher::PlacementFetcher, StreamManager};
 
 use super::util::{finish_response_builder, root_as_rpc_request, MIN_BUFFER_SIZE};
 
@@ -57,7 +57,7 @@ impl<'a> Fetch<'a> {
         response: &mut Frame,
     ) where
         S: Store,
-        F: crate::stream_manager::fetcher::Fetch,
+        F: PlacementFetcher,
     {
         let store_requests = self.build_store_requests(unsafe { &mut *stream_manager.get() });
         let futures = store_requests
@@ -179,7 +179,7 @@ impl<'a> Fetch<'a> {
     ) -> Vec<Result<ReadOptions, FetchError>>
     where
         S: Store,
-        F: crate::stream_manager::fetcher::Fetch,
+        F: PlacementFetcher,
     {
         self.fetch_request
             .entries()

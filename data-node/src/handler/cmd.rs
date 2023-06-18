@@ -5,7 +5,7 @@ use log::error;
 use protocol::rpc::header::ErrorCode;
 use store::Store;
 
-use crate::stream_manager::StreamManager;
+use crate::stream_manager::{fetcher::PlacementFetcher, StreamManager};
 
 use super::{
     append::Append, create_range::CreateRange, fetch::Fetch, heartbeat::Heartbeat, ping::Ping,
@@ -101,7 +101,7 @@ impl<'a> Command<'a> {
         response: &mut Frame,
     ) where
         S: Store,
-        F: crate::stream_manager::fetcher::Fetch,
+        F: PlacementFetcher,
     {
         match self {
             Command::Append(cmd) => cmd.apply(store, stream_manager, response).await,
