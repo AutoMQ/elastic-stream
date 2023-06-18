@@ -10,21 +10,22 @@ use store::Store;
 
 use crate::error::ServiceError;
 
-use super::{fetcher::Fetcher, range::Range, stream::Stream};
+use super::{fetcher::Fetch, range::Range, stream::Stream};
 
-pub(crate) struct StreamManager<S> {
+pub(crate) struct StreamManager<S, F> {
     streams: HashMap<i64, Stream>,
 
-    fetcher: Fetcher,
+    fetcher: F,
 
     store: Rc<S>,
 }
 
-impl<S> StreamManager<S>
+impl<S, F> StreamManager<S, F>
 where
     S: Store,
+    F: Fetch,
 {
-    pub(crate) fn new(fetcher: Fetcher, store: Rc<S>) -> Self {
+    pub(crate) fn new(fetcher: F, store: Rc<S>) -> Self {
         Self {
             streams: HashMap::new(),
             fetcher,
@@ -33,14 +34,7 @@ where
     }
 
     pub(crate) async fn start(&mut self) -> Result<(), ServiceError> {
-        let mut bootstrap = false;
-        if let Fetcher::PlacementClient { .. } = &self.fetcher {
-            bootstrap = true;
-        }
-
-        if bootstrap {
-            self.bootstrap().await?;
-        }
+        self.bootstrap().await?;
         Ok(())
     }
 

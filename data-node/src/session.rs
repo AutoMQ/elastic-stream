@@ -13,29 +13,32 @@ use tokio_uring::net::TcpStream;
 use transport::connection::Connection;
 
 use crate::{
-    connection_handler, connection_tracker::ConnectionTracker, handler::ServerCall,
-    stream_manager::StreamManager,
+    connection_handler,
+    connection_tracker::ConnectionTracker,
+    handler::ServerCall,
+    stream_manager::{fetcher::Fetch, StreamManager},
 };
 
-pub(crate) struct Session<S> {
+pub(crate) struct Session<S, F> {
     config: Arc<Configuration>,
     stream: TcpStream,
     addr: SocketAddr,
     store: Rc<S>,
-    stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
+    stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
     connection_tracker: Rc<RefCell<ConnectionTracker>>,
 }
 
-impl<S> Session<S>
+impl<S, F> Session<S, F>
 where
     S: Store + 'static,
+    F: Fetch + 'static,
 {
     pub(crate) fn new(
         config: Arc<Configuration>,
         stream: TcpStream,
         addr: SocketAddr,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
     ) -> Self {
         Self {
@@ -64,7 +67,7 @@ where
 
     async fn process0(
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
         peer_address: SocketAddr,
         stream: TcpStream,

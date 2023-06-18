@@ -58,13 +58,14 @@ impl Append {
     ///
     /// `response` - Mutable response frame reference, into which required business data are filled.
     ///
-    pub(crate) async fn apply<S>(
+    pub(crate) async fn apply<S, F>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
         response: &mut Frame,
     ) where
         S: Store,
+        F: crate::stream_manager::fetcher::Fetch,
     {
         let to_store_requests = match self.build_store_requests() {
             Ok(requests) => requests,

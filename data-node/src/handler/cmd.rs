@@ -94,13 +94,14 @@ impl<'a> Command<'a> {
         }
     }
 
-    pub(crate) async fn apply<S>(
+    pub(crate) async fn apply<S, F>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
         response: &mut Frame,
     ) where
         S: Store,
+        F: crate::stream_manager::fetcher::Fetch,
     {
         match self {
             Command::Append(cmd) => cmd.apply(store, stream_manager, response).await,

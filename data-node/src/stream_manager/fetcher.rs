@@ -16,6 +16,12 @@ pub struct FetchRangeTask {
     pub tx: oneshot::Sender<Result<Vec<RangeMetadata>, ServiceError>>,
 }
 
+pub trait Fetch {
+    async fn bootstrap(&mut self, node_id: u32) -> Result<Vec<RangeMetadata>, ServiceError>;
+
+    async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ServiceError>;
+}
+
 pub(crate) enum Fetcher {
     /// If a `Node` of `DataNode` is playing primary role, it is carrying the responsibility of communicating with
     /// `PlacementManager`.
@@ -30,11 +36,8 @@ pub(crate) enum Fetcher {
     },
 }
 
-impl Fetcher {
-    pub(crate) async fn bootstrap(
-        &mut self,
-        node_id: u32,
-    ) -> Result<Vec<RangeMetadata>, ServiceError> {
+impl Fetch for Fetcher {
+    async fn bootstrap(&mut self, node_id: u32) -> Result<Vec<RangeMetadata>, ServiceError> {
         if let Fetcher::PlacementClient { client } = self {
             return client
                 .list_ranges(model::ListRangeCriteria::new(Some(node_id), None))
@@ -53,10 +56,7 @@ impl Fetcher {
         Err(ServiceError::AcquireRange)
     }
 
-    pub(crate) async fn describe_stream(
-        &self,
-        stream_id: u64,
-    ) -> Result<StreamMetadata, ServiceError> {
+    async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ServiceError> {
         if let Fetcher::PlacementClient { client } = self {
             return client
                 .describe_stream(stream_id)

@@ -34,13 +34,14 @@ impl<'a> SealRange<'a> {
         Ok(Self { request })
     }
 
-    pub(crate) async fn apply<S>(
+    pub(crate) async fn apply<S, F>(
         &self,
         _store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
         response: &mut Frame,
     ) where
         S: Store,
+        F: crate::stream_manager::fetcher::Fetch,
     {
         let request = self.request.unpack();
         let mut builder = flatbuffers::FlatBufferBuilder::new();

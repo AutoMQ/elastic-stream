@@ -13,7 +13,7 @@ mod util;
 use self::cmd::Command;
 use crate::{
     metrics::{APPEND_LATENCY, FETCH_LATENCY},
-    stream_manager::StreamManager,
+    stream_manager::{fetcher::Fetch, StreamManager},
 };
 use bytes::Bytes;
 use codec::frame::Frame;
@@ -25,7 +25,7 @@ use store::Store;
 /// Representation of the incoming request.
 ///
 ///
-pub struct ServerCall<S> {
+pub struct ServerCall<S, F> {
     /// The incoming request
     pub(crate) request: Frame,
 
@@ -39,12 +39,13 @@ pub struct ServerCall<S> {
     /// Note this store is `!Send` as it follows thread-per-core pattern.
     pub(crate) store: Rc<S>,
 
-    pub(crate) stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
+    pub(crate) stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
 }
 
-impl<S> ServerCall<S>
+impl<S, F> ServerCall<S, F>
 where
     S: Store,
+    F: Fetch,
 {
     /// Serve the incoming request
     ///

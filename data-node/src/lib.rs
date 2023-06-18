@@ -2,6 +2,7 @@
 #![feature(try_find)]
 #![feature(hash_extract_if)]
 #![feature(btree_extract_if)]
+#![feature(async_fn_in_trait)]
 
 pub(crate) mod cli;
 pub(crate) mod connection_tracker;

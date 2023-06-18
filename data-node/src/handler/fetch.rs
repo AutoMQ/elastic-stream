@@ -50,13 +50,14 @@ impl<'a> Fetch<'a> {
     }
 
     /// Apply the fetch requests to the store
-    pub(crate) async fn apply<S>(
+    pub(crate) async fn apply<S, F>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
         response: &mut Frame,
     ) where
         S: Store,
+        F: crate::stream_manager::fetcher::Fetch,
     {
         let store_requests = self.build_store_requests(unsafe { &mut *stream_manager.get() });
         let futures = store_requests
@@ -172,12 +173,13 @@ impl<'a> Fetch<'a> {
     }
 
     /// TODO: this method is out of sync with new replication protocol.
-    fn build_store_requests<S>(
+    fn build_store_requests<S, F>(
         &self,
-        stream_manager: &mut StreamManager<S>,
+        stream_manager: &mut StreamManager<S, F>,
     ) -> Vec<Result<ReadOptions, FetchError>>
     where
         S: Store,
+        F: crate::stream_manager::fetcher::Fetch,
     {
         self.fetch_request
             .entries()
