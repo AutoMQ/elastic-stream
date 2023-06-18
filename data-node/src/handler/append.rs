@@ -8,10 +8,7 @@ use log::{error, trace, warn};
 use model::payload::Payload;
 use protocol::rpc::header::{AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs};
 use std::{cell::UnsafeCell, fmt, rc::Rc};
-use store::{
-    error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, ElasticStore,
-    Store,
-};
+use store::{error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, Store};
 
 use crate::{error::ServiceError, stream_manager::StreamManager};
 
@@ -61,12 +58,14 @@ impl Append {
     ///
     /// `response` - Mutable response frame reference, into which required business data are filled.
     ///
-    pub(crate) async fn apply(
+    pub(crate) async fn apply<S>(
         &self,
-        store: Rc<ElasticStore>,
+        store: Rc<S>,
         stream_manager: Rc<UnsafeCell<StreamManager>>,
         response: &mut Frame,
-    ) {
+    ) where
+        S: Store,
+    {
         let to_store_requests = match self.build_store_requests() {
             Ok(requests) => requests,
             Err(err_code) => {

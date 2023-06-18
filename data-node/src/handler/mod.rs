@@ -20,12 +20,12 @@ use codec::frame::Frame;
 use log::{trace, warn};
 use protocol::rpc::header::{StatusT, SystemErrorT};
 use std::{cell::UnsafeCell, rc::Rc};
-use store::ElasticStore;
+use store::Store;
 
 /// Representation of the incoming request.
 ///
 ///
-pub struct ServerCall {
+pub struct ServerCall<S> {
     /// The incoming request
     pub(crate) request: Frame,
 
@@ -37,12 +37,15 @@ pub struct ServerCall {
     /// `Store` to query, persist and replicate records.
     ///
     /// Note this store is `!Send` as it follows thread-per-core pattern.
-    pub(crate) store: Rc<ElasticStore>,
+    pub(crate) store: Rc<S>,
 
     pub(crate) stream_manager: Rc<UnsafeCell<StreamManager>>,
 }
 
-impl ServerCall {
+impl<S> ServerCall<S>
+where
+    S: Store,
+{
     /// Serve the incoming request
     ///
     /// Delegate each incoming request to its dedicated `on_xxx` method according to

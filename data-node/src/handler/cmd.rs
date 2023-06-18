@@ -3,7 +3,7 @@ use std::{cell::UnsafeCell, fmt, rc::Rc};
 use codec::frame::{Frame, OperationCode};
 use log::error;
 use protocol::rpc::header::ErrorCode;
-use store::ElasticStore;
+use store::Store;
 
 use crate::stream_manager::StreamManager;
 
@@ -94,12 +94,14 @@ impl<'a> Command<'a> {
         }
     }
 
-    pub(crate) async fn apply(
+    pub(crate) async fn apply<S>(
         &self,
-        store: Rc<ElasticStore>,
+        store: Rc<S>,
         stream_manager: Rc<UnsafeCell<StreamManager>>,
         response: &mut Frame,
-    ) {
+    ) where
+        S: Store,
+    {
         match self {
             Command::Append(cmd) => cmd.apply(store, stream_manager, response).await,
             Command::Fetch(cmd) => cmd.apply(store, stream_manager, response).await,

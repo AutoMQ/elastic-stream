@@ -10,7 +10,7 @@ use protocol::rpc::header::{
     FetchResultEntryArgs, Status, StatusArgs,
 };
 use std::{cell::UnsafeCell, fmt, pin::Pin, rc::Rc};
-use store::{error::FetchError, option::ReadOptions, ElasticStore, FetchResult, Store};
+use store::{error::FetchError, option::ReadOptions, FetchResult, Store};
 
 use crate::stream_manager::StreamManager;
 
@@ -50,12 +50,14 @@ impl<'a> Fetch<'a> {
     }
 
     /// Apply the fetch requests to the store
-    pub(crate) async fn apply(
+    pub(crate) async fn apply<S>(
         &self,
-        store: Rc<ElasticStore>,
+        store: Rc<S>,
         stream_manager: Rc<UnsafeCell<StreamManager>>,
         response: &mut Frame,
-    ) {
+    ) where
+        S: Store,
+    {
         let store_requests = self.build_store_requests(unsafe { &mut *stream_manager.get() });
         let futures = store_requests
             .into_iter()

@@ -4,7 +4,7 @@ use bytes::Bytes;
 use codec::frame::Frame;
 use log::trace;
 use protocol::rpc::header::{ErrorCode, HeartbeatRequest, HeartbeatResponseT, StatusT};
-use store::ElasticStore;
+use store::Store;
 
 use crate::stream_manager::StreamManager;
 
@@ -27,12 +27,14 @@ impl<'a> Heartbeat<'a> {
         Ok(Self { request })
     }
 
-    pub(crate) async fn apply(
+    pub(crate) async fn apply<S>(
         &self,
-        _store: Rc<ElasticStore>,
+        _store: Rc<S>,
         _stream_manager: Rc<UnsafeCell<StreamManager>>,
         response: &mut Frame,
-    ) {
+    ) where
+        S: Store,
+    {
         trace!("Prepare heartbeat response header for {:?}", self.request);
 
         let mut builder = flatbuffers::FlatBufferBuilder::new();

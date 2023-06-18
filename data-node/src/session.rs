@@ -7,7 +7,7 @@ use std::{
 
 use config::Configuration;
 use log::{info, trace, warn};
-use store::ElasticStore;
+use store::Store;
 use tokio::sync::mpsc;
 use tokio_uring::net::TcpStream;
 use transport::connection::Connection;
@@ -17,21 +17,24 @@ use crate::{
     stream_manager::StreamManager,
 };
 
-pub(crate) struct Session {
+pub(crate) struct Session<S> {
     config: Arc<Configuration>,
     stream: TcpStream,
     addr: SocketAddr,
-    store: Rc<ElasticStore>,
+    store: Rc<S>,
     stream_manager: Rc<UnsafeCell<StreamManager>>,
     connection_tracker: Rc<RefCell<ConnectionTracker>>,
 }
 
-impl Session {
+impl<S> Session<S>
+where
+    S: Store + 'static,
+{
     pub(crate) fn new(
         config: Arc<Configuration>,
         stream: TcpStream,
         addr: SocketAddr,
-        store: Rc<ElasticStore>,
+        store: Rc<S>,
         stream_manager: Rc<UnsafeCell<StreamManager>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
     ) -> Self {
@@ -60,7 +63,7 @@ impl Session {
     }
 
     async fn process0(
-        store: Rc<ElasticStore>,
+        store: Rc<S>,
         stream_manager: Rc<UnsafeCell<StreamManager>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
         peer_address: SocketAddr,
