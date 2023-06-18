@@ -40,7 +40,7 @@ impl<'a> fmt::Display for Ping<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::UnsafeCell, rc::Rc, error::Error};
+    use std::{cell::UnsafeCell, error::Error, rc::Rc};
 
     use codec::frame::{Frame, OperationCode};
     use store::Store;
@@ -151,7 +151,7 @@ mod tests {
             )));
             ping.apply(Rc::clone(&store), stream_manager, &mut response)
                 .await;
-           Ok(())
+            Ok(())
         })
     }
 }
