@@ -53,7 +53,7 @@ impl<'a> Fetch<'a> {
     pub(crate) async fn apply<S>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
         response: &mut Frame,
     ) where
         S: Store,
@@ -172,10 +172,13 @@ impl<'a> Fetch<'a> {
     }
 
     /// TODO: this method is out of sync with new replication protocol.
-    fn build_store_requests(
+    fn build_store_requests<S>(
         &self,
-        stream_manager: &mut StreamManager,
-    ) -> Vec<Result<ReadOptions, FetchError>> {
+        stream_manager: &mut StreamManager<S>,
+    ) -> Vec<Result<ReadOptions, FetchError>>
+    where
+        S: Store,
+    {
         self.fetch_request
             .entries()
             .iter()

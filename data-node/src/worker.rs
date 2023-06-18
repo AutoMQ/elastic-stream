@@ -34,7 +34,7 @@ use util::metrics::http_serve;
 pub(crate) struct Worker<S> {
     config: WorkerConfig,
     store: Rc<S>,
-    stream_manager: Rc<UnsafeCell<StreamManager>>,
+    stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
     client: Rc<Client>,
     #[allow(dead_code)]
     channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
@@ -47,7 +47,7 @@ where
     pub fn new(
         config: WorkerConfig,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
         client: Rc<Client>,
         channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
     ) -> Self {

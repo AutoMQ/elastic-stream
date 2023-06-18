@@ -22,7 +22,7 @@ pub(crate) struct Session<S> {
     stream: TcpStream,
     addr: SocketAddr,
     store: Rc<S>,
-    stream_manager: Rc<UnsafeCell<StreamManager>>,
+    stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
     connection_tracker: Rc<RefCell<ConnectionTracker>>,
 }
 
@@ -35,7 +35,7 @@ where
         stream: TcpStream,
         addr: SocketAddr,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
     ) -> Self {
         Self {
@@ -64,7 +64,7 @@ where
 
     async fn process0(
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
         peer_address: SocketAddr,
         stream: TcpStream,

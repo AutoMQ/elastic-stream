@@ -39,7 +39,7 @@ pub struct ServerCall<S> {
     /// Note this store is `!Send` as it follows thread-per-core pattern.
     pub(crate) store: Rc<S>,
 
-    pub(crate) stream_manager: Rc<UnsafeCell<StreamManager>>,
+    pub(crate) stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
 }
 
 impl<S> ServerCall<S>

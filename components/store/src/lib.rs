@@ -27,6 +27,8 @@
 pub mod error;
 pub mod util;
 
+use std::sync::Arc;
+
 use self::option::{ReadOptions, WriteOptions};
 use error::{AppendError, FetchError, StoreError};
 use model::range::RangeMetadata;
@@ -91,4 +93,6 @@ pub trait Store {
     fn max_record_offset(&self, stream_id: i64, range: u32) -> Result<Option<u64>, StoreError>;
 
     fn id(&self) -> i32;
+
+    fn config(&self) -> Arc<config::Configuration>;
 }

@@ -133,10 +133,6 @@ impl ElasticStore {
         Ok(store)
     }
 
-    pub fn config(&self) -> Arc<config::Configuration> {
-        Arc::clone(&self.config)
-    }
-
     fn with_thread<F>(
         name: &str,
         task: F,
@@ -389,6 +385,10 @@ impl Store for ElasticStore {
 
     fn id(&self) -> i32 {
         self.lock.id()
+    }
+
+    fn config(&self) -> Arc<config::Configuration> {
+        Arc::clone(&self.config)
     }
 }
 

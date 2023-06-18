@@ -61,7 +61,7 @@ impl Append {
     pub(crate) async fn apply<S>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager>>,
+        stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
         response: &mut Frame,
     ) where
         S: Store,

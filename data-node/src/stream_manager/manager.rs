@@ -6,22 +6,25 @@ use std::{
 
 use log::{error, info};
 use model::{range::RangeMetadata, stream::StreamMetadata};
-use store::{ElasticStore, Store};
+use store::Store;
 
 use crate::error::ServiceError;
 
 use super::{fetcher::Fetcher, range::Range, stream::Stream};
 
-pub(crate) struct StreamManager {
+pub(crate) struct StreamManager<S> {
     streams: HashMap<i64, Stream>,
 
     fetcher: Fetcher,
 
-    store: Rc<ElasticStore>,
+    store: Rc<S>,
 }
 
-impl StreamManager {
-    pub(crate) fn new(fetcher: Fetcher, store: Rc<ElasticStore>) -> Self {
+impl<S> StreamManager<S>
+where
+    S: Store,
+{
+    pub(crate) fn new(fetcher: Fetcher, store: Rc<S>) -> Self {
         Self {
             streams: HashMap::new(),
             fetcher,

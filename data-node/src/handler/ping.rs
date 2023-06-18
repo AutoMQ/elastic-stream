@@ -21,7 +21,7 @@ impl<'a> Ping<'a> {
     pub(crate) async fn apply<S>(
         &self,
         _store: Rc<S>,
-        _stream_manager: Rc<UnsafeCell<StreamManager>>,
+        _stream_manager: Rc<UnsafeCell<StreamManager<S>>>,
         response: &mut Frame,
     ) where
         S: Store,

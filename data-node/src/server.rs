@@ -6,7 +6,7 @@ use crate::{
 use config::Configuration;
 use log::{error, info, warn};
 use std::{cell::UnsafeCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
-use store::ElasticStore;
+use store::{ElasticStore, Store};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub fn launch(
