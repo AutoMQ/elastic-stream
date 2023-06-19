@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    fmt::{self, Display},
+    sync::Arc,
+};
 
 use io_uring::opcode;
 
@@ -68,5 +71,39 @@ impl Context {
             len,
             start_time,
         }))
+    }
+}
+
+impl Display for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.opcode {
+            opcode::Read::CODE | opcode::Readv::CODE | opcode::ReadFixed::CODE => {
+                write!(
+                    f,
+                    "Reading WAL[{}, {}]",
+                    self.wal_offset,
+                    self.wal_offset + self.len as u64
+                )
+            }
+
+            opcode::Write::CODE | opcode::Writev::CODE | opcode::WriteFixed::CODE => {
+                write!(
+                    f,
+                    "Writing WAL[{}, {}]",
+                    self.wal_offset,
+                    self.wal_offset + self.len as u64
+                )
+            }
+            
+            _ => {
+                write!(
+                    f,
+                    "Opcode[{}] against WAL[{}, {}]",
+                    self.opcode,
+                    self.wal_offset,
+                    self.wal_offset + self.len as u64
+                )
+            }
+        }
     }
 }

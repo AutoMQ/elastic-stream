@@ -158,11 +158,8 @@ fn check_io_uring(probe: &register::Probe, params: &Parameters) -> Result<(), St
 
 /// A simple macro_rule to log amount of time used to await completion of submitted IO tasks.
 macro_rules! log_disk_perf {
-    ($level:tt, $elapsed:expr) => {
-        $level!(
-            "io_uring_enter waited {}ms to reap completed data CQE(s)",
-            $elapsed
-        );
+    ($level:tt, $task:ident, $elapsed:expr) => {
+        $level!("{} took {}ms", $task, $elapsed);
     };
 }
 
@@ -965,13 +962,13 @@ impl IO {
                     if cqe.result() >= 0 {
                         let elapsed = latency.as_millis();
                         if elapsed <= 1 {
-                            log_disk_perf!(trace, elapsed);
+                            log_disk_perf!(trace, context, elapsed);
                         } else if elapsed <= 5 {
-                            log_disk_perf!(debug, elapsed);
+                            log_disk_perf!(debug, context, elapsed);
                         } else if elapsed <= 10 {
-                            log_disk_perf!(info, elapsed);
+                            log_disk_perf!(info, context, elapsed);
                         } else {
-                            log_disk_perf!(warn, elapsed);
+                            log_disk_perf!(warn, context, elapsed);
                         }
                     }
 
