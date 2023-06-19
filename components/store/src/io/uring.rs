@@ -888,39 +888,44 @@ impl IO {
         }
 
         loop {
-            if let Err(e) = self.data_ring.submit_and_wait(wanted) {
-                match e.kind() {
-                    io::ErrorKind::Interrupted => {
-                        // io_uring_enter just propagates underlying EINTR signal up to application, allowing to handle this signal.
-                        // For our usage, we just ignore this signal and retry.
-                        //
-                        // See https://www.spinics.net/lists/io-uring/msg01823.html
-                        // Lots of system calls return -EINTR if interrupted by a signal, don't
-                        // think there's anything worth fixing there. For the wait part, the
-                        // application may want to handle the signal before we can wait again.
-                        // We can't go to sleep with a pending signal.
-                        warn!("io_uring_enter got an error: {:?}", e);
-                        continue;
-                    }
-                    io::ErrorKind::WouldBlock => {
-                        // The kernel was unable to allocate memory for the request, or otherwise ran out of resources to handle it.
-                        // The application should wait for some completions and try again.
-                        warn!("io_uring_enter got an error: {:?}", e);
-                        continue;
-                    }
-                    io::ErrorKind::ResourceBusy => {
-                        // If the IORING_FEAT_NODROP feature flag is set, then EBUSY will be returned if there were overflow entries,
-                        // IORING_ENTER_GETEVENTS flag is set and not all of the overflow entries were able to be flushed to the CQ ring.
-                        // Without IORING_FEAT_NODROP the application is attempting to overcommit the number of requests it can have pending.
-                        // The application should wait for some completions and try again. May occur if the application tries to queue more
-                        // requests than we have room for in the CQ ring, or if the application attempts to wait for more events without
-                        // having reaped the ones already present in the CQ ring.
-                        warn!("io_uring_enter got an error: {:?}", e);
-                    }
-                    _ => {
-                        // Fatal errors, crash the process and let watchdog to restart.
-                        error!("io_uring_enter got an error: {:?}", e);
-                        panic!("io_uring_enter returns error {:?}", e);
+            match self.data_ring.submit_and_wait(wanted) {
+                Ok(_submitted) => {
+                    break;
+                }
+                Err(e) => {
+                    match e.kind() {
+                        io::ErrorKind::Interrupted => {
+                            // io_uring_enter just propagates underlying EINTR signal up to application, allowing to handle this signal.
+                            // For our usage, we just ignore this signal and retry.
+                            //
+                            // See https://www.spinics.net/lists/io-uring/msg01823.html
+                            // Lots of system calls return -EINTR if interrupted by a signal, don't
+                            // think there's anything worth fixing there. For the wait part, the
+                            // application may want to handle the signal before we can wait again.
+                            // We can't go to sleep with a pending signal.
+                            warn!("io_uring_enter got an error: {:?}", e);
+                            continue;
+                        }
+                        io::ErrorKind::WouldBlock => {
+                            // The kernel was unable to allocate memory for the request, or otherwise ran out of resources to handle it.
+                            // The application should wait for some completions and try again.
+                            warn!("io_uring_enter got an error: {:?}", e);
+                            continue;
+                        }
+                        io::ErrorKind::ResourceBusy => {
+                            // If the IORING_FEAT_NODROP feature flag is set, then EBUSY will be returned if there were overflow entries,
+                            // IORING_ENTER_GETEVENTS flag is set and not all of the overflow entries were able to be flushed to the CQ ring.
+                            // Without IORING_FEAT_NODROP the application is attempting to overcommit the number of requests it can have pending.
+                            // The application should wait for some completions and try again. May occur if the application tries to queue more
+                            // requests than we have room for in the CQ ring, or if the application attempts to wait for more events without
+                            // having reaped the ones already present in the CQ ring.
+                            warn!("io_uring_enter got an error: {:?}", e);
+                        }
+                        _ => {
+                            // Fatal errors, crash the process and let watchdog to restart.
+                            error!("io_uring_enter got an error: {:?}", e);
+                            panic!("io_uring_enter returns error {:?}", e);
+                        }
                     }
                 }
             }
