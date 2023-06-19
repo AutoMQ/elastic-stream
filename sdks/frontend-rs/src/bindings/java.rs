@@ -396,28 +396,21 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
         .name("Runtime".to_string())
         .spawn(move || {
             trace!("JNI Runtime thread started");
-            tokio_uring::builder()
-                .uring_builder(
-                    tokio_uring::uring_builder()
-                        .setup_sqpoll(2000)
-                        .setup_sqpoll_cpu((num_cpus::get() - 3) as u32),
-                )
-                .entries(32768)
-                .start(async move {
-                    trace!("JNI tokio-uring runtime started");
-                    loop {
-                        match rx.recv().await {
-                            Some(cmd) => {
-                                trace!("JNI tokio-uring receive command");
-                                tokio_uring::spawn(async move { process_command(cmd).await });
-                            }
-                            None => {
-                                info!("JNI command channel is dropped");
-                                break;
-                            }
+            tokio_uring::builder().entries(32768).start(async move {
+                trace!("JNI tokio-uring runtime started");
+                loop {
+                    match rx.recv().await {
+                        Some(cmd) => {
+                            trace!("JNI tokio-uring receive command");
+                            tokio_uring::spawn(async move { process_command(cmd).await });
+                        }
+                        None => {
+                            info!("JNI command channel is dropped");
+                            break;
                         }
                     }
-                });
+                }
+            });
         });
     JNI_VERSION_1_8
 }
