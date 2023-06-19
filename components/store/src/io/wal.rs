@@ -722,7 +722,7 @@ impl Wal {
                     info!("LogSegmentFile: `{}` is renamed", segment);
                     segment.status = Status::OpenAt;
                     let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), segment.path.as_ptr())
-                        .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT | libc::O_DSYNC)
+                        .flags(libc::O_CREAT | libc::O_RDWR | libc::O_DIRECT)
                         .mode(libc::S_IRWXU | libc::S_IRWXG)
                         .build()
                         .user_data(offset);
