@@ -94,7 +94,7 @@ impl Display for Context {
                     self.wal_offset + self.len as u64
                 )
             }
-            
+
             _ => {
                 write!(
                     f,
