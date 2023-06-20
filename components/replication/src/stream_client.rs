@@ -19,44 +19,52 @@ pub struct StreamClient {
 }
 
 impl StreamClient {
-    pub fn new(config: Arc<config::Configuration>) -> Self {
+    pub fn new(config: Arc<config::Configuration>, id: usize) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        let stream_manager = StreamManager::new(config);
-        Self::spawn_loop(stream_manager, rx);
+        let _ = std::thread::Builder::new()
+            .name(format!("Runtime-{}", id))
+            .spawn(move || {
+                tokio_uring::builder().entries(32768).start(async move {
+                    let stream_manager = StreamManager::new(config);
+                    Self::spawn_loop(stream_manager, rx).await;
+                })
+            });
+
         Self { tx }
     }
 
-    fn spawn_loop(mut stream_manager: StreamManager, mut rx: mpsc::UnboundedReceiver<Request>) {
-        tokio_uring::spawn(async move {
-            while let Some(request) = rx.recv().await {
-                match request {
-                    Request::Append { request, tx } => {
-                        stream_manager.append(request, tx);
-                    }
-                    Request::Read { request, tx } => {
-                        stream_manager.fetch(request, tx);
-                    }
-                    Request::CreateStream { request, tx } => {
-                        stream_manager.create(request, tx);
-                    }
-                    Request::OpenStream { request, tx } => {
-                        stream_manager.open(request, tx);
-                    }
-                    Request::CloseStream { request, tx } => {
-                        stream_manager.close(request, tx);
-                    }
-                    Request::StartOffset { request, tx } => {
-                        stream_manager.start_offset(request, tx);
-                    }
-                    Request::NextOffset { request, tx } => {
-                        stream_manager.next_offset(request, tx);
-                    }
-                    Request::Trim { request, tx } => {
-                        stream_manager.trim(request, tx);
-                    }
+    async fn spawn_loop(
+        mut stream_manager: StreamManager,
+        mut rx: mpsc::UnboundedReceiver<Request>,
+    ) {
+        while let Some(request) = rx.recv().await {
+            match request {
+                Request::Append { request, tx } => {
+                    stream_manager.append(request, tx);
+                }
+                Request::Read { request, tx } => {
+                    stream_manager.fetch(request, tx);
+                }
+                Request::CreateStream { request, tx } => {
+                    stream_manager.create(request, tx);
+                }
+                Request::OpenStream { request, tx } => {
+                    stream_manager.open(request, tx);
+                }
+                Request::CloseStream { request, tx } => {
+                    stream_manager.close(request, tx);
+                }
+                Request::StartOffset { request, tx } => {
+                    stream_manager.start_offset(request, tx);
+                }
+                Request::NextOffset { request, tx } => {
+                    stream_manager.next_offset(request, tx);
+                }
+                Request::Trim { request, tx } => {
+                    stream_manager.trim(request, tx);
                 }
             }
-        });
+        }
     }
 
     pub async fn create_stream(

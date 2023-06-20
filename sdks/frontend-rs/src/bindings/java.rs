@@ -13,7 +13,7 @@ use std::ffi::c_void;
 use std::slice;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 use crate::{ClientError, Frontend, Stopwatch, Stream, StreamOptions};
 use crossbeam::channel::{unbounded, Sender};
@@ -47,9 +47,6 @@ async fn process_command(cmd: Command<'_>) {
             future,
         } => {
             process_create_stream_command(front_end, replica, ack_count, retention, future).await;
-        }
-        Command::GetFrontend { access_point, tx } => {
-            process_get_frontend_command(access_point, tx);
         }
         Command::OpenStream {
             front_end,
@@ -213,20 +210,8 @@ async fn process_next_offset_command(stream: &mut Stream, future: GlobalRef) {
     trace!("Next_offset command finished");
 }
 
-fn process_get_frontend_command(
-    access_point: String,
-    tx: oneshot::Sender<Result<Frontend, ClientError>>,
-) {
-    trace!("Start processing get_frontend command");
-    let result = Frontend::new(&access_point);
-    if let Err(_e) = tx.send(result) {
-        error!("Failed to dispatch JNI command to tokio-uring runtime");
-    }
-    trace!("Get_frontend command finished");
-}
-
 async fn process_open_stream_command(
-    front_end: &mut Frontend,
+    front_end: &Frontend,
     stream_id: u64,
     epoch: u64,
     future: GlobalRef,
@@ -391,12 +376,11 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
                 }
             });
     });
-    //
     let _ = std::thread::Builder::new()
         .name("Runtime".to_string())
         .spawn(move || {
             trace!("JNI Runtime thread started");
-            tokio_uring::builder().entries(32768).start(async move {
+            tokio_uring::builder().start(async move {
                 trace!("JNI tokio-uring runtime started");
                 loop {
                     match rx.recv().await {
@@ -431,36 +415,13 @@ pub extern "system" fn Java_com_automq_elasticstream_client_jni_Frontend_getFron
     _class: JClass,
     access_point: JString,
 ) -> jlong {
-    let (tx_frontend, rx_frontend) = oneshot::channel();
-    let command = env
-        .get_string(&access_point)
-        .map(|access_point| Command::GetFrontend {
-            access_point: access_point.into(),
-            tx: tx_frontend,
-        });
-    if let Ok(command) = command {
-        match unsafe { TX.get() } {
-            Some(tx) => match tx.send(command) {
-                Ok(_) => match rx_frontend.blocking_recv() {
-                    Ok(result) => match result {
-                        Ok(frontend) => Box::into_raw(Box::new(frontend)) as jlong,
-                        Err(err) => {
-                            throw_exception(&mut env, &err.to_string());
-                            0
-                        }
-                    },
-                    Err(_) => {
-                        error!("Failed to receive GetFrontend command response from tokio-uring runtime");
-                        0
-                    }
-                },
-                Err(_) => {
-                    error!("Failed to dispatch GetFrontend command to tokio-uring runtime");
-                    0
-                }
-            },
-            None => {
-                info!("JNI command channel was dropped. Ignore a GetFrontend request");
+    if let Ok(access_point) = env.get_string(&access_point) {
+        let access_point: String = access_point.into();
+        let result = Frontend::new(&access_point);
+        match result {
+            Ok(frontend) => Box::into_raw(Box::new(frontend)) as jlong,
+            Err(err) => {
+                throw_exception(&mut env, &err.to_string());
                 0
             }
         }

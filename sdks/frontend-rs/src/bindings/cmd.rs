@@ -2,16 +2,11 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use jni::objects::GlobalRef;
-use tokio::sync::oneshot;
 
 use super::tracing::Tracer;
 use crate::{ClientError, Frontend, Stream};
 
 pub enum Command<'a> {
-    GetFrontend {
-        access_point: String,
-        tx: oneshot::Sender<Result<Frontend, ClientError>>,
-    },
     CreateStream {
         front_end: &'a mut Frontend,
         replica: u8,

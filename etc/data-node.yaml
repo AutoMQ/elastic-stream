@@ -90,4 +90,5 @@ store:
     flush-threshold: 32768
 
 replication:
-  connection-pool-size: 3
+  connection-pool-size: 2
+  thread-count: 4

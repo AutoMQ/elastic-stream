@@ -336,12 +336,16 @@ impl Default for RocksDB {
 pub struct Replication {
     #[serde(rename = "connection-pool-size")]
     pub connection_pool_size: usize,
+
+    #[serde(rename = "thread-count")]
+    pub thread_count: usize,
 }
 
 impl Default for Replication {
     fn default() -> Self {
         Self {
-            connection_pool_size: 3,
+            connection_pool_size: 2,
+            thread_count: 4,
         }
     }
 }
@@ -488,7 +492,7 @@ mod tests {
         assert_eq!(128, config.server.uring.queue_depth);
         assert_eq!(32768, config.store.rocksdb.flush_threshold);
 
-        assert_eq!(3, config.replication.connection_pool_size);
+        assert_eq!(2, config.replication.connection_pool_size);
         Ok(())
     }
 
