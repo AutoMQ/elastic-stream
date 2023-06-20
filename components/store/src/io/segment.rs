@@ -582,7 +582,7 @@ mod tests {
         let pos = segment.append_record(&mut buf_writer, &data)?;
         assert_eq!(pos, 4 + 4 + data.len() as u64);
 
-        let buffers = buf_writer.take();
+        let buffers = buf_writer.take(true);
         let buf = buffers.first().unwrap();
         let crc = buf.read_u32(0)?;
         let ckm = util::crc32::crc32(&data);

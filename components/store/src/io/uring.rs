@@ -612,7 +612,7 @@ impl IO {
 
         let writer = self.buf_writer.get_mut();
         writer
-            .take()
+            .take(false)
             .into_iter()
             .filter(|buf| {
                 // Accept the last partial buffer only if it contains uncommited data.
@@ -1924,7 +1924,7 @@ mod tests {
             io.load()?;
             let pos = io.indexer.get_wal_checkpoint()?;
             io.recover(pos)?;
-            assert!(!io.buf_writer.get_mut().take().is_empty());
+            assert!(!io.buf_writer.get_mut().take(true).is_empty());
         }
 
         Ok(())
