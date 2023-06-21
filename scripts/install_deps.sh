@@ -25,4 +25,4 @@ BASEDIR=$(dirname "$0")
 cd "$BASEDIR" || exit
 
 try_install_flatc
-try_install_rocksdb
+# try_install_rocksdb
