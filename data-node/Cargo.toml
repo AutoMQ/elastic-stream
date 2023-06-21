@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+built = { workspace = true, features = ["chrono", "semver"] }
 byteorder =  { workspace = true }
 bytes =  { workspace = true }
 cfg-if = { workspace = true }
@@ -48,6 +49,9 @@ tikv-jemallocator = "0.5"
 [dev-dependencies]
 mockall = { workspace = true }
 test-util = { path = "../components/test-util" }
+
+[build-dependencies]
+built = { workspace = true, features = ["git2", "chrono", "semver"] }
 
 [features]
 paranoid = []

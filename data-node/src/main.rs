@@ -10,8 +10,9 @@ use tikv_jemallocator::Jemalloc;
 static GLOBAL: Jemalloc = Jemalloc;
 
 fn main() {
-    let cli = Cli::parse();
+    print_built_info();
 
+    let cli = Cli::parse();
     cli.init_log().unwrap();
 
     let config = match cli.create_config() {
@@ -37,6 +38,44 @@ fn main() {
 
     if let Err(e) = data_node::server::launch(config, shutdown_tx) {
         eprintln!("Failed to start data-node: {:?}", e);
+    }
+}
+
+/// Prints the built information.
+fn print_built_info() {
+    println!(
+        "data-node {}, built for {} by {}.\n",
+        data_node::built_info::PKG_VERSION,
+        data_node::built_info::TARGET,
+        data_node::built_info::RUSTC_VERSION
+    );
+
+    let built_time = built::util::strptime(data_node::built_info::BUILT_TIME_UTC);
+    println!(
+        "Built with profile \"{}\", on {} ({} days ago)",
+        data_node::built_info::PROFILE,
+        built_time.with_timezone(&built::chrono::offset::Local),
+        (built::chrono::offset::Utc::now() - built_time).num_days(),
+    );
+
+    if let (Some(v), Some(dirty), Some(hash), Some(short_hash)) = (
+        data_node::built_info::GIT_VERSION,
+        data_node::built_info::GIT_DIRTY,
+        data_node::built_info::GIT_COMMIT_HASH,
+        data_node::built_info::GIT_COMMIT_HASH_SHORT,
+    ) {
+        print!(
+            "Built from git `{}`, commit {}, short_commit {}; the working directory was \"{}\".",
+            v,
+            hash,
+            short_hash,
+            if dirty { "dirty" } else { "clean" }
+        );
+    }
+
+    match data_node::built_info::GIT_HEAD_REF {
+        Some(r) => println!(" The branch was `{r}`.\n"),
+        None => println!("\n"),
     }
 }
 

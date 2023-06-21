@@ -19,6 +19,10 @@ mod metrics;
 pub(crate) mod profiling;
 pub(crate) mod session;
 
+pub mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
