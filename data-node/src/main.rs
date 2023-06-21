@@ -53,7 +53,7 @@ macro_rules! build_info {
 /// Prints the built information.
 fn print_built_info() {
     build_info!(
-        "data-node {}, built for {} by {}.\n",
+        "Data-Node v{}, built for {} by {}.",
         data_node::built_info::PKG_VERSION,
         data_node::built_info::TARGET,
         data_node::built_info::RUSTC_VERSION
@@ -61,7 +61,7 @@ fn print_built_info() {
 
     let built_time = built::util::strptime(data_node::built_info::BUILT_TIME_UTC);
     build_info!(
-        "Built with profile \"{}\", on {} ({} days ago)",
+        "Built with profile \"{}\", on {} ({} days ago).",
         data_node::built_info::PROFILE,
         built_time.with_timezone(&built::chrono::offset::Local),
         (built::chrono::offset::Utc::now() - built_time).num_days(),
@@ -83,7 +83,7 @@ fn print_built_info() {
     }
 
     if let Some(r) = data_node::built_info::GIT_HEAD_REF {
-        build_info!("The branch was `{r}`");
+        build_info!("The branch was `{r}`.");
     }
 }
 
