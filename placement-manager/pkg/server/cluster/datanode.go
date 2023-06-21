@@ -120,10 +120,10 @@ func (c *RaftCluster) chooseDataNodes(cnt int) ([]*rpcfb.DataNodeT, error) {
 		}
 	}
 
+	idx := c.nodeIdx.Add(uint64(cnt))
 	for i := 0; i < cnt; i++ {
-		idx := c.nodeIdx.Add(1)
 		chose[i] = &rpcfb.DataNodeT{
-			NodeId: nodes[idx%uint64(len(nodes))].NodeId,
+			NodeId: nodes[(idx-uint64(i))%uint64(len(nodes))].NodeId,
 		}
 	}
 
