@@ -1,5 +1,6 @@
 use clap::Parser;
 use data_node::Cli;
+use log::info;
 use tokio::sync::broadcast;
 
 #[cfg(not(target_env = "msvc"))]
@@ -41,9 +42,17 @@ fn main() {
     }
 }
 
+// Additively prints the built info to both stdout and log.
+macro_rules! build_info {
+    ($($st:tt)*) => {
+        println!($($st)*);
+        info!($($st)*);
+    };
+}
+
 /// Prints the built information.
 fn print_built_info() {
-    println!(
+    build_info!(
         "data-node {}, built for {} by {}.\n",
         data_node::built_info::PKG_VERSION,
         data_node::built_info::TARGET,
@@ -51,7 +60,7 @@ fn print_built_info() {
     );
 
     let built_time = built::util::strptime(data_node::built_info::BUILT_TIME_UTC);
-    println!(
+    build_info!(
         "Built with profile \"{}\", on {} ({} days ago)",
         data_node::built_info::PROFILE,
         built_time.with_timezone(&built::chrono::offset::Local),
@@ -64,7 +73,7 @@ fn print_built_info() {
         data_node::built_info::GIT_COMMIT_HASH,
         data_node::built_info::GIT_COMMIT_HASH_SHORT,
     ) {
-        print!(
+        build_info!(
             "Built from git `{}`, commit {}, short_commit {}; the working directory was \"{}\".",
             v,
             hash,
@@ -73,9 +82,8 @@ fn print_built_info() {
         );
     }
 
-    match data_node::built_info::GIT_HEAD_REF {
-        Some(r) => println!(" The branch was `{r}`.\n"),
-        None => println!("\n"),
+    if let Some(r) = data_node::built_info::GIT_HEAD_REF {
+        build_info!("The branch was `{r}`");
     }
 }
 
