@@ -22,7 +22,7 @@ impl Frontend {
             ..Default::default()
         };
         config.replication.connection_pool_size = 2;
-        config.replication.thread_count = 4;
+        config.replication.thread_count = 2;
         let config = Arc::new(config);
 
         let mut stream_clients = vec![];
