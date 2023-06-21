@@ -15,7 +15,7 @@ fn main() {
     cli.init_log().unwrap();
 
     display_built_info();
-    
+
     let config = match cli.create_config() {
         Ok(config) => config,
         Err(e) => {
@@ -51,7 +51,7 @@ macro_rules! build_info {
 }
 
 /// Display the built information.
-/// 
+///
 /// The build information is additively printed to both stdout and log.
 fn display_built_info() {
     build_info!(
