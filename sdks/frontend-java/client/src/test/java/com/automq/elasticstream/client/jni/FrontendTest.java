@@ -2,7 +2,8 @@ package com.automq.elasticstream.client.jni;
 
 import org.junit.Assert;
 import org.junit.Test;
-import sun.nio.ch.DirectBuffer;
+
+import com.automq.elasticstream.client.utils.BytesUtils;
 
 import java.nio.ByteBuffer;
 
@@ -13,7 +14,7 @@ public class FrontendTest {
         ByteBuffer buffer = Frontend.allocateDirect(4096);
         Assert.assertEquals(4096, buffer.capacity());
         Assert.assertTrue(buffer.isDirect());
-        Frontend.freeMemory(((DirectBuffer) buffer).address(), buffer.capacity());
+        Frontend.freeMemory(BytesUtils.getAddress(buffer), buffer.capacity());
     }
 
     @Test
@@ -22,7 +23,7 @@ public class FrontendTest {
             ByteBuffer buffer = Frontend.allocateDirect(4096);
             Assert.assertEquals(4096, buffer.capacity());
             Assert.assertTrue(buffer.isDirect());
-            Frontend.freeMemory(((DirectBuffer) buffer).address(), buffer.capacity());
+            Frontend.freeMemory(BytesUtils.getAddress(buffer), buffer.capacity());
         }
     }
 }

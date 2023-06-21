@@ -29,7 +29,7 @@ import java.util.function.Consumer;
  * SDK_BENCHMARK_ENDPOINT=127.0.0.1 \
  * SDK_BENCHMARK_CONFIG=throughput=1,recordSize=1048576,duration=1,taskCount=1,streamPerThread=1,replicaCount=1 \
  * SDK_FETCH_CONFIG=fetchSize=65536,taskCount=1 \
- * java -cp examples/target/examples-1.0-SNAPSHOT-jar-with-dependencies.jar com.automq.elasticstream.client.examples.benchmark.StreamBench
+ * java --add-opens=java.base/java.nio=ALL-UNNAMED -cp examples/target/examples-1.0-SNAPSHOT-jar-with-dependencies.jar com.automq.elasticstream.client.examples.benchmark.StreamBench
  */
 class StreamBench {
     private final StreamClient streamClient;

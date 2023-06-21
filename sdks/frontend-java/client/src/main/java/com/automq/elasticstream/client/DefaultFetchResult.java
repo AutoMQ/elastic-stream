@@ -3,11 +3,10 @@ package com.automq.elasticstream.client;
 import com.automq.elasticstream.client.api.FetchResult;
 import com.automq.elasticstream.client.api.RecordBatchWithContext;
 import com.automq.elasticstream.client.jni.Frontend;
+import com.automq.elasticstream.client.utils.BytesUtils;
 
 import java.nio.ByteBuffer;
 import java.util.List;
-
-import sun.nio.ch.DirectBuffer;
 
 public class DefaultFetchResult implements FetchResult {
     private final ByteBuffer buffer;
@@ -25,6 +24,6 @@ public class DefaultFetchResult implements FetchResult {
 
     @Override
     public void free() {
-        Frontend.freeMemory(((DirectBuffer) buffer).address(), buffer.capacity());
+        Frontend.freeMemory(BytesUtils.getAddress(buffer), buffer.capacity());
     }
 }

@@ -36,4 +36,4 @@ jobs:
           distribution: "zulu"
       - name: Build with Maven
         working-directory: ./sdks/frontend-java
-        run: mvn -DargLine="--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED" package
+        run: mvn -DargLine="--add-opens=java.base/java.nio=ALL-UNNAMED" package
