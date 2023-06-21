@@ -3,8 +3,6 @@ use crate::error::StoreError;
 use log::{error, trace};
 use std::{collections::VecDeque, ptr, slice, sync::Arc};
 
-const OPTIMAL_IO_SIZE: usize = 16 * 1024;
-
 pub(crate) struct AlignedBufWriter {
     /// Write cursor in the WAL space.
     ///
@@ -105,28 +103,15 @@ impl AlignedBufWriter {
         // immediately.
         if additional >= self.alignment {
             let size = additional / self.alignment * self.alignment;
-            let mut remaining = size;
-            loop {
-                if 0 == remaining {
-                    break;
-                }
-                let buf = if remaining > OPTIMAL_IO_SIZE {
-                    remaining -= OPTIMAL_IO_SIZE;
-                    AlignedBuf::new(offset, OPTIMAL_IO_SIZE, self.alignment)?
-                } else {
-                    let aligned_buf = AlignedBuf::new(offset, remaining, self.alignment)?;
-                    remaining = 0;
-                    aligned_buf
-                };
-                trace!(
-                    "Reserved {} bytes for WAL data in complete blocks. [{}, {})",
-                    buf.capacity,
-                    offset,
-                    offset + buf.capacity as u64
-                );
-                offset += buf.capacity as u64;
-                self.allocated.push_back(Arc::new(buf));
-            }
+            let buf = AlignedBuf::new(offset, size, self.alignment)?;
+            trace!(
+                "Reserved {} bytes for WAL data in complete blocks. [{}, {})",
+                buf.capacity,
+                offset,
+                offset + buf.capacity as u64
+            );
+            offset += buf.capacity as u64;
+            self.allocated.push_back(Arc::new(buf));
         }
         debug_assert_eq!(
             offset,
