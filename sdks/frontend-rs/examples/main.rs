@@ -8,7 +8,7 @@ use tokio::time::{sleep, Duration};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     frontend::init_log();
     tokio_uring::start(async {
-        let mut frontend = Frontend::new("127.0.0.1:12378")?;
+        let frontend = Frontend::new("127.0.0.1:12378")?;
         let stream_id = frontend
             .create(StreamOptions {
                 replica: 1,

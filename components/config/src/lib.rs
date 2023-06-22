@@ -256,6 +256,9 @@ pub struct Store {
 
     #[serde(rename = "reclaim-policy")]
     pub reclaim_policy: ReclaimSegmentFilePolicy,
+
+    #[serde(rename = "io-cpu")]
+    pub io_cpu: usize,
 }
 
 impl Default for Store {
@@ -273,6 +276,7 @@ impl Default for Store {
             rocksdb: RocksDB::default(),
             total_segment_file_size: u64::MAX,
             reclaim_policy: ReclaimSegmentFilePolicy::default(),
+            io_cpu: 2,
         }
     }
 }
@@ -389,6 +393,10 @@ impl Configuration {
         let total_processor_num = num_cpus::get();
         if self.server.concurrency + 1 > total_processor_num {
             return Err(ConfigurationError::ConcurrencyTooLarge);
+        }
+
+        if self.store.io_cpu >= total_processor_num {
+            return Err(ConfigurationError::IoCpuTooLarge(self.store.io_cpu));
         }
 
         if self.client.client_id.is_empty() {

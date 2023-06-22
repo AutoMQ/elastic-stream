@@ -22,7 +22,6 @@ use crate::{
     AppendRecordRequest, AppendResult, FetchResult, Store,
 };
 use client::PlacementManagerIdGenerator;
-use core_affinity::CoreId;
 use crossbeam::channel::Sender;
 use futures::future::join_all;
 use log::{error, trace};
@@ -95,24 +94,25 @@ impl ElasticStore {
         let indexer_cp = Arc::clone(&indexer);
         let config = Arc::new(config);
         let cfg = Arc::clone(&config);
-        let _io_thread_handle = Self::with_thread(
-            "IO",
-            move || {
-                let mut io = io::IO::new(&cfg, indexer_cp)?;
-                let sharing_uring = io.as_raw_fd();
-                let tx = io
-                    .sender
-                    .take()
-                    .ok_or(StoreError::Configuration("IO channel".to_owned()))?;
+        let _io_thread_handle = Self::with_thread("IO", move || {
+            if !core_affinity::set_for_current(core_affinity::CoreId {
+                id: cfg.store.io_cpu,
+            }) {
+                error!("Failed to set affinity for IO thread");
+            }
+            let mut io = io::IO::new(&cfg, indexer_cp)?;
+            let sharing_uring = io.as_raw_fd();
+            let tx = io
+                .sender
+                .take()
+                .ok_or(StoreError::Configuration("IO channel".to_owned()))?;
 
-                let io = RefCell::new(io);
-                if let Err(_e) = sender.send((tx, sharing_uring)) {
-                    error!("Failed to expose sharing_uring and task channel sender");
-                }
-                io::IO::run(io, recovery_completion_tx)
-            },
-            None,
-        )?;
+            let io = RefCell::new(io);
+            if let Err(_e) = sender.send((tx, sharing_uring)) {
+                error!("Failed to expose sharing_uring and task channel sender");
+            }
+            io::IO::run(io, recovery_completion_tx)
+        })?;
         let (tx, sharing_uring) = receiver
             .blocking_recv()
             .map_err(|_e| StoreError::Internal("Start".to_owned()))?;
@@ -133,41 +133,21 @@ impl ElasticStore {
         Ok(store)
     }
 
-    fn with_thread<F>(
-        name: &str,
-        task: F,
-        affinity: Option<CoreId>,
-    ) -> Result<JoinHandle<()>, StoreError>
+    fn with_thread<F>(name: &str, task: F) -> Result<JoinHandle<()>, StoreError>
     where
         F: FnOnce() -> Result<(), StoreError> + Send + 'static,
     {
-        if let Some(core) = affinity {
-            let closure = move || {
-                if !core_affinity::set_for_current(core) {
-                    todo!("Log error when setting core affinity");
-                }
-                if let Err(_e) = task() {
-                    todo!("Log internal store error");
-                }
-            };
-            let handle = Builder::new()
-                .name(name.to_owned())
-                .spawn(closure)
-                .map_err(|_e| StoreError::IoUring)?;
-            Ok(handle)
-        } else {
-            let closure = move || {
-                if let Err(e) = task() {
-                    eprintln!("{}", e);
-                    todo!("Log internal store error");
-                }
-            };
-            let handle = Builder::new()
-                .name(name.to_owned())
-                .spawn(closure)
-                .map_err(|_e| StoreError::IoUring)?;
-            Ok(handle)
-        }
+        let closure = move || {
+            if let Err(e) = task() {
+                eprintln!("{}", e);
+                todo!("Log internal store error");
+            }
+        };
+        let handle = Builder::new()
+            .name(name.to_owned())
+            .spawn(closure)
+            .map_err(|_e| StoreError::IoUring)?;
+        Ok(handle)
     }
 
     /// Send append request to IO module.
