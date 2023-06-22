@@ -7,7 +7,7 @@ use crate::{
     worker_config::WorkerConfig,
 };
 use config::Configuration;
-use log::{error, info, warn};
+use log::{error, info};
 use std::{cell::UnsafeCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
 use store::{ElasticStore, Store};
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -16,12 +16,6 @@ pub fn launch(
     config: Configuration,
     shutdown: broadcast::Sender<()>,
 ) -> Result<(), Box<dyn Error>> {
-    let core_ids = core_affinity::get_core_ids().ok_or_else(|| {
-        warn!("No cores are available to set affinity");
-        crate::error::LaunchError::NoCoresAvailable
-    })?;
-    let available_core_len = core_ids.len();
-
     let (recovery_completion_tx, recovery_completion_rx) = oneshot::channel();
 
     // Note we move the configuration into store, letting it either allocate or read existing node-id for us.
@@ -45,14 +39,21 @@ pub fn launch(
 
     let mut channels = vec![];
 
+    let worker_core_ids = config::parse_cpu_set(&config.server.worker_set);
+    debug_assert!(
+        !worker_core_ids.is_empty(),
+        "At least one core should be reserved for primary worker"
+    );
+
     // Build non-primary workers first
-    let mut handles = core_ids
+    let mut handles = worker_core_ids
         .iter()
-        .skip(available_core_len - config.server.concurrency + 1)
+        .rev()
+        .skip(1)
+        .map(|id| core_affinity::CoreId { id: *id as usize })
         .map(|core_id| {
             let server_config = config.clone();
             let store = store.clone();
-            let core_id = *core_id;
             let (tx, rx) = mpsc::unbounded_channel();
             channels.push(rx);
 
@@ -87,9 +88,12 @@ pub fn launch(
 
     // Build primary worker
     {
-        let core_id = *core_ids
-            .get(available_core_len - config.server.concurrency)
-            .expect("At least one core should be reserved for primary node");
+        let core_id = worker_core_ids
+            .iter()
+            .rev()
+            .map(|id| core_affinity::CoreId { id: *id as usize })
+            .next()
+            .unwrap();
         let server_config = config;
         let shutdown_tx = shutdown;
         let handle = thread::Builder::new()

@@ -24,7 +24,7 @@ server:
   # Listening port
   port: 10911
   # Number of Thread-per-Core Nodes
-  concurrency: 1
+  worker-set: "1"
   uring:
     # Network io_uring queue depth
     queue-depth: 128

@@ -138,7 +138,8 @@ pub struct Server {
     #[serde(default)]
     pub node_id: i32,
 
-    pub concurrency: usize,
+    #[serde(rename = "worker-set")]
+    pub worker_set: String,
 
     pub uring: Uring,
 
@@ -166,7 +167,7 @@ impl Default for Server {
             host: "127.0.0.1".to_owned(),
             port: 10911,
             node_id: 0,
-            concurrency: 1,
+            worker_set: String::from("1"),
             uring: Uring::default(),
             connection_idle_duration: 60,
             grace_period: 120,
@@ -429,12 +430,14 @@ impl Configuration {
     /// are potentially created.
     pub fn check_and_apply(&mut self) -> Result<(), ConfigurationError> {
         let total_processor_num = num_cpus::get();
-        if self.server.concurrency + 1 > total_processor_num {
-            return Err(ConfigurationError::ConcurrencyTooLarge);
+        for id in parse_cpu_set(&self.server.worker_set) {
+            if id as usize >= total_processor_num {
+                return Err(ConfigurationError::InvalidCoreId(id as usize));
+            }
         }
 
         if self.store.io_cpu >= total_processor_num {
-            return Err(ConfigurationError::IoCpuTooLarge(self.store.io_cpu));
+            return Err(ConfigurationError::InvalidCoreId(self.store.io_cpu));
         }
 
         if self.client.client_id.is_empty() {
@@ -534,7 +537,7 @@ mod tests {
         file.read_to_string(&mut content)?;
         let config: Configuration = serde_yaml::from_str(&content)?;
         assert_eq!(10911, config.server.port);
-        assert_eq!(1, config.server.concurrency);
+        assert_eq!("1", config.server.worker_set);
         assert_eq!(128, config.server.uring.queue_depth);
         assert_eq!(32768, config.store.rocksdb.flush_threshold);
 
