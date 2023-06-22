@@ -1692,7 +1692,7 @@ dependencies = [
 [[package]]
 name = "librocksdb-sys"
 version = "0.11.0+8.1.1"
-source = "git+https://github.com/lizhanhui/rust-rocksdb.git?branch=expose_flush_cfs#4477f51a2bf4216ba333d315bbc0a9104a2c95c5"
+source = "git+https://github.com/AutoMQ/rust-rocksdb.git?branch=develop#3a0d67507fefbe7d8725de20e4980399f8bed777"
 dependencies = [
  "bindgen",
  "bzip2-sys",
@@ -2712,7 +2712,7 @@ dependencies = [
 [[package]]
 name = "rocksdb"
 version = "0.21.0"
-source = "git+https://github.com/lizhanhui/rust-rocksdb.git?branch=expose_flush_cfs#4477f51a2bf4216ba333d315bbc0a9104a2c95c5"
+source = "git+https://github.com/AutoMQ/rust-rocksdb.git?branch=develop#3a0d67507fefbe7d8725de20e4980399f8bed777"
 dependencies = [
  "libc",
  "librocksdb-sys",

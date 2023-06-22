@@ -63,8 +63,7 @@ tracing-subscriber = "0.3"
 tracing-appender = "0.2"
 
 # RocksDB
-# Use offical repository/release once this PR(https://github.com/rust-rocksdb/rust-rocksdb/pull/793) is merged
-rocksdb = { git = "https://github.com/lizhanhui/rust-rocksdb.git", branch = "expose_flush_cfs",  default-features = false, features = ["jemalloc"] }
+rocksdb = { git = "https://github.com/AutoMQ/rust-rocksdb.git", branch = "develop",  default-features = false, features = ["jemalloc"] }
 
 pprof = { version = "0.11", features = ["flamegraph"] }
 
