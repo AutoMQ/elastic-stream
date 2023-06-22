@@ -39,7 +39,7 @@ pub fn launch(
 
     let mut channels = vec![];
 
-    let worker_core_ids = config::parse_cpu_set(&config.server.worker_set);
+    let worker_core_ids = config::parse_cpu_set(&config.server.worker_cpu_set);
     debug_assert!(
         !worker_core_ids.is_empty(),
         "At least one core should be reserved for primary worker"

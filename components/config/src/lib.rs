@@ -138,8 +138,8 @@ pub struct Server {
     #[serde(default)]
     pub node_id: i32,
 
-    #[serde(rename = "worker-set")]
-    pub worker_set: String,
+    #[serde(rename = "worker-cpu-set")]
+    pub worker_cpu_set: String,
 
     pub uring: Uring,
 
@@ -167,7 +167,7 @@ impl Default for Server {
             host: "127.0.0.1".to_owned(),
             port: 10911,
             node_id: 0,
-            worker_set: String::from("1"),
+            worker_cpu_set: String::from("0"),
             uring: Uring::default(),
             connection_idle_duration: 60,
             grace_period: 120,
@@ -311,7 +311,7 @@ impl Default for Store {
             rocksdb: RocksDB::default(),
             total_segment_file_size: u64::MAX,
             reclaim_policy: ReclaimSegmentFilePolicy::default(),
-            io_cpu: 2,
+            io_cpu: 0,
         }
     }
 }
@@ -345,7 +345,7 @@ impl Default for Uring {
         Self {
             queue_depth: 128,
             sqpoll_idle_ms: 2000,
-            sqpoll_cpu: 1,
+            sqpoll_cpu: 0,
             max_bounded_worker: 2,
             max_unbounded_worker: 2,
         }
@@ -430,7 +430,7 @@ impl Configuration {
     /// are potentially created.
     pub fn check_and_apply(&mut self) -> Result<(), ConfigurationError> {
         let total_processor_num = num_cpus::get();
-        for id in parse_cpu_set(&self.server.worker_set) {
+        for id in parse_cpu_set(&self.server.worker_cpu_set) {
             if id as usize >= total_processor_num {
                 return Err(ConfigurationError::InvalidCoreId(id as usize));
             }
@@ -537,7 +537,7 @@ mod tests {
         file.read_to_string(&mut content)?;
         let config: Configuration = serde_yaml::from_str(&content)?;
         assert_eq!(10911, config.server.port);
-        assert_eq!("1", config.server.worker_set);
+        assert_eq!("1", config.server.worker_cpu_set);
         assert_eq!(128, config.server.uring.queue_depth);
         assert_eq!(32768, config.store.rocksdb.flush_threshold);
 
