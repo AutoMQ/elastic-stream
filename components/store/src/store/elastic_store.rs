@@ -70,19 +70,13 @@ impl ElasticStore {
 
         // Fill node_id
         config.server.node_id = lock.id();
+        let config = Arc::new(config);
 
         // Build wal offset manager
         let wal_offset_manager = Arc::new(WalOffsetManager::new());
-
         // Build index driver
         let indexer = Arc::new(IndexDriver::new(
-            config
-                .store
-                .path
-                .metadata_path()
-                .as_path()
-                .to_str()
-                .ok_or(StoreError::Configuration(String::from("Bad store path")))?,
+            &config,
             Arc::clone(&wal_offset_manager) as Arc<dyn MinOffset>,
             config.store.rocksdb.flush_threshold,
         )?);
@@ -92,7 +86,6 @@ impl ElasticStore {
         // IO thread will be left in detached state.
         // Copy a indexer
         let indexer_cp = Arc::clone(&indexer);
-        let config = Arc::new(config);
         let cfg = Arc::clone(&config);
         let _io_thread_handle = Self::with_thread("IO", move || {
             if !core_affinity::set_for_current(core_affinity::CoreId {

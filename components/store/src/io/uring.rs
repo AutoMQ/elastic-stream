@@ -1559,13 +1559,7 @@ mod tests {
 
             // Build index driver
             let indexer = Arc::new(IndexDriver::new(
-                &config
-                    .store
-                    .path
-                    .metadata_path()
-                    .as_path()
-                    .to_str()
-                    .unwrap(),
+                &config,
                 Arc::clone(&wal_offset_manager) as Arc<dyn MinOffset>,
                 128,
             )?);
