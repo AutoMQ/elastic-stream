@@ -324,6 +324,9 @@ pub struct RocksDB {
 
     #[serde(rename = "flush-threshold")]
     pub flush_threshold: usize,
+
+    #[serde(rename = "cpu-set")]
+    pub cpu_set: Option<String>,
 }
 
 impl Default for RocksDB {
@@ -331,6 +334,7 @@ impl Default for RocksDB {
         Self {
             create_if_missing: true,
             flush_threshold: 32768,
+            cpu_set: None,
         }
     }
 }

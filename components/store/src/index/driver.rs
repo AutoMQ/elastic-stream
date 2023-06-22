@@ -7,7 +7,7 @@ use std::{
 use crate::{error::StoreError, index::LocalRangeManager};
 use config::Configuration;
 use crossbeam::channel::{self, Receiver, Select, Sender, TryRecvError};
-use log::{error, info};
+use log::{error, info, warn};
 use model::range::RangeMetadata;
 use tokio::sync::{mpsc, oneshot};
 
@@ -73,9 +73,14 @@ impl IndexDriver {
             .ok_or(StoreError::Configuration("Bad metadata path".to_owned()))?;
         let indexer = Arc::new(Indexer::new(path, min_offset, flush_threshold)?);
         let runner = IndexDriverRunner::new(rx, shutdown_rx, Arc::clone(&indexer));
+        // Always bind indexer thread to processor-0, which runs miscellaneous tasks.
+        let core = core_affinity::CoreId { id: 0 };
         let handle = Builder::new()
             .name("IndexDriver".to_owned())
             .spawn(move || {
+                if !core_affinity::set_for_current(core) {
+                    warn!("Failed to set core affinity for indexer thread");
+                }
                 runner.run();
             })
             .map_err(|e| StoreError::Internal(e.to_string()))?;
