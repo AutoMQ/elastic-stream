@@ -705,6 +705,7 @@ version = "0.1.0"
 dependencies = [
  "gethostname",
  "lazy_static",
+ "libc",
  "model",
  "nix",
  "num_cpus",

@@ -14,6 +14,40 @@ lazy_static::lazy_static! {
     static ref CLIENT_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 }
 
+pub fn parse_cpu_set(set: &str) -> Vec<libc::c_int> {
+    let mut result = vec![];
+
+    if set.is_empty() {
+        for id in 0..num_cpus::get() {
+            result.push(id as libc::c_int);
+        }
+    } else {
+        set.split_terminator(',').for_each(|group| {
+            if group.contains('-') {
+                let boundaries = group.split('-').collect::<Vec<_>>();
+                debug_assert_eq!(2, boundaries.len());
+                if let (Ok(l), Ok(r)) = (
+                    boundaries[0].trim().parse::<libc::c_int>(),
+                    boundaries[1].trim().parse::<libc::c_int>(),
+                ) {
+                    for id in l..=r {
+                        if result.contains(&id) {
+                            continue;
+                        }
+                        result.push(id);
+                    }
+                }
+            } else if let Ok(id) = group.trim().parse::<libc::c_int>() {
+                if result.contains(&id) {
+                    return;
+                }
+                result.push(id);
+            }
+        })
+    }
+    result
+}
+
 fn client_id() -> String {
     let hostname = gethostname::gethostname()
         .into_string()
@@ -540,5 +574,23 @@ mod tests {
         assert_eq!(super::ReclaimSegmentFilePolicy::Recycle, foo.reclaim_policy);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_cpu_set() {
+        assert_eq!(vec![0], super::parse_cpu_set("0"));
+        assert_eq!(vec![1], super::parse_cpu_set("1"));
+        assert_eq!(vec![0, 2, 4, 6, 8], super::parse_cpu_set("0, 2, 4, 6, 8"));
+        assert_eq!(vec![0, 1], super::parse_cpu_set("0-1"));
+        assert_eq!(vec![0, 1, 2, 3, 5, 7, 9], super::parse_cpu_set("0-3,5,7,9"));
+        assert_eq!(
+            super::parse_cpu_set(""),
+            (0..num_cpus::get() as i32).collect::<Vec<_>>()
+        );
+
+        // Some corner cases
+        assert_eq!(vec![0], super::parse_cpu_set("0,,,"));
+        assert_eq!(vec![0, 1], super::parse_cpu_set("0, 0, 1"));
+        assert_eq!(vec![0, 1, 2], super::parse_cpu_set("0-1, 0, 1, 2"));
     }
 }

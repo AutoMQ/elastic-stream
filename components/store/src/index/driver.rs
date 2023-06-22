@@ -66,12 +66,7 @@ impl IndexDriver {
     ) -> Result<Self, StoreError> {
         let (tx, rx) = channel::unbounded();
         let (shutdown_tx, shutdown_rx) = channel::bounded(1);
-        let metadata_path = config.store.path.metadata_path();
-        let path = metadata_path
-            .as_path()
-            .to_str()
-            .ok_or(StoreError::Configuration("Bad metadata path".to_owned()))?;
-        let indexer = Arc::new(Indexer::new(path, min_offset, flush_threshold)?);
+        let indexer = Arc::new(Indexer::new(config, min_offset, flush_threshold)?);
         let runner = IndexDriverRunner::new(rx, shutdown_rx, Arc::clone(&indexer));
         // Always bind indexer thread to processor-0, which runs miscellaneous tasks.
         let core = core_affinity::CoreId { id: 0 };

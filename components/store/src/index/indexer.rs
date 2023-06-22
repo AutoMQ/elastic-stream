@@ -2,7 +2,6 @@ use std::{
     ffi::CString,
     fs,
     io::Cursor,
-    path::Path,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -10,6 +9,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use config::Configuration;
 use log::{error, info, trace, warn};
 use model::range::RangeMetadata;
 use rocksdb::{
@@ -94,14 +94,14 @@ impl Indexer {
     /// * `min_offset` - Pointer to struct where current minimum WAL offset can be retrieved
     /// * `flush_threshold` - Flush index and metadata records every N operations.
     pub(crate) fn new(
-        path: &str,
+        config: &Arc<Configuration>,
         min_offset: Arc<dyn MinOffset>,
         flush_threshold: usize,
     ) -> Result<Self, StoreError> {
-        let path = Path::new(path);
+        let path = config.store.path.metadata_path();
         if !path.exists() {
             info!("Create directory: {:?}", path);
-            fs::create_dir_all(path)?;
+            fs::create_dir_all(path.as_path())?;
         }
 
         let index_cf_opts = Self::build_index_column_family_options(Arc::clone(&min_offset))?;
@@ -136,6 +136,17 @@ impl Indexer {
         // Threshold of all memtable across column families added in size
         db_opts.set_db_write_buffer_size(1024 * 1024 * 1024);
         db_opts.set_max_background_jobs(2);
+
+        if let Some(ref cpu_set) = config.store.rocksdb.cpu_set {
+            let mut env = rocksdb::Env::new().map_err(|e| {
+                StoreError::Configuration(format!(
+                    "Failed to create default Env for RocksDB: {}",
+                    e
+                ))
+            })?;
+            env.set_cpu_set(&config::parse_cpu_set(cpu_set)[..]);
+            db_opts.set_env(&env);
+        }
 
         let mut write_opts = WriteOptions::default();
         write_opts.disable_wal(true);
@@ -643,11 +654,16 @@ mod tests {
     fn new_indexer() -> Result<super::Indexer, Box<dyn Error>> {
         let path = test_util::create_random_path()?;
         let _guard = test_util::DirectoryRemovalGuard::new(path.as_path());
-        let path_str = path.as_os_str().to_str().unwrap();
+        let mut config = config::Configuration::default();
+        config
+            .store
+            .path
+            .set_base(path.as_os_str().to_str().unwrap());
+        let config = Arc::new(config);
         let min_offset = Arc::new(SampleMinOffset {
             min: AtomicU64::new(0),
         });
-        let indexer = super::Indexer::new(path_str, min_offset as Arc<dyn MinOffset>, 128)?;
+        let indexer = super::Indexer::new(&config, min_offset as Arc<dyn MinOffset>, 128)?;
         Ok(indexer)
     }
 
@@ -885,12 +901,17 @@ mod tests {
     fn test_compaction() -> Result<(), Box<dyn Error>> {
         let path = test_util::create_random_path()?;
         let _guard = test_util::DirectoryRemovalGuard::new(path.as_path());
-        let path_str = path.as_os_str().to_str().unwrap();
+        let mut config = config::Configuration::default();
+        config
+            .store
+            .path
+            .set_base(path.as_os_str().to_str().unwrap());
+        let config = Arc::new(config);
         let min_offset = Arc::new(SampleMinOffset {
             min: AtomicU64::new(0),
         });
         let indexer =
-            super::Indexer::new(path_str, Arc::clone(&min_offset) as Arc<dyn MinOffset>, 128)?;
+            super::Indexer::new(&config, Arc::clone(&min_offset) as Arc<dyn MinOffset>, 128)?;
         let range = 0;
         const CNT: u64 = 1024;
         (0..CNT)
