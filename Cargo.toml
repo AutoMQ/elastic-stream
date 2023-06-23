@@ -100,7 +100,7 @@ panic = "unwind"
 [profile.release]
 opt-level = 2
 debug = false
-strip = "symbols"
+strip = "none"
 debug-assertions = false
 codegen-units = 1
 overflow-checks = true
