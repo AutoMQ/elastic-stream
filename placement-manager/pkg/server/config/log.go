@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
@@ -41,8 +42,21 @@ func NewLog() *Log {
 	}
 	log.Zap.EncoderConfig.EncodeCaller = encodeCaller
 	log.Zap.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	log.Zap.EncoderConfig.EncodeDuration = zapcore.MillisDurationEncoder
+	log.Zap.EncoderConfig.EncodeDuration = DurationEncoder
 	return log
+}
+
+func DurationEncoder(d time.Duration, enc zapcore.PrimitiveArrayEncoder) {
+	switch {
+	case d < time.Microsecond:
+		enc.AppendString(fmt.Sprintf("%dns", d.Nanoseconds()))
+	case d < time.Millisecond:
+		enc.AppendString(fmt.Sprintf("%dus", d.Microseconds()))
+	case d < time.Second:
+		enc.AppendString(fmt.Sprintf("%dms", d.Milliseconds()))
+	default:
+		enc.AppendString(fmt.Sprintf("%.3fs", d.Seconds()))
+	}
 }
 
 // Adjust adjusts the configuration in Log.Zap based on additional settings
