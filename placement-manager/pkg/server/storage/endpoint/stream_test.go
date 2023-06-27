@@ -16,17 +16,17 @@ func TestStreamPath(t *testing.T) {
 		{
 			name:     "zero",
 			streamID: 0,
-			want:     "stream/00000000000000000000",
+			want:     "streams/00000000000000000000",
 		},
 		{
 			name:     "positive",
 			streamID: 123456789,
-			want:     "stream/00000000000123456789",
+			want:     "streams/00000000000123456789",
 		},
 		{
 			name:     "max",
 			streamID: math.MaxInt64,
-			want:     "stream/09223372036854775807",
+			want:     "streams/09223372036854775807",
 		},
 	}
 	for _, tt := range tests {

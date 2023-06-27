@@ -19,7 +19,7 @@ const (
 	_rangeIDLen    = _int32Len
 
 	// ranges in stream
-	_rangeStreamPath         = "range"
+	_rangeStreamPath         = "ranges"
 	_rangeStreamPrefix       = "s"
 	_rangeStreamPrefixFormat = _rangeStreamPrefix + kv.KeySeparator + _streamIDFormat + kv.KeySeparator + _rangeStreamPath + kv.KeySeparator
 	_rangeStreamFormat       = _rangeStreamPrefix + kv.KeySeparator + _streamIDFormat + kv.KeySeparator + _rangeStreamPath + kv.KeySeparator + _rangeIDFormat

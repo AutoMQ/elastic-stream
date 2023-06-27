@@ -18,7 +18,7 @@ const (
 	_streamIDFormat = _int64Format
 	_streamIDLen    = _int64Len
 
-	_streamPath   = "stream"
+	_streamPath   = "streams"
 	_streamPrefix = _streamPath + kv.KeySeparator
 	_streamFormat = _streamPath + kv.KeySeparator + _streamIDFormat // max length of int64 is 20
 	_streamKeyLen = len(_streamPath) + len(kv.KeySeparator) + _streamIDLen

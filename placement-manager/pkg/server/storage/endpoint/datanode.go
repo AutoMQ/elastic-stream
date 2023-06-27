@@ -18,7 +18,7 @@ const (
 	_dataNodeIDFormat = _int32Format
 	_dataNodeIDLen    = _int32Len
 
-	_dataNodePath   = "data-node"
+	_dataNodePath   = "data-nodes"
 	_dataNodePrefix = _dataNodePath + kv.KeySeparator
 	_dataNodeFormat = _dataNodePath + kv.KeySeparator + _dataNodeIDFormat
 	_dataNodeKeyLen = len(_dataNodePath) + len(kv.KeySeparator) + _dataNodeIDLen
