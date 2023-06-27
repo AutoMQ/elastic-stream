@@ -83,11 +83,11 @@ func NewMember(etcd *embed.Etcd, client *clientv3.Client, logger *zap.Logger) *M
 // Init initializes the member info.
 func (m *Member) Init(ctx context.Context, cfg *config.Config, name string, clusterRootPath string) error {
 	info := &Info{
-		Name:       name,
-		MemberID:   m.id,
-		ClientUrls: strings.Split(cfg.AdvertiseClientUrls, config.URLSeparator),
-		PeerUrls:   strings.Split(cfg.AdvertisePeerUrls, config.URLSeparator),
-		SbpAddr:    cfg.AdvertiseSbpAddr,
+		Name:            name,
+		MemberID:        m.id,
+		ClientUrls:      strings.Split(cfg.AdvertiseClientUrls, config.URLSeparator),
+		PeerUrls:        strings.Split(cfg.AdvertisePeerUrls, config.URLSeparator),
+		AdvertisePMAddr: cfg.AdvertisePMAddr,
 	}
 
 	m.info = info
@@ -99,7 +99,7 @@ func (m *Member) Init(ctx context.Context, cfg *config.Config, name string, clus
 	m.clusterRootPath = clusterRootPath
 	m.leadership = election.NewLeadership(m.client, m.LeaderPath(), _leaderElectionPurpose, m.lg)
 
-	err = m.setSbpAddress(ctx, info.SbpAddr)
+	err = m.setSbpAddress(ctx, info.AdvertisePMAddr)
 	if err != nil {
 		return errors.Wrap(err, "set sbp address")
 	}
@@ -301,11 +301,11 @@ func (m *Member) ClusterInfo(ctx context.Context) ([]*Info, error) {
 			return nil, errors.Wrapf(err, "get sbp address for member %d", em.ID)
 		}
 		member := &Info{
-			Name:       em.Name,
-			MemberID:   em.ID,
-			PeerUrls:   em.PeerURLs,
-			ClientUrls: em.ClientURLs,
-			SbpAddr:    addr,
+			Name:            em.Name,
+			MemberID:        em.ID,
+			PeerUrls:        em.PeerURLs,
+			ClientUrls:      em.ClientURLs,
+			AdvertisePMAddr: addr,
 		}
 		if leader != nil && member.MemberID == leader.MemberID {
 			member.IsLeader = true

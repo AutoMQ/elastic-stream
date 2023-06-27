@@ -56,12 +56,12 @@ func (m *mockServer) IsLeader() bool {
 
 func (m *mockServer) ClusterInfo(_ context.Context) ([]*member.Info, error) {
 	return []*member.Info{{
-		Name:       "test-member-name",
-		MemberID:   1,
-		PeerUrls:   []string{"test-member-peer-urls"},
-		ClientUrls: []string{"test-member-client-urls"},
-		SbpAddr:    "test-member-sbp-addr",
-		IsLeader:   true,
+		Name:            "test-member-name",
+		MemberID:        1,
+		PeerUrls:        []string{"test-member-peer-urls"},
+		ClientUrls:      []string{"test-member-client-urls"},
+		AdvertisePMAddr: "test-member-sbp-addr",
+		IsLeader:        true,
 	}}, nil
 }
 

@@ -58,12 +58,12 @@ func NewPMConfig(tb testing.TB) *config.Config {
 
 	peerURL := tempurl.Alloc(tb)
 	clientURL := tempurl.Alloc(tb)
-	sbpAddr := tempurl.AllocAddr(tb)
+	pmAddr := tempurl.AllocAddr(tb)
 
 	cfg, err := config.NewConfig([]string{
 		"--peer-urls", peerURL,
 		"--client-urls", clientURL,
-		"--sbp-addr", sbpAddr,
+		"--pm-addr", pmAddr,
 	}, io.Discard)
 	re.NoError(err)
 

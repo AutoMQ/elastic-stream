@@ -201,10 +201,10 @@ func (s *Server) startServer() error {
 	s.cluster = cluster.NewRaftCluster(s.ctx, s.cfg.Cluster, s.member, logger)
 	s.sbpClient = sbpClient.NewClient(s.cfg.Sbp.Client, logger)
 
-	sbpAddr := s.cfg.SbpAddr
-	listener, err := net.Listen("tcp", sbpAddr)
+	pmAddr := s.cfg.PMAddr
+	listener, err := net.Listen("tcp", pmAddr)
 	if err != nil {
-		return errors.Wrapf(err, "listen on %s", sbpAddr)
+		return errors.Wrapf(err, "listen on %s", pmAddr)
 	}
 	go s.serveSbp(listener, s.cluster)
 

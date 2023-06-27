@@ -35,7 +35,7 @@ const (
 	_defaultDataDirFormat                     = "default.%s"
 	_defaultInitialClusterFormat              = "%s=%s"
 	_defaultInitialClusterToken               = "pm-cluster"
-	_defaultSbpAddr                           = "127.0.0.1:12378"
+	_defaultPMAddr                            = "127.0.0.1:12378"
 	_defaultLeaderLease                 int64 = 3
 	_defaultLeaderPriorityCheckInterval       = time.Minute
 
@@ -61,11 +61,11 @@ type Config struct {
 	AdvertisePeerUrls   string
 	AdvertiseClientUrls string
 
-	Name             string
-	DataDir          string
-	InitialCluster   string
-	SbpAddr          string
-	AdvertiseSbpAddr string
+	Name            string
+	DataDir         string
+	InitialCluster  string
+	PMAddr          string
+	AdvertisePMAddr string
 
 	// LeaderLease time, if leader doesn't update its TTL
 	// in etcd after lease time, etcd will expire the leader key
@@ -159,8 +159,8 @@ func (c *Config) Adjust() error {
 		}
 		c.InitialCluster = strings.Join(nodes, URLSeparator)
 	}
-	if c.AdvertiseSbpAddr == "" {
-		c.AdvertiseSbpAddr = c.SbpAddr
+	if c.AdvertisePMAddr == "" {
+		c.AdvertisePMAddr = c.PMAddr
 	}
 
 	// set etcd config
@@ -271,16 +271,16 @@ func configure(v *viper.Viper, fs *pflag.FlagSet) {
 	fs.Int64("leader-lease", _defaultLeaderLease, "expiration time of the leader, in seconds")
 	fs.Duration("leader-priority-check-interval", _defaultLeaderPriorityCheckInterval, "time interval for checking the leader's priority")
 	fs.String("etcd-initial-cluster-token", _defaultInitialClusterToken, "set different tokens to prevent communication between PMs in different clusters")
-	fs.String("sbp-addr", _defaultSbpAddr, "the address of sbp server")
-	fs.String("advertise-sbp-addr", "", "advertise address of sbp server (default '${sbp-addr}')")
+	fs.String("pm-addr", _defaultPMAddr, "the address of PM")
+	fs.String("advertise-pm-addr", "", "advertise address of PM (default '${pm-addr}')")
 	_ = v.BindPFlag("name", fs.Lookup("name"))
 	_ = v.BindPFlag("dataDir", fs.Lookup("data-dir"))
 	_ = v.BindPFlag("initialCluster", fs.Lookup("initial-cluster"))
 	_ = v.BindPFlag("leaderLease", fs.Lookup("leader-lease"))
 	_ = v.BindPFlag("leaderPriorityCheckInterval", fs.Lookup("leader-priority-check-interval"))
 	_ = v.BindPFlag("etcd.initialClusterToken", fs.Lookup("etcd-initial-cluster-token"))
-	_ = v.BindPFlag("sbpAddr", fs.Lookup("sbp-addr"))
-	_ = v.BindPFlag("advertiseSbpAddr", fs.Lookup("advertise-sbp-addr"))
+	_ = v.BindPFlag("pmAddr", fs.Lookup("pm-addr"))
+	_ = v.BindPFlag("advertisePMAddr", fs.Lookup("advertise-pm-addr"))
 
 	// bind env not set before
 	_ = v.BindEnv("etcd.clusterState")

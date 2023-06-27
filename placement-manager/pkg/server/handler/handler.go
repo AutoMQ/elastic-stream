@@ -61,7 +61,7 @@ func (h *Handler) pmCluster(ctx context.Context) *rpcfb.PlacementManagerClusterT
 	for _, member := range members {
 		pm.Nodes = append(pm.Nodes, &rpcfb.PlacementManagerNodeT{
 			Name:          member.Name,
-			AdvertiseAddr: member.SbpAddr,
+			AdvertiseAddr: member.AdvertisePMAddr,
 			IsLeader:      member.IsLeader,
 		})
 	}

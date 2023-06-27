@@ -58,8 +58,8 @@ var (
 			Name:                        "pm-hostname",
 			DataDir:                     "default.pm-hostname",
 			InitialCluster:              "pm=http://127.0.0.1:12380",
-			SbpAddr:                     "127.0.0.1:12378",
-			AdvertiseSbpAddr:            "127.0.0.1:12378",
+			PMAddr:                      "127.0.0.1:12378",
+			AdvertisePMAddr:             "127.0.0.1:12378",
 			LeaderLease:                 3,
 			LeaderPriorityCheckInterval: time.Minute,
 		}
@@ -119,8 +119,8 @@ var (
 			Name:                        "test-name",
 			DataDir:                     "test-data-dir",
 			InitialCluster:              "test-initial-cluster",
-			SbpAddr:                     "test-sbp-addr",
-			AdvertiseSbpAddr:            "test-advertise-sbp-addr",
+			PMAddr:                      "test-pm-addr",
+			AdvertisePMAddr:             "test-advertise-pm-addr",
 			LeaderLease:                 123,
 			LeaderPriorityCheckInterval: time.Hour + time.Minute + time.Second,
 		}
@@ -160,8 +160,8 @@ func TestNewConfig(t *testing.T) {
 				Name:                        "",
 				DataDir:                     "",
 				InitialCluster:              "",
-				SbpAddr:                     "127.0.0.1:12378",
-				AdvertiseSbpAddr:            "",
+				PMAddr:                      "127.0.0.1:12378",
+				AdvertisePMAddr:             "",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
 			},
@@ -195,8 +195,8 @@ func TestNewConfig(t *testing.T) {
 				"--leader-lease=123",
 				"--leader-priority-check-interval=1h1m1s",
 				"--etcd-initial-cluster-token=test-initial-cluster-token",
-				"--sbp-addr=test-sbp-addr",
-				"--advertise-sbp-addr=test-advertise-sbp-addr",
+				"--pm-addr=test-pm-addr",
+				"--advertise-pm-addr=test-advertise-pm-addr",
 				"--etcd-log-level=test-etcd-log-level",
 				"--etcd-auto-compaction-mode=test-auto-compaction-mode",
 				"--etcd-auto-compaction-retention=test-auto-compaction-retention",
@@ -251,8 +251,8 @@ func TestNewConfig(t *testing.T) {
 				Name:                        "test-name",
 				DataDir:                     "test-data-dir",
 				InitialCluster:              "test-initial-cluster",
-				SbpAddr:                     "test-sbp-addr",
-				AdvertiseSbpAddr:            "test-advertise-sbp-addr",
+				PMAddr:                      "test-pm-addr",
+				AdvertisePMAddr:             "test-advertise-pm-addr",
 				LeaderLease:                 123,
 				LeaderPriorityCheckInterval: time.Hour + time.Minute + time.Second,
 			},
@@ -415,8 +415,8 @@ func TestConfig_Adjust(t *testing.T) {
 				Name:                        fmt.Sprintf("pm-%s", hostname),
 				DataDir:                     fmt.Sprintf("default.pm-%s", hostname),
 				InitialCluster:              fmt.Sprintf("pm-%s=http://127.0.0.1:12380", hostname),
-				SbpAddr:                     "127.0.0.1:12378",
-				AdvertiseSbpAddr:            "127.0.0.1:12378",
+				PMAddr:                      "127.0.0.1:12378",
+				AdvertisePMAddr:             "127.0.0.1:12378",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
 			},
@@ -427,7 +427,7 @@ func TestConfig_Adjust(t *testing.T) {
 				config, _ := NewConfig([]string{}, io.Discard)
 				config.PeerUrls = "http://example.com:12380,http://10.0.0.1:12380"
 				config.ClientUrls = "http://example.com:12379,http://10.0.0.1:12379"
-				config.SbpAddr = "example.com:12378"
+				config.PMAddr = "example.com:12378"
 				config.Name = "test-name"
 				return config
 			}(),
@@ -457,8 +457,8 @@ func TestConfig_Adjust(t *testing.T) {
 				Name:                        "test-name",
 				DataDir:                     "default.test-name",
 				InitialCluster:              "test-name=http://example.com:12380,test-name=http://10.0.0.1:12380",
-				SbpAddr:                     "example.com:12378",
-				AdvertiseSbpAddr:            "example.com:12378",
+				PMAddr:                      "example.com:12378",
+				AdvertisePMAddr:             "example.com:12378",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
 			},
