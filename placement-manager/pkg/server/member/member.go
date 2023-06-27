@@ -42,7 +42,7 @@ const (
 
 	_leaderPathPrefix   = "leader"
 	_priorityPathPrefix = "priority"
-	_sbpAddrPathPrefix  = "sbp"
+	_infoPathPrefix     = "info"
 
 	_leaderElectionPurpose = "PM leader election"
 
@@ -89,19 +89,24 @@ func (m *Member) Init(ctx context.Context, cfg *config.Config, name string, clus
 		PeerUrls:        strings.Split(cfg.AdvertisePeerUrls, config.URLSeparator),
 		AdvertisePMAddr: cfg.AdvertisePMAddr,
 	}
+	logger := m.lg.With(zap.Object("member-info", info))
+
+	logger.Info("start to init member info")
 
 	m.info = info
 	bytes, err := json.Marshal(info)
 	if err != nil {
+		logger.Error("failed to marshal member info", zap.Error(err))
 		return errors.Wrap(err, "marshal member info")
 	}
 	m.infoValue = bytes
 	m.clusterRootPath = clusterRootPath
 	m.leadership = election.NewLeadership(m.client, m.LeaderPath(), _leaderElectionPurpose, m.lg)
 
-	err = m.setSbpAddress(ctx, info.AdvertisePMAddr)
+	err = m.saveInfo(ctx, m.infoValue)
 	if err != nil {
-		return errors.Wrap(err, "set sbp address")
+		logger.Error("failed to save member info", zap.Error(err))
+		return errors.Wrap(err, "save member info")
 	}
 
 	return nil
@@ -296,16 +301,16 @@ func (m *Member) ClusterInfo(ctx context.Context) ([]*Info, error) {
 	leader := m.Leader()
 	members := make([]*Info, 0, len(etcdMembers.Members))
 	for _, em := range etcdMembers.Members {
-		addr, err := m.getSbpAddress(ctx, em.ID)
+		info, err := m.loadInfo(ctx, em.ID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "get sbp address for member %d", em.ID)
+			return nil, errors.Wrapf(err, "get info of member %d", em.ID)
 		}
 		member := &Info{
 			Name:            em.Name,
 			MemberID:        em.ID,
 			PeerUrls:        em.PeerURLs,
 			ClientUrls:      em.ClientURLs,
-			AdvertisePMAddr: addr,
+			AdvertisePMAddr: info.AdvertisePMAddr,
 		}
 		if leader != nil && member.MemberID == leader.MemberID {
 			member.IsLeader = true
@@ -334,38 +339,43 @@ func (m *Member) unsetLeader() {
 	m.leader.Store(&Info{})
 }
 
-func (m *Member) setSbpAddress(ctx context.Context, address string) error {
-	logger := m.lg.With(zap.String("sbp-address", address))
+func (m *Member) saveInfo(ctx context.Context, infoValue []byte) error {
+	logger := m.lg
 
 	txn := etcdutil.NewTxn(ctx, m.client, logger)
-	resp, err := txn.Then(clientv3.OpPut(m.SbpAddrPath(m.id), address)).Commit()
+	resp, err := txn.Then(clientv3.OpPut(m.InfoPath(m.id), string(infoValue))).Commit()
 	if err != nil {
-		logger.Error("failed to put sbp address", zap.Error(err))
-		return errors.Wrap(err, "put sbp address")
+		return errors.Wrap(err, "put member info")
 	}
 	if !resp.Succeeded {
-		logger.Error("failed to put sbp address, transaction failed", zap.Error(err))
-		return errors.New("put sbp address failed: transaction failed")
+		return errors.New("put member info: transaction failed")
 	}
 
 	return nil
 }
 
-func (m *Member) getSbpAddress(ctx context.Context, id uint64) (string, error) {
-	logger := m.lg.With(zap.Uint64("mid", id))
+func (m *Member) loadInfo(ctx context.Context, id uint64) (*Info, error) {
+	logger := m.lg.With(zap.Uint64("member-id", id))
 
-	key := m.SbpAddrPath(id)
+	key := m.InfoPath(id)
 	kv, err := etcdutil.GetOne(ctx, m.client, []byte(key), logger)
 	if err != nil {
-		logger.Error("failed to get sbp address", zap.Error(err))
-		return "", errors.Wrapf(err, "failed to get sbp address by key %s", key)
+		logger.Error("failed to get member info", zap.Error(err))
+		return nil, errors.Wrapf(err, "failed to get member info by key %s", key)
 	}
 	if kv == nil {
-		logger.Error("failed to get sbp address, key not found")
-		return "", errors.New("failed to get sbp address: key not found: " + key)
+		logger.Error("failed to get member info, key not found")
+		return nil, errors.Errorf("failed to get member info: key not found: %s", key)
 	}
 
-	return string(kv.Value), nil
+	info := &Info{}
+	err = json.Unmarshal(kv.Value, info)
+	if err != nil {
+		logger.Error("failed to unmarshal member info", zap.ByteString("raw-string", kv.Value), zap.Error(err))
+		return nil, errors.Wrap(err, "unmarshal member info")
+	}
+
+	return info, nil
 }
 
 func (m *Member) LeaderPath() string {
@@ -376,6 +386,6 @@ func (m *Member) getPriorityPath(id uint64) string {
 	return path.Join(m.clusterRootPath, _memberPathPrefix, strconv.FormatUint(id, 10), _priorityPathPrefix)
 }
 
-func (m *Member) SbpAddrPath(id uint64) string {
-	return path.Join(m.clusterRootPath, _memberPathPrefix, strconv.FormatUint(id, 10), _sbpAddrPathPrefix)
+func (m *Member) InfoPath(id uint64) string {
+	return path.Join(m.clusterRootPath, _memberPathPrefix, strconv.FormatUint(id, 10), _infoPathPrefix)
 }
