@@ -12,7 +12,7 @@ type Info struct {
 	PeerUrls        []string `json:"peer_urls"`         // Member.etcd.Config().APUrls
 	ClientUrls      []string `json:"client_urls"`       // Member.etcd.Config().ACUrls
 	AdvertisePMAddr string   `json:"advertise_pm_addr"` // Config.AdvertisePMAddr
-	IsLeader        bool     `json:"is_leader"`         // Whether current PM node is the leader
+	IsLeader        bool     `json:"-"`                 // Whether current PM node is the leader
 }
 
 // MarshalLogObject implements zapcore.ObjectMarshaler
