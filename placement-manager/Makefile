@@ -296,7 +296,7 @@ $(LICENSES): | $(BUILD_DIRS)
 	find $(LICENSES) -type f | xargs chmod 0644
 
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))
-DEB_FILES = $(foreach bin,$(BINS),$(bin)_$(DEB_VERSION)_$(ARCH).deb)
+DEB_FILES = $(foreach bin,$(BINS),distribution/$(bin)_$(DEB_VERSION)_$(ARCH).deb)
 
 # We print the container names here, rather than in CONTAINER_DOTFILES so
 # they are always at the end of the output.
@@ -311,8 +311,8 @@ container containers: $(CONTAINER_DOTFILES)
 # they are always at the end of the output.
 deb debs: # @HELP builds deb packages for one platform ($OS/$ARCH)
 deb debs: $(DEB_FILES)
-	for bin in $(BINS); do                          \
-	    echo "deb: $${bin}_$(DEB_VERSION)_$(ARCH).deb";  \
+	for bin in $(BINS); do                                            \
+	    echo "deb: distribution/$${bin}_$(DEB_VERSION)_$(ARCH).deb";  \
 	done
 	echo
 
@@ -327,11 +327,11 @@ $(foreach bin,$(BINS),$(eval                                         \
 
 # Each deb-file target can reference a $(BIN) variable.
 # This is done in 2 steps to enable target-specific variables.
-$(foreach bin,$(BINS),$(eval $(strip             \
-	$(bin)_$(DEB_VERSION)_$(ARCH).deb: BIN = $(bin)  \
+$(foreach bin,$(BINS),$(eval $(strip                              \
+	distribution/$(bin)_$(DEB_VERSION)_$(ARCH).deb: BIN = $(bin)  \
 )))
-$(foreach bin,$(BINS),$(eval                     \
-	$(bin)_$(DEB_VERSION)_$(ARCH).deb: bin/$(OS)_$(ARCH)/$(bin)$(BIN_EXTENSION) $(LICENSES) $(shell find ./distribution/template/$(bin) -type f)  \
+$(foreach bin,$(BINS),$(eval  \
+	distribution/$(bin)_$(DEB_VERSION)_$(ARCH).deb: bin/$(OS)_$(ARCH)/$(bin)$(BIN_EXTENSION) $(LICENSES) $(shell find ./distribution/template/$(bin) -type f)  \
 ))
 
 # This is the target definition for all container-dotfiles.
