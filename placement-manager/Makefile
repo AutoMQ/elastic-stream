@@ -374,8 +374,12 @@ $(CONTAINER_DOTFILES): .buildx-initialized
 # These are used to track build state in hidden files.
 $(DEB_FILES):
 	if [ "$(OS)" != "linux" ]; then         \
-	    echo "deb: unsupported OS: $(OS)";  \
+	    echo "deb: invalid OS: $(OS)";      \
 	    exit 1;                             \
+	fi
+	if [[ ! "$(DEB_VERSION)}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then  \
+	    echo "deb: invalid version: $(DEB_VERSION)";               \
+	    exit 1;                                                    \
 	fi
 	rm -rf .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 	mkdir -p .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/DEBIAN
