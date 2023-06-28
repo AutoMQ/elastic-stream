@@ -373,6 +373,10 @@ $(CONTAINER_DOTFILES): .buildx-initialized
 # This is the target definition for all deb-files.
 # These are used to track build state in hidden files.
 $(DEB_FILES):
+	if [ "$(OS)" != "linux" ]; then         \
+	    echo "deb: unsupported OS: $(OS)";  \
+	    exit 1;                             \
+	fi
 	rm -rf .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 	mkdir -p .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/DEBIAN
 	mkdir -p .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/usr/local/bin
