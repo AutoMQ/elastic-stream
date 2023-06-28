@@ -17,6 +17,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      - name: Go Cache
+        uses: actions/cache@v3
+        with:
+          path: ./placement-manager/.go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-release-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{matrix.platform}}-${{matrix.go-version}}-pm-release-
+            ${{matrix.platform}}-${{matrix.go-version}}-pm-
+      - name: Build Placement Manager Debian Packages
+        working-directory: ./placement-manager
+        run: make all-deb GO_VERSION=${{ matrix.go-version }}
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2.4.0
         with:
@@ -30,18 +42,6 @@ jobs:
         run: |
           cargo build --release
           ../scripts/package_deb.sh
-
-      - name: Go Cache
-        uses: actions/cache@v3
-        with:
-          path: ./placement-manager/.go/cache
-          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-release-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-release-
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-
-      - name: Build Placement Manager Debian Packages
-        working-directory: ./placement-manager
-        run: make all-deb GO_VERSION=${{ matrix.go-version }}
 
       - name: Release
         uses: softprops/action-gh-release@v1
