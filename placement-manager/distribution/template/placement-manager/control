@@ -1,0 +1,5 @@
+Package: placement-manager
+Version: {ARG_VERSION}
+Architecture: {ARG_ARCH}
+Maintainer: AutoMQ <devadmin@automq.com>
+Description: AutoMQ Placement Manager.

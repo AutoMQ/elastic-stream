@@ -41,6 +41,9 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 # This version-strategy uses a manual value to set the version string
 #VERSION ?= 1.2.3
 
+# Version of the package, start with digits
+DEB_VERSION ?= $(shell echo $(VERSION) | sed -e 's/^[^0-9]*//')
+
 # Set this to 1 to build a debugger-friendly binaries.
 DBG ?=
 
@@ -85,6 +88,7 @@ TAG := $(VERSION)__$(OS)_$(ARCH)
 
 GO_VERSION := 1.20
 BUILD_IMAGE := golang:$(GO_VERSION)-alpine
+DPKG_IMAGE := debian:bookworm-slim
 
 BIN_EXTENSION :=
 ifeq ($(OS), windows)
@@ -283,6 +287,7 @@ $(LICENSES): | $(BUILD_DIRS)
 	find $(LICENSES) -type f | xargs chmod 0644
 
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))
+DEB_FILES = $(foreach bin,$(BINS),$(bin)_$(DEB_VERSION)_$(ARCH).deb)
 
 # We print the container names here, rather than in CONTAINER_DOTFILES so
 # they are always at the end of the output.
@@ -290,6 +295,15 @@ container containers: # @HELP builds containers for one platform ($OS/$ARCH)
 container containers: $(CONTAINER_DOTFILES)
 	for bin in $(BINS); do                           \
 	    echo "container: $(REGISTRY)/$$bin:$(TAG)";  \
+	done
+	echo
+
+# We print the deb package names here, rather than in DEB_FILES so
+# they are always at the end of the output.
+deb debs: # @HELP builds deb packages for one platform ($OS/$ARCH)
+deb debs: $(DEB_FILES)
+	for bin in $(BINS); do                          \
+	    echo "deb: $${bin}_$(DEB_VERSION)_$(ARCH).deb";  \
 	done
 	echo
 
@@ -301,6 +315,16 @@ $(foreach bin,$(BINS),$(eval $(strip                                 \
 $(foreach bin,$(BINS),$(eval                                         \
     .container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG): bin/$(OS)_$(ARCH)/$(bin)$(BIN_EXTENSION) $(LICENSES) Dockerfile.in  \
 ))
+
+# Each deb-file target can reference a $(BIN) variable.
+# This is done in 2 steps to enable target-specific variables.
+$(foreach bin,$(BINS),$(eval $(strip             \
+	$(bin)_$(DEB_VERSION)_$(ARCH).deb: BIN = $(bin)  \
+)))
+$(foreach bin,$(BINS),$(eval                     \
+	$(bin)_$(DEB_VERSION)_$(ARCH).deb: bin/$(OS)_$(ARCH)/$(bin)$(BIN_EXTENSION) $(LICENSES) $(shell find ./distribution/template/$(BIN) -type f)  \
+))
+
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
 $(CONTAINER_DOTFILES): .buildx-initialized
@@ -336,6 +360,30 @@ $(CONTAINER_DOTFILES): .buildx-initialized
 	    .
 	docker images -q $(REGISTRY)/$(BIN):$(TAG) > $@
 	echo
+
+# This is the target definition for all deb-files.
+# These are used to track build state in hidden files.
+$(DEB_FILES):
+	rm -rf .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
+	mkdir -p .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/DEBIAN
+	mkdir -p .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/usr/local/bin
+	mkdir -p .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/etc/$(BIN)
+	sed                                        \
+	    -e 's|{ARG_VERSION}|$(DEB_VERSION)|g'  \
+	    -e 's|{ARG_ARCH}|$(ARCH)|g'            \
+	    distribution/template/$(BIN)/control > .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/DEBIAN/control
+	docker run                           \
+	    -i                               \
+	    --rm                             \
+	    -u $$(id -u):$$(id -g)           \
+	    -v $$(pwd)/.distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp:/distribution/$(BIN)_$(DEB_VERSION)_$(ARCH)                                \
+	    -v $$(pwd)/bin/$(OS)_$(ARCH)/$(BIN)$(BIN_EXTENSION):/distribution/$(BIN)_$(DEB_VERSION)_$(ARCH)/usr/local/bin/$(BIN)$(BIN_EXTENSION)  \
+	    -v $$(pwd)/conf/config.yaml:/distribution/$(BIN)_$(DEB_VERSION)_$(ARCH)/etc/$(BIN)/config.yaml                                        \
+	    -w /distribution                 \
+	    -v $$(pwd)/distribution:/output  \
+	    $(DPKG_IMAGE)                    \
+	    dpkg-deb --root-owner-group --build $(BIN)_$(DEB_VERSION)_$(ARCH) /output/$(BIN)_$(DEB_VERSION)_$(ARCH).deb
+	rm -rf .distribution/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 
 push: # @HELP pushes the container for one platform ($OS/$ARCH) to the defined registry
 push: container
@@ -482,7 +530,7 @@ $(BUILD_DIRS):
 	mkdir -p $@
 
 clean: # @HELP removes built binaries and temporary files
-clean: container-clean bin-clean
+clean: container-clean bin-clean deb-clean
 
 container-clean:
 	rm -rf .container-* .dockerfile-* .push-* .buildx-initialized $(LICENSES)
@@ -490,6 +538,9 @@ container-clean:
 bin-clean:
 	test -d .go && chmod -R u+w .go || true
 	rm -rf .go bin
+
+deb-clean:
+	rm -rf .distribution distribution/*.deb
 
 help: # @HELP prints this message
 help:

@@ -26,3 +26,5 @@
 /.licenses
 /.buildx-initialized
 /covprofile
+/.distribution
+/distribution/*.deb
