@@ -179,7 +179,7 @@ dependencies = [
  "futures-lite",
  "log",
  "parking",
- "polling",
+ "polling 2.8.0",
  "rustix 0.37.20",
  "slab",
  "socket2",
@@ -2364,6 +2364,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38f6d39893cca0701371e3c27294f09797214b86f1fb951b89ade8ec04e2abab"
 dependencies = [
  "plotters-backend",
+]
+
+[[package]]
+name = "polling"
+version = "0.1.0"
+dependencies = [
+ "codec",
+ "log",
+ "minstant",
+ "thiserror",
 ]
 
 [[package]]

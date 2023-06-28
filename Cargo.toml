@@ -4,18 +4,19 @@
 # will _not_ propagate the feature `x` into `cmd`'s direct dependencies.
 resolver = "2"
 members = [
-    "components/config",
-    "components/codec",
-    "components/model",
-    "components/protocol",
     "components/client",
+    "components/codec",
+    "components/config",
+    "components/model",
+    "components/observation",
+    "components/polling",
+    "components/protocol",
     "components/replication",
-    "components/transport",
     "components/store",
-    "components/util",
+    "components/transport",
     "components/test-util",
     "components/tool",
-    "components/observation",
+    "components/util",
     "data-node",
     "sdks/frontend-rs"
 ]
