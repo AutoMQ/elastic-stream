@@ -138,6 +138,12 @@ push-%:
 	    GOOS=$(firstword $(subst _, ,$*)) \
 	    GOARCH=$(lastword $(subst _, ,$*))
 
+deb-%:
+	$(MAKE) deb                           \
+	    --no-print-directory              \
+	    GOOS=$(firstword $(subst _, ,$*)) \
+	    GOARCH=$(lastword $(subst _, ,$*))
+
 all-build: # @HELP builds binaries for all platforms
 all-build: $(addprefix build-, $(subst /,_, $(ALL_PLATFORMS)))
 
@@ -146,6 +152,9 @@ all-container: $(addprefix container-, $(subst /,_, $(ALL_PLATFORMS)))
 
 all-push: # @HELP pushes containers for all platforms to the defined registry
 all-push: $(addprefix push-, $(subst /,_, $(ALL_PLATFORMS)))
+
+all-deb: # @HELP builds debian packages for all platforms
+all-deb: $(addprefix deb-, $(subst /,_, $(ALL_PLATFORMS)))
 
 # The following structure defeats Go's (intentional) behavior to always touch
 # result files, even if they have not changed.  This will still run `go` but
@@ -322,7 +331,7 @@ $(foreach bin,$(BINS),$(eval $(strip             \
 	$(bin)_$(DEB_VERSION)_$(ARCH).deb: BIN = $(bin)  \
 )))
 $(foreach bin,$(BINS),$(eval                     \
-	$(bin)_$(DEB_VERSION)_$(ARCH).deb: bin/$(OS)_$(ARCH)/$(bin)$(BIN_EXTENSION) $(LICENSES) $(shell find ./distribution/template/$(BIN) -type f)  \
+	$(bin)_$(DEB_VERSION)_$(ARCH).deb: bin/$(OS)_$(ARCH)/$(bin)$(BIN_EXTENSION) $(LICENSES) $(shell find ./distribution/template/$(bin) -type f)  \
 ))
 
 # This is the target definition for all container-dotfiles.
