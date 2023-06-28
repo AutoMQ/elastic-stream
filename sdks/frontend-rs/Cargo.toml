@@ -4,34 +4,34 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bytes = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
 client = { path = "../../components/client" }
 codec = { path = "../../components/codec" }
 config = { path = "../../components/config" }
-model = { path = "../../components/model" }
-clap = { workspace = true }
-log =  { workspace = true }
-local-sync = { workspace = true }
-bytes = { workspace = true }
-tokio = { workspace = true, features = ["full"]  }
-tokio-uring = { workspace = true }
-futures = { workspace = true }
-replication = { path = "../../components/replication" }
-thiserror = { workspace = true }
-flatbuffers = { workspace = true }
-protocol = { path = "../../components/protocol" }
-util = { path = "../../components/util" }
-lazy_static = { workspace = true }
-jni = "0.21.1"
-num_cpus = "1.15.0"
-chrono = { workspace = true }
-minstant = { workspace = true }
-log4rs = { workspace = true }
 crossbeam = { workspace = true }
+flatbuffers = { workspace = true }
+futures = { workspace = true }
+jni = "0.21.1"
+lazy_static = { workspace = true }
+local-sync = { workspace = true }
+log =  { workspace = true }
+log4rs = { workspace = true }
 minitrace = { workspace = true }
 minitrace-jaeger = "0.4.1"
+minstant = { workspace = true }
+model = { path = "../../components/model" }
+num_cpus = "1.15.0"
+protocol = { path = "../../components/protocol" }
+replication = { path = "../../components/replication" }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tokio-uring = { workspace = true }
+util = { path = "../../components/util" }
 [dev-dependencies]
-test-util = { path = "../../components/test-util" }
 criterion = { version = "0.4", features = ["html_reports"] }
+test-util = { path = "../../components/test-util" }
 
 [lib]
 crate-type = ["cdylib", "lib"]

@@ -2,32 +2,31 @@
 name = "client"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 async-channel = { workspace = true }
+bytes = { workspace = true }
 codec = { path = "../codec" }
 config = { path = "../config" }
-itertools = { workspace = true }
-model = { path = "../model" }
-protocol = { path = "../protocol" }
-transport = { path = "../transport" }
-bytes = { workspace = true }
-log = { workspace = true }
-thiserror = { workspace = true }
-futures = { workspace = true }
-flatbuffers = { workspace = true }
-gethostname = { workspace = true }
-ordinal = { workspace = true }
-tokio-uring = { workspace = true }
-tokio = { workspace = true }
 crossbeam = { workspace = true }
-observation = {path = "../observation"}
+flatbuffers = { workspace = true }
+futures = { workspace = true }
+gethostname = { workspace = true }
+itertools = { workspace = true }
 local-sync = { workspace = true }
+log = { workspace = true }
+model = { path = "../model" }
+observation = { path = "../observation" }
+ordinal = { workspace = true }
+protocol = { path = "../protocol" }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-uring = { workspace = true }
+transport = { path = "../transport" }
 
 [dev-dependencies]
-mockall = { workspace = true }
-util = { path = "../util" }
-test-util = { path = "../test-util" }
 cargo-llvm-cov = { workspace = true }
+mockall = { workspace = true }
+test-util = { path = "../test-util" }
+util = { path = "../util" }

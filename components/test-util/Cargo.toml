@@ -2,30 +2,29 @@
 name = "test-util"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = { workspace = true }
-log = { workspace = true }
-env_logger = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-tokio-uring = { workspace = true }
 bytes = { workspace = true }
-uuid = { workspace = true}
-crc32fast = { workspace = true }
-transport = { path = "../transport" }
+chrono = { workspace = true }
 codec = { path = "../codec" }
 config = { path = "../config" }
+crc32fast = { workspace = true }
+env_logger = { workspace = true }
+flatbuffers = { workspace = true }
+log = { workspace = true }
 model = { path = "../model" }
 protocol = { path = "../protocol" }
-store = { path = "../store" }
-flatbuffers = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_yaml = { workspace = true}
+serde_yaml = { workspace = true }
+store = { path = "../store" }
+tokio = { workspace = true, features = ["full"] }
+tokio-uring = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true }
+transport = { path = "../transport" }
+uuid = { workspace = true }
 
 [dev-dependencies]
 crc = { workspace = true }

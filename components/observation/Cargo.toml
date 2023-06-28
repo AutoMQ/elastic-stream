@@ -2,12 +2,11 @@
 name = "observation"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lazy_static = {workspace = true}
-prometheus = {workspace = true}
-sysinfo = "0.29.0"
-procfs = "0.15.1"
+lazy_static = { workspace = true }
 log = { workspace = true }
+procfs = "0.15.1"
+prometheus = { workspace = true }
+sysinfo = "0.29.0"

@@ -2,17 +2,16 @@
 name = "model"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-flatbuffers = { workspace = true }
-protocol = { path = "../protocol" }
-thiserror = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
+codec = { path = "../codec" }
+derivative = { workspace = true }
+flatbuffers = { workspace = true }
+log = { workspace = true }
+protocol = { path = "../protocol" }
 strum = "0.24"
 strum_macros = "0.24"
-derivative = { workspace = true }
-codec = { path = "../codec" }
-log = { workspace = true }
+thiserror = { workspace = true }

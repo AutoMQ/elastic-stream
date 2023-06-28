@@ -2,16 +2,15 @@
 name = "codec"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-util = { path = "../util" }
 byteorder =  { workspace = true }
 bytes =  { workspace = true }
+log = { workspace = true }
 num_enum =  { workspace = true }
 thiserror =  { workspace = true }
-log = { workspace = true }
+util = { path = "../util" }
 
 [dev-dependencies]
 cargo-llvm-cov = { workspace = true }

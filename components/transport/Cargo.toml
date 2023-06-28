@@ -2,17 +2,16 @@
 name = "transport"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-codec = { path = "../codec" }
 bytes = { workspace = true }
+codec = { path = "../codec" }
+local-sync = { workspace = true }
 log = { workspace = true }
 tokio-uring = { workspace = true }
-local-sync = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true}
 cargo-llvm-cov = { workspace = true }
 test-util = { path = "../test-util" }
+tokio = { workspace = true }

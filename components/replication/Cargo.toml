@@ -2,19 +2,18 @@
 name = "replication"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bytes = { workspace = true }
 client = { path = "../client" }
 config = { path = "../config" }
-model = { path = "../model" }
-protocol = { path = "../protocol" }
+itertools = { workspace = true }
+local-sync = { workspace = true }
 log = { workspace = true }
+model = { path = "../model" }
+moka = { workspace = true }
+protocol = { path = "../protocol" }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
-itertools = { workspace = true }
-bytes = { workspace = true }
-local-sync = { workspace = true }
-moka = { workspace = true }

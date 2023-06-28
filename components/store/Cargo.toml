@@ -2,44 +2,43 @@
 name = "store"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 byteorder = { workspace = true }
 bytes = { workspace = true }
-tokio-uring = { workspace = true }
-futures = { workspace = true }
-flatbuffers = { workspace = true }
-thiserror = { workspace = true }
-rand = { workspace = true }
-uuid = { workspace = true }
-log =  { workspace = true }
-percentage = { version = "0.1.0" }
-nix = { workspace = true }
-prometheus = { workspace = true }
-libc = { workspace = true }
-io-uring = { workspace = true }
-crossbeam = { workspace = true }
-core_affinity = { workspace = true }
-tokio = { workspace = true }
-util = { path = "../util" }
-model = { path = "../model" }
 client = { path = "../client" }
 config = { path = "../config" }
-protocol = { path = "../protocol" }
-num_enum = { workspace = true }
+core_affinity = { workspace = true }
+crossbeam = { workspace = true }
 derivative = { workspace = true }
-rocksdb = { workspace = true }
-lazy_static = {version = "1.4.0"}
+flatbuffers = { workspace = true }
+futures = { workspace = true }
+io-uring = { workspace = true }
+lazy_static = { version = "1.4.0" }
+libc = { workspace = true }
+log =  { workspace = true }
 minstant = { workspace = true }
-observation = {path = "../observation"}
+model = { path = "../model" }
+nix = { workspace = true }
+num_enum = { workspace = true }
+observation = { path = "../observation" }
+percentage = { version = "0.1.0" }
+prometheus = { workspace = true }
+protocol = { path = "../protocol" }
+rand = { workspace = true }
+rocksdb = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-uring = { workspace = true }
+util = { path = "../util" }
+uuid = { workspace = true }
 
 [dev-dependencies]
 cargo-llvm-cov = { workspace = true }
-uuid = { workspace = true }
 criterion = { workspace = true }
 test-util = { path = "../test-util" }
+uuid = { workspace = true }
 
 [[bench]]
 name = "benchmark"

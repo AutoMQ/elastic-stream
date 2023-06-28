@@ -2,24 +2,22 @@
 name = "util"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bytes = { workspace = true }
+crc32fast = { workspace = true }
+hyper = { version = "0.14.25", features = ["full"] }
+lazy_static = { version = "1.4.0" }
+libc = "0.2.141"
 log = { workspace = true }
+procfs = "0.15.1"
+
+prometheus = { workspace = true }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
-bytes = { workspace = true }
 
-uuid = { workspace = true}
-crc32fast = { workspace = true }
-
-prometheus = {workspace = true}
-procfs = "0.15.1"
-lazy_static = {version = "1.4.0"}
-libc = "0.2.141"
-hyper = { version = "0.14.25", features = ["full"] }
-
+uuid = { workspace = true }
 
 [dev-dependencies]
 crc = { workspace = true }

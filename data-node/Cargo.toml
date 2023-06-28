@@ -2,7 +2,6 @@
 name = "data-node"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -14,34 +13,36 @@ cfg-if = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 client = { path = "../components/client" }
-config = { path = "../components/config" }
 codec = { path = "../components/codec" }
+config = { path = "../components/config" }
 core_affinity =  { workspace = true }
 crc =  { workspace = true }
 crossbeam = { workspace = true }
 ctrlc = { workspace = true }
-futures = { workspace = true }
-num_cpus =  { workspace = true }
 flatbuffers = { workspace = true }
+futures = { workspace = true }
 io-uring = { workspace = true }
-model = { path = "../components/model" }
-num_enum =  { workspace = true }
-minstant = { workspace = true }
-pprof = { workspace = true }
-protocol = {path = "../components/protocol" }
-serde = { workspace = true, features = ["derive"] }
-serde_yaml = { workspace = true }
+lazy_static = { version = "1.4.0" }
 log =  { workspace = true }
 log4rs = { workspace = true }
+minstant = { workspace = true }
+model = { path = "../components/model" }
+num_cpus =  { workspace = true }
+num_enum =  { workspace = true }
+observation = { path = "../components/observation" }
+polling = { path = "../components/polling" }
+pprof = { workspace = true }
+prometheus = { workspace = true }
+protocol = { path = "../components/protocol" }
+replication = { path = "../components/replication" }
+serde = { workspace = true, features = ["derive"] }
+serde_yaml = { workspace = true }
 store = { path = "../components/store" }
-transport = { path = "../components/transport" }
 thiserror =  { workspace = true }
-tokio-uring = { workspace = true }
 tokio = { workspace = true }
-util = {path = "../components/util"}
-lazy_static = {version = "1.4.0"}
-prometheus = {workspace = true}
-observation = {path = "../components/observation"}
+tokio-uring = { workspace = true }
+transport = { path = "../components/transport" }
+util = { path = "../components/util" }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.5"
