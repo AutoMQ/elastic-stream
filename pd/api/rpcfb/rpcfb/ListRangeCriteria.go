@@ -7,20 +7,20 @@ import (
 )
 
 type ListRangeCriteriaT struct {
-	NodeId int32 `json:"node_id"`
+	ServerId int32 `json:"server_id"`
 	StreamId int64 `json:"stream_id"`
 }
 
 func (t *ListRangeCriteriaT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	ListRangeCriteriaStart(builder)
-	ListRangeCriteriaAddNodeId(builder, t.NodeId)
+	ListRangeCriteriaAddServerId(builder, t.ServerId)
 	ListRangeCriteriaAddStreamId(builder, t.StreamId)
 	return ListRangeCriteriaEnd(builder)
 }
 
 func (rcv *ListRangeCriteria) UnPackTo(t *ListRangeCriteriaT) {
-	t.NodeId = rcv.NodeId()
+	t.ServerId = rcv.ServerId()
 	t.StreamId = rcv.StreamId()
 }
 
@@ -58,7 +58,7 @@ func (rcv *ListRangeCriteria) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *ListRangeCriteria) NodeId() int32 {
+func (rcv *ListRangeCriteria) ServerId() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
@@ -66,7 +66,7 @@ func (rcv *ListRangeCriteria) NodeId() int32 {
 	return -1
 }
 
-func (rcv *ListRangeCriteria) MutateNodeId(n int32) bool {
+func (rcv *ListRangeCriteria) MutateServerId(n int32) bool {
 	return rcv._tab.MutateInt32Slot(4, n)
 }
 
@@ -85,8 +85,8 @@ func (rcv *ListRangeCriteria) MutateStreamId(n int64) bool {
 func ListRangeCriteriaStart(builder *flatbuffers.Builder) {
 	builder.StartObject(2)
 }
-func ListRangeCriteriaAddNodeId(builder *flatbuffers.Builder, nodeId int32) {
-	builder.PrependInt32Slot(0, nodeId, -1)
+func ListRangeCriteriaAddServerId(builder *flatbuffers.Builder, serverId int32) {
+	builder.PrependInt32Slot(0, serverId, -1)
 }
 func ListRangeCriteriaAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(1, streamId, -1)

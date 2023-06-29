@@ -26,5 +26,5 @@ type Storage interface {
 
 	endpoint.Stream
 	endpoint.Range
-	endpoint.DataNode
+	endpoint.RangeServer
 }

@@ -7,21 +7,21 @@ import (
 )
 
 type DescribePlacementDriverClusterRequestT struct {
-	DataNode *DataNodeT `json:"data_node"`
+	RangeServer *RangeServerT `json:"range_server"`
 	TimeoutMs int32 `json:"timeout_ms"`
 }
 
 func (t *DescribePlacementDriverClusterRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	dataNodeOffset := t.DataNode.Pack(builder)
+	rangeServerOffset := t.RangeServer.Pack(builder)
 	DescribePlacementDriverClusterRequestStart(builder)
-	DescribePlacementDriverClusterRequestAddDataNode(builder, dataNodeOffset)
+	DescribePlacementDriverClusterRequestAddRangeServer(builder, rangeServerOffset)
 	DescribePlacementDriverClusterRequestAddTimeoutMs(builder, t.TimeoutMs)
 	return DescribePlacementDriverClusterRequestEnd(builder)
 }
 
 func (rcv *DescribePlacementDriverClusterRequest) UnPackTo(t *DescribePlacementDriverClusterRequestT) {
-	t.DataNode = rcv.DataNode(nil).UnPack()
+	t.RangeServer = rcv.RangeServer(nil).UnPack()
 	t.TimeoutMs = rcv.TimeoutMs()
 }
 
@@ -59,12 +59,12 @@ func (rcv *DescribePlacementDriverClusterRequest) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *DescribePlacementDriverClusterRequest) DataNode(obj *DataNode) *DataNode {
+func (rcv *DescribePlacementDriverClusterRequest) RangeServer(obj *RangeServer) *RangeServer {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
-			obj = new(DataNode)
+			obj = new(RangeServer)
 		}
 		obj.Init(rcv._tab.Bytes, x)
 		return obj
@@ -87,8 +87,8 @@ func (rcv *DescribePlacementDriverClusterRequest) MutateTimeoutMs(n int32) bool 
 func DescribePlacementDriverClusterRequestStart(builder *flatbuffers.Builder) {
 	builder.StartObject(2)
 }
-func DescribePlacementDriverClusterRequestAddDataNode(builder *flatbuffers.Builder, dataNode flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(dataNode), 0)
+func DescribePlacementDriverClusterRequestAddRangeServer(builder *flatbuffers.Builder, rangeServer flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(rangeServer), 0)
 }
 func DescribePlacementDriverClusterRequestAddTimeoutMs(builder *flatbuffers.Builder, timeoutMs int32) {
 	builder.PrependInt32Slot(1, timeoutMs, 0)

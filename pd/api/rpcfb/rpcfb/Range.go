@@ -12,25 +12,25 @@ type RangeT struct {
 	Index int32 `json:"index"`
 	Start int64 `json:"start"`
 	End int64 `json:"end"`
-	Nodes []*DataNodeT `json:"nodes"`
+	Servers []*RangeServerT `json:"servers"`
 	ReplicaCount int8 `json:"replica_count"`
 	AckCount int8 `json:"ack_count"`
 }
 
 func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	nodesOffset := flatbuffers.UOffsetT(0)
-	if t.Nodes != nil {
-		nodesLength := len(t.Nodes)
-		nodesOffsets := make([]flatbuffers.UOffsetT, nodesLength)
-		for j := 0; j < nodesLength; j++ {
-			nodesOffsets[j] = t.Nodes[j].Pack(builder)
+	serversOffset := flatbuffers.UOffsetT(0)
+	if t.Servers != nil {
+		serversLength := len(t.Servers)
+		serversOffsets := make([]flatbuffers.UOffsetT, serversLength)
+		for j := 0; j < serversLength; j++ {
+			serversOffsets[j] = t.Servers[j].Pack(builder)
 		}
-		RangeStartNodesVector(builder, nodesLength)
-		for j := nodesLength - 1; j >= 0; j-- {
-			builder.PrependUOffsetT(nodesOffsets[j])
+		RangeStartServersVector(builder, serversLength)
+		for j := serversLength - 1; j >= 0; j-- {
+			builder.PrependUOffsetT(serversOffsets[j])
 		}
-		nodesOffset = builder.EndVector(nodesLength)
+		serversOffset = builder.EndVector(serversLength)
 	}
 	RangeStart(builder)
 	RangeAddStreamId(builder, t.StreamId)
@@ -38,7 +38,7 @@ func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	RangeAddIndex(builder, t.Index)
 	RangeAddStart(builder, t.Start)
 	RangeAddEnd(builder, t.End)
-	RangeAddNodes(builder, nodesOffset)
+	RangeAddServers(builder, serversOffset)
 	RangeAddReplicaCount(builder, t.ReplicaCount)
 	RangeAddAckCount(builder, t.AckCount)
 	return RangeEnd(builder)
@@ -50,12 +50,12 @@ func (rcv *Range) UnPackTo(t *RangeT) {
 	t.Index = rcv.Index()
 	t.Start = rcv.Start()
 	t.End = rcv.End()
-	nodesLength := rcv.NodesLength()
-	t.Nodes = make([]*DataNodeT, nodesLength)
-	for j := 0; j < nodesLength; j++ {
-		x := DataNode{}
-		rcv.Nodes(&x, j)
-		t.Nodes[j] = x.UnPack()
+	serversLength := rcv.ServersLength()
+	t.Servers = make([]*RangeServerT, serversLength)
+	for j := 0; j < serversLength; j++ {
+		x := RangeServer{}
+		rcv.Servers(&x, j)
+		t.Servers[j] = x.UnPack()
 	}
 	t.ReplicaCount = rcv.ReplicaCount()
 	t.AckCount = rcv.AckCount()
@@ -155,7 +155,7 @@ func (rcv *Range) MutateEnd(n int64) bool {
 	return rcv._tab.MutateInt64Slot(12, n)
 }
 
-func (rcv *Range) Nodes(obj *DataNode, j int) bool {
+func (rcv *Range) Servers(obj *RangeServer, j int) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
 	if o != 0 {
 		x := rcv._tab.Vector(o)
@@ -167,7 +167,7 @@ func (rcv *Range) Nodes(obj *DataNode, j int) bool {
 	return false
 }
 
-func (rcv *Range) NodesLength() int {
+func (rcv *Range) ServersLength() int {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
@@ -217,10 +217,10 @@ func RangeAddStart(builder *flatbuffers.Builder, start int64) {
 func RangeAddEnd(builder *flatbuffers.Builder, end int64) {
 	builder.PrependInt64Slot(4, end, -1)
 }
-func RangeAddNodes(builder *flatbuffers.Builder, nodes flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(5, flatbuffers.UOffsetT(nodes), 0)
+func RangeAddServers(builder *flatbuffers.Builder, servers flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(5, flatbuffers.UOffsetT(servers), 0)
 }
-func RangeStartNodesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func RangeStartServersVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
 func RangeAddReplicaCount(builder *flatbuffers.Builder, replicaCount int8) {

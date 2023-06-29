@@ -9,7 +9,7 @@ import (
 type HeartbeatRequestT struct {
 	ClientId string `json:"client_id"`
 	ClientRole ClientRole `json:"client_role"`
-	DataNode *DataNodeT `json:"data_node"`
+	RangeServer *RangeServerT `json:"range_server"`
 }
 
 func (t *HeartbeatRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
@@ -18,18 +18,18 @@ func (t *HeartbeatRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffs
 	if t.ClientId != "" {
 		clientIdOffset = builder.CreateString(t.ClientId)
 	}
-	dataNodeOffset := t.DataNode.Pack(builder)
+	rangeServerOffset := t.RangeServer.Pack(builder)
 	HeartbeatRequestStart(builder)
 	HeartbeatRequestAddClientId(builder, clientIdOffset)
 	HeartbeatRequestAddClientRole(builder, t.ClientRole)
-	HeartbeatRequestAddDataNode(builder, dataNodeOffset)
+	HeartbeatRequestAddRangeServer(builder, rangeServerOffset)
 	return HeartbeatRequestEnd(builder)
 }
 
 func (rcv *HeartbeatRequest) UnPackTo(t *HeartbeatRequestT) {
 	t.ClientId = string(rcv.ClientId())
 	t.ClientRole = rcv.ClientRole()
-	t.DataNode = rcv.DataNode(nil).UnPack()
+	t.RangeServer = rcv.RangeServer(nil).UnPack()
 }
 
 func (rcv *HeartbeatRequest) UnPack() *HeartbeatRequestT {
@@ -86,12 +86,12 @@ func (rcv *HeartbeatRequest) MutateClientRole(n ClientRole) bool {
 	return rcv._tab.MutateInt8Slot(6, int8(n))
 }
 
-func (rcv *HeartbeatRequest) DataNode(obj *DataNode) *DataNode {
+func (rcv *HeartbeatRequest) RangeServer(obj *RangeServer) *RangeServer {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
-			obj = new(DataNode)
+			obj = new(RangeServer)
 		}
 		obj.Init(rcv._tab.Bytes, x)
 		return obj
@@ -108,8 +108,8 @@ func HeartbeatRequestAddClientId(builder *flatbuffers.Builder, clientId flatbuff
 func HeartbeatRequestAddClientRole(builder *flatbuffers.Builder, clientRole ClientRole) {
 	builder.PrependInt8Slot(1, int8(clientRole), 0)
 }
-func HeartbeatRequestAddDataNode(builder *flatbuffers.Builder, dataNode flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(dataNode), 0)
+func HeartbeatRequestAddRangeServer(builder *flatbuffers.Builder, rangeServer flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(rangeServer), 0)
 }
 func HeartbeatRequestEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

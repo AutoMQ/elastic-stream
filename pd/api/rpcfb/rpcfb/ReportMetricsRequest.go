@@ -7,22 +7,22 @@ import (
 )
 
 type ReportMetricsRequestT struct {
-	DataNode *DataNodeT `json:"data_node"`
-	Metrics *DataNodeMetricsT `json:"metrics"`
+	RangeServer *RangeServerT `json:"range_server"`
+	Metrics *RangeServerMetricsT `json:"metrics"`
 }
 
 func (t *ReportMetricsRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	dataNodeOffset := t.DataNode.Pack(builder)
+	rangeServerOffset := t.RangeServer.Pack(builder)
 	metricsOffset := t.Metrics.Pack(builder)
 	ReportMetricsRequestStart(builder)
-	ReportMetricsRequestAddDataNode(builder, dataNodeOffset)
+	ReportMetricsRequestAddRangeServer(builder, rangeServerOffset)
 	ReportMetricsRequestAddMetrics(builder, metricsOffset)
 	return ReportMetricsRequestEnd(builder)
 }
 
 func (rcv *ReportMetricsRequest) UnPackTo(t *ReportMetricsRequestT) {
-	t.DataNode = rcv.DataNode(nil).UnPack()
+	t.RangeServer = rcv.RangeServer(nil).UnPack()
 	t.Metrics = rcv.Metrics(nil).UnPack()
 }
 
@@ -60,12 +60,12 @@ func (rcv *ReportMetricsRequest) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *ReportMetricsRequest) DataNode(obj *DataNode) *DataNode {
+func (rcv *ReportMetricsRequest) RangeServer(obj *RangeServer) *RangeServer {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
-			obj = new(DataNode)
+			obj = new(RangeServer)
 		}
 		obj.Init(rcv._tab.Bytes, x)
 		return obj
@@ -73,12 +73,12 @@ func (rcv *ReportMetricsRequest) DataNode(obj *DataNode) *DataNode {
 	return nil
 }
 
-func (rcv *ReportMetricsRequest) Metrics(obj *DataNodeMetrics) *DataNodeMetrics {
+func (rcv *ReportMetricsRequest) Metrics(obj *RangeServerMetrics) *RangeServerMetrics {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
-			obj = new(DataNodeMetrics)
+			obj = new(RangeServerMetrics)
 		}
 		obj.Init(rcv._tab.Bytes, x)
 		return obj
@@ -89,8 +89,8 @@ func (rcv *ReportMetricsRequest) Metrics(obj *DataNodeMetrics) *DataNodeMetrics 
 func ReportMetricsRequestStart(builder *flatbuffers.Builder) {
 	builder.StartObject(2)
 }
-func ReportMetricsRequestAddDataNode(builder *flatbuffers.Builder, dataNode flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(dataNode), 0)
+func ReportMetricsRequestAddRangeServer(builder *flatbuffers.Builder, rangeServer flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(rangeServer), 0)
 }
 func ReportMetricsRequestAddMetrics(builder *flatbuffers.Builder, metrics flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(metrics), 0)

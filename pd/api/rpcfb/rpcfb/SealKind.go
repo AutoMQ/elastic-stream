@@ -8,19 +8,19 @@ type SealKind int8
 
 const (
 	SealKindUNSPECIFIED      SealKind = 0
-	SealKindDATA_NODE        SealKind = 1
+	SealKindRANGE_SERVER     SealKind = 1
 	SealKindPLACEMENT_DRIVER SealKind = 2
 )
 
 var EnumNamesSealKind = map[SealKind]string{
 	SealKindUNSPECIFIED:      "UNSPECIFIED",
-	SealKindDATA_NODE:        "DATA_NODE",
+	SealKindRANGE_SERVER:     "RANGE_SERVER",
 	SealKindPLACEMENT_DRIVER: "PLACEMENT_DRIVER",
 }
 
 var EnumValuesSealKind = map[string]SealKind{
 	"UNSPECIFIED":      SealKindUNSPECIFIED,
-	"DATA_NODE":        SealKindDATA_NODE,
+	"RANGE_SERVER":     SealKindRANGE_SERVER,
 	"PLACEMENT_DRIVER": SealKindPLACEMENT_DRIVER,
 }
 

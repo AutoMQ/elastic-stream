@@ -48,14 +48,14 @@ type Range interface {
 // It returns ErrNotLeader if the current PD node is not the leader.
 func (c *RaftCluster) ListRange(ctx context.Context, criteria *rpcfb.ListRangeCriteriaT) (ranges []*rpcfb.RangeT, err error) {
 	byStream := criteria.StreamId >= endpoint.MinStreamID
-	byDataNode := criteria.NodeId >= endpoint.MinDataNodeID
+	byDataNode := criteria.ServerId >= endpoint.MinDataNodeID
 	switch {
 	case byStream && byDataNode:
-		ranges, err = c.listRangeOnDataNodeInStream(ctx, criteria.StreamId, criteria.NodeId)
+		ranges, err = c.listRangeOnDataNodeInStream(ctx, criteria.StreamId, criteria.ServerId)
 	case byStream && !byDataNode:
 		ranges, err = c.listRangeInStream(ctx, criteria.StreamId)
 	case !byStream && byDataNode:
-		ranges, err = c.listRangeOnDataNode(ctx, criteria.NodeId)
+		ranges, err = c.listRangeOnDataNode(ctx, criteria.ServerId)
 	default:
 	}
 	if errors.Is(err, kv.ErrTxnFailed) {
@@ -63,7 +63,7 @@ func (c *RaftCluster) ListRange(ctx context.Context, criteria *rpcfb.ListRangeCr
 	}
 
 	for _, r := range ranges {
-		c.fillDataNodesInfo(r.Nodes)
+		c.fillDataNodesInfo(r.Servers)
 	}
 	return
 }
@@ -173,7 +173,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 	if err != nil {
 		return nil, err
 	}
-	c.fillDataNodesInfo(sealedRange.Nodes)
+	c.fillDataNodesInfo(sealedRange.Servers)
 	return sealedRange, nil
 }
 
@@ -234,7 +234,7 @@ func (c *RaftCluster) CreateRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.
 	if err != nil {
 		return nil, err
 	}
-	c.fillDataNodesInfo(newRange.Nodes)
+	c.fillDataNodesInfo(newRange.Servers)
 	return newRange, nil
 }
 
@@ -284,7 +284,7 @@ func (c *RaftCluster) sealRangeLocked(ctx context.Context, lastRange *rpcfb.Rang
 		Index:        lastRange.Index,
 		Start:        lastRange.Start,
 		End:          end,
-		Nodes:        eraseDataNodesInfo(lastRange.Nodes),
+		Servers:      eraseDataNodesInfo(lastRange.Servers),
 		ReplicaCount: lastRange.ReplicaCount,
 		AckCount:     lastRange.AckCount,
 	}
@@ -313,14 +313,14 @@ func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT
 		return nil, errors.Wrapf(ErrStreamNotFound, "stream %d not found", newRange.StreamId)
 	}
 
-	nodes, err := c.chooseDataNodes(int(stream.Replica))
+	servers, err := c.chooseDataNodes(int(stream.Replica))
 	if err != nil {
 		logger.Error("failed to choose data nodes", zap.Error(err))
 		return nil, err
 	}
-	ids := make([]int32, 0, len(nodes))
-	for _, n := range nodes {
-		ids = append(ids, n.NodeId)
+	ids := make([]int32, 0, len(servers))
+	for _, n := range servers {
+		ids = append(ids, n.ServerId)
 	}
 	logger = logger.With(zap.Int32s("node-ids", ids))
 
@@ -330,7 +330,7 @@ func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT
 		Index:        newRange.Index,
 		Start:        newRange.Start,
 		End:          _writableRangeEnd,
-		Nodes:        nodes,
+		Servers:      servers,
 		ReplicaCount: stream.Replica,
 		AckCount:     stream.AckCount,
 	}

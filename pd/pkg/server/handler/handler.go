@@ -13,7 +13,7 @@ import (
 )
 
 type Cluster interface {
-	cluster.DataNode
+	cluster.RangeServer
 	cluster.Range
 	cluster.Stream
 	cluster.Member

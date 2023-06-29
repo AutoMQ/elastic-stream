@@ -81,7 +81,7 @@ func TestHandler_ListRange(t *testing.T) {
 			}
 
 			req := &protocol.ListRangeRequest{ListRangeRequestT: rpcfb.ListRangeRequestT{
-				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: tt.args.StreamID, NodeId: tt.args.NodeID},
+				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: tt.args.StreamID, ServerId: tt.args.NodeID},
 			}}
 			resp := &protocol.ListRangeResponse{}
 			h.ListRange(req, resp)
@@ -305,7 +305,7 @@ func TestSealRange(t *testing.T) {
 
 			// list ranges
 			lReq := &protocol.ListRangeRequest{ListRangeRequestT: rpcfb.ListRangeRequestT{
-				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: 0, NodeId: -1},
+				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: 0, ServerId: -1},
 			}}
 			lResp := &protocol.ListRangeResponse{}
 			h.ListRange(lReq, lResp)
@@ -481,7 +481,7 @@ func TestHandler_CreateRange(t *testing.T) {
 
 			// list ranges
 			lReq := &protocol.ListRangeRequest{ListRangeRequestT: rpcfb.ListRangeRequestT{
-				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: 0, NodeId: -1},
+				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: 0, ServerId: -1},
 			}}
 			lResp := &protocol.ListRangeResponse{}
 			h.ListRange(lReq, lResp)
@@ -509,9 +509,9 @@ func preHeartbeat(tb testing.TB, h *Handler, nodeID int32) {
 	re := require.New(tb)
 
 	req := &protocol.HeartbeatRequest{HeartbeatRequestT: rpcfb.HeartbeatRequestT{
-		ClientRole: rpcfb.ClientRoleCLIENT_ROLE_DATA_NODE,
-		DataNode: &rpcfb.DataNodeT{
-			NodeId:        nodeID,
+		ClientRole: rpcfb.ClientRoleCLIENT_ROLE_RANGE_SERVER,
+		RangeServer: &rpcfb.RangeServerT{
+			ServerId:      nodeID,
 			AdvertiseAddr: fmt.Sprintf("addr-%d", nodeID),
 		}}}
 	resp := &protocol.HeartbeatResponse{}
@@ -602,7 +602,7 @@ func getLastRange(tb testing.TB, h *Handler, streamID int64) *rpcfb.RangeT {
 	re := require.New(tb)
 
 	req := &protocol.ListRangeRequest{ListRangeRequestT: rpcfb.ListRangeRequestT{
-		Criteria: &rpcfb.ListRangeCriteriaT{StreamId: streamID, NodeId: -1},
+		Criteria: &rpcfb.ListRangeCriteriaT{StreamId: streamID, ServerId: -1},
 	}}
 	resp := &protocol.ListRangeResponse{}
 	h.ListRange(req, resp)
@@ -620,17 +620,17 @@ func getLastRange(tb testing.TB, h *Handler, streamID int64) *rpcfb.RangeT {
 
 func fmtNodes(r *rpcfb.RangeT) {
 	// erase advertise addr
-	for _, n := range r.Nodes {
-		n.AdvertiseAddr = ""
+	for _, s := range r.Servers {
+		s.AdvertiseAddr = ""
 	}
 	// sort by node id
-	sort.Slice(r.Nodes, func(i, j int) bool {
-		return r.Nodes[i].NodeId < r.Nodes[j].NodeId
+	sort.Slice(r.Servers, func(i, j int) bool {
+		return r.Servers[i].ServerId < r.Servers[j].ServerId
 	})
 }
 
 func fillRangeInfo(r *rpcfb.RangeT) {
-	r.Nodes = []*rpcfb.DataNodeT{{NodeId: 0}, {NodeId: 1}, {NodeId: 2}}
+	r.Servers = []*rpcfb.RangeServerT{{ServerId: 0}, {ServerId: 1}, {ServerId: 2}}
 	r.ReplicaCount = 3
 	r.AckCount = 3
 }

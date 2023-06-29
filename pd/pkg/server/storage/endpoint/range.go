@@ -57,15 +57,15 @@ type Range interface {
 func (e *Endpoint) CreateRange(ctx context.Context, rangeT *rpcfb.RangeT) error {
 	logger := e.lg.With(zap.Int64("stream-id", rangeT.StreamId), zap.Int32("range-index", rangeT.Index), traceutil.TraceLogField(ctx))
 
-	kvs := make([]kv.KeyValue, 0, 1+len(rangeT.Nodes))
+	kvs := make([]kv.KeyValue, 0, 1+len(rangeT.Servers))
 	r := fbutil.Marshal(rangeT)
 	kvs = append(kvs, kv.KeyValue{
 		Key:   rangePathInSteam(rangeT.StreamId, rangeT.Index),
 		Value: r,
 	})
-	for _, node := range rangeT.Nodes {
+	for _, server := range rangeT.Servers {
 		kvs = append(kvs, kv.KeyValue{
-			Key:   rangePathOnDataNode(node.NodeId, rangeT.StreamId, rangeT.Index),
+			Key:   rangePathOnDataNode(server.ServerId, rangeT.StreamId, rangeT.Index),
 			Value: nil,
 		})
 	}

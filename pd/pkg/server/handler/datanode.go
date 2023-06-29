@@ -15,10 +15,10 @@ func (h *Handler) Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.Heart
 
 	resp.ClientId = req.ClientId
 	resp.ClientRole = req.ClientRole
-	resp.DataNode = req.DataNode
+	resp.RangeServer = req.RangeServer
 
-	if req.ClientRole == rpcfb.ClientRoleCLIENT_ROLE_DATA_NODE && req.DataNode != nil {
-		err := h.c.Heartbeat(ctx, req.DataNode)
+	if req.ClientRole == rpcfb.ClientRoleCLIENT_ROLE_RANGE_SERVER && req.RangeServer != nil {
+		err := h.c.Heartbeat(ctx, req.RangeServer)
 		if err != nil {
 			switch {
 			case errors.Is(err, cluster.ErrNotLeader):
@@ -55,9 +55,9 @@ func (h *Handler) AllocateID(req *protocol.IDAllocationRequest, resp *protocol.I
 
 func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse) {
 	ctx := req.Context()
-	resp.DataNode = req.DataNode
+	resp.RangeServer = req.RangeServer
 
-	if req.DataNode == nil {
+	if req.RangeServer == nil {
 		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "data node is nil"})
 		return
 	}
@@ -66,7 +66,7 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 		return
 	}
 
-	err := h.c.Metrics(ctx, req.DataNode, req.Metrics)
+	err := h.c.Metrics(ctx, req.RangeServer, req.Metrics)
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):

@@ -7,22 +7,22 @@ import (
 )
 
 type ReportMetricsResponseT struct {
-	DataNode *DataNodeT `json:"data_node"`
+	RangeServer *RangeServerT `json:"range_server"`
 	Status *StatusT `json:"status"`
 }
 
 func (t *ReportMetricsResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	dataNodeOffset := t.DataNode.Pack(builder)
+	rangeServerOffset := t.RangeServer.Pack(builder)
 	statusOffset := t.Status.Pack(builder)
 	ReportMetricsResponseStart(builder)
-	ReportMetricsResponseAddDataNode(builder, dataNodeOffset)
+	ReportMetricsResponseAddRangeServer(builder, rangeServerOffset)
 	ReportMetricsResponseAddStatus(builder, statusOffset)
 	return ReportMetricsResponseEnd(builder)
 }
 
 func (rcv *ReportMetricsResponse) UnPackTo(t *ReportMetricsResponseT) {
-	t.DataNode = rcv.DataNode(nil).UnPack()
+	t.RangeServer = rcv.RangeServer(nil).UnPack()
 	t.Status = rcv.Status(nil).UnPack()
 }
 
@@ -60,12 +60,12 @@ func (rcv *ReportMetricsResponse) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *ReportMetricsResponse) DataNode(obj *DataNode) *DataNode {
+func (rcv *ReportMetricsResponse) RangeServer(obj *RangeServer) *RangeServer {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
-			obj = new(DataNode)
+			obj = new(RangeServer)
 		}
 		obj.Init(rcv._tab.Bytes, x)
 		return obj
@@ -89,8 +89,8 @@ func (rcv *ReportMetricsResponse) Status(obj *Status) *Status {
 func ReportMetricsResponseStart(builder *flatbuffers.Builder) {
 	builder.StartObject(2)
 }
-func ReportMetricsResponseAddDataNode(builder *flatbuffers.Builder, dataNode flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(dataNode), 0)
+func ReportMetricsResponseAddRangeServer(builder *flatbuffers.Builder, rangeServer flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(rangeServer), 0)
 }
 func ReportMetricsResponseAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(status), 0)

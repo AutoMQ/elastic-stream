@@ -18,9 +18,9 @@ func TestHandler_Heartbeat(t *testing.T) {
 	defer closeFunc()
 
 	req := &protocol.HeartbeatRequest{HeartbeatRequestT: rpcfb.HeartbeatRequestT{
-		ClientRole: rpcfb.ClientRoleCLIENT_ROLE_DATA_NODE,
-		DataNode: &rpcfb.DataNodeT{
-			NodeId:        42,
+		ClientRole: rpcfb.ClientRoleCLIENT_ROLE_RANGE_SERVER,
+		RangeServer: &rpcfb.RangeServerT{
+			ServerId:      42,
 			AdvertiseAddr: fmt.Sprintf("addr-%d", 42),
 		}}}
 	resp := &protocol.HeartbeatResponse{}
@@ -36,8 +36,8 @@ func TestHandler_DescribePDCluster(t *testing.T) {
 	defer closeFunc()
 
 	req := &protocol.DescribePDClusterRequest{DescribePlacementDriverClusterRequestT: rpcfb.DescribePlacementDriverClusterRequestT{
-		DataNode: &rpcfb.DataNodeT{
-			NodeId:        42,
+		RangeServer: &rpcfb.RangeServerT{
+			ServerId:      42,
 			AdvertiseAddr: fmt.Sprintf("addr-%d", 42),
 		},
 	}}

@@ -19,25 +19,25 @@ var (
 	ErrNotEnoughDataNodes = errors.New("not enough data nodes")
 )
 
-type DataNode interface {
-	Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) error
+type RangeServer interface {
+	Heartbeat(ctx context.Context, node *rpcfb.RangeServerT) error
 	AllocateID(ctx context.Context) (int32, error)
-	Metrics(ctx context.Context, node *rpcfb.DataNodeT, metrics *rpcfb.DataNodeMetricsT) error
+	Metrics(ctx context.Context, node *rpcfb.RangeServerT, metrics *rpcfb.RangeServerMetricsT) error
 }
 
-// Heartbeat updates DataNode's last active time, and save it to storage if its info changed.
+// Heartbeat updates RangeServer's last active time, and save it to storage if its info changed.
 // It returns ErrNotLeader if the current PD node is not the leader.
-func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.DataNodeT) error {
+func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.RangeServerT) error {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
-	updated, old := c.cache.SaveDataNode(&cache.DataNode{
-		DataNodeT:      *node,
+	updated, old := c.cache.SaveDataNode(&cache.RangeServer{
+		RangeServerT:   *node,
 		LastActiveTime: time.Now(),
 	})
 	if updated && c.IsLeader() {
 		logger.Info("data node updated, start to save it", zap.Any("new", node), zap.Any("old", old))
 		_, err := c.storage.SaveDataNode(ctx, node)
-		logger.Info("finish saving data node", zap.Int32("node-id", node.NodeId), zap.Error(err))
+		logger.Info("finish saving data node", zap.Int32("node-id", node.ServerId), zap.Error(err))
 		if err != nil {
 			if errors.Is(err, kv.ErrTxnFailed) {
 				return ErrNotLeader
@@ -67,18 +67,18 @@ func (c *RaftCluster) AllocateID(ctx context.Context) (int32, error) {
 
 // Metrics receives metrics from data nodes.
 // It returns ErrNotLeader if the current PD node is not the leader.
-func (c *RaftCluster) Metrics(ctx context.Context, node *rpcfb.DataNodeT, metrics *rpcfb.DataNodeMetricsT) error {
+func (c *RaftCluster) Metrics(ctx context.Context, node *rpcfb.RangeServerT, metrics *rpcfb.RangeServerMetricsT) error {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
-	updated, old := c.cache.SaveDataNode(&cache.DataNode{
-		DataNodeT:      *node,
+	updated, old := c.cache.SaveDataNode(&cache.RangeServer{
+		RangeServerT:   *node,
 		LastActiveTime: time.Now(),
 		Metrics:        metrics,
 	})
 	if updated && c.IsLeader() {
 		logger.Info("data node updated when reporting metrics, start to save it", zap.Any("new", node), zap.Any("old", old))
 		_, err := c.storage.SaveDataNode(ctx, node)
-		logger.Info("finish saving data node", zap.Int32("node-id", node.NodeId), zap.Error(err))
+		logger.Info("finish saving data node", zap.Int32("node-id", node.ServerId), zap.Error(err))
 		if err != nil {
 			if errors.Is(err, kv.ErrTxnFailed) {
 				return ErrNotLeader
@@ -91,9 +91,9 @@ func (c *RaftCluster) Metrics(ctx context.Context, node *rpcfb.DataNodeT, metric
 }
 
 // chooseDataNodes selects `cnt` number of data nodes from the available data nodes for a range.
-// Only DataNodeT.NodeId is filled in the returned DataNodeT.
+// Only RangeServerT.ServerId is filled in the returned RangeServerT.
 // It returns ErrNotEnoughDataNodes if there are not enough data nodes to allocate.
-func (c *RaftCluster) chooseDataNodes(cnt int) ([]*rpcfb.DataNodeT, error) {
+func (c *RaftCluster) chooseDataNodes(cnt int) ([]*rpcfb.RangeServerT, error) {
 	if cnt <= 0 {
 		return nil, nil
 	}
@@ -104,58 +104,58 @@ func (c *RaftCluster) chooseDataNodes(cnt int) ([]*rpcfb.DataNodeT, error) {
 	}
 
 	perm := rand.Perm(len(nodes))
-	chose := make([]*rpcfb.DataNodeT, cnt)
+	chose := make([]*rpcfb.RangeServerT, cnt)
 	for i := 0; i < cnt; i++ {
 		// select two random nodes and choose the one with higher score
 		node1 := nodes[perm[i]]
-		id := node1.NodeId
+		id := node1.ServerId
 		if cnt+i < len(perm) {
 			node2 := nodes[perm[cnt+i]]
 			if node2.Score() > node1.Score() {
-				id = node2.NodeId
+				id = node2.ServerId
 			}
 		}
-		chose[i] = &rpcfb.DataNodeT{
-			NodeId: id,
+		chose[i] = &rpcfb.RangeServerT{
+			ServerId: id,
 		}
 	}
 
 	idx := c.nodeIdx.Add(uint64(cnt))
 	for i := 0; i < cnt; i++ {
-		chose[i] = &rpcfb.DataNodeT{
-			NodeId: nodes[(idx-uint64(i))%uint64(len(nodes))].NodeId,
+		chose[i] = &rpcfb.RangeServerT{
+			ServerId: nodes[(idx-uint64(i))%uint64(len(nodes))].ServerId,
 		}
 	}
 
 	return chose, nil
 }
 
-func (c *RaftCluster) fillDataNodesInfo(nodes []*rpcfb.DataNodeT) {
+func (c *RaftCluster) fillDataNodesInfo(nodes []*rpcfb.RangeServerT) {
 	for _, node := range nodes {
 		c.fillDataNodeInfo(node)
 	}
 }
 
-func (c *RaftCluster) fillDataNodeInfo(node *rpcfb.DataNodeT) {
+func (c *RaftCluster) fillDataNodeInfo(node *rpcfb.RangeServerT) {
 	if node == nil {
 		return
 	}
-	n := c.cache.DataNode(node.NodeId)
+	n := c.cache.RangeServer(node.ServerId)
 	if n == nil {
-		c.lg.Warn("data node not found", zap.Int32("node-id", node.NodeId))
+		c.lg.Warn("data node not found", zap.Int32("node-id", node.ServerId))
 		return
 	}
 	node.AdvertiseAddr = n.AdvertiseAddr
 }
 
-func eraseDataNodesInfo(o []*rpcfb.DataNodeT) (n []*rpcfb.DataNodeT) {
+func eraseDataNodesInfo(o []*rpcfb.RangeServerT) (n []*rpcfb.RangeServerT) {
 	if o == nil {
 		return
 	}
-	n = make([]*rpcfb.DataNodeT, len(o))
+	n = make([]*rpcfb.RangeServerT, len(o))
 	for i, node := range o {
-		n[i] = &rpcfb.DataNodeT{
-			NodeId: node.NodeId,
+		n[i] = &rpcfb.RangeServerT{
+			ServerId: node.ServerId,
 		}
 	}
 	return

@@ -12,35 +12,35 @@ import (
 	"github.com/AutoMQ/pd/pkg/server/cluster/cache"
 )
 
-// TestRaftCluster_fillDataNodesInfo will fail if there are new fields in rpcfb.DataNodeT
+// TestRaftCluster_fillDataNodesInfo will fail if there are new fields in rpcfb.RangeServerT
 func TestRaftCluster_fillDataNodesInfo(t *testing.T) {
 	t.Parallel()
 	re := require.New(t)
 
-	var node rpcfb.DataNodeT
+	var node rpcfb.RangeServerT
 	_ = gofakeit.New(1).Struct(&node)
 	cluster := NewRaftCluster(context.Background(), nil, nil, zap.NewNop())
-	cluster.cache.SaveDataNode(&cache.DataNode{
-		DataNodeT: node,
+	cluster.cache.SaveDataNode(&cache.RangeServer{
+		RangeServerT: node,
 	})
 
-	node2 := rpcfb.DataNodeT{
-		NodeId: node.NodeId,
+	node2 := rpcfb.RangeServerT{
+		ServerId: node.ServerId,
 	}
-	cluster.fillDataNodesInfo([]*rpcfb.DataNodeT{&node2})
+	cluster.fillDataNodesInfo([]*rpcfb.RangeServerT{&node2})
 
 	re.Equal(node, node2)
 }
 
-// Test_eraseDataNodesInfo will fail if there are new fields in rpcfb.DataNodeT
+// Test_eraseDataNodesInfo will fail if there are new fields in rpcfb.RangeServerT
 func Test_eraseDataNodesInfo(t *testing.T) {
 	t.Parallel()
 	re := require.New(t)
 
-	var node rpcfb.DataNodeT
+	var node rpcfb.RangeServerT
 	_ = gofakeit.New(1).Struct(&node)
 
-	nodes := eraseDataNodesInfo([]*rpcfb.DataNodeT{&node})
+	nodes := eraseDataNodesInfo([]*rpcfb.RangeServerT{&node})
 
 	// `AdvertiseAddr` should not be copied
 	node.AdvertiseAddr = ""

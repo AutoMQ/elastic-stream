@@ -26,21 +26,21 @@ const (
 	_dataNodeByRangeLimit = 1e4
 )
 
-type DataNode interface {
-	SaveDataNode(ctx context.Context, dataNode *rpcfb.DataNodeT) (*rpcfb.DataNodeT, error)
-	ForEachDataNode(ctx context.Context, f func(dataNode *rpcfb.DataNodeT) error) error
+type RangeServer interface {
+	SaveDataNode(ctx context.Context, dataNode *rpcfb.RangeServerT) (*rpcfb.RangeServerT, error)
+	ForEachDataNode(ctx context.Context, f func(dataNode *rpcfb.RangeServerT) error) error
 }
 
 // SaveDataNode creates or updates the given data node and returns it.
-func (e *Endpoint) SaveDataNode(ctx context.Context, dataNode *rpcfb.DataNodeT) (*rpcfb.DataNodeT, error) {
-	logger := e.lg.With(zap.Int32("node-id", dataNode.NodeId), traceutil.TraceLogField(ctx))
+func (e *Endpoint) SaveDataNode(ctx context.Context, dataNode *rpcfb.RangeServerT) (*rpcfb.RangeServerT, error) {
+	logger := e.lg.With(zap.Int32("node-id", dataNode.ServerId), traceutil.TraceLogField(ctx))
 
-	if dataNode.NodeId < MinDataNodeID {
+	if dataNode.ServerId < MinDataNodeID {
 		logger.Error("invalid data node id")
-		return nil, errors.Errorf("invalid data node id: %d < %d", dataNode.NodeId, MinDataNodeID)
+		return nil, errors.Errorf("invalid data node id: %d < %d", dataNode.ServerId, MinDataNodeID)
 	}
 
-	key := dataNodePath(dataNode.NodeId)
+	key := dataNodePath(dataNode.ServerId)
 	value := fbutil.Marshal(dataNode)
 	defer mcache.Free(value)
 
@@ -55,7 +55,7 @@ func (e *Endpoint) SaveDataNode(ctx context.Context, dataNode *rpcfb.DataNodeT) 
 
 // ForEachDataNode calls the given function for every data node in the storage.
 // If f returns an error, the iteration is stopped and the error is returned.
-func (e *Endpoint) ForEachDataNode(ctx context.Context, f func(dataNode *rpcfb.DataNodeT) error) error {
+func (e *Endpoint) ForEachDataNode(ctx context.Context, f func(dataNode *rpcfb.RangeServerT) error) error {
 	var startID = MinDataNodeID
 	for startID >= MinDataNodeID {
 		nextID, err := e.forEachDataNodeLimited(ctx, f, startID, _dataNodeByRangeLimit)
@@ -67,7 +67,7 @@ func (e *Endpoint) ForEachDataNode(ctx context.Context, f func(dataNode *rpcfb.D
 	return nil
 }
 
-func (e *Endpoint) forEachDataNodeLimited(ctx context.Context, f func(dataNode *rpcfb.DataNodeT) error, startID int32, limit int64) (nextID int32, err error) {
+func (e *Endpoint) forEachDataNodeLimited(ctx context.Context, f func(dataNode *rpcfb.RangeServerT) error, startID int32, limit int64) (nextID int32, err error) {
 	logger := e.lg.With(traceutil.TraceLogField(ctx))
 
 	startKey := dataNodePath(startID)
@@ -78,8 +78,8 @@ func (e *Endpoint) forEachDataNodeLimited(ctx context.Context, f func(dataNode *
 	}
 
 	for _, keyValue := range kvs {
-		dataNode := rpcfb.GetRootAsDataNode(keyValue.Value, 0).UnPack()
-		nextID = dataNode.NodeId + 1
+		dataNode := rpcfb.GetRootAsRangeServer(keyValue.Value, 0).UnPack()
+		nextID = dataNode.ServerId + 1
 		err = f(dataNode)
 		if err != nil {
 			return MinDataNodeID - 1, err
