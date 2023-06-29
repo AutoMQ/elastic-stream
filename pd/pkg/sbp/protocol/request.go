@@ -288,23 +288,23 @@ func (rm *ReportMetricsRequest) Timeout() int32 {
 	return 0
 }
 
-// DescribePMClusterRequest is a request to operation.OpDescribePMCluster
-type DescribePMClusterRequest struct {
+// DescribePDClusterRequest is a request to operation.OpDescribePMCluster
+type DescribePDClusterRequest struct {
 	baseRequest
 	baseUnmarshaler
 
 	rpcfb.DescribePlacementManagerClusterRequestT
 }
 
-func (dpm *DescribePMClusterRequest) unmarshalFlatBuffer(data []byte) error {
-	dpm.DescribePlacementManagerClusterRequestT = *rpcfb.GetRootAsDescribePlacementManagerClusterRequest(data, 0).UnPack()
+func (dpd *DescribePDClusterRequest) unmarshalFlatBuffer(data []byte) error {
+	dpd.DescribePlacementManagerClusterRequestT = *rpcfb.GetRootAsDescribePlacementManagerClusterRequest(data, 0).UnPack()
 	return nil
 }
 
-func (dpm *DescribePMClusterRequest) Unmarshal(fmt format.Format, data []byte) error {
-	return unmarshal(dpm, fmt, data)
+func (dpd *DescribePDClusterRequest) Unmarshal(fmt format.Format, data []byte) error {
+	return unmarshal(dpd, fmt, data)
 }
 
-func (dpm *DescribePMClusterRequest) Timeout() int32 {
-	return dpm.TimeoutMs
+func (dpd *DescribePDClusterRequest) Timeout() int32 {
+	return dpd.TimeoutMs
 }

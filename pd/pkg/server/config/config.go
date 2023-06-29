@@ -240,7 +240,7 @@ func newViper() *viper.Viper {
 }
 
 func newFlagSet(errOutput io.Writer) *pflag.FlagSet {
-	fs := pflag.NewFlagSet("placement-manager", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("pd", pflag.ContinueOnError)
 	fs.SetOutput(errOutput)
 	return fs
 }

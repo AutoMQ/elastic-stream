@@ -338,26 +338,26 @@ func (rm *ReportMetricsResponse) OK() {
 	rm.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
 }
 
-// DescribePMClusterResponse is a response to operation.OpDescribePMCluster
-type DescribePMClusterResponse struct {
+// DescribePDClusterResponse is a response to operation.OpDescribePMCluster
+type DescribePDClusterResponse struct {
 	baseMarshaller
 	singleResponse
 
 	rpcfb.DescribePlacementManagerClusterResponseT
 }
 
-func (dpm *DescribePMClusterResponse) marshalFlatBuffer() ([]byte, error) {
-	return fbutil.Marshal(&dpm.DescribePlacementManagerClusterResponseT), nil
+func (dpd *DescribePDClusterResponse) marshalFlatBuffer() ([]byte, error) {
+	return fbutil.Marshal(&dpd.DescribePlacementManagerClusterResponseT), nil
 }
 
-func (dpm *DescribePMClusterResponse) Marshal(fmt format.Format) ([]byte, error) {
-	return marshal(dpm, fmt)
+func (dpd *DescribePDClusterResponse) Marshal(fmt format.Format) ([]byte, error) {
+	return marshal(dpd, fmt)
 }
 
-func (dpm *DescribePMClusterResponse) Error(status *rpcfb.StatusT) {
-	dpm.Status = status
+func (dpd *DescribePDClusterResponse) Error(status *rpcfb.StatusT) {
+	dpd.Status = status
 }
 
-func (dpm *DescribePMClusterResponse) OK() {
-	dpm.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
+func (dpd *DescribePDClusterResponse) OK() {
+	dpd.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
 }

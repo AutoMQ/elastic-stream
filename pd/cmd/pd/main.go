@@ -1,4 +1,4 @@
-// Package main is the entrypoint for placement-manager.
+// Package main is the entrypoint for pd.
 package main
 
 import (

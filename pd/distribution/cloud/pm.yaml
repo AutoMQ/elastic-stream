@@ -1,24 +1,24 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: pm-client
+  name: pd-client
 spec:
   type: LoadBalancer
   ports:
-    - name: pm-client
+    - name: pd-client
       port: 12379
       protocol: TCP
       targetPort: 12379
   selector:
-    app: placement-manager
+    app: placement-driver
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: pm
-  namespace: placement-manager
+  name: pd
+  namespace: placement-driver
   labels:
-    app: placement-manager
+    app: placement-driver
 spec:
   clusterIP: None
   ports:
@@ -27,32 +27,32 @@ spec:
     - port: 12380
       name: peer
   selector:
-    app: placement-manager
+    app: placement-driver
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: pm
-  namespace: placement-manager
+  name: pd
+  namespace: placement-driver
   labels:
-    app: placement-manager
+    app: placement-driver
 spec:
   selector:
     matchLabels:
-      app: placement-manager
-  serviceName: "pm"
+      app: placement-driver
+  serviceName: "pd"
   replicas: 3
   template:
     metadata:
-      name: placement-manager
+      name: placement-driver
       labels:
-        app: placement-manager
+        app: placement-driver
     spec:
       securityContext:
         fsGroup: 65535
       containers:
-        - name: placement-manager
-          image: 716469478206.dkr.ecr.ap-northeast-1.amazonaws.com/placement-manager:latest
+        - name: placement-driver
+          image: 716469478206.dkr.ecr.ap-northeast-1.amazonaws.com/placement-driver:latest
           imagePullPolicy: "Always"
           ports:
             - containerPort: 12379
@@ -60,36 +60,36 @@ spec:
             - containerPort: 12380
               name: peer
           volumeMounts:
-            - name: pm-data
-              mountPath: /data/placement-manager
+            - name: pd-data
+              mountPath: /data/placement-driver
           env:
             - name: NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: PM_PEERURLS
+            - name: PD_PEERURLS
               value: "http://0.0.0.0:12380"
-            - name: PM_CLIENTURLS
+            - name: PD_CLIENTURLS
               value: "http://0.0.0.0:12379"
-            - name: PM_ADVERTISEPEERURLS
-              value: "http://$(NAME).pm:12380"
-            - name: PM_ADVERTISECLIENTURLS
-              value: "http://$(NAME).pm:12379"
-            - name: PM_NAME
+            - name: PD_ADVERTISEPEERURLS
+              value: "http://$(NAME).pd:12380"
+            - name: PD_ADVERTISECLIENTURLS
+              value: "http://$(NAME).pd:12379"
+            - name: PD_NAME
               value: "$(NAME)"
-            - name: PM_DATADIR
-              value: "/data/placement-manager/default.$(NAME)"
-            - name: PM_INITIALCLUSTER
-              value: "pm-0=http://pm-0.pm:12380,pm-1=http://pm-1.pm:12380,pm-2=http://pm-2.pm:12380"
-            - name: PM_PMADDR
+            - name: PD_DATADIR
+              value: "/data/placement-driver/default.$(NAME)"
+            - name: PD_INITIALCLUSTER
+              value: "pd-0=http://pd-0.pd:12380,pd-1=http://pd-1.pd:12380,pd-2=http://pd-2.pd:12380"
+            - name: PD_PMADDR
               value: "0.0.0.0:12378"
-            - name: PM_ADVERTISEPMADDR
-              value: "$(NAME).pm:12378"
-            - name: PM_ETCD_INITIALCLUSTERTOKEN
-              value: "pm-cluster"
+            - name: PD_ADVERTISEPMADDR
+              value: "$(NAME).pd:12378"
+            - name: PD_ETCD_INITIALCLUSTERTOKEN
+              value: "pd-cluster"
   volumeClaimTemplates:
     - metadata:
-        name: pm-data
+        name: pd-data
       spec:
         storageClassName: gp2
         accessModes: [ "ReadWriteOnce" ]

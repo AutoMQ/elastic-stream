@@ -1,2 +1,2 @@
-// Package server implements server of placement-manager
+// Package server implements server of Placement Driver.
 package server

@@ -48,22 +48,22 @@ func (h *Handler) Check(req protocol.InRequest, resp protocol.OutResponse) (pass
 }
 
 func (h *Handler) notLeaderError(ctx context.Context) *rpcfb.StatusT {
-	pmCluster := h.pmCluster(ctx)
+	pmCluster := h.pdCluster(ctx)
 	return &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: fbutil.Marshal(pmCluster)}
 }
 
-func (h *Handler) pmCluster(ctx context.Context) *rpcfb.PlacementManagerClusterT {
-	pm := &rpcfb.PlacementManagerClusterT{Nodes: make([]*rpcfb.PlacementManagerNodeT, 0)}
+func (h *Handler) pdCluster(ctx context.Context) *rpcfb.PlacementManagerClusterT {
+	pd := &rpcfb.PlacementManagerClusterT{Nodes: make([]*rpcfb.PlacementManagerNodeT, 0)}
 	members, err := h.c.ClusterInfo(ctx)
 	if err != nil {
 		return &rpcfb.PlacementManagerClusterT{Nodes: []*rpcfb.PlacementManagerNodeT{}}
 	}
 	for _, member := range members {
-		pm.Nodes = append(pm.Nodes, &rpcfb.PlacementManagerNodeT{
+		pd.Nodes = append(pd.Nodes, &rpcfb.PlacementManagerNodeT{
 			Name:          member.Name,
 			AdvertiseAddr: member.AdvertisePMAddr,
 			IsLeader:      member.IsLeader,
 		})
 	}
-	return pm
+	return pd
 }

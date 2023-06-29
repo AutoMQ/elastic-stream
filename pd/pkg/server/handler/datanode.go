@@ -79,8 +79,8 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 	resp.OK()
 }
 
-func (h *Handler) DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
+func (h *Handler) DescribePMCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse) {
 	ctx := req.Context()
-	resp.Cluster = h.pmCluster(ctx)
+	resp.Cluster = h.pdCluster(ctx)
 	resp.OK()
 }

@@ -118,6 +118,6 @@ func (b *baseHandler) ReportMetrics(_ *protocol.ReportMetricsRequest, resp *prot
 	resp.OK()
 }
 
-func (b *baseHandler) DescribePMCluster(_ *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
+func (b *baseHandler) DescribePMCluster(_ *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse) {
 	resp.OK()
 }

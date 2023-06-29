@@ -35,13 +35,13 @@ func TestHandler_DescribePMCluster(t *testing.T) {
 	h, closeFunc := startSbpHandler(t, nil, true)
 	defer closeFunc()
 
-	req := &protocol.DescribePMClusterRequest{DescribePlacementManagerClusterRequestT: rpcfb.DescribePlacementManagerClusterRequestT{
+	req := &protocol.DescribePDClusterRequest{DescribePlacementManagerClusterRequestT: rpcfb.DescribePlacementManagerClusterRequestT{
 		DataNode: &rpcfb.DataNodeT{
 			NodeId:        42,
 			AdvertiseAddr: fmt.Sprintf("addr-%d", 42),
 		},
 	}}
-	resp := &protocol.DescribePMClusterResponse{}
+	resp := &protocol.DescribePDClusterResponse{}
 	h.DescribePMCluster(req, resp)
 
 	re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code)

@@ -82,7 +82,7 @@ func (c Checker) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoco
 	c.Handler.ReportMetrics(req, resp)
 }
 
-func (c Checker) DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse) {
+func (c Checker) DescribePMCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse) {
 	// all pm nodes will handle describe PM cluster request, so we don't need to check leader here.
 	c.Handler.DescribePMCluster(req, resp)
 }

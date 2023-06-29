@@ -26,10 +26,10 @@ type Handler interface {
 	UpdateStream(req *protocol.UpdateStreamRequest, resp *protocol.UpdateStreamResponse)
 	// DescribeStream describes the specified stream.
 	DescribeStream(req *protocol.DescribeStreamRequest, resp *protocol.DescribeStreamResponse)
-	// ReportMetrics reports metrics to placement manager.
+	// ReportMetrics reports metrics to pd.
 	ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse)
-	// DescribePMCluster describes placement manager cluster membership.
-	DescribePMCluster(req *protocol.DescribePMClusterRequest, resp *protocol.DescribePMClusterResponse)
+	// DescribePMCluster describes pd cluster membership.
+	DescribePMCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse)
 }
 
 var (
@@ -105,10 +105,10 @@ var (
 			},
 		},
 		{Code: operation.OpDescribePMCluster}: {
-			newReq:  func() protocol.InRequest { return &protocol.DescribePMClusterRequest{} },
-			newResp: func() protocol.OutResponse { return &protocol.DescribePMClusterResponse{} },
+			newReq:  func() protocol.InRequest { return &protocol.DescribePDClusterRequest{} },
+			newResp: func() protocol.OutResponse { return &protocol.DescribePDClusterResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
-				handler.DescribePMCluster(req.(*protocol.DescribePMClusterRequest), resp.(*protocol.DescribePMClusterResponse))
+				handler.DescribePMCluster(req.(*protocol.DescribePDClusterRequest), resp.(*protocol.DescribePDClusterResponse))
 			},
 		},
 	}

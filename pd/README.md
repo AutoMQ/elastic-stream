@@ -1,6 +1,4 @@
-# placement-manager
-
-[![Tests](https://github.com/AutoMQ/pd/actions/workflows/tests.yaml/badge.svg)](https://github.com/AutoMQ/pd/actions/workflows/tests.yaml)
+# Placement Driver
 
 ## Getting started
 
@@ -20,9 +18,9 @@ make
 ### Running
 
 ```sh
-./bin/${OS}_${ARCH}/placement-manager
+./bin/${OS}_${ARCH}/pd
 ```
-For more options, run `./bin/${OS}_${ARCH}/placement-manager --help`.
+For more options, run `./bin/${OS}_${ARCH}/pd --help`.
 
 ## Contributing
 

@@ -57,8 +57,8 @@ const (
 	_leaderTickInterval       = 50 * time.Millisecond // check leader loop interval
 	_shutdownSbpServerTimeout = time.Second * 5       // timeout when shutdown sbp server
 
-	_rootPathPrefix = "/pm"                           // prefix of Server.rootPath
-	_clusterIDPath  = "/placement-manager/cluster_id" // path of Server.clusterID
+	_rootPathPrefix = "/pd"                          // prefix of Server.rootPath
+	_clusterIDPath  = "/placement-driver/cluster_id" // path of Server.clusterID
 )
 
 // Server ensures redundancy by using the Raft consensus algorithm provided by etcd
