@@ -319,8 +319,8 @@ func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT
 		return nil, err
 	}
 	ids := make([]int32, 0, len(servers))
-	for _, n := range servers {
-		ids = append(ids, n.ServerId)
+	for _, rs := range servers {
+		ids = append(ids, rs.ServerId)
 	}
 	logger = logger.With(zap.Int32s("server-ids", ids))
 

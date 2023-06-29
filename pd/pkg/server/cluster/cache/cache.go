@@ -33,9 +33,9 @@ type RangeServer struct {
 }
 
 // Score returns the score of the range server.
-func (n *RangeServer) Score() (score int) {
+func (rs *RangeServer) Score() (score int) {
 	// TODO more intelligent score
-	if n.Metrics == nil {
+	if rs.Metrics == nil {
 		return
 	}
 
@@ -46,23 +46,23 @@ func (n *RangeServer) Score() (score int) {
 	)
 
 	score += 10000
-	score -= int(10 * n.Metrics.DiskInRate / (100 * MB))
-	score -= int(10 * n.Metrics.DiskOutRate / (100 * MB))
-	score += int(10 * n.Metrics.DiskFreeSpace / (50 * GB))
-	score -= int(10 * n.Metrics.DiskUnindexedDataSize / (100 * MB))
-	score -= int(10 * n.Metrics.MemoryUsed / (1 * GB))
-	score -= int(10 * n.Metrics.UringTaskRate / 1024)
-	score -= int(10 * n.Metrics.UringInflightTaskCnt / 128)
-	score -= int(10 * n.Metrics.UringPendingTaskCnt / 1024)
-	score -= int(10 * n.Metrics.UringTaskAvgLatency / 10)
-	score -= int(10 * n.Metrics.NetworkAppendRate / 256)
-	score -= int(10 * n.Metrics.NetworkFetchRate / 256)
-	score -= int(10 * n.Metrics.NetworkFailedAppendRate / 1)
-	score -= int(10 * n.Metrics.NetworkFailedFetchRate / 1)
-	score -= int(10 * n.Metrics.NetworkAppendAvgLatency / 1)
-	score -= int(10 * n.Metrics.NetworkAppendAvgLatency / 1)
-	score -= int(10 * n.Metrics.RangeMissingReplicaCnt / 2)
-	score -= int(10 * n.Metrics.RangeActiveCnt / 10)
+	score -= int(10 * rs.Metrics.DiskInRate / (100 * MB))
+	score -= int(10 * rs.Metrics.DiskOutRate / (100 * MB))
+	score += int(10 * rs.Metrics.DiskFreeSpace / (50 * GB))
+	score -= int(10 * rs.Metrics.DiskUnindexedDataSize / (100 * MB))
+	score -= int(10 * rs.Metrics.MemoryUsed / (1 * GB))
+	score -= int(10 * rs.Metrics.UringTaskRate / 1024)
+	score -= int(10 * rs.Metrics.UringInflightTaskCnt / 128)
+	score -= int(10 * rs.Metrics.UringPendingTaskCnt / 1024)
+	score -= int(10 * rs.Metrics.UringTaskAvgLatency / 10)
+	score -= int(10 * rs.Metrics.NetworkAppendRate / 256)
+	score -= int(10 * rs.Metrics.NetworkFetchRate / 256)
+	score -= int(10 * rs.Metrics.NetworkFailedAppendRate / 1)
+	score -= int(10 * rs.Metrics.NetworkFailedFetchRate / 1)
+	score -= int(10 * rs.Metrics.NetworkAppendAvgLatency / 1)
+	score -= int(10 * rs.Metrics.NetworkAppendAvgLatency / 1)
+	score -= int(10 * rs.Metrics.RangeMissingReplicaCnt / 2)
+	score -= int(10 * rs.Metrics.RangeActiveCnt / 10)
 
 	return
 }

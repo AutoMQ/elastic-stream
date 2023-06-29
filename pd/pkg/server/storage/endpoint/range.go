@@ -27,7 +27,7 @@ const (
 
 	// ranges on range server
 	_rangeOnServerPath               = "stream-range"
-	_rangeOnServerPrefix             = "n"
+	_rangeOnServerPrefix             = "rs"
 	_rangeOnServerPrefixFormat       = _rangeOnServerPrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeOnServerPath + kv.KeySeparator
 	_rangeOnServerStreamPrefixFormat = _rangeOnServerPrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeOnServerPath + kv.KeySeparator + _streamIDFormat + kv.KeySeparator
 	_rangeOnServerFormat             = _rangeOnServerPrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeOnServerPath + kv.KeySeparator + _streamIDFormat + kv.KeySeparator + _rangeIDFormat

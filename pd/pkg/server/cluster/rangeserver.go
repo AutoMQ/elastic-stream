@@ -140,21 +140,21 @@ func (c *RaftCluster) fillRangeServerInfo(rangeServer *rpcfb.RangeServerT) {
 	if rangeServer == nil {
 		return
 	}
-	n := c.cache.RangeServer(rangeServer.ServerId)
-	if n == nil {
+	rs := c.cache.RangeServer(rangeServer.ServerId)
+	if rs == nil {
 		c.lg.Warn("range server not found", zap.Int32("server-id", rangeServer.ServerId))
 		return
 	}
-	rangeServer.AdvertiseAddr = n.AdvertiseAddr
+	rangeServer.AdvertiseAddr = rs.AdvertiseAddr
 }
 
-func eraseRangeServersInfo(o []*rpcfb.RangeServerT) (n []*rpcfb.RangeServerT) {
+func eraseRangeServersInfo(o []*rpcfb.RangeServerT) (rs []*rpcfb.RangeServerT) {
 	if o == nil {
 		return
 	}
-	n = make([]*rpcfb.RangeServerT, len(o))
+	rs = make([]*rpcfb.RangeServerT, len(o))
 	for i, rangeServer := range o {
-		n[i] = &rpcfb.RangeServerT{
+		rs[i] = &rpcfb.RangeServerT{
 			ServerId: rangeServer.ServerId,
 		}
 	}
