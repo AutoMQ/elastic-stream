@@ -17,6 +17,7 @@ members = [
     "components/tool",
     "components/transport",
     "components/util",
+    "components/tiered-storage",
     "range-server",
     "sdks/frontend-rs",
 ]
@@ -53,7 +54,7 @@ flatbuffers = { git = "https://github.com/google/flatbuffers.git", tag = "v23.3.
 
 libc = "0.2"
 nix = "0.26"
-moka = { version = "0.11", features = ["future"] }
+opendal = "0.38.0"
 
 # Logging
 log = { version = "0.4", features = [

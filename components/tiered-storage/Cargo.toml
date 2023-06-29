@@ -1,0 +1,14 @@
+[package]
+name = "tiered-storage"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+store = { path = "../store" }
+opendal = { workspace = true }
+bytes = { workspace = true }
+tokio = { workspace = true }
+tokio-uring = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+clap = { workspace = true }

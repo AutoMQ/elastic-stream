@@ -12,7 +12,6 @@ itertools = { workspace = true }
 local-sync = { workspace = true }
 log = { workspace = true }
 model = { path = "../model" }
-moka = { workspace = true }
 protocol = { path = "../protocol" }
 thiserror = { workspace = true }
 tokio = { workspace = true }
