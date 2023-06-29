@@ -67,6 +67,18 @@ enum ErrorCode : int16 {
     // leader nodes. Otherwise, use this code to signal the client to redirect future requests.
     PD_NOT_LEADER = 1503,
 
+    // 16xx is reserved for PD key-value pair operation errors
+    PD_KV_INTERNAL_SERVER_ERROR = 1600,
+
+    // The number of operations in the request exceeds the limit.
+    PD_KV_TOO_MANY_OPS = 1601,
+
+    // The key already exists, and the request is refused.
+    PD_KV_KEY_ALREADY_EXIST = 1602,
+
+    // The key does not exist, and the request is refused.
+    PD_KV_KEY_NOT_FOUND = 1603,
+
     // 25xx is reserved for range server errors
     RS_INTERNAL_SERVER_ERROR = 2500,
     RS_NOT_IMPLEMENTED = 2501,
@@ -535,4 +547,109 @@ table DescribePlacementDriverClusterResponse {
     status: Status (id: 0, required);
 
     cluster: PlacementDriverCluster (id: 1, required);
+}
+
+table KV {
+    key: string (id: 0, required);
+
+    value: string (id: 1, required);
+}
+
+// The insert kv request is used to insert a batch of key-value pairs to PD in transaction.
+// Note: the number of key-value pairs in a request is limited (based on the configuration of PD, default to 64).
+table InsertKVRequest {
+    timeout_ms: int32 (id: 0);
+
+    // The namespace is used to isolate the key-value pairs.
+    // An empty namespace means the default namespace.
+    namespace: string (id: 1);
+
+    // The key-value pairs to insert.
+    kv: [KV] (id: 2, required);
+}
+
+table InsertKVResponse {
+    // The status of the insert kv request.
+    //
+    // PD_KV_TOO_MANY_OPS if the number of key-value pairs in the request exceeds the limit.
+    // PD_KV_KEY_ALREADY_EXIST if any key in the request already exists.
+    status: Status (id: 0, required);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 1);
+}
+
+// The update kv request is used to update a batch of key-value pairs to PD in transaction.
+// Note: the number of key-value pairs in a request is limited (based on the configuration of PD, default to 64).
+table UpdateKVRequest {
+    timeout_ms: int32 (id: 0);
+
+    // The namespace is used to isolate the key-value pairs.
+    // An empty namespace means the default namespace.
+    namespace: string (id: 1);
+
+    // The key-value pairs to update.
+    kv: [KV] (id: 2, required);
+}
+
+table UpdateKVResponse {
+    // The status of the update kv request.
+    //
+    // PD_KV_TOO_MANY_OPS if the number of key-value pairs in the request exceeds the limit.
+    // PD_KV_KEY_NOT_FOUND if any key in the request does not exist.
+    status: Status (id: 0, required);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 1);
+}
+
+// The get kv request is used to get a batch of key-value pairs from PD in transaction.
+// It returns no error if any key in the request does not exist.
+// Note: the number of keys in a request is limited (based on the configuration of PD, default to 128).
+table GetKVRequest {
+    timeout_ms: int32 (id: 0);
+
+    // The namespace is used to isolate the key-value pairs.
+    // An empty namespace means the default namespace.
+    namespace: string (id: 1);
+
+    // The keys to get.
+    keys: [string] (id: 2, required);
+}
+
+table GetKVResponse {
+    // The status of the get kv request.
+    //
+    // PD_KV_TOO_MANY_OPS if the number of keys in the request exceeds the limit.
+    status: Status (id: 0, required);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 1);
+
+    // The key-value pairs.
+    kv: [KV] (id: 2, required);
+}
+
+// The delete kv request is used to delete a batch of key-value pairs from PD in transaction.
+// Note: the number of keys in a request is limited (based on the configuration of PD, default to 64).
+table DeleteKVRequest {
+    timeout_ms: int32 (id: 0);
+
+    // The namespace is used to isolate the key-value pairs.
+    // An empty namespace means the default namespace.
+    namespace: string (id: 1);
+
+    // The keys to delete.
+    keys: [string] (id: 2, required);
+}
+
+table DeleteKVResponse {
+    // The status of the delete kv request.
+    //
+    // PD_KV_TOO_MANY_OPS if the number of keys in the request exceeds the limit.
+    // PD_KV_KEY_NOT_FOUND if any key in the request does not exist.
+    status: Status (id: 0, required);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 1);
 }
