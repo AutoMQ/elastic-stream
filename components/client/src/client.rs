@@ -185,7 +185,7 @@ impl Client {
                     return Err(ClientError::BadRequest);
                 }
             }
-            SealKind::PLACEMENT_MANAGER => {
+            SealKind::PLACEMENT_DRIVER => {
                 if range.end().is_none() {
                     error!(
                         "SealRange.range.end MUST be present while seal against placement manager"
@@ -598,7 +598,7 @@ mod tests {
             let range = client
                 .seal(
                     Some(&config.placement_manager),
-                    SealKind::PLACEMENT_MANAGER,
+                    SealKind::PLACEMENT_DRIVER,
                     range,
                 )
                 .await?;

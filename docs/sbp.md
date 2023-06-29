@@ -65,7 +65,7 @@ The table below shows all the supported frame types along with a preallocated op
 | 0x3004 | DESCRIBE_STREAMS | Fetch the details of a batch of streams. |
 | 0x3005 | TRIM_STREAMS | Trim the min offset of a batch of streams. |
 | 0x4001 | REPORT_METRICS | Data node reports metrics to the PM. |
-| 0x4002 | DESCRIBE_PM_CLUSTER| Describe placement manager cluster membership |
+| 0x4002 | DESCRIBE_PD_CLUSTER| Describe placement manager cluster membership |
 
 The below sub-sections describe the details of each frame type, including their usage, their binary format, and the meaning of their fields.
 
@@ -163,7 +163,7 @@ Request Header => timeout_ms [append_request]
     stream_id => int64
     request_index => int32
     batch_length => int32
-  
+
 Request Payload => [stream_data]
   stream_data => record_batch
     record_batch => bytes
@@ -181,7 +181,7 @@ Request Payload => [stream_data]
 
 **Response Frame:**
 ```
-Response Header => throttle_time_ms [append_responses] 
+Response Header => throttle_time_ms [append_responses]
   throttle_time_ms => int32
   status => code message detail
     code => int16
@@ -230,7 +230,7 @@ Request Header => max_wait_ms min_bytes [fetch_requests]
     request_index => int32
     fetch_offset => int64
     batch_max_bytes => int32
-  
+
 Request Payload => Empty
 ```
 
@@ -301,7 +301,7 @@ Request Header => timeout_ms [range_owners]
     data_node => node_id advertise_addr
       node_id => int32
       advertise_addr => string
-  
+
 Request Payload => Empty
 ```
 
@@ -340,7 +340,7 @@ Response Header => throttle_time_ms [list_responses]
           node_id => int32
           advertise_addr => string
         is_primary => bool
-  
+
 Response Payload => Empty
 ```
 
@@ -366,7 +366,7 @@ Response Payload => Empty
 | data_node | struct | The data node information of the range. |
 | node_id | int32 | The node id of the data node. |
 | advertise_addr | string | The advertise address of the data node. |
-| is_primary | bool | Whether the range in current data node is primary or secondary. | 
+| is_primary | bool | Whether the range in current data node is primary or secondary. |
 
 ### SEAL_RANGES
 The SEAL_RANGES frame(opcode=0x2002) seals the current writable ranges of a batch of streams.
@@ -378,7 +378,7 @@ Request Header => timeout_ms [ranges]
   ranges => stream_id range_index
     stream_id => int64
     range_index => int32
-  
+
 Request Payload => Empty
 ```
 
@@ -404,7 +404,7 @@ Response Header => throttle_time_ms [seal_responses]
       message => string
       detail => bytes
     range => ...
-  
+
 Response Payload => Empty
 ```
 
@@ -435,7 +435,7 @@ Request Header => timeout_ms [stream_ranges]
   stream_ranges => stream_id [ranges]
     stream_id => int64
     ranges => ...
-  
+
 Request Payload => Empty
 ```
 
@@ -461,7 +461,7 @@ Response Header => throttle_time_ms [sync_responses]
       message => string
       detail => bytes
     ranges => ...
-  
+
 Response Payload => Empty
 ```
 
@@ -528,7 +528,7 @@ Request Header => timeout_ms [streams]
   streams => replica_nums retention_period_ms
     replica_nums => int8
     retention_period_ms => int64
-  
+
 Request Payload => Empty
 ```
 
@@ -588,7 +588,7 @@ Request Header => timeout_ms [streams]
     stream_id => int64
     replica_nums => int8
     retention_period_ms => int64
-  
+
 Request Payload => Empty
 ```
 
@@ -613,7 +613,7 @@ Response Header => throttle_time_ms [delete_responses]
       code => int16
       message => string
       detail => bytes
-  
+
 Request Payload => Empty
 ```
 
@@ -632,7 +632,7 @@ Request Header => timeout_ms [streams]
     stream_id => int64
     replica_nums => int8
     retention_period_ms => int64
-  
+
 Request Payload => Empty
 ```
 
@@ -653,7 +653,7 @@ Response Header => throttle_time_ms [update_responses]
       code => int16
       message => string
       detail => bytes
-  
+
 Response Payload => Empty
 ```
 
@@ -667,7 +667,7 @@ Request Header => timeout_ms [stream_ids]
   timeout_ms
   stream_ids => stream_id
     stream_id => int64
-  
+
 Request Payload => Empty
 ```
 
@@ -688,14 +688,14 @@ Response Header => throttle_time_ms [describe_responses]
       code => int16
       message => string
       detail => bytes
-  
+
 Response Payload => Empty
 ```
 
 ### TRIM_STREAMS
 The TRIM_STREAMS frame(opcode=0x3005) trims a batch of streams to PM.
 
-The data node stores the records in the stream in a log structure, and the records are appended to the end of the log. Consider the length of disk is limited, the data node will delete the records to recycling the disk space. Once the deletion occurs, some ranges should be trimmed to avoid the clients to read the deleted records. 
+The data node stores the records in the stream in a log structure, and the records are appended to the end of the log. Consider the length of disk is limited, the data node will delete the records to recycling the disk space. Once the deletion occurs, some ranges should be trimmed to avoid the clients to read the deleted records.
 
 The data node will send the TRIM_STREAMS frame to the PM to trim the stream with a trim offset. The PM will delete the ranges whose end offset is less than the trim offset and shrink the ranges whose start offset is less than the trim offset.
 
@@ -815,8 +815,8 @@ Response Header => data_node
 Response Payload => Empty
 ```
 
-### DESCRIBE_PM_CLUSTER
-The DESCRIBE_PM_CLUSTER frame(opcode=0x4002) requests placement manager to describe its current cluster membership. Embedded clients of the data-node MUST send heartbeats / load metrics to all PM nodes.
+### DESCRIBE_PD_CLUSTER
+The DESCRIBE_PD_CLUSTER frame(opcode=0x4002) requests placement manager to describe its current cluster membership. Embedded clients of the data-node MUST send heartbeats / load metrics to all PM nodes.
 
 ** Request Frame**
 ```
@@ -842,7 +842,7 @@ Response Header=> status
     code => int16
     message => string
     detail => bytes
-  cluster => PlacementManagerCluster
+  cluster => PlacementDriverCluster
 
 Response Body => Empty
 ```
@@ -883,7 +883,7 @@ The error codes are defined in the following table.
 | UNKNOWN | 1 | No | An unexpected server error |
 | INVALID_REQUEST | 2 | No | The request is invalid |
 | UNSUPPORTED_VERSION | 3 | No | The version of the request is not supported |
-| PM_NOT_LEADER | 5 | No | The requested PM node is not the leader. |
+| PD_NOT_LEADER | 5 | No | The requested PM node is not the leader. |
 
 ## References
 

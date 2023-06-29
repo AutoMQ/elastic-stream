@@ -1,4 +1,4 @@
-use protocol::rpc::header::PlacementManagerNodeT;
+use protocol::rpc::header::PlacementDriverNodeT;
 
 /// Represent a placement manager member.
 ///
@@ -12,8 +12,8 @@ pub struct PlacementManagerNode {
     pub leader: bool,
 }
 
-impl From<&PlacementManagerNodeT> for PlacementManagerNode {
-    fn from(value: &PlacementManagerNodeT) -> Self {
+impl From<&PlacementDriverNodeT> for PlacementManagerNode {
+    fn from(value: &PlacementDriverNodeT) -> Self {
         Self {
             name: value.name.clone(),
             advertise_addr: value.advertise_addr.clone(),

@@ -6,7 +6,7 @@ use model::{
 };
 use protocol::rpc::header::{
     AppendRequestT, CreateRangeRequestT, CreateStreamRequestT, DataNodeMetricsT,
-    DescribePlacementManagerClusterRequestT, DescribeStreamRequestT, FetchEntryT, FetchRequestT,
+    DescribePlacementDriverClusterRequestT, DescribeStreamRequestT, FetchEntryT, FetchRequestT,
     HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT,
     ReportMetricsRequestT, SealKind, SealRangeRequestT,
 };
@@ -153,7 +153,7 @@ impl From<&Request> for Bytes {
             }
 
             Headers::DescribePlacementManager { data_node } => {
-                let mut request = DescribePlacementManagerClusterRequestT::default();
+                let mut request = DescribePlacementDriverClusterRequestT::default();
                 request.data_node = Box::new(data_node.into());
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);

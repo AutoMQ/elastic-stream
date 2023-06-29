@@ -218,15 +218,15 @@ impl Append {
     fn convert_store_error(&self, err: &AppendError) -> (ErrorCode, Option<String>) {
         match err {
             AppendError::SubmissionQueue => (
-                ErrorCode::PM_NO_AVAILABLE_DN,
+                ErrorCode::PD_NO_AVAILABLE_DN,
                 Some(AppendError::SubmissionQueue.to_string()),
             ),
             AppendError::ChannelRecv => (
-                ErrorCode::PM_NO_AVAILABLE_DN,
+                ErrorCode::PD_NO_AVAILABLE_DN,
                 Some(AppendError::ChannelRecv.to_string()),
             ),
             AppendError::System(inner) => (
-                ErrorCode::PM_NO_AVAILABLE_DN,
+                ErrorCode::PD_NO_AVAILABLE_DN,
                 Some(AppendError::System(*inner).to_string()),
             ),
             AppendError::BadRequest => (

@@ -16,7 +16,7 @@ use observation::metrics::{
     uring_metrics::UringStatistics,
 };
 use protocol::rpc::header::SealKind;
-use protocol::rpc::header::{ErrorCode, PlacementManagerCluster};
+use protocol::rpc::header::{ErrorCode, PlacementDriverCluster};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -121,7 +121,7 @@ impl CompositeSession {
     /// Synchronize leadership of each placement manager node according to the specified description.
     ///
     /// # Parameter
-    /// `nodes` - Placement manager nodes description from `DescribePlacementManagerClusterResponse`.
+    /// `nodes` - Placement manager nodes description from `DescribePlacementDriverClusterResponse`.
     fn refresh_leadership(&self, nodes: &[PlacementManagerNode]) {
         debug!("Refresh placement manager cluster leadership");
         // Sync leader/follower state
@@ -319,7 +319,7 @@ impl CompositeSession {
                 })?;
 
                 if !response.ok() {
-                    if ErrorCode::PM_NOT_LEADER == response.status.code
+                    if ErrorCode::PD_NOT_LEADER == response.status.code
                         && self.refresh_leadership_on_demand(&response.status).await
                     {
                         continue;
@@ -345,7 +345,7 @@ impl CompositeSession {
     async fn refresh_leadership_on_demand(&self, status: &model::Status) -> bool {
         if let Some(ref details) = status.details {
             if !details.is_empty() {
-                if let Ok(cluster) = flatbuffers::root::<PlacementManagerCluster>(&details[..]) {
+                if let Ok(cluster) = flatbuffers::root::<PlacementDriverCluster>(&details[..]) {
                     let nodes = cluster
                         .unpack()
                         .nodes
@@ -398,7 +398,7 @@ impl CompositeSession {
             })?;
 
             if !response.ok() {
-                if ErrorCode::PM_NOT_LEADER == response.status.code
+                if ErrorCode::PD_NOT_LEADER == response.status.code
                     && self.refresh_leadership_on_demand(&response.status).await
                 {
                     // Retry after refresh leadership
@@ -456,7 +456,7 @@ impl CompositeSession {
             })?;
 
             if !response.ok() {
-                if ErrorCode::PM_NOT_LEADER == response.status.code
+                if ErrorCode::PD_NOT_LEADER == response.status.code
                     && self.refresh_leadership_on_demand(&response.status).await
                 {
                     // Retry after refresh leadership
@@ -516,7 +516,7 @@ impl CompositeSession {
 
                 if !response.ok() {
                     // Handle recoverable error
-                    if ErrorCode::PM_NOT_LEADER == response.status.code
+                    if ErrorCode::PD_NOT_LEADER == response.status.code
                         && self.refresh_leadership_on_demand(&response.status).await
                     {
                         continue;

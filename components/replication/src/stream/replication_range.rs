@@ -414,7 +414,7 @@ impl ReplicationRange {
             let mut metadata = self.metadata.clone();
             metadata.set_end(end_offset);
             match client
-                .seal(None, SealKind::PLACEMENT_MANAGER, metadata)
+                .seal(None, SealKind::PLACEMENT_DRIVER, metadata)
                 .await
             {
                 Ok(_) => Ok(()),

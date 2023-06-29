@@ -13,7 +13,7 @@ use model::AppendResultEntry;
 use protocol::rpc::header::AppendResponse;
 use protocol::rpc::header::CreateRangeResponse;
 use protocol::rpc::header::CreateStreamResponse;
-use protocol::rpc::header::DescribePlacementManagerClusterResponse;
+use protocol::rpc::header::DescribePlacementDriverClusterResponse;
 use protocol::rpc::header::DescribeStreamResponse;
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::FetchResponse;
@@ -304,7 +304,7 @@ impl Response {
 
     pub fn on_describe_placement_manager(&mut self, frame: &Frame) {
         if let Some(ref buf) = frame.header {
-            match flatbuffers::root::<DescribePlacementManagerClusterResponse>(buf) {
+            match flatbuffers::root::<DescribePlacementDriverClusterResponse>(buf) {
                 Ok(response) => {
                     debug!("Received {response:?}");
                     self.status = Into::<Status>::into(&response.status().unpack());
@@ -324,7 +324,7 @@ impl Response {
                 }
                 Err(_e) => {
                     // Deserialize error
-                    warn!( "Failed to decode `DescribePlacementManagerClusterResponse` response header using FlatBuffers. Cause: {}", _e);
+                    warn!( "Failed to decode `DescribePlacementDriverClusterResponse` response header using FlatBuffers. Cause: {}", _e);
                 }
             }
         }
