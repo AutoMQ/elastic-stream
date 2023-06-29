@@ -33,10 +33,10 @@ const (
 	ErrorCodeUNKNOWN_OPERATION             ErrorCode = 1499
 	ErrorCodePD_INTERNAL_SERVER_ERROR      ErrorCode = 1500
 	ErrorCodePD_NOT_IMPLEMENTED            ErrorCode = 1501
-	ErrorCodePD_NO_AVAILABLE_DN            ErrorCode = 1502
+	ErrorCodePD_NO_AVAILABLE_RS            ErrorCode = 1502
 	ErrorCodePD_NOT_LEADER                 ErrorCode = 1503
-	ErrorCodeDN_INTERNAL_SERVER_ERROR      ErrorCode = 2500
-	ErrorCodeDN_NOT_IMPLEMENTED            ErrorCode = 2501
+	ErrorCodeRS_INTERNAL_SERVER_ERROR      ErrorCode = 2500
+	ErrorCodeRS_NOT_IMPLEMENTED            ErrorCode = 2501
 )
 
 var EnumNamesErrorCode = map[ErrorCode]string{
@@ -66,10 +66,10 @@ var EnumNamesErrorCode = map[ErrorCode]string{
 	ErrorCodeUNKNOWN_OPERATION:             "UNKNOWN_OPERATION",
 	ErrorCodePD_INTERNAL_SERVER_ERROR:      "PD_INTERNAL_SERVER_ERROR",
 	ErrorCodePD_NOT_IMPLEMENTED:            "PD_NOT_IMPLEMENTED",
-	ErrorCodePD_NO_AVAILABLE_DN:            "PD_NO_AVAILABLE_DN",
+	ErrorCodePD_NO_AVAILABLE_RS:            "PD_NO_AVAILABLE_RS",
 	ErrorCodePD_NOT_LEADER:                 "PD_NOT_LEADER",
-	ErrorCodeDN_INTERNAL_SERVER_ERROR:      "DN_INTERNAL_SERVER_ERROR",
-	ErrorCodeDN_NOT_IMPLEMENTED:            "DN_NOT_IMPLEMENTED",
+	ErrorCodeRS_INTERNAL_SERVER_ERROR:      "RS_INTERNAL_SERVER_ERROR",
+	ErrorCodeRS_NOT_IMPLEMENTED:            "RS_NOT_IMPLEMENTED",
 }
 
 var EnumValuesErrorCode = map[string]ErrorCode{
@@ -99,10 +99,10 @@ var EnumValuesErrorCode = map[string]ErrorCode{
 	"UNKNOWN_OPERATION":             ErrorCodeUNKNOWN_OPERATION,
 	"PD_INTERNAL_SERVER_ERROR":      ErrorCodePD_INTERNAL_SERVER_ERROR,
 	"PD_NOT_IMPLEMENTED":            ErrorCodePD_NOT_IMPLEMENTED,
-	"PD_NO_AVAILABLE_DN":            ErrorCodePD_NO_AVAILABLE_DN,
+	"PD_NO_AVAILABLE_RS":            ErrorCodePD_NO_AVAILABLE_RS,
 	"PD_NOT_LEADER":                 ErrorCodePD_NOT_LEADER,
-	"DN_INTERNAL_SERVER_ERROR":      ErrorCodeDN_INTERNAL_SERVER_ERROR,
-	"DN_NOT_IMPLEMENTED":            ErrorCodeDN_NOT_IMPLEMENTED,
+	"RS_INTERNAL_SERVER_ERROR":      ErrorCodeRS_INTERNAL_SERVER_ERROR,
+	"RS_NOT_IMPLEMENTED":            ErrorCodeRS_NOT_IMPLEMENTED,
 }
 
 func (v ErrorCode) String() string {

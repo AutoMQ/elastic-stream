@@ -71,7 +71,7 @@ impl<'a> SealRange<'a> {
                 );
                 match e {
                     ServiceError::NotFound(_) => status.code = ErrorCode::RANGE_NOT_FOUND,
-                    _ => status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR,
+                    _ => status.code = ErrorCode::RS_INTERNAL_SERVER_ERROR,
                 }
                 status.message = Some(format!("{:?}", e));
             }

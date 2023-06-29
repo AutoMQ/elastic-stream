@@ -27,7 +27,9 @@ fn serve_heartbeat(request: &HeartbeatRequest, frame: &mut Frame) {
     let mut response = HeartbeatResponseT::default();
     response.client_id = request.client_id().map(|client_id| client_id.to_owned());
     response.client_role = request.client_role();
-    response.range_server = request.range_server().map(|dn| Box::new(dn.unpack()));
+    response.range_server = request
+        .range_server()
+        .map(|range_server| Box::new(range_server.unpack()));
     let mut status = StatusT::default();
     status.code = ErrorCode::OK;
     status.message = Some("OK".to_owned());
@@ -107,7 +109,9 @@ fn serve_report_metrics(request: &ReportMetricsRequest, frame: &mut Frame) {
     debug!("{:?}", request);
     frame.operation_code = OperationCode::ReportMetrics;
     let mut response = ReportMetricsResponseT::default();
-    response.range_server = request.range_server().map(|dn| Box::new(dn.unpack()));
+    response.range_server = request
+        .range_server()
+        .map(|range_server| Box::new(range_server.unpack()));
     let mut status = StatusT::default();
     status.code = ErrorCode::OK;
     status.message = Some("OK".to_owned());

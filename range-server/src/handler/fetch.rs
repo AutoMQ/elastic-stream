@@ -211,11 +211,11 @@ impl<'a> Fetch<'a> {
     fn convert_store_error(&self, err: &FetchError) -> (ErrorCode, Option<String>) {
         match err {
             FetchError::SubmissionQueue => {
-                (ErrorCode::DN_INTERNAL_SERVER_ERROR, Some(err.to_string()))
+                (ErrorCode::RS_INTERNAL_SERVER_ERROR, Some(err.to_string()))
             }
-            FetchError::ChannelRecv => (ErrorCode::DN_INTERNAL_SERVER_ERROR, Some(err.to_string())),
+            FetchError::ChannelRecv => (ErrorCode::RS_INTERNAL_SERVER_ERROR, Some(err.to_string())),
             FetchError::TranslateIndex => {
-                (ErrorCode::DN_INTERNAL_SERVER_ERROR, Some(err.to_string()))
+                (ErrorCode::RS_INTERNAL_SERVER_ERROR, Some(err.to_string()))
             }
             FetchError::NoRecord => (ErrorCode::NO_NEW_RECORD, Some(err.to_string())),
             FetchError::RangeNotFound => (ErrorCode::RANGE_NOT_FOUND, Some(err.to_string())),

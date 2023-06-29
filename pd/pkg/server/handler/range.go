@@ -92,7 +92,7 @@ func (h *Handler) CreateRange(req *protocol.CreateRangeRequest, resp *protocol.C
 		case errors.Is(err, cluster.ErrInvalidStartOffset):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()})
 		case errors.Is(err, cluster.ErrNotEnoughRangeServers):
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_NO_AVAILABLE_DN, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_NO_AVAILABLE_RS, Message: err.Error()})
 		case errors.Is(err, cluster.ErrExpiredRangeEpoch):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH, Message: err.Error()})
 		default:

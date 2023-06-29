@@ -63,7 +63,7 @@ impl Status {
 
     pub fn dn_internal(message: String) -> Self {
         Self {
-            code: ErrorCode::DN_INTERNAL_SERVER_ERROR,
+            code: ErrorCode::RS_INTERNAL_SERVER_ERROR,
             message,
             details: None,
         }

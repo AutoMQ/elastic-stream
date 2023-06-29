@@ -218,15 +218,15 @@ impl Append {
     fn convert_store_error(&self, err: &AppendError) -> (ErrorCode, Option<String>) {
         match err {
             AppendError::SubmissionQueue => (
-                ErrorCode::PD_NO_AVAILABLE_DN,
+                ErrorCode::PD_NO_AVAILABLE_RS,
                 Some(AppendError::SubmissionQueue.to_string()),
             ),
             AppendError::ChannelRecv => (
-                ErrorCode::PD_NO_AVAILABLE_DN,
+                ErrorCode::PD_NO_AVAILABLE_RS,
                 Some(AppendError::ChannelRecv.to_string()),
             ),
             AppendError::System(inner) => (
-                ErrorCode::PD_NO_AVAILABLE_DN,
+                ErrorCode::PD_NO_AVAILABLE_RS,
                 Some(AppendError::System(*inner).to_string()),
             ),
             AppendError::BadRequest => (
@@ -234,13 +234,13 @@ impl Append {
                 Some(AppendError::BadRequest.to_string()),
             ),
             AppendError::Internal => (
-                ErrorCode::DN_INTERNAL_SERVER_ERROR,
+                ErrorCode::RS_INTERNAL_SERVER_ERROR,
                 Some(AppendError::Internal.to_string()),
             ),
             // TODO: this is a workaround for now, return ok for a committed error to pass the test
             AppendError::Committed => (ErrorCode::OK, None),
             _ => (
-                ErrorCode::DN_INTERNAL_SERVER_ERROR,
+                ErrorCode::RS_INTERNAL_SERVER_ERROR,
                 Some(AppendError::Internal.to_string()),
             ),
         }

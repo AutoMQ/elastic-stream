@@ -56,7 +56,7 @@ impl<'a> CreateRange<'a> {
             error!("Failed to create range: {:?}", e);
             let mut status = StatusT::default();
             // TODO: Map service error to the corresponding error code.
-            status.code = ErrorCode::DN_INTERNAL_SERVER_ERROR;
+            status.code = ErrorCode::RS_INTERNAL_SERVER_ERROR;
             status.message = Some(format!("Failed to create range: {}", e));
             create_response.status = Box::new(status);
         } else {
