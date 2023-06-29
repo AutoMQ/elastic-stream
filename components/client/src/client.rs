@@ -538,7 +538,11 @@ mod tests {
             let client = Client::new(Arc::clone(&config), tx);
             let range = RangeMetadata::new(0, 0, 0, 0, None);
             let range = client
-                .seal(Some(&config.placement_driver), SealKind::RANGE_SERVER, range)
+                .seal(
+                    Some(&config.placement_driver),
+                    SealKind::RANGE_SERVER,
+                    range,
+                )
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());
@@ -567,7 +571,11 @@ mod tests {
             let client = Client::new(Arc::clone(&config), tx);
             let range = RangeMetadata::new(0, 0, 0, 0, Some(1));
             let range = client
-                .seal(Some(&config.placement_driver), SealKind::RANGE_SERVER, range)
+                .seal(
+                    Some(&config.placement_driver),
+                    SealKind::RANGE_SERVER,
+                    range,
+                )
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());

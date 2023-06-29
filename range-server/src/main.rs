@@ -1,6 +1,6 @@
 use clap::Parser;
-use range_server::Cli;
 use log::info;
+use range_server::Cli;
 use tokio::sync::broadcast;
 
 #[cfg(not(target_env = "msvc"))]

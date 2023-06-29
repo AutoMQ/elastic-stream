@@ -2,13 +2,13 @@ use bytes::{Bytes, BytesMut};
 use model::fetch::FetchRequestEntry;
 use model::stream::StreamMetadata;
 use model::{
-    client_role::ClientRole, range_server::DataNode, range::RangeMetadata, ListRangeCriteria,
+    client_role::ClientRole, range::RangeMetadata, range_server::DataNode, ListRangeCriteria,
 };
 use protocol::rpc::header::{
-    AppendRequestT, CreateRangeRequestT, CreateStreamRequestT, RangeServerMetricsT,
+    AppendRequestT, CreateRangeRequestT, CreateStreamRequestT,
     DescribePlacementDriverClusterRequestT, DescribeStreamRequestT, FetchEntryT, FetchRequestT,
-    HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT,
-    ReportMetricsRequestT, SealKind, SealRangeRequestT,
+    HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT,
+    RangeServerMetricsT, RangeT, ReportMetricsRequestT, SealKind, SealRangeRequestT,
 };
 use std::fmt;
 use std::time::Duration;
