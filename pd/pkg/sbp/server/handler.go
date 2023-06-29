@@ -10,9 +10,9 @@ import (
 type Handler interface {
 	// Heartbeat handles heartbeat requests.
 	Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.HeartbeatResponse)
-	// AllocateID allocates a unique ID for data nodes.
+	// AllocateID allocates a unique ID for range servers.
 	AllocateID(req *protocol.IDAllocationRequest, resp *protocol.IDAllocationResponse)
-	// ListRange lists ranges either in a specified steam, a specified data node, or both.
+	// ListRange lists ranges either in a specified steam, a specified range server, or both.
 	ListRange(req *protocol.ListRangeRequest, resp *protocol.ListRangeResponse)
 	// SealRange seals the specified range.
 	SealRange(req *protocol.SealRangeRequest, resp *protocol.SealRangeResponse)

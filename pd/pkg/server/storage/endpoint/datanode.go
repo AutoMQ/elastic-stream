@@ -15,50 +15,50 @@ import (
 )
 
 const (
-	_dataNodeIDFormat = _int32Format
-	_dataNodeIDLen    = _int32Len
+	_rangeServerIDFormat = _int32Format
+	_rangeServerIDLen    = _int32Len
 
-	_dataNodePath   = "data-nodes"
-	_dataNodePrefix = _dataNodePath + kv.KeySeparator
-	_dataNodeFormat = _dataNodePath + kv.KeySeparator + _dataNodeIDFormat
-	_dataNodeKeyLen = len(_dataNodePath) + len(kv.KeySeparator) + _dataNodeIDLen
+	_rangeServerPath   = "range-servers"
+	_rangeServerPrefix = _rangeServerPath + kv.KeySeparator
+	_rangeServerFormat = _rangeServerPath + kv.KeySeparator + _rangeServerIDFormat
+	_rangeServerKeyLen = len(_rangeServerPath) + len(kv.KeySeparator) + _rangeServerIDLen
 
-	_dataNodeByRangeLimit = 1e4
+	_rangeServerByRangeLimit = 1e4
 )
 
 type RangeServer interface {
-	SaveDataNode(ctx context.Context, dataNode *rpcfb.RangeServerT) (*rpcfb.RangeServerT, error)
-	ForEachDataNode(ctx context.Context, f func(dataNode *rpcfb.RangeServerT) error) error
+	SaveRangeServer(ctx context.Context, rangeServer *rpcfb.RangeServerT) (*rpcfb.RangeServerT, error)
+	ForEachRangeServer(ctx context.Context, f func(rangeServer *rpcfb.RangeServerT) error) error
 }
 
-// SaveDataNode creates or updates the given data node and returns it.
-func (e *Endpoint) SaveDataNode(ctx context.Context, dataNode *rpcfb.RangeServerT) (*rpcfb.RangeServerT, error) {
-	logger := e.lg.With(zap.Int32("node-id", dataNode.ServerId), traceutil.TraceLogField(ctx))
+// SaveRangeServer creates or updates the given range server and returns it.
+func (e *Endpoint) SaveRangeServer(ctx context.Context, rangeServer *rpcfb.RangeServerT) (*rpcfb.RangeServerT, error) {
+	logger := e.lg.With(zap.Int32("node-id", rangeServer.ServerId), traceutil.TraceLogField(ctx))
 
-	if dataNode.ServerId < MinDataNodeID {
-		logger.Error("invalid data node id")
-		return nil, errors.Errorf("invalid data node id: %d < %d", dataNode.ServerId, MinDataNodeID)
+	if rangeServer.ServerId < MinRangeServerID {
+		logger.Error("invalid range server id")
+		return nil, errors.Errorf("invalid range server id: %d < %d", rangeServer.ServerId, MinRangeServerID)
 	}
 
-	key := dataNodePath(dataNode.ServerId)
-	value := fbutil.Marshal(dataNode)
+	key := rangeServerPath(rangeServer.ServerId)
+	value := fbutil.Marshal(rangeServer)
 	defer mcache.Free(value)
 
 	_, err := e.Put(ctx, key, value, false)
 	if err != nil {
-		logger.Error("failed to save data node", zap.Error(err))
-		return nil, errors.Wrap(err, "save data node")
+		logger.Error("failed to save range server", zap.Error(err))
+		return nil, errors.Wrap(err, "save range server")
 	}
 
-	return dataNode, nil
+	return rangeServer, nil
 }
 
-// ForEachDataNode calls the given function for every data node in the storage.
+// ForEachRangeServer calls the given function for every range server in the storage.
 // If f returns an error, the iteration is stopped and the error is returned.
-func (e *Endpoint) ForEachDataNode(ctx context.Context, f func(dataNode *rpcfb.RangeServerT) error) error {
-	var startID = MinDataNodeID
-	for startID >= MinDataNodeID {
-		nextID, err := e.forEachDataNodeLimited(ctx, f, startID, _dataNodeByRangeLimit)
+func (e *Endpoint) ForEachRangeServer(ctx context.Context, f func(rangeServer *rpcfb.RangeServerT) error) error {
+	var startID = MinRangeServerID
+	for startID >= MinRangeServerID {
+		nextID, err := e.forEachRangeServerLimited(ctx, f, startID, _rangeServerByRangeLimit)
 		if err != nil {
 			return err
 		}
@@ -67,38 +67,38 @@ func (e *Endpoint) ForEachDataNode(ctx context.Context, f func(dataNode *rpcfb.R
 	return nil
 }
 
-func (e *Endpoint) forEachDataNodeLimited(ctx context.Context, f func(dataNode *rpcfb.RangeServerT) error, startID int32, limit int64) (nextID int32, err error) {
+func (e *Endpoint) forEachRangeServerLimited(ctx context.Context, f func(rangeServer *rpcfb.RangeServerT) error, startID int32, limit int64) (nextID int32, err error) {
 	logger := e.lg.With(traceutil.TraceLogField(ctx))
 
-	startKey := dataNodePath(startID)
-	kvs, err := e.GetByRange(ctx, kv.Range{StartKey: startKey, EndKey: e.endDataNodePath()}, limit, false)
+	startKey := rangeServerPath(startID)
+	kvs, err := e.GetByRange(ctx, kv.Range{StartKey: startKey, EndKey: e.endRangeServerPath()}, limit, false)
 	if err != nil {
-		logger.Error("failed to get data nodes", zap.Int32("start-id", startID), zap.Int64("limit", limit), zap.Error(err))
-		return MinDataNodeID - 1, errors.Wrap(err, "get data nodes")
+		logger.Error("failed to get range servers", zap.Int32("start-id", startID), zap.Int64("limit", limit), zap.Error(err))
+		return MinRangeServerID - 1, errors.Wrap(err, "get range servers")
 	}
 
 	for _, keyValue := range kvs {
-		dataNode := rpcfb.GetRootAsRangeServer(keyValue.Value, 0).UnPack()
-		nextID = dataNode.ServerId + 1
-		err = f(dataNode)
+		rangeServer := rpcfb.GetRootAsRangeServer(keyValue.Value, 0).UnPack()
+		nextID = rangeServer.ServerId + 1
+		err = f(rangeServer)
 		if err != nil {
-			return MinDataNodeID - 1, err
+			return MinRangeServerID - 1, err
 		}
 	}
 
 	if int64(len(kvs)) < limit {
-		// no more data nodes
-		nextID = MinDataNodeID - 1
+		// no more range servers
+		nextID = MinRangeServerID - 1
 	}
 	return
 }
 
-func (e *Endpoint) endDataNodePath() []byte {
-	return e.GetPrefixRangeEnd([]byte(_dataNodePrefix))
+func (e *Endpoint) endRangeServerPath() []byte {
+	return e.GetPrefixRangeEnd([]byte(_rangeServerPrefix))
 }
 
-func dataNodePath(nodeID int32) []byte {
-	res := make([]byte, 0, _dataNodeKeyLen)
-	res = fmt.Appendf(res, _dataNodeFormat, nodeID)
+func rangeServerPath(nodeID int32) []byte {
+	res := make([]byte, 0, _rangeServerKeyLen)
+	res = fmt.Appendf(res, _rangeServerFormat, nodeID)
 	return res
 }

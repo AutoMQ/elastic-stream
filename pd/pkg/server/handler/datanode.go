@@ -58,7 +58,7 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 	resp.RangeServer = req.RangeServer
 
 	if req.RangeServer == nil {
-		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "data node is nil"})
+		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: "range server is nil"})
 		return
 	}
 	if req.Metrics == nil {

@@ -43,19 +43,19 @@ type Range interface {
 
 // ListRange lists ranges of
 // 1. a stream
-// 2. a data node
-// 3. a data node and a stream
+// 2. a range server
+// 3. a range server and a stream
 // It returns ErrNotLeader if the current PD node is not the leader.
 func (c *RaftCluster) ListRange(ctx context.Context, criteria *rpcfb.ListRangeCriteriaT) (ranges []*rpcfb.RangeT, err error) {
 	byStream := criteria.StreamId >= endpoint.MinStreamID
-	byDataNode := criteria.ServerId >= endpoint.MinDataNodeID
+	byRangeServer := criteria.ServerId >= endpoint.MinRangeServerID
 	switch {
-	case byStream && byDataNode:
-		ranges, err = c.listRangeOnDataNodeInStream(ctx, criteria.StreamId, criteria.ServerId)
-	case byStream && !byDataNode:
+	case byStream && byRangeServer:
+		ranges, err = c.listRangeOnRangeServerInStream(ctx, criteria.StreamId, criteria.ServerId)
+	case byStream && !byRangeServer:
 		ranges, err = c.listRangeInStream(ctx, criteria.StreamId)
-	case !byStream && byDataNode:
-		ranges, err = c.listRangeOnDataNode(ctx, criteria.ServerId)
+	case !byStream && byRangeServer:
+		ranges, err = c.listRangeOnRangeServer(ctx, criteria.ServerId)
 	default:
 	}
 	if errors.Is(err, kv.ErrTxnFailed) {
@@ -63,17 +63,17 @@ func (c *RaftCluster) ListRange(ctx context.Context, criteria *rpcfb.ListRangeCr
 	}
 
 	for _, r := range ranges {
-		c.fillDataNodesInfo(r.Servers)
+		c.fillRangeServersInfo(r.Servers)
 	}
 	return
 }
 
-// listRangeOnDataNodeInStream lists ranges on a data node in a stream.
-func (c *RaftCluster) listRangeOnDataNodeInStream(ctx context.Context, streamID int64, dataNodeID int32) ([]*rpcfb.RangeT, error) {
-	logger := c.lg.With(zap.Int64("stream-id", streamID), zap.Int32("data-node-id", dataNodeID), traceutil.TraceLogField(ctx))
+// listRangeOnRangeServerInStream lists ranges on a range server in a stream.
+func (c *RaftCluster) listRangeOnRangeServerInStream(ctx context.Context, streamID int64, rangeServerID int32) ([]*rpcfb.RangeT, error) {
+	logger := c.lg.With(zap.Int64("stream-id", streamID), zap.Int32("range-server-id", rangeServerID), traceutil.TraceLogField(ctx))
 
-	logger.Debug("start to list ranges on data node in stream")
-	rangeIDs, err := c.storage.GetRangeIDsByDataNodeAndStream(ctx, streamID, dataNodeID)
+	logger.Debug("start to list ranges on range server in stream")
+	rangeIDs, err := c.storage.GetRangeIDsByRangeServerAndStream(ctx, streamID, rangeServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (c *RaftCluster) listRangeOnDataNodeInStream(ctx context.Context, streamID 
 		return nil, err
 	}
 
-	logger.Debug("finish listing ranges on data node in stream", zap.Int("range-cnt", len(ranges)))
+	logger.Debug("finish listing ranges on range server in stream", zap.Int("range-cnt", len(ranges)))
 	return ranges, nil
 }
 
@@ -98,12 +98,12 @@ func (c *RaftCluster) listRangeInStream(ctx context.Context, streamID int64) ([]
 	return ranges, err
 }
 
-// listRangeOnDataNode lists ranges on a data node.
-func (c *RaftCluster) listRangeOnDataNode(ctx context.Context, dataNodeID int32) ([]*rpcfb.RangeT, error) {
-	logger := c.lg.With(zap.Int32("data-node-id", dataNodeID), traceutil.TraceLogField(ctx))
+// listRangeOnRangeServer lists ranges on a range server.
+func (c *RaftCluster) listRangeOnRangeServer(ctx context.Context, rangeServerID int32) ([]*rpcfb.RangeT, error) {
+	logger := c.lg.With(zap.Int32("range-server-id", rangeServerID), traceutil.TraceLogField(ctx))
 
-	logger.Debug("start to list ranges on data node")
-	rangeIDs, err := c.storage.GetRangeIDsByDataNode(ctx, dataNodeID)
+	logger.Debug("start to list ranges on range server")
+	rangeIDs, err := c.storage.GetRangeIDsByRangeServer(ctx, rangeServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (c *RaftCluster) listRangeOnDataNode(ctx context.Context, dataNodeID int32)
 		return nil, err
 	}
 
-	logger.Debug("finish listing ranges on data node", zap.Int("range-cnt", len(ranges)))
+	logger.Debug("finish listing ranges on range server", zap.Int("range-cnt", len(ranges)))
 	return ranges, nil
 }
 
@@ -173,7 +173,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 	if err != nil {
 		return nil, err
 	}
-	c.fillDataNodesInfo(sealedRange.Servers)
+	c.fillRangeServersInfo(sealedRange.Servers)
 	return sealedRange, nil
 }
 
@@ -183,7 +183,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 // It returns ErrInvalidRangeIndex if the range index is invalid.
 // It returns ErrCreateBeforeSeal if the last range is not sealed.
 // It returns ErrInvalidStartOffset if the start offset is invalid.
-// It returns ErrNotEnoughDataNodes if there are not enough data nodes to allocate.
+// It returns ErrNotEnoughRangeServers if there are not enough range servers to allocate.
 // It returns ErrExpiredRangeEpoch if the range epoch is invalid.
 func (c *RaftCluster) CreateRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.RangeT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", r.StreamId), zap.Int32("range-index", r.Index), traceutil.TraceLogField(ctx))
@@ -234,7 +234,7 @@ func (c *RaftCluster) CreateRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.
 	if err != nil {
 		return nil, err
 	}
-	c.fillDataNodesInfo(newRange.Servers)
+	c.fillRangeServersInfo(newRange.Servers)
 	return newRange, nil
 }
 
@@ -284,7 +284,7 @@ func (c *RaftCluster) sealRangeLocked(ctx context.Context, lastRange *rpcfb.Rang
 		Index:        lastRange.Index,
 		Start:        lastRange.Start,
 		End:          end,
-		Servers:      eraseDataNodesInfo(lastRange.Servers),
+		Servers:      eraseRangeServersInfo(lastRange.Servers),
 		ReplicaCount: lastRange.ReplicaCount,
 		AckCount:     lastRange.AckCount,
 	}
@@ -313,9 +313,9 @@ func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT
 		return nil, errors.Wrapf(ErrStreamNotFound, "stream %d not found", newRange.StreamId)
 	}
 
-	servers, err := c.chooseDataNodes(int(stream.Replica))
+	servers, err := c.chooseRangeServers(int(stream.Replica))
 	if err != nil {
-		logger.Error("failed to choose data nodes", zap.Error(err))
+		logger.Error("failed to choose range servers", zap.Error(err))
 		return nil, err
 	}
 	ids := make([]int32, 0, len(servers))

@@ -71,8 +71,8 @@ compress = false
 [cluster]
 # seal request timeout in milliseconds
 sealReqTimeoutMs = 1000
-# timeout after which a data node is considered dead
-dataNodeTimeout = "100s"
+# timeout after which a range server is considered dead
+rangeServerTimeout = "100s"
 
 [sbp.server]
 # time interval between sending heartbeats from client to server

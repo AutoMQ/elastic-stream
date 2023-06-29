@@ -26,7 +26,7 @@ var (
 	_testDefaultCluster = func() *Cluster {
 		cluster := NewCluster()
 		cluster.SealReqTimeoutMs = 1000
-		cluster.DataNodeTimeout = 100 * time.Second
+		cluster.RangeServerTimeout = 100 * time.Second
 		return cluster
 	}
 	_testDefaultSbp = func() *Sbp {
@@ -68,7 +68,7 @@ var (
 	_testCluster = func() *Cluster {
 		cluster := NewCluster()
 		cluster.SealReqTimeoutMs = 1234567
-		cluster.DataNodeTimeout = 1*time.Hour + 1*time.Minute + 1*time.Second
+		cluster.RangeServerTimeout = 1*time.Hour + 1*time.Minute + 1*time.Second
 		return cluster
 	}
 	_testSbp = func() *Sbp {
@@ -211,7 +211,7 @@ func TestNewConfig(t *testing.T) {
 				"--log-rotate-local-time=true",
 				"--log-rotate-compress=true",
 				"--cluster-seal-req-timeout-ms=1234567",
-				"--cluster-data-node-timeout=1h1m1s",
+				"--cluster-range-server-timeout=1h1m1s",
 				"--sbp-server-heartbeat-interval=2h2m2s",
 				"--sbp-server-heartbeat-miss-count=12345678",
 				"--sbp-client-idle-conn-timeout=3h3m3s",
@@ -566,14 +566,14 @@ func TestConfig_Validate(t *testing.T) {
 			errMsg:  "validate cluster config: invalid seal request timeout",
 		},
 		{
-			name: "invalid Cluster.DataNodeTimeout",
+			name: "invalid Cluster.RangeServerTimeout",
 			in: func() *Config {
 				config, _ := NewConfig([]string{}, io.Discard)
-				config.Cluster.DataNodeTimeout = 0
+				config.Cluster.RangeServerTimeout = 0
 				return config
 			}(),
 			wantErr: true,
-			errMsg:  "validate cluster config: invalid data node timeout",
+			errMsg:  "validate cluster config: invalid range server timeout",
 		},
 		{
 			name: "invalid Sbp.Server.HeartbeatInterval",

@@ -42,7 +42,7 @@ compress = true
 
 [cluster]
 sealReqTimeoutMs = 1234567
-dataNodeTimeout = "1h1m1s"
+rangeServerTimeout = "1h1m1s"
 
 [sbp.server]
 heartbeatInterval = "2h2m2s"

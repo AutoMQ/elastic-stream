@@ -34,10 +34,10 @@ import (
 )
 
 const (
-	_streamIDAllocKey   = "stream"
-	_streamIDStep       = 100
-	_dataNodeIDAllocKey = "data-node"
-	_dataNodeIDStep     = 1
+	_streamIDAllocKey      = "stream"
+	_streamIDStep          = 100
+	_rangeServerIDAllocKey = "range-server"
+	_rangeServerIDStep     = 1
 )
 
 var (
@@ -58,7 +58,7 @@ type RaftCluster struct {
 
 	storage storage.Storage
 	sAlloc  id.Allocator // stream id allocator
-	dnAlloc id.Allocator // data node id allocator
+	dnAlloc id.Allocator // range server id allocator
 	member  Member
 	cache   *cache.Cache
 	nodeIdx atomic.Uint64
@@ -113,7 +113,7 @@ func (c *RaftCluster) Start(s Server) error {
 	c.storage = s.Storage()
 	c.runningCtx, c.runningCancel = context.WithCancel(c.ctx)
 	c.sAlloc = s.IDAllocator(_streamIDAllocKey, uint64(endpoint.MinStreamID), _streamIDStep)
-	c.dnAlloc = s.IDAllocator(_dataNodeIDAllocKey, uint64(endpoint.MinDataNodeID), _dataNodeIDStep)
+	c.dnAlloc = s.IDAllocator(_rangeServerIDAllocKey, uint64(endpoint.MinRangeServerID), _rangeServerIDStep)
 	c.client = s.SbpClient()
 	c.sealMus = cmap.NewWithCustomShardingFunction[int64, chan struct{}](func(key int64) uint32 { return uint32(key) })
 
@@ -138,21 +138,21 @@ func (c *RaftCluster) loadInfo() error {
 
 	c.cache.Reset()
 
-	// load data nodes
+	// load range servers
 	start := time.Now()
-	err := c.storage.ForEachDataNode(c.ctx, func(nodeT *rpcfb.RangeServerT) error {
-		updated, old := c.cache.SaveDataNode(&cache.RangeServer{
+	err := c.storage.ForEachRangeServer(c.ctx, func(nodeT *rpcfb.RangeServerT) error {
+		updated, old := c.cache.SaveRangeServer(&cache.RangeServer{
 			RangeServerT: *nodeT,
 		})
 		if updated {
-			logger.Warn("different data node in storage and cache", zap.Any("node-in-storage", nodeT), zap.Any("node-in-cache", old))
+			logger.Warn("different range server in storage and cache", zap.Any("node-in-storage", nodeT), zap.Any("node-in-cache", old))
 		}
 		return nil
 	})
 	if err != nil {
-		return errors.Wrap(err, "load data nodes")
+		return errors.Wrap(err, "load range servers")
 	}
-	logger.Info("load data nodes", zap.Int("count", c.cache.DataNodeCount()), zap.Duration("cost", time.Since(start)))
+	logger.Info("load range servers", zap.Int("count", c.cache.RangeServerCount()), zap.Duration("cost", time.Since(start)))
 
 	return nil
 }
