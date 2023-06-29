@@ -560,7 +560,7 @@ func (c *conn) runHandler(act func(protocol.OutResponse), resp protocol.OutRespo
 	defer func() {
 		if didPanic {
 			e := recover()
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: "handler panic"})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: "handler panic"})
 			logger.Error("panic serving", zap.Reflect("panic", e), zap.Stack("stack"))
 		}
 	}()

@@ -7,21 +7,21 @@ import "strconv"
 type SealKind int8
 
 const (
-	SealKindUNSPECIFIED       SealKind = 0
-	SealKindDATA_NODE         SealKind = 1
-	SealKindPLACEMENT_MANAGER SealKind = 2
+	SealKindUNSPECIFIED      SealKind = 0
+	SealKindDATA_NODE        SealKind = 1
+	SealKindPLACEMENT_DRIVER SealKind = 2
 )
 
 var EnumNamesSealKind = map[SealKind]string{
-	SealKindUNSPECIFIED:       "UNSPECIFIED",
-	SealKindDATA_NODE:         "DATA_NODE",
-	SealKindPLACEMENT_MANAGER: "PLACEMENT_MANAGER",
+	SealKindUNSPECIFIED:      "UNSPECIFIED",
+	SealKindDATA_NODE:        "DATA_NODE",
+	SealKindPLACEMENT_DRIVER: "PLACEMENT_DRIVER",
 }
 
 var EnumValuesSealKind = map[string]SealKind{
-	"UNSPECIFIED":       SealKindUNSPECIFIED,
-	"DATA_NODE":         SealKindDATA_NODE,
-	"PLACEMENT_MANAGER": SealKindPLACEMENT_MANAGER,
+	"UNSPECIFIED":      SealKindUNSPECIFIED,
+	"DATA_NODE":        SealKindDATA_NODE,
+	"PLACEMENT_DRIVER": SealKindPLACEMENT_DRIVER,
 }
 
 func (v SealKind) String() string {

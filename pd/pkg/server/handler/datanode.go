@@ -25,7 +25,7 @@ func (h *Handler) Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.Heart
 				// It's ok to ignore this error, as all pd nodes will receive this request.
 				break
 			default:
-				resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+				resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 			}
 			return
 		}
@@ -43,7 +43,7 @@ func (h *Handler) AllocateID(req *protocol.IDAllocationRequest, resp *protocol.I
 		case errors.Is(err, cluster.ErrNotLeader):
 			resp.Error(h.notLeaderError(ctx))
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}
@@ -72,7 +72,7 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 		case errors.Is(err, cluster.ErrNotLeader):
 			// It's ok to ignore this error, as all pd nodes will receive this request.
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}

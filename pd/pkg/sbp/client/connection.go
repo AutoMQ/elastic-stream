@@ -163,7 +163,7 @@ func (cc *conn) heartbeat(ctx context.Context) error {
 	req := protocol.HeartbeatRequest{
 		HeartbeatRequestT: rpcfb.HeartbeatRequestT{
 			ClientId:   cc.c.id,
-			ClientRole: rpcfb.ClientRoleCLIENT_ROLE_PM,
+			ClientRole: rpcfb.ClientRoleCLIENT_ROLE_PD,
 		},
 	}
 	header, err := req.Marshal(fmt)

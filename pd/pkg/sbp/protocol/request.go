@@ -293,11 +293,11 @@ type DescribePDClusterRequest struct {
 	baseRequest
 	baseUnmarshaler
 
-	rpcfb.DescribePlacementManagerClusterRequestT
+	rpcfb.DescribePlacementDriverClusterRequestT
 }
 
 func (dpd *DescribePDClusterRequest) unmarshalFlatBuffer(data []byte) error {
-	dpd.DescribePlacementManagerClusterRequestT = *rpcfb.GetRootAsDescribePlacementManagerClusterRequest(data, 0).UnPack()
+	dpd.DescribePlacementDriverClusterRequestT = *rpcfb.GetRootAsDescribePlacementDriverClusterRequest(data, 0).UnPack()
 	return nil
 }
 

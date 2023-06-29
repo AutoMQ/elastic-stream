@@ -343,11 +343,11 @@ type DescribePDClusterResponse struct {
 	baseMarshaller
 	singleResponse
 
-	rpcfb.DescribePlacementManagerClusterResponseT
+	rpcfb.DescribePlacementDriverClusterResponseT
 }
 
 func (dpd *DescribePDClusterResponse) marshalFlatBuffer() ([]byte, error) {
-	return fbutil.Marshal(&dpd.DescribePlacementManagerClusterResponseT), nil
+	return fbutil.Marshal(&dpd.DescribePlacementDriverClusterResponseT), nil
 }
 
 func (dpd *DescribePDClusterResponse) Marshal(fmt format.Format) ([]byte, error) {

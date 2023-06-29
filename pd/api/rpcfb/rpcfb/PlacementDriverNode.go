@@ -6,13 +6,13 @@ import (
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-type PlacementManagerNodeT struct {
+type PlacementDriverNodeT struct {
 	Name string `json:"name"`
 	AdvertiseAddr string `json:"advertise_addr"`
 	IsLeader bool `json:"is_leader"`
 }
 
-func (t *PlacementManagerNodeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+func (t *PlacementDriverNodeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	nameOffset := flatbuffers.UOffsetT(0)
 	if t.Name != "" {
@@ -22,54 +22,54 @@ func (t *PlacementManagerNodeT) Pack(builder *flatbuffers.Builder) flatbuffers.U
 	if t.AdvertiseAddr != "" {
 		advertiseAddrOffset = builder.CreateString(t.AdvertiseAddr)
 	}
-	PlacementManagerNodeStart(builder)
-	PlacementManagerNodeAddName(builder, nameOffset)
-	PlacementManagerNodeAddAdvertiseAddr(builder, advertiseAddrOffset)
-	PlacementManagerNodeAddIsLeader(builder, t.IsLeader)
-	return PlacementManagerNodeEnd(builder)
+	PlacementDriverNodeStart(builder)
+	PlacementDriverNodeAddName(builder, nameOffset)
+	PlacementDriverNodeAddAdvertiseAddr(builder, advertiseAddrOffset)
+	PlacementDriverNodeAddIsLeader(builder, t.IsLeader)
+	return PlacementDriverNodeEnd(builder)
 }
 
-func (rcv *PlacementManagerNode) UnPackTo(t *PlacementManagerNodeT) {
+func (rcv *PlacementDriverNode) UnPackTo(t *PlacementDriverNodeT) {
 	t.Name = string(rcv.Name())
 	t.AdvertiseAddr = string(rcv.AdvertiseAddr())
 	t.IsLeader = rcv.IsLeader()
 }
 
-func (rcv *PlacementManagerNode) UnPack() *PlacementManagerNodeT {
+func (rcv *PlacementDriverNode) UnPack() *PlacementDriverNodeT {
 	if rcv == nil { return nil }
-	t := &PlacementManagerNodeT{}
+	t := &PlacementDriverNodeT{}
 	rcv.UnPackTo(t)
 	return t
 }
 
-type PlacementManagerNode struct {
+type PlacementDriverNode struct {
 	_tab flatbuffers.Table
 }
 
-func GetRootAsPlacementManagerNode(buf []byte, offset flatbuffers.UOffsetT) *PlacementManagerNode {
+func GetRootAsPlacementDriverNode(buf []byte, offset flatbuffers.UOffsetT) *PlacementDriverNode {
 	n := flatbuffers.GetUOffsetT(buf[offset:])
-	x := &PlacementManagerNode{}
+	x := &PlacementDriverNode{}
 	x.Init(buf, n+offset)
 	return x
 }
 
-func GetSizePrefixedRootAsPlacementManagerNode(buf []byte, offset flatbuffers.UOffsetT) *PlacementManagerNode {
+func GetSizePrefixedRootAsPlacementDriverNode(buf []byte, offset flatbuffers.UOffsetT) *PlacementDriverNode {
 	n := flatbuffers.GetUOffsetT(buf[offset+flatbuffers.SizeUint32:])
-	x := &PlacementManagerNode{}
+	x := &PlacementDriverNode{}
 	x.Init(buf, n+offset+flatbuffers.SizeUint32)
 	return x
 }
 
-func (rcv *PlacementManagerNode) Init(buf []byte, i flatbuffers.UOffsetT) {
+func (rcv *PlacementDriverNode) Init(buf []byte, i flatbuffers.UOffsetT) {
 	rcv._tab.Bytes = buf
 	rcv._tab.Pos = i
 }
 
-func (rcv *PlacementManagerNode) Table() flatbuffers.Table {
+func (rcv *PlacementDriverNode) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *PlacementManagerNode) Name() []byte {
+func (rcv *PlacementDriverNode) Name() []byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		return rcv._tab.ByteVector(o + rcv._tab.Pos)
@@ -77,7 +77,7 @@ func (rcv *PlacementManagerNode) Name() []byte {
 	return nil
 }
 
-func (rcv *PlacementManagerNode) AdvertiseAddr() []byte {
+func (rcv *PlacementDriverNode) AdvertiseAddr() []byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		return rcv._tab.ByteVector(o + rcv._tab.Pos)
@@ -85,7 +85,7 @@ func (rcv *PlacementManagerNode) AdvertiseAddr() []byte {
 	return nil
 }
 
-func (rcv *PlacementManagerNode) IsLeader() bool {
+func (rcv *PlacementDriverNode) IsLeader() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
@@ -93,22 +93,22 @@ func (rcv *PlacementManagerNode) IsLeader() bool {
 	return false
 }
 
-func (rcv *PlacementManagerNode) MutateIsLeader(n bool) bool {
+func (rcv *PlacementDriverNode) MutateIsLeader(n bool) bool {
 	return rcv._tab.MutateBoolSlot(8, n)
 }
 
-func PlacementManagerNodeStart(builder *flatbuffers.Builder) {
+func PlacementDriverNodeStart(builder *flatbuffers.Builder) {
 	builder.StartObject(3)
 }
-func PlacementManagerNodeAddName(builder *flatbuffers.Builder, name flatbuffers.UOffsetT) {
+func PlacementDriverNodeAddName(builder *flatbuffers.Builder, name flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(name), 0)
 }
-func PlacementManagerNodeAddAdvertiseAddr(builder *flatbuffers.Builder, advertiseAddr flatbuffers.UOffsetT) {
+func PlacementDriverNodeAddAdvertiseAddr(builder *flatbuffers.Builder, advertiseAddr flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(advertiseAddr), 0)
 }
-func PlacementManagerNodeAddIsLeader(builder *flatbuffers.Builder, isLeader bool) {
+func PlacementDriverNodeAddIsLeader(builder *flatbuffers.Builder, isLeader bool) {
 	builder.PrependBoolSlot(2, isLeader, false)
 }
-func PlacementManagerNodeEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+func PlacementDriverNodeEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }

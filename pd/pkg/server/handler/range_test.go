@@ -146,7 +146,7 @@ func TestSealRange(t *testing.T) {
 				{end: 42},
 				{index: 1, start: 42, end: -1},
 			},
-			args: args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 2, index: 1, end: 84},
+			args: args{kind: rpcfb.SealKindPLACEMENT_DRIVER, epoch: 2, index: 1, end: 84},
 			want: want{
 				returned: &rpcfb.RangeT{Epoch: 2, Index: 1, Start: 42, End: 84},
 				after: []*rpcfb.RangeT{
@@ -161,7 +161,7 @@ func TestSealRange(t *testing.T) {
 				{end: 42},
 				{index: 1, start: 42, end: -1},
 			},
-			args: args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 2, streamID: 1, index: 1, end: 84},
+			args: args{kind: rpcfb.SealKindPLACEMENT_DRIVER, epoch: 2, streamID: 1, index: 1, end: 84},
 			want: want{
 				wantErr: true,
 				errCode: rpcfb.ErrorCodeNOT_FOUND,
@@ -175,7 +175,7 @@ func TestSealRange(t *testing.T) {
 		{
 			name:    "empty stream",
 			prepare: []preRange{},
-			args:    args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 2, index: 0, end: 42},
+			args:    args{kind: rpcfb.SealKindPLACEMENT_DRIVER, epoch: 2, index: 0, end: 42},
 			want: want{
 				wantErr: true,
 				errCode: rpcfb.ErrorCodeRANGE_NOT_FOUND,
@@ -189,7 +189,7 @@ func TestSealRange(t *testing.T) {
 				{end: 42},
 				{index: 1, start: 42, end: -1},
 			},
-			args: args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 2, index: 2, end: 84},
+			args: args{kind: rpcfb.SealKindPLACEMENT_DRIVER, epoch: 2, index: 2, end: 84},
 			want: want{
 				wantErr: true,
 				errCode: rpcfb.ErrorCodeRANGE_NOT_FOUND,
@@ -206,7 +206,7 @@ func TestSealRange(t *testing.T) {
 				{end: 42},
 				{index: 1, start: 42, end: -1},
 			},
-			args: args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 2, index: 0, end: 84},
+			args: args{kind: rpcfb.SealKindPLACEMENT_DRIVER, epoch: 2, index: 0, end: 84},
 			want: want{
 				wantErr: true,
 				errCode: rpcfb.ErrorCodeRANGE_ALREADY_SEALED,
@@ -223,7 +223,7 @@ func TestSealRange(t *testing.T) {
 				{end: 42},
 				{index: 1, start: 42, end: 84},
 			},
-			args: args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 2, index: 1, end: 84},
+			args: args{kind: rpcfb.SealKindPLACEMENT_DRIVER, epoch: 2, index: 1, end: 84},
 			want: want{
 				wantErr: true,
 				errCode: rpcfb.ErrorCodeRANGE_ALREADY_SEALED,
@@ -240,7 +240,7 @@ func TestSealRange(t *testing.T) {
 				{end: 42},
 				{index: 1, start: 42, end: -1},
 			},
-			args: args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 2, index: 1, end: 21},
+			args: args{kind: rpcfb.SealKindPLACEMENT_DRIVER, epoch: 2, index: 1, end: 21},
 			want: want{
 				wantErr: true,
 				errCode: rpcfb.ErrorCodeBAD_REQUEST,
@@ -257,7 +257,7 @@ func TestSealRange(t *testing.T) {
 				{end: 42},
 				{index: 1, start: 42, end: -1},
 			},
-			args: args{kind: rpcfb.SealKindPLACEMENT_MANAGER, epoch: 1, index: 1, end: 84},
+			args: args{kind: rpcfb.SealKindPLACEMENT_DRIVER, epoch: 1, index: 1, end: 84},
 			want: want{
 				wantErr: true,
 				errCode: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH,
@@ -581,7 +581,7 @@ func sealRange(tb testing.TB, h *Handler, streamID int64, length int64) *rpcfb.R
 
 	r := getLastRange(tb, h, streamID)
 	req := &protocol.SealRangeRequest{SealRangeRequestT: rpcfb.SealRangeRequestT{
-		Kind: rpcfb.SealKindPLACEMENT_MANAGER,
+		Kind: rpcfb.SealKindPLACEMENT_DRIVER,
 		Range: &rpcfb.RangeT{
 			StreamId: streamID,
 			Epoch:    r.Epoch,

@@ -31,10 +31,10 @@ const (
 	ErrorCodeEXPIRED_RANGE_EPOCH           ErrorCode = 1471
 	ErrorCodeUNSUPPORTED_OPERATION         ErrorCode = 1498
 	ErrorCodeUNKNOWN_OPERATION             ErrorCode = 1499
-	ErrorCodePM_INTERNAL_SERVER_ERROR      ErrorCode = 1500
-	ErrorCodePM_NOT_IMPLEMENTED            ErrorCode = 1501
-	ErrorCodePM_NO_AVAILABLE_DN            ErrorCode = 1502
-	ErrorCodePM_NOT_LEADER                 ErrorCode = 1503
+	ErrorCodePD_INTERNAL_SERVER_ERROR      ErrorCode = 1500
+	ErrorCodePD_NOT_IMPLEMENTED            ErrorCode = 1501
+	ErrorCodePD_NO_AVAILABLE_DN            ErrorCode = 1502
+	ErrorCodePD_NOT_LEADER                 ErrorCode = 1503
 	ErrorCodeDN_INTERNAL_SERVER_ERROR      ErrorCode = 2500
 	ErrorCodeDN_NOT_IMPLEMENTED            ErrorCode = 2501
 )
@@ -64,10 +64,10 @@ var EnumNamesErrorCode = map[ErrorCode]string{
 	ErrorCodeEXPIRED_RANGE_EPOCH:           "EXPIRED_RANGE_EPOCH",
 	ErrorCodeUNSUPPORTED_OPERATION:         "UNSUPPORTED_OPERATION",
 	ErrorCodeUNKNOWN_OPERATION:             "UNKNOWN_OPERATION",
-	ErrorCodePM_INTERNAL_SERVER_ERROR:      "PM_INTERNAL_SERVER_ERROR",
-	ErrorCodePM_NOT_IMPLEMENTED:            "PM_NOT_IMPLEMENTED",
-	ErrorCodePM_NO_AVAILABLE_DN:            "PM_NO_AVAILABLE_DN",
-	ErrorCodePM_NOT_LEADER:                 "PM_NOT_LEADER",
+	ErrorCodePD_INTERNAL_SERVER_ERROR:      "PD_INTERNAL_SERVER_ERROR",
+	ErrorCodePD_NOT_IMPLEMENTED:            "PD_NOT_IMPLEMENTED",
+	ErrorCodePD_NO_AVAILABLE_DN:            "PD_NO_AVAILABLE_DN",
+	ErrorCodePD_NOT_LEADER:                 "PD_NOT_LEADER",
 	ErrorCodeDN_INTERNAL_SERVER_ERROR:      "DN_INTERNAL_SERVER_ERROR",
 	ErrorCodeDN_NOT_IMPLEMENTED:            "DN_NOT_IMPLEMENTED",
 }
@@ -97,10 +97,10 @@ var EnumValuesErrorCode = map[string]ErrorCode{
 	"EXPIRED_RANGE_EPOCH":           ErrorCodeEXPIRED_RANGE_EPOCH,
 	"UNSUPPORTED_OPERATION":         ErrorCodeUNSUPPORTED_OPERATION,
 	"UNKNOWN_OPERATION":             ErrorCodeUNKNOWN_OPERATION,
-	"PM_INTERNAL_SERVER_ERROR":      ErrorCodePM_INTERNAL_SERVER_ERROR,
-	"PM_NOT_IMPLEMENTED":            ErrorCodePM_NOT_IMPLEMENTED,
-	"PM_NO_AVAILABLE_DN":            ErrorCodePM_NO_AVAILABLE_DN,
-	"PM_NOT_LEADER":                 ErrorCodePM_NOT_LEADER,
+	"PD_INTERNAL_SERVER_ERROR":      ErrorCodePD_INTERNAL_SERVER_ERROR,
+	"PD_NOT_IMPLEMENTED":            ErrorCodePD_NOT_IMPLEMENTED,
+	"PD_NO_AVAILABLE_DN":            ErrorCodePD_NO_AVAILABLE_DN,
+	"PD_NOT_LEADER":                 ErrorCodePD_NOT_LEADER,
 	"DN_INTERNAL_SERVER_ERROR":      ErrorCodeDN_INTERNAL_SERVER_ERROR,
 	"DN_NOT_IMPLEMENTED":            ErrorCodeDN_NOT_IMPLEMENTED,
 }

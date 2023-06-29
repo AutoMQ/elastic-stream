@@ -22,7 +22,7 @@ func (h *Handler) CreateStream(req *protocol.CreateStreamRequest, resp *protocol
 		case errors.Is(err, cluster.ErrNotLeader):
 			resp.Error(h.notLeaderError(ctx))
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}
@@ -42,7 +42,7 @@ func (h *Handler) DeleteStream(req *protocol.DeleteStreamRequest, resp *protocol
 		case errors.Is(err, cluster.ErrStreamNotFound):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeNOT_FOUND, Message: err.Error()})
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}
@@ -60,7 +60,7 @@ func (h *Handler) UpdateStream(req *protocol.UpdateStreamRequest, resp *protocol
 		case errors.Is(err, cluster.ErrNotLeader):
 			resp.Error(h.notLeaderError(ctx))
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}
@@ -80,7 +80,7 @@ func (h *Handler) DescribeStream(req *protocol.DescribeStreamRequest, resp *prot
 		case errors.Is(err, cluster.ErrStreamNotFound):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeNOT_FOUND, Message: err.Error()})
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}

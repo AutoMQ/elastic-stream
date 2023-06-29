@@ -24,7 +24,7 @@ func (h *Handler) ListRange(req *protocol.ListRangeRequest, resp *protocol.ListR
 		case errors.Is(err, cluster.ErrNotLeader):
 			resp.Error(h.notLeaderError(ctx))
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}
@@ -36,7 +36,7 @@ func (h *Handler) ListRange(req *protocol.ListRangeRequest, resp *protocol.ListR
 func (h *Handler) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealRangeResponse) {
 	ctx := req.Context()
 
-	if req.Kind != rpcfb.SealKindPLACEMENT_MANAGER {
+	if req.Kind != rpcfb.SealKindPLACEMENT_DRIVER {
 		resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: fmt.Sprintf("invalid seal kind: %s", req.Kind)})
 		return
 	}
@@ -61,7 +61,7 @@ func (h *Handler) SealRange(req *protocol.SealRangeRequest, resp *protocol.SealR
 		case errors.Is(err, cluster.ErrExpiredRangeEpoch):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH, Message: err.Error()})
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}
@@ -92,11 +92,11 @@ func (h *Handler) CreateRange(req *protocol.CreateRangeRequest, resp *protocol.C
 		case errors.Is(err, cluster.ErrInvalidStartOffset):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeBAD_REQUEST, Message: err.Error()})
 		case errors.Is(err, cluster.ErrNotEnoughDataNodes):
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NO_AVAILABLE_DN, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_NO_AVAILABLE_DN, Message: err.Error()})
 		case errors.Is(err, cluster.ErrExpiredRangeEpoch):
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeEXPIRED_RANGE_EPOCH, Message: err.Error()})
 		default:
-			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
+			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePD_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
 		return
 	}

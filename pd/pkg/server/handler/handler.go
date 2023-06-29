@@ -49,17 +49,17 @@ func (h *Handler) Check(req protocol.InRequest, resp protocol.OutResponse) (pass
 
 func (h *Handler) notLeaderError(ctx context.Context) *rpcfb.StatusT {
 	pdCluster := h.pdCluster(ctx)
-	return &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: fbutil.Marshal(pdCluster)}
+	return &rpcfb.StatusT{Code: rpcfb.ErrorCodePD_NOT_LEADER, Message: "not leader", Detail: fbutil.Marshal(pdCluster)}
 }
 
-func (h *Handler) pdCluster(ctx context.Context) *rpcfb.PlacementManagerClusterT {
-	pd := &rpcfb.PlacementManagerClusterT{Nodes: make([]*rpcfb.PlacementManagerNodeT, 0)}
+func (h *Handler) pdCluster(ctx context.Context) *rpcfb.PlacementDriverClusterT {
+	pd := &rpcfb.PlacementDriverClusterT{Nodes: make([]*rpcfb.PlacementDriverNodeT, 0)}
 	members, err := h.c.ClusterInfo(ctx)
 	if err != nil {
-		return &rpcfb.PlacementManagerClusterT{Nodes: []*rpcfb.PlacementManagerNodeT{}}
+		return &rpcfb.PlacementDriverClusterT{Nodes: []*rpcfb.PlacementDriverNodeT{}}
 	}
 	for _, member := range members {
-		pd.Nodes = append(pd.Nodes, &rpcfb.PlacementManagerNodeT{
+		pd.Nodes = append(pd.Nodes, &rpcfb.PlacementDriverNodeT{
 			Name:          member.Name,
 			AdvertiseAddr: member.AdvertisePDAddr,
 			IsLeader:      member.IsLeader,
