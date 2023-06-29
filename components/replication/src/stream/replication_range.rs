@@ -106,10 +106,10 @@ impl ReplicationRange {
         index: i32,
         start_offset: u64,
     ) -> Result<RangeMetadata, ReplicationError> {
-        // 1. request placement manager to create range and get the range metadata.
+        // 1. request placement driver to create range and get the range metadata.
         let mut metadata = RangeMetadata::new(stream_id, index, epoch, start_offset, None);
         metadata = client.create_range(metadata).await.map_err(|e| {
-            error!("Create range[{stream_id}#{index}] to pm failed, err: {e}");
+            error!("Create range[{stream_id}#{index}] to pd failed, err: {e}");
             ReplicationError::Internal
         })?;
         // 2. request data node to create range replica.
@@ -334,8 +334,8 @@ impl ReplicationRange {
             if self.open_for_write {
                 // the range is open for write, it's ok to directly use memory confirm offset as range end offset.
                 let end_offset = self.confirm_offset();
-                // 1. call placement manager to seal range
-                match self.placement_manager_seal(end_offset).await {
+                // 1. call placement driver to seal range
+                match self.placement_driver_seal(end_offset).await {
                     Ok(_) => {
                         info!("{}The range is created by current stream, then directly seal with memory confirm_offset=[{}]", self.log_ident, end_offset);
                         self.mark_sealed();
@@ -357,7 +357,7 @@ impl ReplicationRange {
                             .await
                             .is_err()
                             {
-                                debug!("Failed to seal data-node after sealing placement-manager");
+                                debug!("Failed to seal data-node after sealing placement-driver");
                             }
                             // keep range alive until seal task complete.
                             drop(range);
@@ -365,7 +365,7 @@ impl ReplicationRange {
                         Ok(end_offset)
                     }
                     Err(e) => {
-                        error!("{}Request pm seal fail, err: {e}", self.log_ident);
+                        error!("{}Request pd seal fail, err: {e}", self.log_ident);
                         self.erase_sealing();
                         Err(ReplicationError::Internal)
                     }
@@ -384,9 +384,9 @@ impl ReplicationRange {
                 .await
                 {
                     Ok(end_offset) => {
-                        // 2. call placement manager to seal range.
+                        // 2. call placement driver to seal range.
                         info!("{}The range is created by other stream, then seal replicas to calculate end_offset=[{}]", self.log_ident, end_offset);
-                        match self.placement_manager_seal(end_offset).await {
+                        match self.placement_driver_seal(end_offset).await {
                             Ok(_) => {
                                 self.mark_sealed();
                                 *self.confirm_offset.borrow_mut() = end_offset;
@@ -394,7 +394,7 @@ impl ReplicationRange {
                                 Ok(end_offset)
                             }
                             Err(e) => {
-                                error!("{}Request pm seal fail, err: {e}", self.log_ident);
+                                error!("{}Request pd seal fail, err: {e}", self.log_ident);
                                 self.erase_sealing();
                                 Err(ReplicationError::Internal)
                             }
@@ -409,7 +409,7 @@ impl ReplicationRange {
         }
     }
 
-    async fn placement_manager_seal(&self, end_offset: u64) -> Result<(), ReplicationError> {
+    async fn placement_driver_seal(&self, end_offset: u64) -> Result<(), ReplicationError> {
         if let Some(client) = self.client.upgrade() {
             let mut metadata = self.metadata.clone();
             metadata.set_end(end_offset);
@@ -420,7 +420,7 @@ impl ReplicationRange {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     error!(
-                        "{}Request pm seal with end_offset[{end_offset}] fail, err: {e}",
+                        "{}Request pd seal with end_offset[{end_offset}] fail, err: {e}",
                         self.log_ident
                     );
                     Err(ReplicationError::Internal)

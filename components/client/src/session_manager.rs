@@ -46,7 +46,7 @@ impl SessionManager {
         match sessions.get(target) {
             Some(session) => Ok(Rc::clone(session)),
             None => {
-                let lb_policy = if target == self.config.placement_manager {
+                let lb_policy = if target == self.config.placement_driver {
                     super::lb_policy::LbPolicy::LeaderOnly
                 } else {
                     super::lb_policy::LbPolicy::PickFirst
@@ -63,9 +63,9 @@ impl SessionManager {
                 );
 
                 if lb_policy == super::lb_policy::LbPolicy::LeaderOnly
-                    && session.refresh_placement_manager_cluster().await.is_err()
+                    && session.refresh_placement_driver_cluster().await.is_err()
                 {
-                    error!("Failed to refresh placement manager cluster for {target}");
+                    error!("Failed to refresh placement driver cluster for {target}");
                 }
 
                 sessions.insert(target.to_owned(), Rc::clone(&session));

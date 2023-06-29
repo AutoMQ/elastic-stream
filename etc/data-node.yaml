@@ -1,8 +1,8 @@
 ---
 # Unit of interval in milliseconds
 tick: 100
-# Placement manager address
-placement-manager: "127.0.0.1:12378"
+# Placement driver address
+placement-driver: "127.0.0.1:12378"
 # Client configuration
 client:
   # Connect timeout duration in ticks
@@ -15,8 +15,8 @@ client:
   max-attempt: 3
   # Heartbeat interval in ticks
   heartbeat-interval: 30
-  # Refresh placement manager cluster interval in ticks
-  refresh-pm-cluster-interval: 300
+  # Refresh placement driver cluster interval in ticks
+  refresh-pd-cluster-interval: 300
 # Server configuration
 server:
   # Advertise host address
@@ -38,7 +38,7 @@ server:
     sampling-frequency: 1000
     # Generate flamegraph interval in seconds
     report-interval: 3000
-    # Path to save flamegraph files: if a relative path is configured, it will be relative to current working directory; 
+    # Path to save flamegraph files: if a relative path is configured, it will be relative to current working directory;
     # If an absolute path is configured, the absolute path is used.
     report-path: "/tmp"
     # max backup reports
@@ -63,7 +63,7 @@ store:
   read-block-size: 131072
   # Pre-allocated number of segment files
   pre-allocate-segment-file-number: 2
-  # The total size of Status::Read segment files 
+  # The total size of Status::Read segment files
   # 100GiB
   total-segment-file-size: 107374182400
   # Policy to reclaim segment files
@@ -77,7 +77,7 @@ store:
     sqpoll-idle-ms: 2000
     # Bind the kernel's poll thread to the specified cpu.
     sqpoll-cpu: 1
-    # Kernel thread pool size for bounded tasks. Note this thread pool is 
+    # Kernel thread pool size for bounded tasks. Note this thread pool is
     # shared with server `Node`s.
     max-bounded-worker: 2
     # Kernel thread pool size for unbounded tasks. Note this thread pool is

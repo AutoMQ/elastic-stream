@@ -36,7 +36,7 @@ impl Client {
     pub async fn allocate_id(&self, host: &str) -> Result<i32, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager
-            .get_composite_session(&self.config.placement_manager)
+            .get_composite_session(&self.config.placement_driver)
             .await?;
         let future = composite_session.allocate_id(host, None);
         time::timeout(self.config.client_io_timeout(), future)
@@ -62,7 +62,7 @@ impl Client {
     ) -> Result<Vec<RangeMetadata>, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager
-            .get_composite_session(&self.config.placement_manager)
+            .get_composite_session(&self.config.placement_driver)
             .await?;
         let future = session.list_range(criteria);
         time::timeout(self.config.client_io_timeout(), future)
@@ -85,7 +85,7 @@ impl Client {
     /// Broadcast heartbeats to all sessions in the `CompositeSession`.
     ///
     /// # Arguments
-    /// `target` - Placement manager access URL.
+    /// `target` - Placement driver access URL.
     ///
     /// # Returns
     ///
@@ -100,7 +100,7 @@ impl Client {
     ) -> Result<StreamMetadata, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager
-            .get_composite_session(&self.config.placement_manager)
+            .get_composite_session(&self.config.placement_driver)
             .await?;
         let future = composite_session.create_stream(stream_metadata);
         time::timeout(self.config.client_io_timeout(), future)
@@ -116,7 +116,7 @@ impl Client {
     pub async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager
-            .get_composite_session(&self.config.placement_manager)
+            .get_composite_session(&self.config.placement_driver)
             .await?;
         let future = composite_session.describe_stream(stream_id);
         time::timeout(self.config.client_io_timeout(), future)
@@ -129,14 +129,14 @@ impl Client {
             })?
     }
 
-    /// Create a new range by send request to placement manager.
+    /// Create a new range by send request to placement driver.
     pub async fn create_range(
         &self,
         range_metadata: RangeMetadata,
     ) -> Result<RangeMetadata, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let composite_session = session_manager
-            .get_composite_session(&self.config.placement_manager)
+            .get_composite_session(&self.config.placement_driver)
             .await?;
         self.create_range0(composite_session, range_metadata).await
     }
@@ -188,7 +188,7 @@ impl Client {
             SealKind::PLACEMENT_DRIVER => {
                 if range.end().is_none() {
                     error!(
-                        "SealRange.range.end MUST be present while seal against placement manager"
+                        "SealRange.range.end MUST be present while seal against placement driver"
                     );
                     return Err(ClientError::BadRequest);
                 }
@@ -203,7 +203,7 @@ impl Client {
         let composite_session = match target {
             None => {
                 session_manager
-                    .get_composite_session(&self.config.placement_manager)
+                    .get_composite_session(&self.config.placement_driver)
                     .await?
             }
 
@@ -252,10 +252,10 @@ impl Client {
             })?
     }
 
-    /// Report metrics to placement manager
+    /// Report metrics to placement driver
     ///
     /// # Arguments
-    /// `target` - Placement manager access URL.
+    /// `target` - Placement driver access URL.
     ///
     /// # Returns
     ///
@@ -315,7 +315,7 @@ mod tests {
             let port = 2378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             config.check_and_apply().unwrap();
@@ -337,7 +337,7 @@ mod tests {
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
@@ -357,7 +357,7 @@ mod tests {
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
@@ -390,7 +390,7 @@ mod tests {
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
@@ -419,8 +419,8 @@ mod tests {
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
-            config.placement_manager = format!("localhost:{}", port);
-            let target = config.placement_manager.clone();
+            config.placement_driver = format!("localhost:{}", port);
+            let target = config.placement_driver.clone();
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
@@ -434,8 +434,8 @@ mod tests {
         test_util::try_init_log();
         tokio_uring::start(async {
             #[allow(unused_variables)]
-            let placement_manager_port = 12378;
-            let placement_manager_port = run_listener().await;
+            let placement_driver_port = 12378;
+            let placement_driver_port = run_listener().await;
 
             #[allow(unused_variables)]
             let data_node_port = 10911;
@@ -444,7 +444,7 @@ mod tests {
             let mut config = config::Configuration::default();
             config.server.host = "127.0.0.1".to_owned();
             config.server.port = data_node_port;
-            config.placement_manager = format!("127.0.0.1:{}", placement_manager_port);
+            config.placement_driver = format!("127.0.0.1:{}", placement_driver_port);
 
             let target = format!("127.0.0.1:{}", data_node_port);
 
@@ -466,7 +466,7 @@ mod tests {
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
@@ -498,7 +498,7 @@ mod tests {
             let mut config = config::Configuration::default();
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             let config = Arc::new(config);
             let (tx, _rx) = broadcast::channel(1);
             let client = Client::new(config, tx);
@@ -529,7 +529,7 @@ mod tests {
             let port = 2378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             config.check_and_apply().unwrap();
@@ -538,7 +538,7 @@ mod tests {
             let client = Client::new(Arc::clone(&config), tx);
             let range = RangeMetadata::new(0, 0, 0, 0, None);
             let range = client
-                .seal(Some(&config.placement_manager), SealKind::DATA_NODE, range)
+                .seal(Some(&config.placement_driver), SealKind::DATA_NODE, range)
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());
@@ -558,7 +558,7 @@ mod tests {
             let port = 2378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             config.check_and_apply().unwrap();
@@ -567,7 +567,7 @@ mod tests {
             let client = Client::new(Arc::clone(&config), tx);
             let range = RangeMetadata::new(0, 0, 0, 0, Some(1));
             let range = client
-                .seal(Some(&config.placement_manager), SealKind::DATA_NODE, range)
+                .seal(Some(&config.placement_driver), SealKind::DATA_NODE, range)
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());
@@ -578,16 +578,16 @@ mod tests {
         })
     }
 
-    /// Test seal placement manager.
+    /// Test seal placement driver.
     #[test]
-    fn test_seal_placement_manager() -> Result<(), ClientError> {
+    fn test_seal_placement_driver() -> Result<(), ClientError> {
         test_util::try_init_log();
         tokio_uring::start(async move {
             #[allow(unused_variables)]
             let port = 2378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             config.check_and_apply().unwrap();
@@ -597,7 +597,7 @@ mod tests {
             let range = RangeMetadata::new(0, 0, 0, 0, Some(1));
             let range = client
                 .seal(
-                    Some(&config.placement_manager),
+                    Some(&config.placement_driver),
                     SealKind::PLACEMENT_DRIVER,
                     range,
                 )
@@ -619,7 +619,7 @@ mod tests {
             let port = 2378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             config.check_and_apply().unwrap();
@@ -657,7 +657,7 @@ mod tests {
             }
 
             let response = client
-                .append(&config.placement_manager, vec![buf.freeze()])
+                .append(&config.placement_driver, vec![buf.freeze()])
                 .await?;
 
             assert_eq!(response.len(), BATCH as usize);
@@ -673,7 +673,7 @@ mod tests {
             let port = 2378;
             let port = run_listener().await;
             let mut config = config::Configuration::default();
-            config.placement_manager = format!("localhost:{}", port);
+            config.placement_driver = format!("localhost:{}", port);
             config.server.host = "localhost".to_owned();
             config.server.port = 10911;
             config.check_and_apply().unwrap();
@@ -686,7 +686,7 @@ mod tests {
             let memory_statistics = MemoryStatistics::new();
             client
                 .report_metrics(
-                    &config.placement_manager,
+                    &config.placement_driver,
                     &uring_statistics,
                     &data_node_statistics,
                     &disk_statistics,

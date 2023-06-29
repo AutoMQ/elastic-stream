@@ -20,13 +20,13 @@ jobs:
       - name: Go Cache
         uses: actions/cache@v3
         with:
-          path: ./placement-manager/.go/cache
-          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-release-${{ hashFiles('**/go.sum') }}
+          path: ./pd/.go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pd-release-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-release-
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-
-      - name: Build Placement Manager Debian Packages
-        working-directory: ./placement-manager
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-release-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-
+      - name: Build Placement Driver Debian Packages
+        working-directory: ./pd
         run: make all-deb GO_VERSION=${{ matrix.go-version }}
 
       - name: Rust Cache
@@ -50,4 +50,4 @@ jobs:
           generate_release_notes: true
           files: |
             ./dist/data-node.deb
-            ./placement-manager/distribution/*.deb
+            ./pd/distribution/*.deb

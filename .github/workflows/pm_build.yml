@@ -1,4 +1,4 @@
-name: Placement Manager - CI
+name: Placement Driver - CI
 
 on:
   workflow_call:
@@ -6,7 +6,7 @@ permissions: read-all
 
 defaults:
   run:
-    working-directory: ./placement-manager
+    working-directory: ./pd
 
 jobs:
   flatc:
@@ -44,11 +44,11 @@ jobs:
       - name: Go Cache
         uses: actions/cache@v3
         with:
-          path: ./placement-manager/.go/cache
-          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-lint-${{ hashFiles('**/go.sum') }}
+          path: ./pd/.go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pd-lint-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-lint-
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-lint-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-
       - name: Lint
         run: make lint GO_VERSION=${{ matrix.go-version }}
   crossbuild:
@@ -65,11 +65,11 @@ jobs:
       - name: Go Cache
         uses: actions/cache@v3
         with:
-          path: ./placement-manager/.go/cache
-          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-build-${{ hashFiles('**/go.sum') }}
+          path: ./pd/.go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pd-build-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-build-
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-build-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-
       - name: Build containers
         run: make all-container GO_VERSION=${{ matrix.go-version }}
   test:
@@ -86,10 +86,10 @@ jobs:
       - name: Go Cache
         uses: actions/cache@v3
         with:
-          path: ./placement-manager/.go/cache
-          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-test-${{ hashFiles('**/go.sum') }}
+          path: ./pd/.go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pd-test-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-test-
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-test-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-
       - name: Test
         run: make test GOFLAGS="-v" GO_VERSION=${{ matrix.go-version }} GO_TEST_FLAGS="-coverprofile=covprofile -covermode=atomic -coverpkg=./..."

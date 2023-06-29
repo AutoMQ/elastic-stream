@@ -81,8 +81,8 @@ pub struct Client {
     #[serde(rename = "heartbeat-interval")]
     pub heartbeat_interval: u64,
 
-    #[serde(rename = "refresh-pm-cluster-interval")]
-    pub refresh_pm_cluster_interval: u64,
+    #[serde(rename = "refresh-pd-cluster-interval")]
+    pub refresh_pd_cluster_interval: u64,
 }
 
 impl Default for Client {
@@ -93,7 +93,7 @@ impl Default for Client {
             client_id: "".to_owned(),
             max_attempt: 3,
             heartbeat_interval: 30,
-            refresh_pm_cluster_interval: 300,
+            refresh_pd_cluster_interval: 300,
         }
     }
 }
@@ -398,8 +398,8 @@ pub struct Configuration {
     /// Unit of time in milliseconds.
     pub tick: u64,
 
-    #[serde(rename = "placement-manager")]
-    pub placement_manager: String,
+    #[serde(rename = "placement-driver")]
+    pub placement_driver: String,
 
     pub client: Client,
 
@@ -414,7 +414,7 @@ impl Default for Configuration {
     fn default() -> Self {
         Self {
             tick: 100,
-            placement_manager: "127.0.0.1:12378".to_owned(),
+            placement_driver: "127.0.0.1:12378".to_owned(),
             client: Default::default(),
             server: Default::default(),
             store: Default::default(),
@@ -506,8 +506,8 @@ impl Configuration {
         Duration::from_millis(self.tick * self.client.heartbeat_interval)
     }
 
-    pub fn client_refresh_placement_manager_cluster_interval(&self) -> Duration {
-        Duration::from_millis(self.tick * self.client.refresh_pm_cluster_interval)
+    pub fn client_refresh_placement_driver_cluster_interval(&self) -> Duration {
+        Duration::from_millis(self.tick * self.client.refresh_pd_cluster_interval)
     }
 
     pub fn server_grace_period(&self) -> Duration {

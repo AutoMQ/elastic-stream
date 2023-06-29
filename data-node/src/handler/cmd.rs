@@ -87,8 +87,8 @@ impl<'a> Command<'a> {
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
-            OperationCode::DescribePlacementManager => {
-                error!("DescribePlacementManager is not supported in data-node");
+            OperationCode::DescribePlacementDriver => {
+                error!("DescribePlacementDriver is not supported in data-node");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
         }

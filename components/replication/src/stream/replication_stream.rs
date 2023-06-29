@@ -92,7 +92,7 @@ impl ReplicationStream {
             .await
             .map_err(|e| {
                 error!(
-                    "{}Failed to list ranges from placement-manager: {e}",
+                    "{}Failed to list ranges from placement-driver: {e}",
                     self.log_ident
                 );
                 ReplicationError::Internal

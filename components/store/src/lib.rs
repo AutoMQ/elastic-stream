@@ -83,7 +83,7 @@ pub trait Store {
     where
         F: Fn(&RangeMetadata) -> bool;
 
-    /// Seal stream range in metadata column family after cross check with placement manager.
+    /// Seal stream range in metadata column family after cross check with placement driver.
     async fn seal(&self, range: RangeMetadata) -> Result<(), StoreError>;
 
     /// Create a stream range in metadata.

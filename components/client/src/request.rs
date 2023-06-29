@@ -50,7 +50,7 @@ pub enum Headers {
         host: String,
     },
 
-    DescribePlacementManager {
+    DescribePlacementDriver {
         data_node: DataNode,
     },
 
@@ -152,7 +152,7 @@ impl From<&Request> for Bytes {
                 builder.finish(request, None);
             }
 
-            Headers::DescribePlacementManager { data_node } => {
+            Headers::DescribePlacementDriver { data_node } => {
                 let mut request = DescribePlacementDriverClusterRequestT::default();
                 request.data_node = Box::new(data_node.into());
                 let request = request.pack(&mut builder);

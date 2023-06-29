@@ -1,5 +1,5 @@
 use crate::range::RangeMetadata;
-use crate::PlacementManagerNode;
+use crate::PlacementDriverNode;
 use crate::Status;
 
 use self::append::AppendResultEntry;
@@ -22,9 +22,9 @@ pub enum Response {
         id: i32,
     },
 
-    DescribePlacementManager {
+    DescribePlacementDriver {
         status: Status,
-        nodes: Option<Vec<PlacementManagerNode>>,
+        nodes: Option<Vec<PlacementDriverNode>>,
     },
 
     SealRange {

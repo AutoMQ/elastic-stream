@@ -34,13 +34,13 @@ impl Lock {
                         (file.into_raw_fd(), id)
                     } else {
                         warn!(
-                            "LOCK file has only {} bytes. Generate a new data-node ID from PM now",
+                            "LOCK file has only {} bytes. Generate a new data-node ID from PD now",
                             metadata.len()
                         );
                         let id: i32 = match id_generator.generate() {
                             Ok(id) => id,
                             Err(_e) => {
-                                error!("Failed to acquire data-node ID from placement-manager");
+                                error!("Failed to acquire data-node ID from placement-driver");
                                 return Err(StoreError::Configuration(String::from(
                                     "Failed to acquire data-node ID",
                                 )));
@@ -64,7 +64,7 @@ impl Lock {
             let id: i32 = match id_generator.generate() {
                 Ok(id) => id,
                 Err(_e) => {
-                    error!("Failed to acquire data-node ID from placement-manager");
+                    error!("Failed to acquire data-node ID from placement-driver");
                     return Err(StoreError::Configuration(String::from(
                         "Failed to acquire data-node ID",
                     )));
@@ -108,7 +108,7 @@ impl Drop for Lock {
 
 #[cfg(test)]
 mod tests {
-    use client::PlacementManagerIdGenerator;
+    use client::PlacementDriverIdGenerator;
     use tokio::sync::oneshot;
 
     use super::Lock;
@@ -131,14 +131,14 @@ mod tests {
         });
 
         let port = port_rx.blocking_recv().unwrap();
-        let pm_address = format!("localhost:{}", port);
+        let pd_address = format!("localhost:{}", port);
         let mut config = config::Configuration::default();
-        config.placement_manager = pm_address;
+        config.placement_driver = pd_address;
         config
             .check_and_apply()
             .expect("Failed to check-and-apply configuration");
         let cfg = Arc::new(config);
-        let generator = Box::new(PlacementManagerIdGenerator::new(&cfg));
+        let generator = Box::new(PlacementDriverIdGenerator::new(&cfg));
         let _lock = Lock::new(&cfg, generator)?;
         let _ = stop_tx.send(());
         let _ = handle.join();

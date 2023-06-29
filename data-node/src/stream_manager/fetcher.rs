@@ -38,7 +38,7 @@ impl PlacementFetcher for PlacementClient {
             .list_ranges(model::ListRangeCriteria::new(Some(node_id), None))
             .await
             .map_err(|_e| {
-                error!("Failed to list ranges by data node from placement manager");
+                error!("Failed to list ranges by data node from placement driver");
                 ServiceError::AcquireRange
             })
             .inspect(|ranges| {
@@ -55,14 +55,14 @@ impl PlacementFetcher for PlacementClient {
             .await
             .map_err(|_e| {
                 error!(
-                    "Failed to get stream={} metadata from placement manager",
+                    "Failed to get stream={} metadata from placement driver",
                     stream_id
                 );
                 ServiceError::DescribeStream
             })
             .inspect(|metadata| {
                 trace!(
-                    "Received stream-metadata={:?} from placement manager for stream-id={}",
+                    "Received stream-metadata={:?} from placement driver for stream-id={}",
                     metadata,
                     stream_id,
                 );

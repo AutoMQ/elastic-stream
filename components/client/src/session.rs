@@ -208,8 +208,8 @@ impl Session {
                 frame.operation_code = OperationCode::AllocateId;
             }
 
-            request::Headers::DescribePlacementManager { .. } => {
-                frame.operation_code = OperationCode::DescribePlacementManager;
+            request::Headers::DescribePlacementDriver { .. } => {
+                frame.operation_code = OperationCode::DescribePlacementDriver;
             }
 
             request::Headers::CreateRange { .. } => {
@@ -409,8 +409,8 @@ impl Session {
                             response.on_report_metrics(&frame);
                         }
 
-                        OperationCode::DescribePlacementManager => {
-                            response.on_describe_placement_manager(&frame);
+                        OperationCode::DescribePlacementDriver => {
+                            response.on_describe_placement_driver(&frame);
                         }
 
                         OperationCode::Heartbeat => {

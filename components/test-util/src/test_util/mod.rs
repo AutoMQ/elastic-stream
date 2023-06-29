@@ -69,7 +69,7 @@ fn serve_list_ranges(request: &ListRangeRequest, frame: &mut Frame) {
     frame.header = Some(Bytes::copy_from_slice(buf));
 }
 
-fn serve_describe_placement_manager_cluster(
+fn serve_describe_placement_driver_cluster(
     request: &DescribePlacementDriverClusterRequest,
     frame: &mut Frame,
     port: u16,
@@ -192,16 +192,16 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::DescribePlacementManager => {
+                                OperationCode::DescribePlacementDriver => {
                                     response_frame.operation_code =
-                                        OperationCode::DescribePlacementManager;
+                                        OperationCode::DescribePlacementDriver;
                                     if let Some(ref buf) = frame.header {
                                         match flatbuffers::root::<
                                             DescribePlacementDriverClusterRequest,
                                         >(buf)
                                         {
                                             Ok(request) => {
-                                                serve_describe_placement_manager_cluster(
+                                                serve_describe_placement_driver_cluster(
                                                     &request,
                                                     &mut response_frame,
                                                     port,
@@ -209,7 +209,7 @@ pub async fn run_listener() -> u16 {
                                             }
                                             Err(e) => {
                                                 error!(
-                                                    "Failed to decode describe-placement-manager-request header: {:?}", e
+                                                    "Failed to decode describe-placement-driver-request header: {:?}", e
                                                 );
                                             }
                                         }
@@ -442,7 +442,7 @@ fn serve_seal_range(req: &SealRangeRequest, response_frame: &mut Frame) {
                 let mut status_bad_request = StatusT::default();
                 status_bad_request.code = ErrorCode::BAD_REQUEST;
                 status_bad_request.message = Some(String::from(
-                    "end-offset should be non-negative in case of placement manager seal",
+                    "end-offset should be non-negative in case of placement driver seal",
                 ));
                 response.status = Box::new(status_bad_request);
             }

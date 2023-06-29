@@ -31,7 +31,7 @@ use util::metrics::http_serve;
 /// processor, following the Thread-per-Core design paradigm.
 ///
 /// There is only one primary worker, which is in charge of the stream/range management
-/// and communication with the placement manager.
+/// and communication with the placement driver.
 ///
 /// Inter-worker communications are achieved via channels.
 pub(crate) struct Worker<S, F> {
@@ -103,7 +103,7 @@ where
                 unsafe { &mut *self.stream_manager.get() }
                     .start()
                     .await
-                    .expect("Failed to bootstrap stream ranges from placement managers");
+                    .expect("Failed to bootstrap stream ranges from placement drivers");
 
                 if self.config.primary {
                     tokio_uring::spawn(async {
@@ -144,7 +144,7 @@ where
                         disk_statistics.record();
                         memory_statistics.record();
                         let _ = client
-                        .report_metrics(&config.placement_manager, &uring_statistics,&data_node_statistics, &disk_statistics, &memory_statistics)
+                        .report_metrics(&config.placement_driver, &uring_statistics,&data_node_statistics, &disk_statistics, &memory_statistics)
                         .await;
                     }
 

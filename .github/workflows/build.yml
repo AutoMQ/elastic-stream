@@ -11,7 +11,7 @@ jobs:
     outputs:
       java: ${{ steps.filter.outputs.java }}
       rust: ${{ steps.filter.outputs.rust }}
-      pm: ${{ steps.filter.outputs.pm }}
+      pd: ${{ steps.filter.outputs.pd }}
     steps:
       - uses: actions/checkout@v3
       - uses: dorny/paths-filter@v2
@@ -25,8 +25,8 @@ jobs:
               - 'data-node/**'
               - 'components/**'
               - 'sdks/frontend-rs/**'
-            pm:
-              - 'placement-manager/**'
+            pd:
+              - 'pd/**'
               - 'components/protocol/fbs/rpc.fbs'
   java-build:
     needs: [paths-filter]
@@ -36,22 +36,22 @@ jobs:
     needs: [paths-filter]
     if: ${{ needs.paths-filter.outputs.rust == 'true' }}
     uses: ./.github/workflows/rust_build.yml
-  pm-build:
+  pd-build:
     needs: [paths-filter]
-    if: ${{ needs.paths-filter.outputs.pm == 'true' }}
-    uses: ./.github/workflows/pm_build.yml
+    if: ${{ needs.paths-filter.outputs.pd == 'true' }}
+    uses: ./.github/workflows/pd_build.yml
   build-result:
     runs-on: ubuntu-latest
-    needs: [java-build, rust-build, pm-build]
+    needs: [java-build, rust-build, pd-build]
     if: ${{ always() }}
     steps:
       - uses: actions/checkout@v3
       - name: Collect build result
         run: |
-          if echo java-${{ needs.java-build.result }},rust-${{ needs.rust-build.result }},pm-${{ needs.pm-build.result }} | grep -E 'cancelled|failure' -o > null
+          if echo java-${{ needs.java-build.result }},rust-${{ needs.rust-build.result }},pd-${{ needs.pd-build.result }} | grep -E 'cancelled|failure' -o > null
           then
             echo "There are failed/cancelled builds"
-            exit 1 
+            exit 1
           else
             echo "All builds are successful/skipped"
             exit 0

@@ -3,9 +3,9 @@ target
 ./components/protocol/src/generated/rpc_generated.rs
 .DS_Store
 components/protocol/src/generated/
-placement-manager/default.*
+pd/default.*
 benchmark/logs/
 sdks/java/flatc
 log
 logs
-default.pm*
+default.pd*

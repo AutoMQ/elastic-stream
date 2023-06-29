@@ -64,7 +64,7 @@ where
                 }
                 Entry::Vacant(vacant) => {
                     let metadata = self.fetcher.describe_stream(range.stream_id() as u64).await.expect(
-                        "Failed to fetch stream metadata from placement manager during bootstrap",
+                        "Failed to fetch stream metadata from placement driver during bootstrap",
                     );
                     let mut stream = Stream::new(metadata);
                     stream.create_range(range);
@@ -126,7 +126,7 @@ where
             stream.seal(range)
         } else {
             info!(
-                "Stream[id={}] is not found, fetch stream metadata from placement manager",
+                "Stream[id={}] is not found, fetch stream metadata from placement driver",
                 range.stream_id()
             );
             let stream_metadata = StreamMetadata {

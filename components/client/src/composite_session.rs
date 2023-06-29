@@ -8,7 +8,7 @@ use log::{debug, error, info, trace, warn};
 use model::{
     client_role::ClientRole, fetch::FetchRequestEntry, fetch::FetchResultEntry,
     range::RangeMetadata, stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
-    PlacementManagerNode,
+    PlacementDriverNode,
 };
 use observation::metrics::{
     store_metrics::DataNodeStatistics,
@@ -94,19 +94,19 @@ impl CompositeSession {
         })
     }
 
-    /// Check if we need to refresh placement manager cluster topology and leadership.
+    /// Check if we need to refresh placement driver cluster topology and leadership.
     ///
     /// # Returns
     /// `true` - if the interval has elapsed or the cluster has only one node;
     /// `false` - otherwise
-    fn need_refresh_placement_manager_cluster(&self) -> bool {
-        if self.target != self.config.placement_manager {
+    fn need_refresh_placement_driver_cluster(&self) -> bool {
+        if self.target != self.config.placement_driver {
             return false;
         }
 
         let cluster_size = self.sessions.borrow().len();
         if cluster_size <= 1 {
-            debug!("Placement Manager Cluster size is {} which is rare in production, flag refresh-cluster true", cluster_size);
+            debug!("Placement Driver Cluster size is {} which is rare in production, flag refresh-cluster true", cluster_size);
             return true;
         }
 
@@ -114,16 +114,16 @@ impl CompositeSession {
         *self.refresh_cluster_instant.borrow()
             + self
                 .config
-                .client_refresh_placement_manager_cluster_interval()
+                .client_refresh_placement_driver_cluster_interval()
             <= now
     }
 
-    /// Synchronize leadership of each placement manager node according to the specified description.
+    /// Synchronize leadership of each placement driver node according to the specified description.
     ///
     /// # Parameter
-    /// `nodes` - Placement manager nodes description from `DescribePlacementDriverClusterResponse`.
-    fn refresh_leadership(&self, nodes: &[PlacementManagerNode]) {
-        debug!("Refresh placement manager cluster leadership");
+    /// `nodes` - Placement driver nodes description from `DescribePlacementDriverClusterResponse`.
+    fn refresh_leadership(&self, nodes: &[PlacementDriverNode]) {
+        debug!("Refresh placement driver cluster leadership");
         // Sync leader/follower state
         for node in nodes.iter() {
             node.advertise_addr
@@ -147,9 +147,9 @@ impl CompositeSession {
         }
     }
 
-    async fn refresh_sessions(&self, nodes: &Vec<PlacementManagerNode>) {
+    async fn refresh_sessions(&self, nodes: &Vec<PlacementDriverNode>) {
         if nodes.is_empty() {
-            trace!("Placement Manager Cluster is empty, no need to refresh sessions");
+            trace!("Placement Driver Cluster is empty, no need to refresh sessions");
             return;
         }
 
@@ -172,14 +172,14 @@ impl CompositeSession {
             self.endpoints.borrow_mut().retain(|e| {
                 e != &k
             });
-            info!("Session to {} will be disconnected because latest Placement Manager Cluster does not contain it any more", k);
+            info!("Session to {} will be disconnected because latest Placement Driver Cluster does not contain it any more", k);
         });
 
         addrs.retain(|addr| !self.sessions.borrow().contains_key(addr));
 
         addrs.iter().for_each(|addr| {
             trace!(
-                "Create a new session for new Placement Manager Cluster member: {}",
+                "Create a new session for new Placement Driver Cluster member: {}",
                 addr
             );
         });
@@ -213,14 +213,14 @@ impl CompositeSession {
         self.refresh_leadership(nodes);
     }
 
-    pub(crate) async fn refresh_placement_manager_cluster(&self) -> Result<(), ClientError> {
-        match self.describe_placement_manager_cluster().await? {
+    pub(crate) async fn refresh_placement_driver_cluster(&self) -> Result<(), ClientError> {
+        match self.describe_placement_driver_cluster().await? {
             Some(nodes) => {
                 self.refresh_sessions(&nodes).await;
                 Ok(())
             }
             None => {
-                warn!("Placement manager returns an unexpected empty cluster. Skip refreshing sessions");
+                warn!("Placement driver returns an unexpected empty cluster. Skip refreshing sessions");
                 Err(ClientError::ServerInternal)
             }
         }
@@ -232,8 +232,8 @@ impl CompositeSession {
                 match self.pick_leader_session() {
                     Some(session) => Some(session),
                     None => {
-                        trace!("No leader session found, try to describe placement manager cluster again");
-                        if self.refresh_placement_manager_cluster().await.is_ok() {
+                        trace!("No leader session found, try to describe placement driver cluster again");
+                        if self.refresh_placement_driver_cluster().await.is_ok() {
                             return self.pick_leader_session();
                         }
                         None
@@ -269,10 +269,10 @@ impl CompositeSession {
     pub(crate) async fn heartbeat(&self, role: ClientRole) {
         self.try_reconnect().await;
 
-        if self.need_refresh_placement_manager_cluster()
-            && self.refresh_placement_manager_cluster().await.is_err()
+        if self.need_refresh_placement_driver_cluster()
+            && self.refresh_placement_driver_cluster().await.is_err()
         {
-            error!("Failed to refresh placement manager cluster");
+            error!("Failed to refresh placement driver cluster");
         }
 
         let sessions = self
@@ -350,7 +350,7 @@ impl CompositeSession {
                         .unpack()
                         .nodes
                         .iter()
-                        .map(Into::<PlacementManagerNode>::into)
+                        .map(Into::<PlacementDriverNode>::into)
                         .collect::<Vec<_>>();
                     if !nodes.is_empty() {
                         self.refresh_sessions(&nodes).await;
@@ -359,7 +359,7 @@ impl CompositeSession {
                 }
             }
         }
-        self.refresh_placement_manager_cluster().await.is_ok()
+        self.refresh_placement_driver_cluster().await.is_ok()
     }
 
     pub(crate) async fn create_stream(
@@ -478,9 +478,9 @@ impl CompositeSession {
         }
     }
 
-    /// Create the specified range to the target: placement manager or data node.
+    /// Create the specified range to the target: placement driver or data node.
     ///
-    /// If the target is placement manager, we need to select the session to the primary node;
+    /// If the target is placement driver, we need to select the session to the primary node;
     pub(crate) async fn create_range(
         &self,
         range: RangeMetadata,
@@ -583,23 +583,23 @@ impl CompositeSession {
         Err(ClientError::ClientInternal)
     }
 
-    /// Describe current placement manager cluster membership.
+    /// Describe current placement driver cluster membership.
     ///
     /// There are multiple rationales for this RPC.
-    /// 1. Placement manager is built on top of RAFT consensus algorithm and election happens in case of leader outage. Some RPCs
+    /// 1. Placement driver is built on top of RAFT consensus algorithm and election happens in case of leader outage. Some RPCs
     ///    should steer to the leader node and need to refresh the leadership on failure;
-    /// 2. Heartbeat, metrics-reporting RPC requests should broadcast to all placement manager nodes, so that when leader changes,
+    /// 2. Heartbeat, metrics-reporting RPC requests should broadcast to all placement driver nodes, so that when leader changes,
     ///    data-node liveness and load evaluation are not impacted.
     ///
     /// # Implementation walkthrough
-    /// Step 1: If placement manager access URL uses domain name, resolve it;
+    /// Step 1: If placement driver access URL uses domain name, resolve it;
     ///  1.1 If the result `SocketAddress` has an existing `Session`, re-use it and go to step 2;
     ///  1.2 If the result `SocketAddress` is completely new, connect and build a new `Session`
-    /// Step 2: Send DescribePlacementManagerRequest to the `Session` discovered in step 1;
-    /// Step 3: Once response is received from placement manager server, update the aggregated `Session` table, including leadership
-    async fn describe_placement_manager_cluster(
+    /// Step 2: Send DescribePlacementDriverRequest to the `Session` discovered in step 1;
+    /// Step 3: Once response is received from placement driver server, update the aggregated `Session` table, including leadership
+    async fn describe_placement_driver_cluster(
         &self,
-    ) -> Result<Option<Vec<PlacementManagerNode>>, ClientError> {
+    ) -> Result<Option<Vec<PlacementDriverNode>>, ClientError> {
         self.try_reconnect().await;
 
         // Get latest `A` records for access point domain name
@@ -616,7 +616,7 @@ impl CompositeSession {
         let data_node = self.config.server.data_node();
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            headers: request::Headers::DescribePlacementManager { data_node },
+            headers: request::Headers::DescribePlacementDriver { data_node },
             body: None,
         };
 
@@ -636,14 +636,14 @@ impl CompositeSession {
                     error!("Failed to send request to {}", addr);
                     continue;
                 }
-                trace!("Describe placement manager cluster via {}", addr);
+                trace!("Describe placement driver cluster via {}", addr);
                 request_sent = true;
                 break 'outer;
             }
 
             if !request_sent {
                 warn!(
-                    "Failed to describe placement manager cluster via existing sessions. Try to re-connect..."
+                    "Failed to describe placement driver cluster via existing sessions. Try to re-connect..."
                 );
                 if let Some(addr) = addrs.first() {
                     let session = Self::connect(
@@ -670,19 +670,19 @@ impl CompositeSession {
                 Ok(response) => {
                     debug_assert_eq!(
                         response.operation_code,
-                        OperationCode::DescribePlacementManager,
+                        OperationCode::DescribePlacementDriver,
                         "Unexpected operation code"
                     );
                     if !response.ok() {
                         warn!(
-                            "Failed to describe placement manager cluster: {:?}",
+                            "Failed to describe placement driver cluster: {:?}",
                             response.status
                         );
                         Err(ClientError::ServerInternal)
-                    } else if let Some(response::Headers::DescribePlacementManager { nodes }) =
+                    } else if let Some(response::Headers::DescribePlacementDriver { nodes }) =
                         response.headers
                     {
-                        trace!("Received placement manager cluster {:?}", nodes);
+                        trace!("Received placement driver cluster {:?}", nodes);
                         Ok(nodes)
                     } else {
                         Err(ClientError::ClientInternal)
@@ -696,14 +696,14 @@ impl CompositeSession {
         }
     }
 
-    /// Seal range on data-node or placement manager.
+    /// Seal range on data-node or placement driver.
     ///
     /// # Implementation Walkthrough
-    /// 1. If the seal kind is placement manager, find the session to the leader node;
+    /// 1. If the seal kind is placement driver, find the session to the leader node;
     /// 2. Send the request to the session and await response;
     ///
     /// # Returns
-    /// If seal kind is seal-placement-manager and renew, returns the newly created mutable range;
+    /// If seal kind is seal-placement-driver and renew, returns the newly created mutable range;
     /// Otherwise, return the range that is being sealed with the end properly filled.
     ///
     /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
@@ -964,10 +964,10 @@ impl CompositeSession {
     ) -> Result<(), ClientError> {
         self.try_reconnect().await;
 
-        if self.need_refresh_placement_manager_cluster()
-            && self.refresh_placement_manager_cluster().await.is_err()
+        if self.need_refresh_placement_driver_cluster()
+            && self.refresh_placement_driver_cluster().await.is_err()
         {
-            error!("Failed to refresh placement manager cluster");
+            error!("Failed to refresh placement driver cluster");
         }
 
         // TODO: add disk_unindexed_data_size, range_missing_replica_cnt, range_active_cnt
@@ -1060,7 +1060,7 @@ mod tests {
     }
 
     #[test]
-    fn test_describe_placement_manager_cluster() -> Result<(), Box<dyn Error>> {
+    fn test_describe_placement_driver_cluster() -> Result<(), Box<dyn Error>> {
         test_util::try_init_log();
         let mut config = config::Configuration::default();
         config.server.node_id = 1;
@@ -1072,7 +1072,7 @@ mod tests {
             let composite_session =
                 CompositeSession::new(&target, config, LbPolicy::PickFirst, shutdown_tx).await?;
             let nodes = composite_session
-                .describe_placement_manager_cluster()
+                .describe_placement_driver_cluster()
                 .await
                 .unwrap()
                 .unwrap();

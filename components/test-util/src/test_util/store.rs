@@ -1,9 +1,9 @@
 use store::ElasticStore;
 use tokio::sync::oneshot;
 
-pub fn build_store(pm_address: String, store_path: &str) -> ElasticStore {
+pub fn build_store(pd_address: String, store_path: &str) -> ElasticStore {
     let mut cfg = config::Configuration {
-        placement_manager: pm_address,
+        placement_driver: pd_address,
         ..Default::default()
     };
     cfg.store.path.set_base(store_path);

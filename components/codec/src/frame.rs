@@ -356,7 +356,7 @@ pub enum OperationCode {
     // To keep clients alive through periodic heartbeat frames.
     Heartbeat = 0x0003,
 
-    // Allocate a unique ID from placement managers.
+    // Allocate a unique ID from placement drivers.
     AllocateId = 0x0004,
 
     // 0x1000 ~ 0x1FFF is reserved for data communication
@@ -368,10 +368,10 @@ pub enum OperationCode {
 
     // 0x2000 ~ 0x2FFF is reserved for range management
 
-    // List ranges from the PM of a batch of streams.
+    // List ranges from the PD of a batch of streams.
     ListRange = 0x2001,
     // Request seal ranges of a batch of streams.
-    // The PM will provide the `SEAL_AND_NEW` semantic while Data Node only provide the `SEAL` semantic.
+    // The PD will provide the `SEAL_AND_NEW` semantic while Data Node only provide the `SEAL` semantic.
     SealRange = 0x2002,
     // Syncs newly writable ranges to a data node to accelerate the availability of a newly created writable range.
     SyncRange = 0x2003,
@@ -394,11 +394,11 @@ pub enum OperationCode {
 
     // 0x4000 ~ 0x4FFF is reserved for observability
 
-    // Data node reports metrics to the PM.
+    // Data node reports metrics to the PD.
     ReportMetrics = 0x4001,
 
-    // Describe placement manager cluster membership.
-    DescribePlacementManager = 0x4002,
+    // Describe placement driver cluster membership.
+    DescribePlacementDriver = 0x4002,
 }
 
 impl Display for OperationCode {

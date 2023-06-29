@@ -4,8 +4,8 @@ on:
     - cron: '0 20 * * *'
 
 jobs:
-  pm-images:
-    name: Build and Push Placement Manager Images
+  pd-images:
+    name: Build and Push Placement Driver Images
     strategy:
       matrix:
         go-version: [ "1.20" ]
@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     defaults:
       run:
-        working-directory: ./placement-manager
+        working-directory: ./pd
     timeout-minutes: 30
     steps:
       - name: Checkout Code
@@ -21,11 +21,11 @@ jobs:
       - name: Go Cache
         uses: actions/cache@v3
         with:
-          path: ./placement-manager/.go/cache
-          key: ${{matrix.platform}}-${{matrix.go-version}}-pm-nightly-${{ hashFiles('**/go.sum') }}
+          path: ./pd/.go/cache
+          key: ${{matrix.platform}}-${{matrix.go-version}}-pd-nightly-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-nightly-
-            ${{matrix.platform}}-${{matrix.go-version}}-pm-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-nightly-
+            ${{matrix.platform}}-${{matrix.go-version}}-pd-
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:

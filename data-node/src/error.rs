@@ -9,7 +9,7 @@ pub enum ServiceError {
     #[error("Failed to describe stream")]
     DescribeStream,
 
-    #[error("Failed to acquire stream range from placement managers")]
+    #[error("Failed to acquire stream range from placement drivers")]
     AcquireRange,
 
     #[error("Failed to seal a stream range")]

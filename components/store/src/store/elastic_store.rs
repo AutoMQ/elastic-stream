@@ -21,7 +21,7 @@ use crate::{
     option::{ReadOptions, WriteOptions},
     AppendRecordRequest, AppendResult, FetchResult, Store,
 };
-use client::PlacementManagerIdGenerator;
+use client::PlacementDriverIdGenerator;
 use crossbeam::channel::Sender;
 use futures::future::join_all;
 use log::{error, trace};
@@ -64,7 +64,7 @@ impl ElasticStore {
         mut config: config::Configuration,
         recovery_completion_tx: oneshot::Sender<()>,
     ) -> Result<Self, StoreError> {
-        let id_generator = Box::new(PlacementManagerIdGenerator::new(&config));
+        let id_generator = Box::new(PlacementDriverIdGenerator::new(&config));
 
         let lock = Arc::new(Lock::new(&config, id_generator)?);
 
@@ -390,9 +390,9 @@ mod tests {
         AppendRecordRequest, ElasticStore, Store,
     };
 
-    fn build_store(pm_address: &str, store_path: &str) -> ElasticStore {
+    fn build_store(pd_address: &str, store_path: &str) -> ElasticStore {
         let mut config = config::Configuration::default();
-        config.placement_manager = pm_address.to_owned();
+        config.placement_driver = pd_address.to_owned();
         config.store.path.set_base(store_path);
         config.check_and_apply().expect("Configuration is invalid");
         let (tx, rx) = oneshot::channel();
@@ -428,9 +428,9 @@ mod tests {
             });
         });
         let port = port_rx.await.unwrap();
-        let pm_address = format!("localhost:{}", port);
+        let pd_address = format!("localhost:{}", port);
         let _ = std::thread::spawn(move || {
-            let store = build_store(&pm_address, store_path.as_str());
+            let store = build_store(&pd_address, store_path.as_str());
             let send_r = tx.send(store);
             if let Err(_) = send_r {
                 panic!("Failed to send store");
