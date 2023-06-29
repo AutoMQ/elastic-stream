@@ -1,4 +1,4 @@
-use protocol::rpc::header::DataNodeT;
+use protocol::rpc::header::RangeServerT;
 
 #[derive(Debug, Clone)]
 pub struct DataNode {
@@ -18,19 +18,19 @@ impl DataNode {
     }
 }
 
-impl From<&DataNode> for DataNodeT {
+impl From<&DataNode> for RangeServerT {
     fn from(value: &DataNode) -> Self {
-        let mut ret = DataNodeT::default();
-        ret.node_id = value.node_id;
+        let mut ret = RangeServerT::default();
+        ret.server_id = value.node_id;
         ret.advertise_addr = value.advertise_address.clone();
         ret
     }
 }
 
-impl From<&DataNodeT> for DataNode {
-    fn from(value: &DataNodeT) -> Self {
+impl From<&RangeServerT> for DataNode {
+    fn from(value: &RangeServerT) -> Self {
         Self {
-            node_id: value.node_id,
+            node_id: value.server_id,
             advertise_address: value.advertise_addr.clone(),
         }
     }

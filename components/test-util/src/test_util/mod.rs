@@ -27,7 +27,7 @@ fn serve_heartbeat(request: &HeartbeatRequest, frame: &mut Frame) {
     let mut response = HeartbeatResponseT::default();
     response.client_id = request.client_id().map(|client_id| client_id.to_owned());
     response.client_role = request.client_role();
-    response.data_node = request.data_node().map(|dn| Box::new(dn.unpack()));
+    response.range_server = request.range_server().map(|dn| Box::new(dn.unpack()));
     let mut status = StatusT::default();
     status.code = ErrorCode::OK;
     status.message = Some("OK".to_owned());
@@ -107,7 +107,7 @@ fn serve_report_metrics(request: &ReportMetricsRequest, frame: &mut Frame) {
     debug!("{:?}", request);
     frame.operation_code = OperationCode::ReportMetrics;
     let mut response = ReportMetricsResponseT::default();
-    response.data_node = request.data_node().map(|dn| Box::new(dn.unpack()));
+    response.range_server = request.range_server().map(|dn| Box::new(dn.unpack()));
     let mut status = StatusT::default();
     status.code = ErrorCode::OK;
     status.message = Some("OK".to_owned());
@@ -433,7 +433,7 @@ fn serve_seal_range(req: &SealRangeRequest, response_frame: &mut Frame) {
     response.status = Box::new(status_ok);
 
     match request.kind {
-        SealKind::DATA_NODE => {}
+        SealKind::RANGE_SERVER => {}
 
         SealKind::PLACEMENT_DRIVER => {
             if request.range.end < 0 {

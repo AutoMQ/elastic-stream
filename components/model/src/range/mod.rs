@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use derivative::Derivative;
 use log::info;
-use protocol::rpc::header::{DataNodeT, RangeT};
+use protocol::rpc::header::{RangeServerT, RangeT};
 
 use crate::data_node::DataNode;
 
@@ -161,14 +161,14 @@ impl From<&RangeMetadata> for RangeT {
             None => -1,
             Some(offset) => offset as i64,
         };
-        let mut replica: Vec<DataNodeT> = vec![];
+        let mut replica: Vec<RangeServerT> = vec![];
         for node in &value.replica {
             replica.push(node.into());
         }
         if replica.is_empty() {
-            range.nodes = None;
+            range.servers = None;
         } else {
-            range.nodes = Some(replica);
+            range.servers = Some(replica);
         }
         range.replica_count = value.replica_count as i8;
         range.ack_count = value.ack_count as i8;
@@ -179,7 +179,7 @@ impl From<&RangeMetadata> for RangeT {
 impl From<&RangeT> for RangeMetadata {
     fn from(value: &RangeT) -> Self {
         let mut replica: Vec<DataNode> = vec![];
-        if let Some(nodes) = &value.nodes {
+        if let Some(nodes) = &value.servers {
             for node in nodes {
                 replica.push(node.into());
             }

@@ -179,7 +179,7 @@ impl Client {
     ) -> Result<RangeMetadata, ClientError> {
         // Validate request
         match kind {
-            SealKind::DATA_NODE => {
+            SealKind::RANGE_SERVER => {
                 if target.is_none() {
                     error!("Target is required while seal range against data nodes");
                     return Err(ClientError::BadRequest);
@@ -538,7 +538,7 @@ mod tests {
             let client = Client::new(Arc::clone(&config), tx);
             let range = RangeMetadata::new(0, 0, 0, 0, None);
             let range = client
-                .seal(Some(&config.placement_driver), SealKind::DATA_NODE, range)
+                .seal(Some(&config.placement_driver), SealKind::RANGE_SERVER, range)
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());
@@ -567,7 +567,7 @@ mod tests {
             let client = Client::new(Arc::clone(&config), tx);
             let range = RangeMetadata::new(0, 0, 0, 0, Some(1));
             let range = client
-                .seal(Some(&config.placement_driver), SealKind::DATA_NODE, range)
+                .seal(Some(&config.placement_driver), SealKind::RANGE_SERVER, range)
                 .await?;
             assert_eq!(0, range.stream_id());
             assert_eq!(0, range.index());

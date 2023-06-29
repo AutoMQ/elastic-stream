@@ -87,7 +87,7 @@ The client can send a heartbeat frame to the server periodically. If the server 
 ```
 Request Header => client_id client_role data_node
   client_id => string
-  client_role => enum {DATA_NODE, CLIENT}
+  client_role => enum {RANGE_SERVER, CLIENT}
   data_node => node_id advertise_addr
     node_id => int32
     advertise_addr => string
@@ -99,7 +99,7 @@ Request Payload => Empty
 ```
 Response Header => client_id client_role data_node
   client_id => string
-  client_role => enum {DATA_NODE, CLIENT}
+  client_role => enum {RANGE_SERVER, CLIENT}
   data_node => node_id advertise_addr
     node_id => int32
     advertise_addr => string

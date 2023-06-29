@@ -5,7 +5,7 @@ use model::{
     client_role::ClientRole, data_node::DataNode, range::RangeMetadata, ListRangeCriteria,
 };
 use protocol::rpc::header::{
-    AppendRequestT, CreateRangeRequestT, CreateStreamRequestT, DataNodeMetricsT,
+    AppendRequestT, CreateRangeRequestT, CreateStreamRequestT, RangeServerMetricsT,
     DescribePlacementDriverClusterRequestT, DescribeStreamRequestT, FetchEntryT, FetchRequestT,
     HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT, RangeT,
     ReportMetricsRequestT, SealKind, SealRangeRequestT,
@@ -104,7 +104,7 @@ impl From<&Request> for Bytes {
                 let mut heartbeat_request = HeartbeatRequestT::default();
                 heartbeat_request.client_id = Some(client_id.to_owned());
                 heartbeat_request.client_role = role.into();
-                heartbeat_request.data_node = data_node;
+                heartbeat_request.range_server = data_node;
                 let heartbeat = heartbeat_request.pack(&mut builder);
                 builder.finish(heartbeat, None);
             }
@@ -128,7 +128,7 @@ impl From<&Request> for Bytes {
             Headers::ListRange { criteria } => {
                 let mut criteria_t = ListRangeCriteriaT::default();
                 if let Some(node_id) = criteria.node_id {
-                    criteria_t.node_id = node_id as i32;
+                    criteria_t.server_id = node_id as i32;
                 }
 
                 if let Some(stream_id) = criteria.stream_id {
@@ -154,7 +154,7 @@ impl From<&Request> for Bytes {
 
             Headers::DescribePlacementDriver { data_node } => {
                 let mut request = DescribePlacementDriverClusterRequestT::default();
-                request.data_node = Box::new(data_node.into());
+                request.range_server = Box::new(data_node.into());
                 let request = request.pack(&mut builder);
                 builder.finish(request, None);
             }
@@ -236,7 +236,7 @@ impl From<&Request> for Bytes {
                 range_missing_replica_cnt,
                 range_active_cnt,
             } => {
-                let mut metrics = DataNodeMetricsT::default();
+                let mut metrics = RangeServerMetricsT::default();
                 metrics.disk_in_rate = *disk_in_rate;
                 metrics.disk_out_rate = *disk_out_rate;
                 metrics.disk_free_space = *disk_free_space;
@@ -256,7 +256,7 @@ impl From<&Request> for Bytes {
                 metrics.range_active_cnt = *range_active_cnt;
 
                 let mut request = ReportMetricsRequestT::default();
-                request.data_node = Some(Box::new(data_node.into()));
+                request.range_server = Some(Box::new(data_node.into()));
                 request.metrics = Some(Box::new(metrics));
 
                 let request = request.pack(&mut builder);

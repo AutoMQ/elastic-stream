@@ -210,7 +210,7 @@ impl Replicator {
                 return match client
                     .seal(
                         Some(&self.data_node.advertise_address),
-                        SealKind::DATA_NODE,
+                        SealKind::RANGE_SERVER,
                         metadata,
                     )
                     .await
