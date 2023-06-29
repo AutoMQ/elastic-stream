@@ -45,7 +45,7 @@ where
     async fn bootstrap(&mut self) -> Result<(), ServiceError> {
         let ranges = self
             .fetcher
-            .bootstrap(self.store.config().server.node_id as u32)
+            .bootstrap(self.store.config().server.server_id as u32)
             .await?;
 
         for range in ranges {

@@ -40,7 +40,7 @@ impl Replicator {
                 "Replica[{}#{}-{}#{}] ",
                 metadata.stream_id(),
                 metadata.index(),
-                range_server.node_id,
+                range_server.server_id,
                 range_server.advertise_address
             ),
             range: Rc::downgrade(&range),

@@ -18,7 +18,7 @@ pub fn launch(
 ) -> Result<(), Box<dyn Error>> {
     let (recovery_completion_tx, recovery_completion_rx) = oneshot::channel();
 
-    // Note we move the configuration into store, letting it either allocate or read existing node-id for us.
+    // Note we move the configuration into store, letting it either allocate or read existing server-id for us.
     let store = match ElasticStore::new(config, recovery_completion_tx) {
         Ok(store) => store,
         Err(e) => {

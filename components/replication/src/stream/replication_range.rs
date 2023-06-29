@@ -84,8 +84,11 @@ impl ReplicationRange {
         });
 
         let mut replicators = Vec::with_capacity(this.metadata.replica().len());
-        for replica_node in this.metadata.replica().iter() {
-            replicators.push(Rc::new(Replicator::new(this.clone(), replica_node.clone())));
+        for replica_server in this.metadata.replica().iter() {
+            replicators.push(Rc::new(Replicator::new(
+                this.clone(),
+                replica_server.clone(),
+            )));
         }
         // #Safety: the weak_self/replicators only changed(init) in range new.
         unsafe {
@@ -114,8 +117,8 @@ impl ReplicationRange {
         })?;
         // 2. request range server to create range replica.
         let mut create_replica_tasks = vec![];
-        for node in metadata.replica().iter() {
-            let address = node.advertise_address.clone();
+        for server in metadata.replica().iter() {
+            let address = server.advertise_address.clone();
             let metadata = metadata.clone();
             let client = client.clone();
             create_replica_tasks.push(tokio_uring::spawn(async move {

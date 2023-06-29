@@ -32,7 +32,7 @@ pub struct RangeMetadata {
     #[derivative(PartialEq = "ignore")]
     replica: Vec<RangeServer>,
 
-    /// The range replica expected count. When cluster nodes count is less than replica count but
+    /// The range replica expected count. When cluster servers count is less than replica count but
     /// but larger than ack_count, the range can still be successfully created.
     replica_count: u8,
 
@@ -162,8 +162,8 @@ impl From<&RangeMetadata> for RangeT {
             Some(offset) => offset as i64,
         };
         let mut replica: Vec<RangeServerT> = vec![];
-        for node in &value.replica {
-            replica.push(node.into());
+        for server in &value.replica {
+            replica.push(server.into());
         }
         if replica.is_empty() {
             range.servers = None;
@@ -179,9 +179,9 @@ impl From<&RangeMetadata> for RangeT {
 impl From<&RangeT> for RangeMetadata {
     fn from(value: &RangeT) -> Self {
         let mut replica: Vec<RangeServer> = vec![];
-        if let Some(nodes) = &value.servers {
-            for node in nodes {
-                replica.push(node.into());
+        if let Some(servers) = &value.servers {
+            for server in servers {
+                replica.push(server.into());
             }
         }
         Self {

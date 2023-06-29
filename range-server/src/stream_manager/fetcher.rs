@@ -6,9 +6,9 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::error::ServiceError;
 
-/// Non-primary `Node` uses this task to delegate query range task to the primary one.
+/// Non-primary `Range Server` uses this task to delegate query range task to the primary one.
 pub struct FetchRangeTask {
-    pub node_id: Option<u32>,
+    pub server_id: Option<u32>,
     /// Stream-id to query
     pub stream_id: Option<u64>,
 
@@ -17,7 +17,7 @@ pub struct FetchRangeTask {
 }
 
 pub trait PlacementFetcher {
-    async fn bootstrap(&mut self, node_id: u32) -> Result<Vec<RangeMetadata>, ServiceError>;
+    async fn bootstrap(&mut self, server_id: u32) -> Result<Vec<RangeMetadata>, ServiceError>;
 
     async fn describe_stream(&self, stream_id: u64) -> Result<StreamMetadata, ServiceError>;
 }
@@ -33,9 +33,9 @@ impl PlacementClient {
 }
 
 impl PlacementFetcher for PlacementClient {
-    async fn bootstrap(&mut self, node_id: u32) -> Result<Vec<RangeMetadata>, ServiceError> {
+    async fn bootstrap(&mut self, server_id: u32) -> Result<Vec<RangeMetadata>, ServiceError> {
         self.client
-            .list_ranges(model::ListRangeCriteria::new(Some(node_id), None))
+            .list_ranges(model::ListRangeCriteria::new(Some(server_id), None))
             .await
             .map_err(|_e| {
                 error!("Failed to list ranges by range server from placement driver");
@@ -82,7 +82,7 @@ impl DelegatePlacementClient {
 }
 
 impl PlacementFetcher for DelegatePlacementClient {
-    async fn bootstrap(&mut self, _node_id: u32) -> Result<Vec<RangeMetadata>, ServiceError> {
+    async fn bootstrap(&mut self, _server_id: u32) -> Result<Vec<RangeMetadata>, ServiceError> {
         todo!()
     }
 

@@ -136,7 +136,7 @@ pub struct Server {
 
     /// Range Server ID
     #[serde(default)]
-    pub node_id: i32,
+    pub server_id: i32,
 
     #[serde(rename = "worker-cpu-set")]
     pub worker_cpu_set: String,
@@ -155,7 +155,7 @@ pub struct Server {
 impl Server {
     pub fn range_server(&self) -> RangeServer {
         RangeServer {
-            node_id: self.node_id,
+            server_id: self.server_id,
             advertise_address: format!("{}:{}", self.host, self.port),
         }
     }
@@ -166,7 +166,7 @@ impl Default for Server {
         Self {
             host: "127.0.0.1".to_owned(),
             port: 10911,
-            node_id: 0,
+            server_id: 0,
             worker_cpu_set: String::from("0"),
             uring: Uring::default(),
             connection_idle_duration: 60,

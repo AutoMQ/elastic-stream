@@ -88,8 +88,8 @@ The client can send a heartbeat frame to the server periodically. If the server 
 Request Header => client_id client_role range_server
   client_id => string
   client_role => enum {RANGE_SERVER, CLIENT}
-  range_server => node_id advertise_addr
-    node_id => int32
+  range_server => server_id advertise_addr
+    server_id => int32
     advertise_addr => string
 
 Request Payload => Empty
@@ -100,8 +100,8 @@ Request Payload => Empty
 Response Header => client_id client_role range_server
   client_id => string
   client_role => enum {RANGE_SERVER, CLIENT}
-  range_server => node_id advertise_addr
-    node_id => int32
+  range_server => server_id advertise_addr
+    server_id => int32
     advertise_addr => string
   status => code message detail
     code => int16
@@ -117,9 +117,9 @@ The request and response frames of HEARTBEAT have the same format. The table bel
 |-------|------|-------------|
 | client_id | string | The unique id of the client. |
 | client_role | enum | The role of the client. Note the client is a relative term, it can be a range server or a SDK client. |
-| range_server | struct | Optional, the node information of the range server. Empty if the client is a SDK client. |
-| node_id | int32 | The unique id of the node. |
-| advertise_addr | string | The advertise address of the node, for client traffic from outside. The scheme is `host:port`, while host supports both domain name and IPv4/IPv6 address. |
+| range_server | struct | Optional, the server information of the range server. Empty if the client is a SDK client. |
+| server_id | int32 | The unique id of the server. |
+| advertise_addr | string | The advertise address of the server, for client traffic from outside. The scheme is `host:port`, while host supports both domain name and IPv4/IPv6 address. |
 | status | struct | The error status of the response. |
 | code | int16 | The error code of the response. |
 | message | string | The error message of the response. |
@@ -298,8 +298,8 @@ Request Header => timeout_ms [range_owners]
     // List the ranges of streams
     stream_id => int64
     // List the ranges of a specific range server
-    range_server => node_id advertise_addr
-      node_id => int32
+    range_server => server_id advertise_addr
+      server_id => int32
       advertise_addr => string
 
 Request Payload => Empty
@@ -311,7 +311,7 @@ Request Payload => Empty
 | range_owners | union | The array of owner of the ranges to list. |
 | stream_id | int64 | A specific stream to list the ranges. |
 | range_server | struct | A specific range server to list the ranges of all the streams. |
-| node_id | int32 | The node id of the range server. |
+| server_id | int32 | The server id of the range server. |
 | advertise_addr | string | The advertise address of the range server. |
 
 **Response Frame:**
@@ -329,15 +329,15 @@ Response Header => throttle_time_ms [list_responses]
       code => int16
       message => string
       detail => bytes
-    ranges => stream_id range_index start_offset next_offset end_offset [replica_nodes]
+    ranges => stream_id range_index start_offset next_offset end_offset [servers]
       stream_id => int64
       range_index => int32
       start_offset => int64
       next_offset => int64
       end_offset => int64
-      replica_nodes => range_server is_primary
-        range_server => node_id advertise_addr
-          node_id => int32
+      servers => server is_primary
+        server => server_id advertise_addr
+          server_id => int32
           advertise_addr => string
         is_primary => bool
 
@@ -362,9 +362,9 @@ Response Payload => Empty
 | start_offset | int64 | The start offset of the range. |
 | next_offset | int64 | The next writable offset for incoming records of the range. It's a snapshot of the next offset of the range, and it may be changed after the response is sent. |
 | end_offset | int64 | Optional. The end offset of the range. Empty if the range is open. |
-| replica_nodes | array | The array of nodes that host the range, containing the range server information of the range. |
+| servers | array | The array of servers that host the range, containing the range server information of the range. |
 | range_server | struct | The range server information of the range. |
-| node_id | int32 | The node id of the range server. |
+| server_id | int32 | The server id of the range server. |
 | advertise_addr | string | The advertise address of the range server. |
 | is_primary | bool | Whether the range in current range server is primary or secondary. |
 
@@ -756,8 +756,8 @@ The REPORT_METRICS frame(opcode=0x4001) reports load metrics of Range Server to 
 **Request Frame:**
 ```
 Request Header => range_server
-  range_server => node_id advertise_addr
-    node_id => int32
+  range_server => server_id advertise_addr
+    server_id => int32
     advertise_addr => string
   disk_in_rate => int64
   disk_out_rate => int64
@@ -804,8 +804,8 @@ Request Payload => Empty
 **Response Frame:**
 ```
 Response Header => range_server
-  range_server => node_id advertise_addr
-    node_id => int32
+  range_server => server_id advertise_addr
+    server_id => int32
     advertise_addr => string
   status => code message detail
     code => int16
@@ -821,8 +821,8 @@ The DESCRIBE_PD_CLUSTER frame(opcode=0x4002) requests placement driver to descri
 ** Request Frame**
 ```
 Request Header => range_server
-  range_server => node_id advertise_addr
-    node_id => int32
+  range_server => server_id advertise_addr
+    server_id => int32
     advertise_addr => string
   timeout_ms
 
@@ -832,7 +832,7 @@ Request Payload => Empty
 | Field | Type | Description |
 |-------|------|-------------|
 | timeout_ms | int32 | The timeout in milliseconds to wait for the response. |
-| node_id| int32 | The request range-server ID |
+| server_id| int32 | The request range-server ID |
 | advertise_addr| string | advertise address of the range-server |
 
 **Response Frame:**

@@ -68,7 +68,7 @@ impl Stream {
         if let Some(range) = self.ranges.iter().next_back() {
             if range.metadata.index() > metadata.index() {
                 warn!(
-                    "Attempting to create a range which should have been sealed: {:?}. Last range on current node: {:?}",
+                    "Attempting to create a range which should have been sealed: {:?}. Last range on current server: {:?}",
                     metadata, range.metadata
                 );
             }

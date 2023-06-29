@@ -77,7 +77,7 @@ where
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         // Put current connection into connection-tracker, such that when TERM/STOP signal is received,
-        // nodes send go-away frame to each connection, requesting clients to complete and migrate as soon
+        // servers send go-away frame to each connection, requesting clients to complete and migrate as soon
         // as possible.
         connection_tracker
             .borrow_mut()

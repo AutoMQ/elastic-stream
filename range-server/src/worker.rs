@@ -243,7 +243,7 @@ where
             }
         }
 
-        info!("Node#run completed");
+        info!("Server#run completed");
         Ok(())
     }
 }

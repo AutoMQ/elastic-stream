@@ -100,7 +100,7 @@ impl From<&Request> for Bytes {
                 role,
                 range_server,
             } => {
-                let range_server = range_server.as_ref().map(|node| Box::new(node.into()));
+                let range_server = range_server.as_ref().map(|server| Box::new(server.into()));
                 let mut heartbeat_request = HeartbeatRequestT::default();
                 heartbeat_request.client_id = Some(client_id.to_owned());
                 heartbeat_request.client_role = role.into();
@@ -127,8 +127,8 @@ impl From<&Request> for Bytes {
 
             Headers::ListRange { criteria } => {
                 let mut criteria_t = ListRangeCriteriaT::default();
-                if let Some(node_id) = criteria.node_id {
-                    criteria_t.server_id = node_id as i32;
+                if let Some(server_id) = criteria.server_id {
+                    criteria_t.server_id = server_id as i32;
                 }
 
                 if let Some(stream_id) = criteria.stream_id {

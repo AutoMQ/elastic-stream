@@ -68,8 +68,8 @@ impl ElasticStore {
 
         let lock = Arc::new(Lock::new(&config, id_generator)?);
 
-        // Fill node_id
-        config.server.node_id = lock.id();
+        // Fill server_id
+        config.server.server_id = lock.id();
         let config = Arc::new(config);
 
         // Build wal offset manager
