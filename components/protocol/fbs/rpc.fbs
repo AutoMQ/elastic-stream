@@ -1,8 +1,8 @@
 namespace header;
 
 // Use HTTP status codes where possible: https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
-// 5xx is not used as we have two kinds of servers: placement driver and data node. Instead, use
-// 15xx for placement driver errors and 25xx for data node errors.
+// 5xx is not used as we have two kinds of servers: placement driver and range server. Instead, use
+// 15xx for placement driver errors and 25xx for range server errors.
 enum ErrorCode : int16 {
     ERROR_CODE_UNSPECIFIED = 0,
 
@@ -60,14 +60,14 @@ enum ErrorCode : int16 {
 
     // When creating a new stream or sealing a mutable range, placement drivers need to create
     // a new replica-set of mutable range, which requires at least replica number of survival
-    // data nodes. If this requirement is not met, use this error code to signal the client.
+    // range servers. If this requirement is not met, use this error code to signal the client.
     PD_NO_AVAILABLE_DN = 1502,
 
     // Placement driver nodes are running RAFT consensus algorithm, write operations should go to
     // leader nodes. Otherwise, use this code to signal the client to redirect future requests.
     PD_NOT_LEADER = 1503,
 
-    // 25xx is reserved for data node errors
+    // 25xx is reserved for range server errors
     DN_INTERNAL_SERVER_ERROR = 2500,
     DN_NOT_IMPLEMENTED = 2501,
 }
@@ -112,7 +112,7 @@ table SystemError {
 enum ClientRole : byte {
     CLIENT_ROLE_UNSPECIFIED = 0,
     CLIENT_ROLE_PD = 1,
-    CLIENT_ROLE_DATA_NODE = 2,
+    CLIENT_ROLE_RANGE_SERVER = 2,
     CLIENT_ROLE_FRONTEND = 3,
 }
 
@@ -124,8 +124,8 @@ table HeartbeatRequest {
     // The role of the client. The client role is used to determine the type of the client.
     client_role: ClientRole (id: 1);
 
-    // Optional, the node information of the data node. Empty if the client is an SDK client.
-    data_node: DataNode (id: 2);
+    // Optional, the server information of the range server. Empty if the client is an SDK client.
+    range_server: RangeServer (id: 2);
 }
 
 table HeartbeatResponse {
@@ -133,7 +133,7 @@ table HeartbeatResponse {
 
     client_role: ClientRole (id: 1);
 
-    data_node: DataNode (id: 2);
+    range_server: RangeServer (id: 2);
 
     status: Status (id: 3, required);
 }
@@ -149,11 +149,11 @@ table IdAllocationRequest {
 table IdAllocationResponse {
     status: Status (id: 0, required);
 
-    // Allocated node-id
+    // Allocated server-id
     id: int32 (id: 1);
 }
 
-// The append request is used to append records to the data node.
+// The append request is used to append records to the range server.
 table AppendRequest {
     // The timeout to await a response in milliseconds.
     timeout_ms: int32 (id: 0);
@@ -185,11 +185,11 @@ table AppendResultEntry {
     // Status for the AppendEntry
     status: Status (id: 0, required);
 
-    // The timestamp returned by the data node server after appending the records.
+    // The timestamp returned by the range server server after appending the records.
     timestamp_ms: int64 (id: 1);
 }
 
-// The fetch request is used to fetch records from the data node.
+// The fetch request is used to fetch records from the range server.
 // This frame supports fetching data from multiple streams in one frame,
 // and the response could be split into multiple frames then returned in a streaming way.
 table FetchRequest {
@@ -240,32 +240,32 @@ table FetchResultEntry {
     batch_count: int32 (id: 2);
 }
 
-// Used to fetch the ranges from a specific data node or a specific stream list.
+// Used to fetch the ranges from a specific range server or a specific stream list.
 // Regard this table as a union type.
 // Alway set one of the fields.
 table ListRangeCriteria {
-    // If non-negative, placement drivers are expected to filter ranges assigned to the specified node.
-    node_id: int32 = -1 (id: 0);
+    // If non-negative, placement drivers are expected to filter ranges assigned to the specified server.
+    server_id: int32 = -1 (id: 0);
 
     // The stream id to list the ranges.
     stream_id: int64 = -1 (id: 1);
 }
 
-table DataNode {
-    // The node id of the data node.
-    node_id: int32 = -1 (id: 0);
+table RangeServer {
+    // The server id of the range server.
+    server_id: int32 = -1 (id: 0);
 
-    // The advertise address of the data node, for client traffic from outside.
+    // The advertise address of the range server, for client traffic from outside.
     // The schema of the address is `host:port`, while host supports both domain name and IPv4/IPv6 address.
     advertise_addr: string (id: 1, required);
 }
 
 // The list streams request is used to list the ranges of a batch of streams.
-// Or it could list the ranges of all the streams in a specific data node.
+// Or it could list the ranges of all the streams in a specific range server.
 table ListRangeRequest {
     timeout_ms: int32 (id: 0);
 
-    // The range criteria could be a data node or a list of streams.
+    // The range criteria could be a range server or a list of streams.
     criteria: ListRangeCriteria (id: 1, required);
 }
 
@@ -301,8 +301,8 @@ table Range {
     // as a result, clients should NOT cache these empty ones.
     end: int64 = -1 (id: 4);
 
-    // The collection of data-node that host this range.
-    nodes: [DataNode] (id: 5);
+    // The collection of range-server that host this range.
+    servers: [RangeServer] (id: 5);
 
     // The range replica expected count.
     replica_count: int8 = -1 (id: 6);
@@ -328,19 +328,19 @@ table CreateRangeResponse {
 
 // Seal target kinds.
 //
-// Replication layer SDK performs two kinds of seals: seal-data-node and seal-placement-driver.
-// The former one renders ranges on data-node immutable and blocks further writes. In the scenario of chasing
-// write, replication SDK acknowledges application if MinCopy out of MaxCopy replicas are successfully written in data nodes
+// Replication layer SDK performs two kinds of seals: seal-range-server and seal-placement-driver.
+// The former one renders ranges on range-server immutable and blocks further writes. In the scenario of chasing
+// write, replication SDK acknowledges application if MinCopy out of MaxCopy replicas are successfully written in range servers
 // within the configured amount of tolerance, where 2 * MinCopy > MaxCopy. Otherwise, replication SDK initiates seal actions
-// of the range towards data-nodes. Data nodes, on receipt of replication SDK seal, immediately changes range as immutable and
+// of the range towards range-servers. Range servers, on receipt of replication SDK seal, immediately changes range as immutable and
 // returns currently confirmed offset and fails all inflight and future writes to current range.
 //
-// After receiving at least MinCopy of data-node seal responses, replication layer SDK is safe to seal the range in placement driver
-// and potentially create a new range, replicas of which reside on a different set of data nodes. This achieves fast fault toleration
+// After receiving at least MinCopy of range-server seal responses, replication layer SDK is safe to seal the range in placement driver
+// and potentially create a new range, replicas of which reside on a different set of range servers. This achieves fast fault toleration
 // as well as overall low write latency.
 enum SealKind : byte {
     UNSPECIFIED = 0,
-    DATA_NODE = 1,
+    RANGE_SERVER = 1,
     PLACEMENT_DRIVER = 2,
 }
 
@@ -356,7 +356,7 @@ table SealRangeRequest {
 table SealRangeResponse {
     status: Status (id: 0, required);
 
-    // Both the PD and the data node will handle the seal ranges request.
+    // Both the PD and the range server will handle the seal ranges request.
     range: Range (id: 1);
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
@@ -399,8 +399,8 @@ table CreateStreamResponse {
     throttle_time_ms: int32 (id: 2);
 }
 
-// The delete streams request is used to delete a batch of streams to PD or data node.
-// The PD will delete the stream metadata as well as the range info, while the data node only marks the stream as deleted to reject the new write requests timely.
+// The delete streams request is used to delete a batch of streams to PD or range server.
+// The PD will delete the stream metadata as well as the range info, while the range server only marks the stream as deleted to reject the new write requests timely.
 table DeleteStreamRequest {
 
     // The timeout in milliseconds to wait for the response.
@@ -457,12 +457,12 @@ table DescribeStreamResponse {
 }
 
 // The trim streams request is used to trim a batch of streams to PD.
-// The data node stores the records in the stream in a log structure,
+// The range server stores the records in the stream in a log structure,
 // and the records are appended to the end of the log.
-// Consider the length of disk is limited, the data node will delete the records to recycling the disk space.
+// Consider the length of disk is limited, the range server will delete the records to recycling the disk space.
 // Once the deletion occurs, some ranges should be trimmed to avoid the clients to read the deleted records.
 
-// The data node will send the TRIM_STREAMS frame to the PD to trim the stream with a trim offset.
+// The range server will send the TRIM_STREAMS frame to the PD to trim the stream with a trim offset.
 // The PD will delete the ranges whose end offset is less than the trim offset
 // and shrink the ranges whose start offset is less than the trim offset.
 table TrimStreamRequest {
@@ -492,12 +492,12 @@ table TrimStreamsResponse {
 
 
 table ReportMetricsRequest {
-    data_node: DataNode (id: 0);
+    range_server: RangeServer (id: 0);
 
-    metrics: DataNodeMetrics (id: 1);
+    metrics: RangeServerMetrics (id: 1);
 }
 
-table DataNodeMetrics {
+table RangeServerMetrics {
     disk_in_rate: int64 (id: 0);
     disk_out_rate: int64 (id: 1);
     disk_free_space: int64 (id: 2);
@@ -518,14 +518,14 @@ table DataNodeMetrics {
 }
 
 table ReportMetricsResponse {
-    data_node: DataNode (id: 0);
+    range_server: RangeServer (id: 0);
 
     status: Status (id: 1, required);
 }
 
 table DescribePlacementDriverClusterRequest {
-    // Data node that needs to know PD membership
-    data_node: DataNode (id: 0, required);
+    // Range server that needs to know PD membership
+    range_server: RangeServer (id: 0, required);
 
     // The timeout in milliseconds to wait for the response.
     timeout_ms: int32 (id: 1);
