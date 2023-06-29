@@ -34,21 +34,21 @@ impl Lock {
                         (file.into_raw_fd(), id)
                     } else {
                         warn!(
-                            "LOCK file has only {} bytes. Generate a new data-node ID from PD now",
+                            "LOCK file has only {} bytes. Generate a new range-server ID from PD now",
                             metadata.len()
                         );
                         let id: i32 = match id_generator.generate() {
                             Ok(id) => id,
                             Err(_e) => {
-                                error!("Failed to acquire data-node ID from placement-driver");
+                                error!("Failed to acquire range-server ID from placement-driver");
                                 return Err(StoreError::Configuration(String::from(
-                                    "Failed to acquire data-node ID",
+                                    "Failed to acquire range-server ID",
                                 )));
                             }
                         };
                         file.write_all(&id.to_be_bytes())?;
                         file.sync_all()?;
-                        info!("data-node ID is: {id}");
+                        info!("range-server ID is: {id}");
                         (file.into_raw_fd(), id)
                     }
                 }
@@ -64,20 +64,20 @@ impl Lock {
             let id: i32 = match id_generator.generate() {
                 Ok(id) => id,
                 Err(_e) => {
-                    error!("Failed to acquire data-node ID from placement-driver");
+                    error!("Failed to acquire range-server ID from placement-driver");
                     return Err(StoreError::Configuration(String::from(
-                        "Failed to acquire data-node ID",
+                        "Failed to acquire range-server ID",
                     )));
                 }
             };
             file.write_all(&id.to_be_bytes())?;
             file.sync_all()?;
-            info!("data-node ID is: {id}");
+            info!("range-server ID is: {id}");
             (file.into_raw_fd(), id)
         };
 
         info!(
-            "Acquiring store lock: {:?}, data-node ID={}",
+            "Acquiring store lock: {:?}, range-server ID={}",
             lock_file_path.as_path(),
             id
         );
@@ -87,7 +87,7 @@ impl Lock {
             StoreError::AcquireLock
         })?;
 
-        info!("Store lock acquired. data-node ID={}", id);
+        info!("Store lock acquired. range-server ID={}", id);
 
         Ok(Self { fd, id })
     }

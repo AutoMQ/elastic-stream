@@ -24,7 +24,7 @@ jobs:
               - 'components/protocol/fbs/*.fbs'
             rust:
               - '.github/workflows/**'
-              - 'data-node/**'
+              - 'range-server/**'
               - 'components/**'
               - 'sdks/frontend-rs/**'
             pd:

@@ -10,18 +10,18 @@
         },
         {
             "type": "lldb",
-            "name": "Launch Data Node",
+            "name": "Launch Range Server",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/target/debug/data-node",
+            "program": "${workspaceFolder}/target/debug/range-server",
             "env": {
                 "RUST_LOG": "trace"
             },
             "args": [
                 "-c",
-                "${workspaceFolder}/etc/data-node.yaml",
+                "${workspaceFolder}/etc/range-server.yaml",
                 "-l",
-                "${workspaceFolder}/etc/data-node-log.yaml"
+                "${workspaceFolder}/etc/range-server-log.yaml"
             ]
         },
         {

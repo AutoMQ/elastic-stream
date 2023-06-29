@@ -38,7 +38,7 @@ where
         Ok(())
     }
 
-    /// Bootstrap all stream ranges that are assigned to current data node.
+    /// Bootstrap all stream ranges that are assigned to current range server.
     ///
     /// # Panic
     /// If failed to access store to acquire max offset of the stream with mutable range.

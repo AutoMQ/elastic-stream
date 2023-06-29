@@ -30,14 +30,14 @@ impl<'a> Command<'a> {
             OperationCode::Ping => Ok(Command::Ping(Ping::new(frame))),
 
             OperationCode::GoAway => {
-                error!("GoAway is not supported in data-node");
+                error!("GoAway is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
             OperationCode::Heartbeat => Ok(Command::Heartbeat(Heartbeat::parse_frame(frame)?)),
 
             OperationCode::AllocateId => {
-                error!("AllocateId is not supported in data-node");
+                error!("AllocateId is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
@@ -46,7 +46,7 @@ impl<'a> Command<'a> {
             OperationCode::Fetch => Ok(Command::Fetch(Fetch::parse_frame(frame)?)),
 
             OperationCode::ListRange => {
-                error!("ListRange is not supported in data-node");
+                error!("ListRange is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
@@ -59,36 +59,36 @@ impl<'a> Command<'a> {
             OperationCode::SyncRange => Err(ErrorCode::UNSUPPORTED_OPERATION),
 
             OperationCode::CreateStream => {
-                error!("CreateStream is not supported in data-node");
+                error!("CreateStream is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
             OperationCode::DeleteStream => {
-                error!("DeleteStream is not supported in data-node");
+                error!("DeleteStream is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
             OperationCode::UpdateStream => {
-                error!("UpdateStream is not supported in data-node");
+                error!("UpdateStream is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
             OperationCode::DescribeStream => {
-                error!("DescribeStream is not supported in data-node");
+                error!("DescribeStream is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
             OperationCode::TrimStream => {
-                error!("TrimStream is not supported in data-node");
+                error!("TrimStream is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
             OperationCode::ReportMetrics => {
-                error!("ReportMetrics is not supported in data-node");
+                error!("ReportMetrics is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
 
             OperationCode::DescribePlacementDriver => {
-                error!("DescribePlacementDriver is not supported in data-node");
+                error!("DescribePlacementDriver is not supported in range-server");
                 Err(ErrorCode::UNSUPPORTED_OPERATION)
             }
         }

@@ -38,7 +38,7 @@ fn main() {
     .expect("Failed to set Ctrl-C");
 
     if let Err(e) = range_server::server::launch(config, shutdown_tx) {
-        eprintln!("Failed to start data-node: {:?}", e);
+        eprintln!("Failed to start range-server: {:?}", e);
     }
 }
 
@@ -55,7 +55,7 @@ macro_rules! build_info {
 /// The build information is additively printed to both stdout and log.
 fn display_built_info() {
     build_info!(
-        "Data-Node v{}, built for {} by {}.",
+        "Range Server v{}, built for {} by {}.",
         range_server::built_info::PKG_VERSION,
         range_server::built_info::TARGET,
         range_server::built_info::RUSTC_VERSION

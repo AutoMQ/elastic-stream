@@ -4,7 +4,7 @@ use derivative::Derivative;
 use log::info;
 use protocol::rpc::header::{RangeServerT, RangeT};
 
-use crate::range_server::DataNode;
+use crate::range_server::RangeServer;
 
 /// Representation of a stream range in form of `[start, end)` in which `start` is inclusive and `end` is exclusive.
 /// If `start` == `end`, there will be no valid records in the range.
@@ -28,9 +28,9 @@ pub struct RangeMetadata {
     /// The end of the range, exclusive
     end: Option<u64>,
 
-    /// List of data nodes, that all have identical records within the range.
+    /// List of range servers, that all have identical records within the range.
     #[derivative(PartialEq = "ignore")]
-    replica: Vec<DataNode>,
+    replica: Vec<RangeServer>,
 
     /// The range replica expected count. When cluster nodes count is less than replica count but
     /// but larger than ack_count, the range can still be successfully created.
@@ -77,11 +77,11 @@ impl RangeMetadata {
         }
     }
 
-    pub fn replica(&self) -> &Vec<DataNode> {
+    pub fn replica(&self) -> &Vec<RangeServer> {
         &self.replica
     }
 
-    pub fn replica_mut(&mut self) -> &mut Vec<DataNode> {
+    pub fn replica_mut(&mut self) -> &mut Vec<RangeServer> {
         &mut self.replica
     }
 
@@ -178,7 +178,7 @@ impl From<&RangeMetadata> for RangeT {
 
 impl From<&RangeT> for RangeMetadata {
     fn from(value: &RangeT) -> Self {
-        let mut replica: Vec<DataNode> = vec![];
+        let mut replica: Vec<RangeServer> = vec![];
         if let Some(nodes) = &value.servers {
             for node in nodes {
                 replica.push(node.into());

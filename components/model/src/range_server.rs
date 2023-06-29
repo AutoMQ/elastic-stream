@@ -1,12 +1,12 @@
 use protocol::rpc::header::RangeServerT;
 
 #[derive(Debug, Clone)]
-pub struct DataNode {
+pub struct RangeServer {
     pub node_id: i32,
     pub advertise_address: String,
 }
 
-impl DataNode {
+impl RangeServer {
     pub fn new<Addr>(id: i32, address: Addr) -> Self
     where
         Addr: AsRef<str>,
@@ -18,8 +18,8 @@ impl DataNode {
     }
 }
 
-impl From<&DataNode> for RangeServerT {
-    fn from(value: &DataNode) -> Self {
+impl From<&RangeServer> for RangeServerT {
+    fn from(value: &RangeServer) -> Self {
         let mut ret = RangeServerT::default();
         ret.server_id = value.node_id;
         ret.advertise_addr = value.advertise_address.clone();
@@ -27,7 +27,7 @@ impl From<&DataNode> for RangeServerT {
     }
 }
 
-impl From<&RangeServerT> for DataNode {
+impl From<&RangeServerT> for RangeServer {
     fn from(value: &RangeServerT) -> Self {
         Self {
             node_id: value.server_id,

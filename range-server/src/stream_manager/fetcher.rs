@@ -38,12 +38,12 @@ impl PlacementFetcher for PlacementClient {
             .list_ranges(model::ListRangeCriteria::new(Some(node_id), None))
             .await
             .map_err(|_e| {
-                error!("Failed to list ranges by data node from placement driver");
+                error!("Failed to list ranges by range server from placement driver");
                 ServiceError::AcquireRange
             })
             .inspect(|ranges| {
                 trace!(
-                    "Received list ranges response for current data node: {:?}",
+                    "Received list ranges response for current range server: {:?}",
                     ranges
                 );
             })

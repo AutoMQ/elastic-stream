@@ -90,7 +90,7 @@ impl Stream {
             range.seal(metadata);
             Ok(())
         } else {
-            info!("Range does not exist, metadata={:?}. Create the sealed range on data-node directly", metadata);
+            info!("Range does not exist, metadata={:?}. Create the sealed range on range-server directly", metadata);
             Err(ServiceError::NotFound(format!(
                 "Range[{}#{}] is not found",
                 metadata.stream_id(),

@@ -1,4 +1,4 @@
-//! This module contains a trait and a simple implementation to generate unique ID for data node.
+//! This module contains a trait and a simple implementation to generate unique ID for range server.
 
 use log::{error, trace};
 use std::sync::Arc;
@@ -36,14 +36,14 @@ impl IdGenerator for PlacementDriverIdGenerator {
             match client.allocate_id(&self.config.server.host).await {
                 Ok(id) => {
                     trace!(
-                        "Acquired ID={} for data-node[host={}]",
+                        "Acquired ID={} for range-server[host={}]",
                         id,
                         self.config.server.host
                     );
                     let _ = tx.send(Ok(id));
                 }
                 Err(e) => {
-                    error!("Failed to acquire ID for data-node. Cause: {:?}", e);
+                    error!("Failed to acquire ID for range-server. Cause: {:?}", e);
                     let _ = tx.send(Err(()));
                 }
             }

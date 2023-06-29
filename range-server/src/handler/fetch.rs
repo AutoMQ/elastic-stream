@@ -202,7 +202,7 @@ impl<'a> Fetch<'a> {
                         max_bytes: req.batch_max_bytes(),
                     });
                 }
-                // Cannot find the range in the current data node
+                // Cannot find the range in the current range server
                 Err(FetchError::RangeNotFound)
             })
             .collect()

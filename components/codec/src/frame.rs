@@ -361,9 +361,9 @@ pub enum OperationCode {
 
     // 0x1000 ~ 0x1FFF is reserved for data communication
 
-    // Append records to the data node.
+    // Append records to the range server.
     Append = 0x1001,
-    // Fetch records from the data node.
+    // Fetch records from the range server.
     Fetch = 0x1002,
 
     // 0x2000 ~ 0x2FFF is reserved for range management
@@ -371,9 +371,9 @@ pub enum OperationCode {
     // List ranges from the PD of a batch of streams.
     ListRange = 0x2001,
     // Request seal ranges of a batch of streams.
-    // The PD will provide the `SEAL_AND_NEW` semantic while Data Node only provide the `SEAL` semantic.
+    // The PD will provide the `SEAL_AND_NEW` semantic while Range Server only provide the `SEAL` semantic.
     SealRange = 0x2002,
-    // Syncs newly writable ranges to a data node to accelerate the availability of a newly created writable range.
+    // Syncs newly writable ranges to a range server to accelerate the availability of a newly created writable range.
     SyncRange = 0x2003,
 
     // Create a new range for a stream.
@@ -394,7 +394,7 @@ pub enum OperationCode {
 
     // 0x4000 ~ 0x4FFF is reserved for observability
 
-    // Data node reports metrics to the PD.
+    // Range Server reports metrics to the PD.
     ReportMetrics = 0x4001,
 
     // Describe placement driver cluster membership.

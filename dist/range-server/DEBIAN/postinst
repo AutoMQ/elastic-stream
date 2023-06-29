@@ -1,2 +1,2 @@
 #!/bin/bash
-chmod +x /usr/local/bin/data-node
+chmod +x /usr/local/bin/range-server

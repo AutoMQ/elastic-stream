@@ -8,7 +8,7 @@ pub struct AppendResultEntry {
     /// Appending record batch entry result.
     pub status: Status,
 
-    /// Timestamp at which the record batch entry was appended to the stream in the data-node.
+    /// Timestamp at which the record batch entry was appended to the stream in the range-server.
     pub timestamp: DateTime<Utc>,
 }
 

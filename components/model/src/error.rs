@@ -18,7 +18,7 @@ pub enum StreamError {
     #[error("Bad offset")]
     SealBadOffset,
 
-    #[error("Current data-node does not have the stream/range to seal")]
+    #[error("Current range-server does not have the stream/range to seal")]
     SealWrongNode,
 }
 

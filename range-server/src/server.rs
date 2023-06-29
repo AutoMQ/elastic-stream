@@ -59,7 +59,7 @@ pub fn launch(
 
             let shutdown_tx = shutdown.clone();
             thread::Builder::new()
-                .name("DataNode".to_owned())
+                .name("RangeServer".to_owned())
                 .spawn(move || {
                     let worker_config = WorkerConfig {
                         core_id,
@@ -97,7 +97,7 @@ pub fn launch(
         let server_config = config;
         let shutdown_tx = shutdown;
         let handle = thread::Builder::new()
-            .name("DataNode[Primary]".to_owned())
+            .name("RangeServer[Primary]".to_owned())
             .spawn(move || {
                 let worker_config = WorkerConfig {
                     core_id,

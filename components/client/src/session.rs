@@ -275,8 +275,8 @@ impl Session {
             timeout: self.config.client_io_timeout(),
             headers: request::Headers::Heartbeat {
                 client_id: self.config.client.client_id.clone(),
-                data_node: if role == ClientRole::DataNode {
-                    Some(self.config.server.data_node())
+                range_server: if role == ClientRole::RangeServer {
+                    Some(self.config.server.range_server())
                 } else {
                     None
                 },

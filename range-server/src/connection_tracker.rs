@@ -32,13 +32,13 @@ impl ConnectionTracker {
 
     /// Send `GoAway` frame to all existing connections.
     ///
-    /// When data node executes scheduled restarts. Graceful shutdown is desirable and
+    /// When range server executes scheduled restarts. Graceful shutdown is desirable and
     /// it is a must to disconnect existing long connections gracefully.
     ///
     /// Roughly, three steps are done for this particular purpose:
     /// 1. Stop accepting new connections;
     /// 2. Send `GoAway` frame to each existing connection, requesting them to disconnect as soon as possible;
-    /// 3. Await until all connections are terminated after client migrated to other data nodes.
+    /// 3. Await until all connections are terminated after client migrated to other range servers.
     pub(crate) fn go_away(&mut self) {
         self.connections.iter().for_each(|(peer_address, sender)| {
             let mut frame = Frame::new(OperationCode::GoAway);

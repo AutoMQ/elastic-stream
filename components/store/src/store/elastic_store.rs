@@ -27,7 +27,7 @@ use futures::future::join_all;
 use log::{error, trace};
 use model::range::RangeMetadata;
 use observation::metrics::store_metrics::{
-    DataNodeStatistics, STORE_APPEND_BYTES_COUNT, STORE_APPEND_COUNT,
+    RangeServerStatistics, STORE_APPEND_BYTES_COUNT, STORE_APPEND_COUNT,
     STORE_APPEND_LATENCY_HISTOGRAM, STORE_FAILED_APPEND_COUNT, STORE_FAILED_FETCH_COUNT,
     STORE_FETCH_BYTES_COUNT, STORE_FETCH_COUNT, STORE_FETCH_LATENCY_HISTOGRAM,
 };
@@ -186,7 +186,7 @@ impl Store for ElasticStore {
             Ok(res) => {
                 let latency = now.elapsed();
                 STORE_APPEND_LATENCY_HISTOGRAM.observe(latency.as_micros() as f64);
-                DataNodeStatistics::observe_append_latency(latency.as_millis() as i16);
+                RangeServerStatistics::observe_append_latency(latency.as_millis() as i16);
                 STORE_APPEND_COUNT.inc();
                 STORE_APPEND_BYTES_COUNT.inc_by(len as u64);
                 res
@@ -265,7 +265,7 @@ impl Store for ElasticStore {
             STORE_FETCH_COUNT.inc();
             let latency = now.elapsed();
             STORE_FETCH_LATENCY_HISTOGRAM.observe(latency.as_micros() as f64);
-            DataNodeStatistics::observe_fetch_latency(latency.as_millis() as i16);
+            RangeServerStatistics::observe_fetch_latency(latency.as_millis() as i16);
             STORE_FETCH_BYTES_COUNT
                 .inc_by(final_result.iter().map(|re| re.total_len()).sum::<usize>() as u64);
             return Ok(FetchResult {
@@ -278,12 +278,12 @@ impl Store for ElasticStore {
         Err(FetchError::NoRecord)
     }
 
-    /// List ranges of all streams that are served by this data node.
+    /// List ranges of all streams that are served by this range server.
     ///
     /// Note this job is delegated to RocksDB threads.
     ///
     /// True that RocksDB may internally use asynchronous IO, but its public API is blocking and synchronous.
-    /// Given that we do NOT accept any blocking code in data-node and store crates, we have to delegate these
+    /// Given that we do NOT accept any blocking code in range-server and store crates, we have to delegate these
     /// tasks to RocksDB threads and asynchronously await in tokio::sync::mpsc::unbounded channel.
     ///
     /// This method involves communication between sync and async code, remember to read
@@ -307,7 +307,7 @@ impl Store for ElasticStore {
     /// List ranges of the specified stream.
     ///
     /// Rationale of delegating this job to RocksDB threads is exactly same to `list` ranges of all streams served by
-    /// this data node.
+    /// this range server.
     async fn list_by_stream<F>(
         &self,
         stream_id: i64,

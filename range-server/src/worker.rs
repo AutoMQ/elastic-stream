@@ -18,7 +18,7 @@ use client::Client;
 use log::{debug, error, info, warn};
 use model::client_role::ClientRole;
 use observation::metrics::{
-    store_metrics::DataNodeStatistics,
+    store_metrics::RangeServerStatistics,
     sys_metrics::{DiskStatistics, MemoryStatistics},
     uring_metrics::UringStatistics,
 };
@@ -129,7 +129,7 @@ where
             // TODO: Modify it to client report metrics interval, instead of config.client_heartbeat_interval()
             let mut interval = tokio::time::interval(config.client_heartbeat_interval());
             let mut uring_statistics = UringStatistics::new();
-            let mut data_node_statistics = DataNodeStatistics::new();
+            let mut range_server_statistics = RangeServerStatistics::new();
             let mut disk_statistics = DiskStatistics::new();
             let mut memory_statistics = MemoryStatistics::new();
             loop {
@@ -140,11 +140,11 @@ where
                     }
                     _ = interval.tick() => {
                         uring_statistics.record();
-                        data_node_statistics.record();
+                        range_server_statistics.record();
                         disk_statistics.record();
                         memory_statistics.record();
                         let _ = client
-                        .report_metrics(&config.placement_driver, &uring_statistics,&data_node_statistics, &disk_statistics, &memory_statistics)
+                        .report_metrics(&config.placement_driver, &uring_statistics,&range_server_statistics, &disk_statistics, &memory_statistics)
                         .await;
                     }
 
@@ -166,7 +166,7 @@ where
                     }
                     _ = interval.tick() => {
                         let _ = client
-                        .broadcast_heartbeat(ClientRole::DataNode)
+                        .broadcast_heartbeat(ClientRole::RangeServer)
                         .await;
                     }
 

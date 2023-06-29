@@ -14,10 +14,10 @@ Benchmark on `Append` operations.
 
 ### Approach
 
-1. Launch the Placement Driver and a Data Node.
-2. Use the SDK to send Append requests to the Data Node, with a record batch size of 64 MB (65536 Bytes) per request, and randomly send each request to 1, 100, or 2000 streams.
-3. Adjust the number of concurrently running clients and the concurrency level of each client to achieve write rates of 500 MB/s or 1 GB/s on the Data Node. Run the test until the Data Node's resource utilization stabilizes and continue to run for some time.
-4. Record the CPU and memory usage of the Data Node, the SDK request latency, and the write latency on the Data Node side during the process.
+1. Launch the Placement Driver and a Range Server.
+2. Use the SDK to send Append requests to the Range Server, with a record batch size of 64 MB (65536 Bytes) per request, and randomly send each request to 1, 100, or 2000 streams.
+3. Adjust the number of concurrently running clients and the concurrency level of each client to achieve write rates of 500 MB/s or 1 GB/s on the Range Server. Run the test until the Range Server's resource utilization stabilizes and continue to run for some time.
+4. Record the CPU and memory usage of the Range Server, the SDK request latency, and the write latency on the Range Server side during the process.
 
 ### Result
 #### Elastic Stream

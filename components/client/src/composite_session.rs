@@ -11,7 +11,7 @@ use model::{
     PlacementDriverNode,
 };
 use observation::metrics::{
-    store_metrics::DataNodeStatistics,
+    store_metrics::RangeServerStatistics,
     sys_metrics::{DiskStatistics, MemoryStatistics},
     uring_metrics::UringStatistics,
 };
@@ -478,7 +478,7 @@ impl CompositeSession {
         }
     }
 
-    /// Create the specified range to the target: placement driver or data node.
+    /// Create the specified range to the target: placement driver or range server.
     ///
     /// If the target is placement driver, we need to select the session to the primary node;
     pub(crate) async fn create_range(
@@ -589,7 +589,7 @@ impl CompositeSession {
     /// 1. Placement driver is built on top of RAFT consensus algorithm and election happens in case of leader outage. Some RPCs
     ///    should steer to the leader node and need to refresh the leadership on failure;
     /// 2. Heartbeat, metrics-reporting RPC requests should broadcast to all placement driver nodes, so that when leader changes,
-    ///    data-node liveness and load evaluation are not impacted.
+    ///    range-server liveness and load evaluation are not impacted.
     ///
     /// # Implementation walkthrough
     /// Step 1: If placement driver access URL uses domain name, resolve it;
@@ -613,10 +613,10 @@ impl CompositeSession {
             .collect::<Vec<_>>();
 
         let (mut tx, rx) = oneshot::channel();
-        let data_node = self.config.server.data_node();
+        let range_server = self.config.server.range_server();
         let request = request::Request {
             timeout: self.config.client_io_timeout(),
-            headers: request::Headers::DescribePlacementDriver { data_node },
+            headers: request::Headers::DescribePlacementDriver { range_server },
             body: None,
         };
 
@@ -696,7 +696,7 @@ impl CompositeSession {
         }
     }
 
-    /// Seal range on data-node or placement driver.
+    /// Seal range on range-server or placement driver.
     ///
     /// # Implementation Walkthrough
     /// 1. If the seal kind is placement driver, find the session to the leader node;
@@ -706,8 +706,8 @@ impl CompositeSession {
     /// If seal kind is seal-placement-driver and renew, returns the newly created mutable range;
     /// Otherwise, return the range that is being sealed with the end properly filled.
     ///
-    /// If the seal kind is seal-data-node, resulting `end` of `StreamRange` is data-node specific only.
-    /// Final end value of the range will be resolved after MinCopy of data nodes responded.
+    /// If the seal kind is seal-range-server, resulting `end` of `StreamRange` is range-server specific only.
+    /// Final end value of the range will be resolved after MinCopy of range servers responded.
     pub(crate) async fn seal(
         &self,
         kind: SealKind,
@@ -958,7 +958,7 @@ impl CompositeSession {
     pub(crate) async fn report_metrics(
         &self,
         uring_statistics: &UringStatistics,
-        data_node_statistics: &DataNodeStatistics,
+        range_server_statistics: &RangeServerStatistics,
         disk_statistics: &DiskStatistics,
         memory_statistics: &MemoryStatistics,
     ) -> Result<(), ClientError> {
@@ -972,7 +972,7 @@ impl CompositeSession {
 
         // TODO: add disk_unindexed_data_size, range_missing_replica_cnt, range_active_cnt
         let extension = request::Headers::ReportMetrics {
-            data_node: self.config.server.data_node(),
+            range_server: self.config.server.range_server(),
             disk_in_rate: disk_statistics.get_disk_in_rate(),
             disk_out_rate: disk_statistics.get_disk_out_rate(),
             disk_free_space: disk_statistics.get_disk_free_space(),
@@ -982,12 +982,12 @@ impl CompositeSession {
             uring_inflight_task_cnt: uring_statistics.get_uring_inflight_task_cnt(),
             uring_pending_task_cnt: uring_statistics.get_uring_pending_task_cnt(),
             uring_task_avg_latency: uring_statistics.get_uring_task_avg_latency(),
-            network_append_rate: data_node_statistics.get_network_append_rate(),
-            network_fetch_rate: data_node_statistics.get_network_fetch_rate(),
-            network_failed_append_rate: data_node_statistics.get_network_failed_append_rate(),
-            network_failed_fetch_rate: data_node_statistics.get_network_failed_fetch_rate(),
-            network_append_avg_latency: data_node_statistics.get_network_append_avg_latency(),
-            network_fetch_avg_latency: data_node_statistics.get_network_fetch_avg_latency(),
+            network_append_rate: range_server_statistics.get_network_append_rate(),
+            network_fetch_rate: range_server_statistics.get_network_fetch_rate(),
+            network_failed_append_rate: range_server_statistics.get_network_failed_append_rate(),
+            network_failed_fetch_rate: range_server_statistics.get_network_failed_fetch_rate(),
+            network_append_avg_latency: range_server_statistics.get_network_append_avg_latency(),
+            network_fetch_avg_latency: range_server_statistics.get_network_fetch_avg_latency(),
             range_missing_replica_cnt: 0,
             range_active_cnt: 0,
         };

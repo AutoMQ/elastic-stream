@@ -6,7 +6,7 @@ use store::Store;
 
 /// Process Ping request
 ///
-/// Ping-pong mechanism is designed to be a light weight API to probe liveness of data-node.
+/// Ping-pong mechanism is designed to be a light weight API to probe liveness of range-server.
 /// The Pong response return the same header and payload as the Ping request.
 #[derive(Debug)]
 pub(crate) struct Ping<'a> {

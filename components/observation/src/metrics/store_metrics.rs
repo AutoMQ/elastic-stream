@@ -7,7 +7,7 @@ use prometheus::{
 };
 
 #[derive(Debug)]
-pub struct DataNodeStatistics {
+pub struct RangeServerStatistics {
     last_instant: Instant,
     network_append_old: u64,
     network_fetch_old: u64,
@@ -19,7 +19,7 @@ pub struct DataNodeStatistics {
     network_failed_fetch_rate: i16,
 }
 
-impl Default for DataNodeStatistics {
+impl Default for RangeServerStatistics {
     fn default() -> Self {
         Self {
             last_instant: Instant::now(),
@@ -35,7 +35,7 @@ impl Default for DataNodeStatistics {
     }
 }
 
-impl DataNodeStatistics {
+impl RangeServerStatistics {
     pub fn new() -> Self {
         Self::default()
     }
@@ -186,14 +186,14 @@ mod tests {
     // use log::trace;
 
     use super::{
-        DataNodeStatistics, STORE_APPEND_COUNT, STORE_FAILED_APPEND_COUNT,
+        RangeServerStatistics, STORE_APPEND_COUNT, STORE_FAILED_APPEND_COUNT,
         STORE_FAILED_FETCH_COUNT, STORE_FETCH_COUNT,
     };
 
     #[test]
     #[ignore = "Due to time jitter, it's hard to determine accuracy, so this test is just for observing the effect."]
     fn test_store_statistics() {
-        let mut statistics = DataNodeStatistics::new();
+        let mut statistics = RangeServerStatistics::new();
         statistics.record();
         STORE_APPEND_COUNT.inc_by(1);
         STORE_FETCH_COUNT.inc_by(5);
@@ -208,30 +208,30 @@ mod tests {
             statistics.get_network_failed_append_rate(),
             statistics.get_network_failed_fetch_rate(),
         );
-        DataNodeStatistics::observe_fetch_latency(5);
+        RangeServerStatistics::observe_fetch_latency(5);
         sleep(Duration::from_secs(1));
-        DataNodeStatistics::observe_fetch_latency(5);
+        RangeServerStatistics::observe_fetch_latency(5);
         sleep(Duration::from_secs(1));
-        DataNodeStatistics::observe_fetch_latency(5);
+        RangeServerStatistics::observe_fetch_latency(5);
         sleep(Duration::from_secs(1));
-        DataNodeStatistics::observe_fetch_latency(5);
+        RangeServerStatistics::observe_fetch_latency(5);
         sleep(Duration::from_secs(1));
-        DataNodeStatistics::observe_fetch_latency(5);
+        RangeServerStatistics::observe_fetch_latency(5);
         sleep(Duration::from_secs(1));
         trace!("avg[0] = {}", statistics.get_network_fetch_avg_latency());
-        DataNodeStatistics::observe_fetch_latency(1);
+        RangeServerStatistics::observe_fetch_latency(1);
         trace!("avg[1]: {}", statistics.get_network_fetch_avg_latency());
         sleep(Duration::from_secs(1));
-        DataNodeStatistics::observe_fetch_latency(1);
+        RangeServerStatistics::observe_fetch_latency(1);
         trace!("avg[2]: {}", statistics.get_network_fetch_avg_latency());
         sleep(Duration::from_secs(1));
-        DataNodeStatistics::observe_fetch_latency(1);
+        RangeServerStatistics::observe_fetch_latency(1);
         trace!("avg[3]: {}", statistics.get_network_fetch_avg_latency());
         sleep(Duration::from_secs(1));
-        DataNodeStatistics::observe_fetch_latency(1);
+        RangeServerStatistics::observe_fetch_latency(1);
         trace!("avg[4]: {}", statistics.get_network_fetch_avg_latency());
         sleep(Duration::from_secs(1));
-        DataNodeStatistics::observe_fetch_latency(1);
+        RangeServerStatistics::observe_fetch_latency(1);
         trace!("avg[5]: {}", statistics.get_network_fetch_avg_latency());
     }
 }

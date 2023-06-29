@@ -52,11 +52,11 @@ The table below shows all the supported frame types along with a preallocated op
 | 0x0002 | GOAWAY | Initiate a shutdown of a connection or signal serious error conditions. |
 | 0x0003 | HEARTBEAT | To keep clients alive through periodic heartbeat frames. |
 | 0x0004 | ALLOCATE_ID | Allocate a unique identifier from placement drivers. |
-| 0x1001 | APPEND | Append records to the data node. |
-| 0x1002 | FETCH | Fetch records from the data node. |
+| 0x1001 | APPEND | Append records to the range server. |
+| 0x1002 | FETCH | Fetch records from the range server. |
 | 0x2001 | LIST_RANGES | List ranges from the PD of a batch of streams. |
-| 0x2002 | SEAL_RANGE | Request to seal a range of a stream. Both PD and data-node serve this operation accordingly |
-| 0x2003 | SYNC_RANGES | Syncs newly writable ranges to a data node to accelerate the availability of a newly created writable range. |
+| 0x2002 | SEAL_RANGE | Request to seal a range of a stream. Both PD and range-server serve this operation accordingly |
+| 0x2003 | SYNC_RANGES | Syncs newly writable ranges to a range server to accelerate the availability of a newly created writable range. |
 | 0x2004 | CRATE_RANGE | Request PD to create a new range for the specified stream |
 | 0x2005 | DESCRIBE_RANGE | Describe the details of a batch of ranges, mainly used to get the max offset of the current writable range. |
 | 0x3001 | CREATE_STREAMS | Create a batch of streams. |
@@ -64,7 +64,7 @@ The table below shows all the supported frame types along with a preallocated op
 | 0x3003 | UPDATE_STREAMS | Update a batch of streams. |
 | 0x3004 | DESCRIBE_STREAMS | Fetch the details of a batch of streams. |
 | 0x3005 | TRIM_STREAMS | Trim the min offset of a batch of streams. |
-| 0x4001 | REPORT_METRICS | Data node reports metrics to the PD. |
+| 0x4001 | REPORT_METRICS | Range Server reports metrics to the PD. |
 | 0x4002 | DESCRIBE_PD_CLUSTER| Describe placement driver cluster membership |
 
 The below sub-sections describe the details of each frame type, including their usage, their binary format, and the meaning of their fields.
@@ -85,10 +85,10 @@ The client can send a heartbeat frame to the server periodically. If the server 
 **Request Frame:**
 
 ```
-Request Header => client_id client_role data_node
+Request Header => client_id client_role range_server
   client_id => string
   client_role => enum {RANGE_SERVER, CLIENT}
-  data_node => node_id advertise_addr
+  range_server => node_id advertise_addr
     node_id => int32
     advertise_addr => string
 
@@ -97,10 +97,10 @@ Request Payload => Empty
 
 **Response Frame:**
 ```
-Response Header => client_id client_role data_node
+Response Header => client_id client_role range_server
   client_id => string
   client_role => enum {RANGE_SERVER, CLIENT}
-  data_node => node_id advertise_addr
+  range_server => node_id advertise_addr
     node_id => int32
     advertise_addr => string
   status => code message detail
@@ -116,8 +116,8 @@ The request and response frames of HEARTBEAT have the same format. The table bel
 | Field | Type | Description |
 |-------|------|-------------|
 | client_id | string | The unique id of the client. |
-| client_role | enum | The role of the client. Note the client is a relative term, it can be a data node or a SDK client. |
-| data_node | struct | Optional, the node information of the data node. Empty if the client is a SDK client. |
+| client_role | enum | The role of the client. Note the client is a relative term, it can be a range server or a SDK client. |
+| range_server | struct | Optional, the node information of the range server. Empty if the client is a SDK client. |
 | node_id | int32 | The unique id of the node. |
 | advertise_addr | string | The advertise address of the node, for client traffic from outside. The scheme is `host:port`, while host supports both domain name and IPv4/IPv6 address. |
 | status | struct | The error status of the response. |
@@ -153,7 +153,7 @@ Response Payload => Empty
 ```
 
 ### APPEND
-The APPEND frame(opcode=0x1001) appends record batches to the data node.
+The APPEND frame(opcode=0x1001) appends record batches to the range server.
 
 **Request Frame:**
 ```
@@ -211,14 +211,14 @@ Response Payload => Empty
 | stream_id | int64 | The target stream_id of the append record batch. |
 | request_index | int32 | The request_index that the append_response relates to. |
 | base_offset | int64 | The base offset of the record batch. |
-| stream_append_time_ms | int64 | The timestamp returned by the data node server after appending the records. |
+| stream_append_time_ms | int64 | The timestamp returned by the range server server after appending the records. |
 | status | struct | The error status of a fetch response. |
 | code | int16 | The error code, or 0 if there was no error. |
 | message | string | The error message, or null if there was no error. |
 | detail | bytes | Additional information about the error. |
 
 ### FETCH
-The FETCH frame(opcode=0x1002) fetches record batches from the data node. This frame supports fetching data from multiple streams in one frame, and the response could be split into multiple frames then returned in a streaming way. The best benefit of this behavior is that the storage server could return records timely according to the arrival of the records, which is very useful for real-time data processing.
+The FETCH frame(opcode=0x1002) fetches record batches from the range server. This frame supports fetching data from multiple streams in one frame, and the response could be split into multiple frames then returned in a streaming way. The best benefit of this behavior is that the storage server could return records timely according to the arrival of the records, which is very useful for real-time data processing.
 
 **Request Frame:**
 ```
@@ -285,20 +285,20 @@ Response Payload => [stream_data]
 | record_batch | bytes | The payload of each record batch, already serialized. |
 
 ### LIST_RANGES
-The LIST_RANGES frame(opcode=0x2001) lists the ranges of a batch of streams. Or it could list the ranges of all the streams in a specific data node.
+The LIST_RANGES frame(opcode=0x2001) lists the ranges of a batch of streams. Or it could list the ranges of all the streams in a specific range server.
 
 **Request Frame:**
 
-There are two types of LIST_RANGES request, one is to list the ranges of a batch of streams, and the other is to list the ranges of all the streams in a specific data node.
+There are two types of LIST_RANGES request, one is to list the ranges of a batch of streams, and the other is to list the ranges of all the streams in a specific range server.
 
 ```
 Request Header => timeout_ms [range_owners]
   timeout_ms => int32
-  range_owners => union { stream_id, data_node }
+  range_owners => union { stream_id, range_server }
     // List the ranges of streams
     stream_id => int64
-    // List the ranges of a specific data node
-    data_node => node_id advertise_addr
+    // List the ranges of a specific range server
+    range_server => node_id advertise_addr
       node_id => int32
       advertise_addr => string
 
@@ -310,9 +310,9 @@ Request Payload => Empty
 | timeout_ms | int32 | The timeout in milliseconds to wait for the response. |
 | range_owners | union | The array of owner of the ranges to list. |
 | stream_id | int64 | A specific stream to list the ranges. |
-| data_node | struct | A specific data node to list the ranges of all the streams. |
-| node_id | int32 | The node id of the data node. |
-| advertise_addr | string | The advertise address of the data node. |
+| range_server | struct | A specific range server to list the ranges of all the streams. |
+| node_id | int32 | The node id of the range server. |
+| advertise_addr | string | The advertise address of the range server. |
 
 **Response Frame:**
 
@@ -335,8 +335,8 @@ Response Header => throttle_time_ms [list_responses]
       start_offset => int64
       next_offset => int64
       end_offset => int64
-      replica_nodes => data_node is_primary
-        data_node => node_id advertise_addr
+      replica_nodes => range_server is_primary
+        range_server => node_id advertise_addr
           node_id => int32
           advertise_addr => string
         is_primary => bool
@@ -362,11 +362,11 @@ Response Payload => Empty
 | start_offset | int64 | The start offset of the range. |
 | next_offset | int64 | The next writable offset for incoming records of the range. It's a snapshot of the next offset of the range, and it may be changed after the response is sent. |
 | end_offset | int64 | Optional. The end offset of the range. Empty if the range is open. |
-| replica_nodes | array | The array of nodes that host the range, containing the data node information of the range. |
-| data_node | struct | The data node information of the range. |
-| node_id | int32 | The node id of the data node. |
-| advertise_addr | string | The advertise address of the data node. |
-| is_primary | bool | Whether the range in current data node is primary or secondary. |
+| replica_nodes | array | The array of nodes that host the range, containing the range server information of the range. |
+| range_server | struct | The range server information of the range. |
+| node_id | int32 | The node id of the range server. |
+| advertise_addr | string | The advertise address of the range server. |
+| is_primary | bool | Whether the range in current range server is primary or secondary. |
 
 ### SEAL_RANGES
 The SEAL_RANGES frame(opcode=0x2002) seals the current writable ranges of a batch of streams.
@@ -421,12 +421,12 @@ Response Payload => Empty
 | code | int16 | The error code, or 0 if there was no error. |
 | message | string | The error message, or null if there was no error. |
 | detail | bytes | Additional information about the error. |
-| range | struct | Both the PD and the data node will handle the seal ranges request. The data node returns the sealed range, while the PD returns the newly writable range. |
+| range | struct | Both the PD and the range server will handle the seal ranges request. The range server returns the sealed range, while the PD returns the newly writable range. |
 
 ### SYNC_RANGES
 The SYNC_RANGES frame(opcode=0x2003) syncs newly writable ranges to accelerate the availability of a newly created writable range.
 
-Or, it could be used to assign a new replics of a range to a new data node.
+Or, it could be used to assign a new replics of a range to a new range server.
 
 **Request Frame:**
 ```
@@ -444,7 +444,7 @@ Request Payload => Empty
 | timeout_ms | int32 | The timeout in milliseconds to wait for the response. |
 | stream_ranges | array | A batch of stream ids to sync the ranges. |
 | stream_id | int64 | A specific stream to sync the ranges. |
-| ranges | array | A specific range to sync to the data node. |
+| ranges | array | A specific range to sync to the range server. |
 
 **Response Frame:**
 ```
@@ -578,7 +578,7 @@ Response Payload => Empty
 | detail | bytes | Additional information about the error. |
 
 ### DELETE_STREAMS
-The DELETE_STREAMS frame(opcode=0x3002) deletes a batch of streams to PD or data node. The PD will delete the stream metadata as well as the range info, while the data node only marks the stream as deleted to reject the new write requests timely.
+The DELETE_STREAMS frame(opcode=0x3002) deletes a batch of streams to PD or range server. The PD will delete the stream metadata as well as the range info, while the range server only marks the stream as deleted to reject the new write requests timely.
 
 **Request Frame:**
 ```
@@ -695,9 +695,9 @@ Response Payload => Empty
 ### TRIM_STREAMS
 The TRIM_STREAMS frame(opcode=0x3005) trims a batch of streams to PD.
 
-The data node stores the records in the stream in a log structure, and the records are appended to the end of the log. Consider the length of disk is limited, the data node will delete the records to recycling the disk space. Once the deletion occurs, some ranges should be trimmed to avoid the clients to read the deleted records.
+The range server stores the records in the stream in a log structure, and the records are appended to the end of the log. Consider the length of disk is limited, the range server will delete the records to recycling the disk space. Once the deletion occurs, some ranges should be trimmed to avoid the clients to read the deleted records.
 
-The data node will send the TRIM_STREAMS frame to the PD to trim the stream with a trim offset. The PD will delete the ranges whose end offset is less than the trim offset and shrink the ranges whose start offset is less than the trim offset.
+The range server will send the TRIM_STREAMS frame to the PD to trim the stream with a trim offset. The PD will delete the ranges whose end offset is less than the trim offset and shrink the ranges whose start offset is less than the trim offset.
 
 **Request Frame:**
 ```
@@ -751,12 +751,12 @@ Response Header => throttle_time_ms [streams]
 | range | struct | The smallest range of the stream after a trim operation. |
 
 ### REPORT_METRICS
-The REPORT_METRICS frame(opcode=0x4001) reports load metrics of Data Node to PD. PD uses these metrics to allocate ranges.
+The REPORT_METRICS frame(opcode=0x4001) reports load metrics of Range Server to PD. PD uses these metrics to allocate ranges.
 
 **Request Frame:**
 ```
-Request Header => data_node
-  data_node => node_id advertise_addr
+Request Header => range_server
+  range_server => node_id advertise_addr
     node_id => int32
     advertise_addr => string
   disk_in_rate => int64
@@ -782,7 +782,7 @@ Request Payload => Empty
 
 | Field | Type | Description |
 |-------|------|-------------|
-| hostname | string | Data Node's hostname. |
+| hostname | string | Range Server's hostname. |
 | disk_in_rate | int64 | Number of bytes written to the disk per second. |
 | disk_out_rate | int64 | Number of bytes read from the disk per second. |
 | disk_free_space | int64 | Disk free space size, measured in bytes. |
@@ -798,13 +798,13 @@ Request Payload => Empty
 | network_failed_fetch_rate | int16 | Number of failed fetch requests per second. |
 | network_append_avg_latency | int16 | Average latency of append requests over the past minute, measured in ms. |
 | network_fetch_avg_latency | int16 | Average latency of fetch requests over the past minute, measured in ms. |
-| range_missing_replica_cnt | int16 | Number of replicas that need to be copied from other Data Node. |
+| range_missing_replica_cnt | int16 | Number of replicas that need to be copied from other Range Server. |
 | range_active_cnt | int16 | Number of active(recently read or write) ranges in the past minute. |
 
 **Response Frame:**
 ```
-Response Header => data_node
-  data_node => node_id advertise_addr
+Response Header => range_server
+  range_server => node_id advertise_addr
     node_id => int32
     advertise_addr => string
   status => code message detail
@@ -816,12 +816,12 @@ Response Payload => Empty
 ```
 
 ### DESCRIBE_PD_CLUSTER
-The DESCRIBE_PD_CLUSTER frame(opcode=0x4002) requests placement driver to describe its current cluster membership. Embedded clients of the data-node MUST send heartbeats / load metrics to all PD nodes.
+The DESCRIBE_PD_CLUSTER frame(opcode=0x4002) requests placement driver to describe its current cluster membership. Embedded clients of the range-server MUST send heartbeats / load metrics to all PD nodes.
 
 ** Request Frame**
 ```
-Request Header => data_node
-  data_node => node_id advertise_addr
+Request Header => range_server
+  range_server => node_id advertise_addr
     node_id => int32
     advertise_addr => string
   timeout_ms
@@ -832,8 +832,8 @@ Request Payload => Empty
 | Field | Type | Description |
 |-------|------|-------------|
 | timeout_ms | int32 | The timeout in milliseconds to wait for the response. |
-| node_id| int32 | The request data-node ID |
-| advertise_addr| string | advertise address of the data-node |
+| node_id| int32 | The request range-server ID |
+| advertise_addr| string | advertise address of the range-server |
 
 **Response Frame:**
 ```

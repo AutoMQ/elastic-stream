@@ -112,7 +112,7 @@ impl ReplicationRange {
             error!("Create range[{stream_id}#{index}] to pd failed, err: {e}");
             ReplicationError::Internal
         })?;
-        // 2. request data node to create range replica.
+        // 2. request range server to create range replica.
         let mut create_replica_tasks = vec![];
         for node in metadata.replica().iter() {
             let address = node.advertise_address.clone();
@@ -123,7 +123,7 @@ impl ReplicationRange {
                     .create_range_replica(&address, metadata)
                     .await
                     .map_err(|e| {
-                        error!("Create range[{stream_id}#{index}] to data node[{address}] failed, err: {e}");
+                        error!("Create range[{stream_id}#{index}] to range server[{address}] failed, err: {e}");
                         ReplicationError::Internal
                     })
             }));
@@ -357,7 +357,9 @@ impl ReplicationRange {
                             .await
                             .is_err()
                             {
-                                debug!("Failed to seal data-node after sealing placement-driver");
+                                debug!(
+                                    "Failed to seal range-server after sealing placement-driver"
+                                );
                             }
                             // keep range alive until seal task complete.
                             drop(range);

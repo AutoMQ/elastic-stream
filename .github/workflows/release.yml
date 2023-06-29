@@ -49,5 +49,5 @@ jobs:
           draft: false
           generate_release_notes: true
           files: |
-            ./dist/data-node.deb
+            ./dist/range-server.deb
             ./pd/distribution/*.deb

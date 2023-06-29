@@ -5,9 +5,9 @@ use protocol::rpc::header::StreamT;
 /// Stream is the basic storage unit in the system that store records in an append-only fashion.
 ///
 /// A stream is composed of ranges. Conceptually, only the last range of the stream is mutable while the rest are immutable. Ranges of a
-/// stream are distributed among data-nodes.
+/// stream are distributed among range-servers.
 ///
-/// `Stream` on a specific data-node only cares about ranges that are located on it.
+/// `Stream` on a specific range-server only cares about ranges that are located on it.
 #[derive(Debug, Default, Clone)]
 pub struct StreamMetadata {
     /// Stream ID, unique within the cluster.

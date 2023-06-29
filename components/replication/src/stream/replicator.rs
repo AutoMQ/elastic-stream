@@ -9,12 +9,12 @@ use crate::ReplicationError;
 use bytes::Bytes;
 use log::{error, info, warn};
 use model::fetch::FetchRequestEntry;
-use model::DataNode;
+use model::RangeServer;
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
 use tokio::time::sleep;
 
-/// Replicator is responsible for replicating data to a data-node of range replica.
+/// Replicator is responsible for replicating data to a range-server of range replica.
 ///
 /// It is created by ReplicationRange and is dropped when the range is sealed.
 #[derive(Debug)]
@@ -22,7 +22,7 @@ pub(crate) struct Replicator {
     log_ident: String,
     range: Weak<ReplicationRange>,
     confirm_offset: Rc<RefCell<u64>>,
-    data_node: DataNode,
+    range_server: RangeServer,
     corrupted: Rc<RefCell<bool>>,
 }
 
@@ -31,8 +31,8 @@ impl Replicator {
     ///
     /// # Arguments
     /// `range` - The replication range.
-    /// `data_node` - The target data-node to replicate data to.
-    pub(crate) fn new(range: Rc<ReplicationRange>, data_node: DataNode) -> Self {
+    /// `range_server` - The target range-server to replicate data to.
+    pub(crate) fn new(range: Rc<ReplicationRange>, range_server: RangeServer) -> Self {
         let metadata = range.metadata().clone();
         let confirm_offset = metadata.start();
         Self {
@@ -40,12 +40,12 @@ impl Replicator {
                 "Replica[{}#{}-{}#{}] ",
                 metadata.stream_id(),
                 metadata.index(),
-                data_node.node_id,
-                data_node.advertise_address
+                range_server.node_id,
+                range_server.advertise_address
             ),
             range: Rc::downgrade(&range),
             confirm_offset: Rc::new(RefCell::new(confirm_offset)),
-            data_node,
+            range_server,
             corrupted: Rc::new(RefCell::new(false)),
         }
     }
@@ -76,11 +76,11 @@ impl Replicator {
             return;
         };
         let offset = Rc::clone(&self.confirm_offset);
-        let target = self.data_node.advertise_address.clone();
+        let target = self.range_server.advertise_address.clone();
         let range = self.range.clone();
         let corrupted = self.corrupted.clone();
 
-        // Spawn a task to replicate data to the target data-node.
+        // Spawn a task to replicate data to the target range-server.
         let log_ident = self.log_ident.clone();
         tokio_uring::spawn(async move {
             let mut attempts = 1;
@@ -133,7 +133,7 @@ impl Replicator {
                     Err(e) => {
                         // TODO: inspect error and retry only if it's a network error.
                         // If the error is a protocol error, we should abort replication.
-                        // If the range is sealed on data-node, we should abort replication and fire replication seal immediately.
+                        // If the range is sealed on range-server, we should abort replication and fire replication seal immediately.
                         warn!("{log_ident}Failed to append entries(base_offset={base_offset}): {e}. Retry...");
                         attempts += 1;
                         // TODO: Retry immediately?
@@ -159,7 +159,7 @@ impl Replicator {
             if let Some(client) = range.client() {
                 let result = client
                     .fetch(
-                        &self.data_node.advertise_address,
+                        &self.range_server.advertise_address,
                         FetchRequestEntry {
                             stream_id: range.metadata().stream_id(),
                             index: range.metadata().index(),
@@ -209,7 +209,7 @@ impl Replicator {
             if let Some(client) = range.client() {
                 return match client
                     .seal(
-                        Some(&self.data_node.advertise_address),
+                        Some(&self.range_server.advertise_address),
                         SealKind::RANGE_SERVER,
                         metadata,
                     )

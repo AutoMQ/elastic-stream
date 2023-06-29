@@ -21,6 +21,6 @@ pub use crate::append_result_entry::AppendResultEntry;
 pub use crate::batch::Batch;
 pub use crate::list_range_criteria::ListRangeCriteria;
 pub use crate::placement_driver_node::PlacementDriverNode;
-pub use crate::range_server::DataNode;
+pub use crate::range_server::RangeServer;
 pub use crate::record::RecordBatch;
 pub use crate::status::Status;
