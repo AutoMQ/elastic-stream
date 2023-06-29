@@ -19,13 +19,16 @@ jobs:
         with:
           filters: |
             java:
+              - '.github/workflows/**'
               - 'sdks/frontend-java/**'
               - 'components/protocol/fbs/*.fbs'
             rust:
+              - '.github/workflows/**'
               - 'data-node/**'
               - 'components/**'
               - 'sdks/frontend-rs/**'
             pd:
+              - '.github/workflows/**'
               - 'pd/**'
               - 'components/protocol/fbs/rpc.fbs'
   java-build:

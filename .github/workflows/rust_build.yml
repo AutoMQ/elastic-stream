@@ -12,7 +12,7 @@ jobs:
       matrix:
         os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }}
-    env: 
+    env:
       RUST_LOG: trace
     steps:
     - uses: actions/checkout@v3
@@ -73,12 +73,6 @@ jobs:
     - name: Install Deps
       run: |
         ./scripts/install_deps.sh
-    - name: Install Nightly Toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
     - name: Clippy Check
       uses: actions-rs/clippy-check@v1
       with:
