@@ -200,13 +200,11 @@ pub async fn run_listener() -> u16 {
                                             DescribePlacementDriverClusterRequest,
                                         >(buf)
                                         {
-                                            Ok(request) => {
-                                                serve_describe_placement_driver_cluster(
-                                                    &request,
-                                                    &mut response_frame,
-                                                    port,
-                                                )
-                                            }
+                                            Ok(request) => serve_describe_placement_driver_cluster(
+                                                &request,
+                                                &mut response_frame,
+                                                port,
+                                            ),
                                             Err(e) => {
                                                 error!(
                                                     "Failed to decode describe-placement-driver-request header: {:?}", e

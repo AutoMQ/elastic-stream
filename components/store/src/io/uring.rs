@@ -8,7 +8,6 @@ use crate::io::task::WriteTask;
 use crate::io::wal::Wal;
 use crate::io::write_window::WriteWindow;
 use crate::AppendResult;
-use crate::BufSlice;
 use minstant::Instant;
 use observation::metrics::uring_metrics::{
     UringStatistics, COMPLETED_READ_IO, COMPLETED_WRITE_IO, INFLIGHT_IO, IO_DEPTH, PENDING_TASK,
@@ -615,7 +614,7 @@ impl IO {
             .take()
             .into_iter()
             .filter(|buf| {
-                // Accept the last partial buffer only if it contains uncommited data.
+                // Accept the last partial buffer only if it contains uncommitted data.
                 buf.wal_offset + buf.limit() as u64 > self.write_window.committed
             })
             .flat_map(|buf| {
@@ -1255,8 +1254,7 @@ impl IO {
             if let Some(limit_len) = limit_len {
                 limit -= limit_len as usize;
             }
-
-            slice_v.push(BufSlice::new(buf, start_pos, limit as u32));
+            slice_v.push(buf.slice(start_pos as usize..limit));
         });
 
         let fetch_result = SingleFetchResult {

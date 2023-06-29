@@ -1,7 +1,6 @@
 mod aligned_buf;
 mod aligned_buf_reader;
 mod aligned_buf_writer;
-pub(crate) mod buf_slice;
 
 pub(crate) use self::aligned_buf::AlignedBuf;
 pub(crate) use self::aligned_buf_reader::AlignedBufReader;

@@ -4,7 +4,7 @@ use tokio::sync::oneshot;
 
 use crate::{
     error::{AppendError, FetchError},
-    AppendResult, BufSlice,
+    AppendResult,
 };
 
 #[derive(Debug)]
@@ -28,8 +28,8 @@ pub(crate) struct ReadTask {
 pub struct SingleFetchResult {
     pub(crate) stream_id: i64,
     pub(crate) wal_offset: i64,
-    /// The payload of a SingleFetchResult may be splitted into multiple `BufSlice`s.
-    pub(crate) payload: Vec<BufSlice>,
+    /// The payload of a SingleFetchResult may be splitted into multiple `Bytes`s.
+    pub(crate) payload: Vec<Bytes>,
 }
 
 impl SingleFetchResult {
@@ -40,7 +40,7 @@ impl SingleFetchResult {
 
     /// The iterator of the payload.
     /// It's a convenience method to iterate over the payload.
-    pub fn iter(&self) -> impl Iterator<Item = &BufSlice> {
+    pub fn iter(&self) -> impl Iterator<Item = &Bytes> {
         self.payload.iter()
     }
 }

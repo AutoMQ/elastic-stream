@@ -1,10 +1,8 @@
-use log::debug;
 use std::{
     alloc::{self, Layout},
     fmt::{self, Display, Formatter},
-    ops::{Bound, RangeBounds},
-    ptr::{self, NonNull},
-    slice,
+    ops::{Bound, Deref, RangeBounds},
+    ptr, slice,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -18,10 +16,8 @@ pub(crate) struct AlignedBuf {
     /// An aligned WAL offset which is an absolute address in the WAL.
     pub(crate) wal_offset: u64,
 
-    /// Pointer to the allocated memory
-    ptr: NonNull<u8>,
-
-    layout: Layout,
+    /// Allocated block-size aligned memory
+    buf: bytes::Bytes,
 
     pub(crate) capacity: usize,
 
@@ -52,21 +48,26 @@ impl AlignedBuf {
         // alloc may return null if memory is exhausted or layout does not meet allocator's size or alignment constraint.
         let ptr = unsafe { alloc::alloc_zeroed(layout) };
 
-        let ptr = match NonNull::<u8>::new(ptr) {
-            Some(ptr) => ptr,
-            None => {
-                // Crash eagerly to facilitate root-cause-analysis.
-                return Err(StoreError::OutOfMemory);
-            }
-        };
+        let vec = unsafe { Vec::from_raw_parts(ptr, capacity, capacity) };
+
+        let buf = bytes::Bytes::from(vec);
 
         Ok(Self {
             wal_offset,
-            ptr,
-            layout,
+            buf,
             capacity,
             limit: AtomicUsize::new(0),
         })
+    }
+
+    #[inline]
+    pub(crate) fn as_ptr(&self) -> *const u8 {
+        self.buf.as_ptr()
+    }
+
+    #[inline]
+    pub(crate) fn as_mut_ptr(&self) -> *mut u8 {
+        self.buf.as_ptr() as *mut u8
     }
 
     /// Judge if this buffer covers specified data region in WAL.
@@ -118,7 +119,7 @@ impl AlignedBuf {
         if self.limit.load(Ordering::Relaxed) - pos < std::mem::size_of::<u32>() {
             return Err(StoreError::InsufficientData);
         }
-        let value = unsafe { ptr::read_unaligned::<u32>(self.ptr.as_ptr().add(pos) as *const u32) };
+        let value = unsafe { ptr::read_unaligned::<u32>(self.as_ptr().add(pos) as *const u32) };
         Ok(u32::from_be(value))
     }
 
@@ -139,15 +140,11 @@ impl AlignedBuf {
             return Err(StoreError::InsufficientData);
         }
 
-        let value = unsafe { ptr::read_unaligned::<u64>(self.ptr.as_ptr().add(pos) as *const u64) };
+        let value = unsafe { ptr::read_unaligned::<u64>(self.as_ptr().add(pos) as *const u64) };
         Ok(u64::from_be(value))
     }
 
-    pub(crate) fn as_ptr(&self) -> *const u8 {
-        self.ptr.as_ptr() as *const u8
-    }
-
-    pub(crate) fn slice<R>(&self, range: R) -> &[u8]
+    pub(crate) fn slice<R>(&self, range: R) -> bytes::Bytes
     where
         R: RangeBounds<usize>,
     {
@@ -161,8 +158,7 @@ impl AlignedBuf {
             Bound::Excluded(&m) => m,
             Bound::Unbounded => self.limit.load(Ordering::Relaxed),
         };
-        let len = end - start;
-        unsafe { slice::from_raw_parts(self.ptr.as_ptr().add(start) as *const u8, len) }
+        self.buf.slice(start..end)
     }
 
     /// Generate a mutable slice from the buffer.
@@ -172,18 +168,9 @@ impl AlignedBuf {
     where
         R: RangeBounds<usize>,
     {
-        let start = match range.start_bound() {
-            Bound::Included(&n) => n,
-            Bound::Excluded(&n) => n.checked_add(1).expect("out of bound"),
-            Bound::Unbounded => 0,
-        };
-        let end = match range.end_bound() {
-            Bound::Included(&m) => m.checked_add(1).expect("out of bound"),
-            Bound::Excluded(&m) => m,
-            Bound::Unbounded => self.capacity,
-        };
-        let len = end - start;
-        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr().add(start) as *mut u8, len) }
+        let buf = self.buf.slice(range);
+        let ptr = buf.as_ptr() as *mut u8;
+        unsafe { slice::from_raw_parts_mut(ptr, buf.len()) }
     }
 
     pub(crate) fn write_buf(&self, cursor: u64, buf: &[u8]) -> bool {
@@ -196,7 +183,7 @@ impl AlignedBuf {
         if pos + buf.len() > self.capacity {
             return false;
         }
-        unsafe { ptr::copy_nonoverlapping(buf.as_ptr(), self.ptr.as_ptr().add(pos), buf.len()) };
+        unsafe { ptr::copy_nonoverlapping(buf.as_ptr(), self.as_mut_ptr().add(pos), buf.len()) };
         self.limit.fetch_add(buf.len(), Ordering::Relaxed);
         true
     }
@@ -222,14 +209,6 @@ impl AlignedBuf {
     }
 }
 
-/// Return the memory back to allocator.
-impl Drop for AlignedBuf {
-    fn drop(&mut self) {
-        unsafe { alloc::dealloc(self.ptr.as_ptr(), self.layout) };
-        debug!("Deallocated {}", self);
-    }
-}
-
 impl Display for AlignedBuf {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
@@ -239,6 +218,14 @@ impl Display for AlignedBuf {
             self.limit(),
             self.capacity
         )
+    }
+}
+
+impl Deref for AlignedBuf {
+    type Target = bytes::Bytes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buf
     }
 }
 
@@ -268,9 +255,7 @@ mod tests {
         let msg = "hello world";
         buf.write_buf(12, msg.as_bytes());
         assert_eq!(buf.remaining(), 4096 - 4 - 8 - msg.as_bytes().len());
-
-        let payload = std::str::from_utf8(buf.slice(12..))?;
-        assert_eq!(payload, msg);
+        assert_eq!(&buf.slice(12..), msg.as_bytes());
         Ok(())
     }
 

@@ -469,7 +469,7 @@ impl LogSegment {
 
                         last_page_buf
                             .slice_mut(..last_page_len as usize)
-                            .copy_from_slice(buf_src);
+                            .copy_from_slice(&buf_src);
                         last_page_buf.increase_written(last_page_len as usize);
 
                         self.block_cache.add_entry(Arc::new(last_page_buf));
@@ -483,7 +483,7 @@ impl LogSegment {
 
                         last_buf
                             .slice_mut(..last_len as usize)
-                            .copy_from_slice(buf.slice(..last_len as usize));
+                            .copy_from_slice(&buf.slice(..last_len as usize));
 
                         last_buf.increase_written(last_len as usize);
 
@@ -597,7 +597,7 @@ mod tests {
         assert_eq!(len as usize, data.len());
 
         let payload = buf.slice((crate::RECORD_PREFIX_LENGTH as usize)..);
-        assert_eq!(&data, payload);
+        assert_eq!(data, payload);
         Ok(())
     }
 
@@ -633,7 +633,7 @@ mod tests {
         // Open the file with the given `fd`.
         let file = unsafe { File::from_raw_fd(sd.fd) };
         // Write pages to file
-        file.write_all_at(buf_w.slice(..), 0).unwrap();
+        file.write_all_at(&buf_w.slice(..), 0).unwrap();
 
         // Read some bytes in the second page, and test whether the whole second page is cached.
         let mut buf = [0u8; 5];
@@ -642,7 +642,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             &buf,
-            buf_w.slice((alignment + 2) as usize..(alignment + 2 + 5) as usize)
+            &buf_w.slice((alignment + 2) as usize..(alignment + 2 + 5) as usize)[..]
         );
 
         let buf_v = segment
@@ -670,7 +670,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             &buf,
-            buf_w.slice((alignment * 3 - 2) as usize..(alignment * 3 - 2 + 5) as usize)
+            &buf_w.slice((alignment * 3 - 2) as usize..(alignment * 3 - 2 + 5) as usize)[..]
         );
 
         let buf_v = segment
@@ -724,7 +724,7 @@ mod tests {
         // Open the file with the given `fd`.
         let file = unsafe { File::from_raw_fd(sd.fd) };
         // Write pages to file
-        file.write_all_at(buf_w.slice(..), 0).unwrap();
+        file.write_all_at(&buf_w.slice(..), 0).unwrap();
 
         {
             // Case one: the last page is already cached individually.
