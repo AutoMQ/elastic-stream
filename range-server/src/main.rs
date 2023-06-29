@@ -1,5 +1,5 @@
 use clap::Parser;
-use data_node::Cli;
+use range_server::Cli;
 use log::info;
 use tokio::sync::broadcast;
 
@@ -37,7 +37,7 @@ fn main() {
     })
     .expect("Failed to set Ctrl-C");
 
-    if let Err(e) = data_node::server::launch(config, shutdown_tx) {
+    if let Err(e) = range_server::server::launch(config, shutdown_tx) {
         eprintln!("Failed to start data-node: {:?}", e);
     }
 }
@@ -56,24 +56,24 @@ macro_rules! build_info {
 fn display_built_info() {
     build_info!(
         "Data-Node v{}, built for {} by {}.",
-        data_node::built_info::PKG_VERSION,
-        data_node::built_info::TARGET,
-        data_node::built_info::RUSTC_VERSION
+        range_server::built_info::PKG_VERSION,
+        range_server::built_info::TARGET,
+        range_server::built_info::RUSTC_VERSION
     );
 
-    let built_time = built::util::strptime(data_node::built_info::BUILT_TIME_UTC);
+    let built_time = built::util::strptime(range_server::built_info::BUILT_TIME_UTC);
     build_info!(
         "Built with profile \"{}\", on {} ({} days ago).",
-        data_node::built_info::PROFILE,
+        range_server::built_info::PROFILE,
         built_time.with_timezone(&built::chrono::offset::Local),
         (built::chrono::offset::Utc::now() - built_time).num_days(),
     );
 
     if let (Some(v), Some(dirty), Some(hash), Some(short_hash)) = (
-        data_node::built_info::GIT_VERSION,
-        data_node::built_info::GIT_DIRTY,
-        data_node::built_info::GIT_COMMIT_HASH,
-        data_node::built_info::GIT_COMMIT_HASH_SHORT,
+        range_server::built_info::GIT_VERSION,
+        range_server::built_info::GIT_DIRTY,
+        range_server::built_info::GIT_COMMIT_HASH,
+        range_server::built_info::GIT_COMMIT_HASH_SHORT,
     ) {
         build_info!(
             "Built from git `{}`, commit {}, short_commit {}; the working directory was \"{}\".",
@@ -84,7 +84,7 @@ fn display_built_info() {
         );
     }
 
-    if let Some(r) = data_node::built_info::GIT_HEAD_REF {
+    if let Some(r) = range_server::built_info::GIT_HEAD_REF {
         build_info!("The branch was `{r}`.");
     }
 }

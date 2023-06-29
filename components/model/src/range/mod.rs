@@ -4,7 +4,7 @@ use derivative::Derivative;
 use log::info;
 use protocol::rpc::header::{RangeServerT, RangeT};
 
-use crate::data_node::DataNode;
+use crate::range_server::DataNode;
 
 /// Representation of a stream range in form of `[start, end)` in which `start` is inclusive and `end` is exclusive.
 /// If `start` == `end`, there will be no valid records in the range.

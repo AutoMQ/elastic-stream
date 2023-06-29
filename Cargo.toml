@@ -17,7 +17,7 @@ members = [
     "components/tool",
     "components/transport",
     "components/util",
-    "data-node",
+    "range-server",
     "sdks/frontend-rs"
 ]
 

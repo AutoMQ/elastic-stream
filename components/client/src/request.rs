@@ -2,7 +2,7 @@ use bytes::{Bytes, BytesMut};
 use model::fetch::FetchRequestEntry;
 use model::stream::StreamMetadata;
 use model::{
-    client_role::ClientRole, data_node::DataNode, range::RangeMetadata, ListRangeCriteria,
+    client_role::ClientRole, range_server::DataNode, range::RangeMetadata, ListRangeCriteria,
 };
 use protocol::rpc::header::{
     AppendRequestT, CreateRangeRequestT, CreateStreamRequestT, RangeServerMetricsT,

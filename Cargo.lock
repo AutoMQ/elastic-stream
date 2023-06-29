@@ -888,53 +888,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "data-node"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "built",
- "byteorder",
- "bytes",
- "cfg-if",
- "chrono",
- "clap 4.3.5",
- "client",
- "codec",
- "config",
- "core_affinity",
- "crc",
- "crossbeam",
- "ctrlc",
- "flatbuffers",
- "futures",
- "io-uring",
- "lazy_static",
- "log",
- "log4rs",
- "minstant",
- "mockall",
- "model",
- "num_cpus",
- "num_enum",
- "observation",
- "polling 0.1.0",
- "pprof",
- "prometheus",
- "protocol",
- "replication",
- "serde",
- "serde_yaml 0.9.21",
- "store",
- "test-util",
- "thiserror",
- "tikv-jemallocator",
- "tokio",
- "tokio-uring",
- "transport",
- "util",
-]
-
-[[package]]
 name = "debugid"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2621,6 +2574,53 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "range-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "built",
+ "byteorder",
+ "bytes",
+ "cfg-if",
+ "chrono",
+ "clap 4.3.5",
+ "client",
+ "codec",
+ "config",
+ "core_affinity",
+ "crc",
+ "crossbeam",
+ "ctrlc",
+ "flatbuffers",
+ "futures",
+ "io-uring",
+ "lazy_static",
+ "log",
+ "log4rs",
+ "minstant",
+ "mockall",
+ "model",
+ "num_cpus",
+ "num_enum",
+ "observation",
+ "polling 0.1.0",
+ "pprof",
+ "prometheus",
+ "protocol",
+ "replication",
+ "serde",
+ "serde_yaml 0.9.21",
+ "store",
+ "test-util",
+ "thiserror",
+ "tikv-jemallocator",
+ "tokio",
+ "tokio-uring",
+ "transport",
+ "util",
 ]
 
 [[package]]
