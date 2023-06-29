@@ -6,8 +6,8 @@ advertiseClientUrls = "test-advertise-client-urls"
 name = "test-name"
 dataDir = "test-data-dir"
 initialCluster = "test-initial-cluster"
-pmAddr = "test-pm-addr"
-advertisePMAddr = "test-advertise-pm-addr"
+pdAddr = "test-pd-addr"
+advertisePDAddr = "test-advertise-pd-addr"
 leaderLease = 123
 leaderPriorityCheckInterval = 3661000000000
 

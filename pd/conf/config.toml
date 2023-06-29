@@ -1,4 +1,4 @@
-# PM Configuration.
+# PD Configuration.
 
 # urls for peer traffic
 peerUrls = "http://127.0.0.1:12380"
@@ -9,24 +9,24 @@ advertisePeerUrls = "http://127.0.0.1:12380"
 # advertise urls for client traffic
 advertiseClientUrls = "http://127.0.0.1:12379"
 
-# human-readable name for this PM member
-name = "pm-hostname"
+# human-readable name for this PD member
+name = "pd-hostname"
 # path to the data directory
-dataDir = "default.pm-hostname"
+dataDir = "default.pd-hostname"
 # the initial cluster configuration for bootstrapping
-initialCluster = "pm=http://127.0.0.1:12380"
-# the address of PM
-pmAddr = "127.0.0.1:12378"
-# advertise address of PM
-advertisePMAddr = "127.0.0.1:12378"
+initialCluster = "pd=http://127.0.0.1:12380"
+# the address of PD
+pdAddr = "127.0.0.1:12378"
+# advertise address of PD
+advertisePDAddr = "127.0.0.1:12378"
 # expiration time of the leader, in seconds
 leaderLease = 3
 # time interval for checking the leader's priority
 leaderPriorityCheckInterval = 60000000000 # 1 minute
 
 [etcd]
-# set different tokens to prevent communication between PMs in different clusters
-initialClusterToken = "pm-cluster"
+# set different tokens to prevent communication between PD nodes in different clusters
+initialClusterToken = "pd-cluster"
 # log level for etcd. One of: debug|info|warn|error|panic|fatal
 logLevel = "warn"
 # interpret 'auto-compaction-retention' one of: periodic|revision

@@ -28,8 +28,8 @@ type Handler interface {
 	DescribeStream(req *protocol.DescribeStreamRequest, resp *protocol.DescribeStreamResponse)
 	// ReportMetrics reports metrics to pd.
 	ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse)
-	// DescribePMCluster describes pd cluster membership.
-	DescribePMCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse)
+	// DescribePDCluster describes pd cluster membership.
+	DescribePDCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse)
 }
 
 var (
@@ -104,11 +104,11 @@ var (
 				handler.ReportMetrics(req.(*protocol.ReportMetricsRequest), resp.(*protocol.ReportMetricsResponse))
 			},
 		},
-		{Code: operation.OpDescribePMCluster}: {
+		{Code: operation.OpDescribePDCluster}: {
 			newReq:  func() protocol.InRequest { return &protocol.DescribePDClusterRequest{} },
 			newResp: func() protocol.OutResponse { return &protocol.DescribePDClusterResponse{} },
 			act: func(handler Handler, req protocol.InRequest, resp protocol.OutResponse) {
-				handler.DescribePMCluster(req.(*protocol.DescribePDClusterRequest), resp.(*protocol.DescribePDClusterResponse))
+				handler.DescribePDCluster(req.(*protocol.DescribePDClusterRequest), resp.(*protocol.DescribePDClusterResponse))
 			},
 		},
 	}

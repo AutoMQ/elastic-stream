@@ -140,11 +140,11 @@ func TestNewOperation(t *testing.T) {
 			},
 		},
 		{
-			name:   "DescribePMCluster",
-			fields: fields{code: OpDescribePMCluster},
+			name:   "DescribePDCluster",
+			fields: fields{code: OpDescribePDCluster},
 			wants: wants{
-				s:    "DescribePMCluster",
-				code: OpDescribePMCluster,
+				s:    "DescribePDCluster",
+				code: OpDescribePDCluster,
 			},
 		},
 		{

@@ -24,7 +24,7 @@ type Stream interface {
 }
 
 // CreateStream creates a stream.
-// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrNotLeader if the current PD node is not the leader.
 func (c *RaftCluster) CreateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error) {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
@@ -53,7 +53,7 @@ func (c *RaftCluster) CreateStream(ctx context.Context, stream *rpcfb.StreamT) (
 }
 
 // DeleteStream deletes the stream.
-// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrNotLeader if the current PD node is not the leader.
 // It returns ErrStreamNotFound if the stream is not found.
 func (c *RaftCluster) DeleteStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))
@@ -75,7 +75,7 @@ func (c *RaftCluster) DeleteStream(ctx context.Context, streamID int64) (*rpcfb.
 }
 
 // UpdateStream updates the stream.
-// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrNotLeader if the current PD node is not the leader.
 func (c *RaftCluster) UpdateStream(ctx context.Context, stream *rpcfb.StreamT) (*rpcfb.StreamT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", stream.StreamId), traceutil.TraceLogField(ctx))
 
@@ -93,7 +93,7 @@ func (c *RaftCluster) UpdateStream(ctx context.Context, stream *rpcfb.StreamT) (
 }
 
 // DescribeStream describes the stream.
-// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrNotLeader if the current PD node is not the leader.
 // It returns ErrStreamNotFound if the stream is not found.
 func (c *RaftCluster) DescribeStream(ctx context.Context, streamID int64) (*rpcfb.StreamT, error) {
 	logger := c.lg.With(zap.Int64("stream-id", streamID), traceutil.TraceLogField(ctx))

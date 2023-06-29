@@ -42,7 +42,7 @@ var (
 		return Config{
 			Etcd: func() *embed.Config {
 				config := embed.NewConfig()
-				config.InitialClusterToken = "pm-cluster"
+				config.InitialClusterToken = "pd-cluster"
 				config.LogLevel = "warn"
 				config.AutoCompactionMode = "periodic"
 				config.AutoCompactionRetention = "1h"
@@ -55,11 +55,11 @@ var (
 			ClientUrls:                  "http://127.0.0.1:12379",
 			AdvertisePeerUrls:           "http://127.0.0.1:12380",
 			AdvertiseClientUrls:         "http://127.0.0.1:12379",
-			Name:                        "pm-hostname",
-			DataDir:                     "default.pm-hostname",
-			InitialCluster:              "pm=http://127.0.0.1:12380",
-			PMAddr:                      "127.0.0.1:12378",
-			AdvertisePMAddr:             "127.0.0.1:12378",
+			Name:                        "pd-hostname",
+			DataDir:                     "default.pd-hostname",
+			InitialCluster:              "pd=http://127.0.0.1:12380",
+			PDAddr:                      "127.0.0.1:12378",
+			AdvertisePDAddr:             "127.0.0.1:12378",
 			LeaderLease:                 3,
 			LeaderPriorityCheckInterval: time.Minute,
 		}
@@ -119,8 +119,8 @@ var (
 			Name:                        "test-name",
 			DataDir:                     "test-data-dir",
 			InitialCluster:              "test-initial-cluster",
-			PMAddr:                      "test-pm-addr",
-			AdvertisePMAddr:             "test-advertise-pm-addr",
+			PDAddr:                      "test-pd-addr",
+			AdvertisePDAddr:             "test-advertise-pd-addr",
 			LeaderLease:                 123,
 			LeaderPriorityCheckInterval: time.Hour + time.Minute + time.Second,
 		}
@@ -144,7 +144,7 @@ func TestNewConfig(t *testing.T) {
 			want: Config{
 				Etcd: func() *embed.Config {
 					config := embed.NewConfig()
-					config.InitialClusterToken = "pm-cluster"
+					config.InitialClusterToken = "pd-cluster"
 					config.LogLevel = "warn"
 					config.AutoCompactionMode = "periodic"
 					config.AutoCompactionRetention = "1h"
@@ -160,8 +160,8 @@ func TestNewConfig(t *testing.T) {
 				Name:                        "",
 				DataDir:                     "",
 				InitialCluster:              "",
-				PMAddr:                      "127.0.0.1:12378",
-				AdvertisePMAddr:             "",
+				PDAddr:                      "127.0.0.1:12378",
+				AdvertisePDAddr:             "",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
 			},
@@ -195,8 +195,8 @@ func TestNewConfig(t *testing.T) {
 				"--leader-lease=123",
 				"--leader-priority-check-interval=1h1m1s",
 				"--etcd-initial-cluster-token=test-initial-cluster-token",
-				"--pm-addr=test-pm-addr",
-				"--advertise-pm-addr=test-advertise-pm-addr",
+				"--pd-addr=test-pd-addr",
+				"--advertise-pd-addr=test-advertise-pd-addr",
 				"--etcd-log-level=test-etcd-log-level",
 				"--etcd-auto-compaction-mode=test-auto-compaction-mode",
 				"--etcd-auto-compaction-retention=test-auto-compaction-retention",
@@ -251,8 +251,8 @@ func TestNewConfig(t *testing.T) {
 				Name:                        "test-name",
 				DataDir:                     "test-data-dir",
 				InitialCluster:              "test-initial-cluster",
-				PMAddr:                      "test-pm-addr",
-				AdvertisePMAddr:             "test-advertise-pm-addr",
+				PDAddr:                      "test-pd-addr",
+				AdvertisePDAddr:             "test-advertise-pd-addr",
 				LeaderLease:                 123,
 				LeaderPriorityCheckInterval: time.Hour + time.Minute + time.Second,
 			},
@@ -350,12 +350,12 @@ func TestNewConfig(t *testing.T) {
 func TestConfigFromEnv(t *testing.T) {
 	re := require.New(t)
 
-	t.Setenv("PM_NAME", "env-test-name")
-	t.Setenv("PM_ETCD_INITIALCLUSTERTOKEN", "env-test-token")
-	t.Setenv("PM_LOG_ZAP_ENCODERCONFIG_MESSAGEKEY", "env-test-msg-key")
-	t.Setenv("PM_LOG_ZAP_DISABLECALLER", "true")
-	t.Setenv("PM_ETCD_TICKMS", "4321")
-	t.Setenv("PM_ETCD_CLUSTERSTATE", "env-test-cluster-state")
+	t.Setenv("PD_NAME", "env-test-name")
+	t.Setenv("PD_ETCD_INITIALCLUSTERTOKEN", "env-test-token")
+	t.Setenv("PD_LOG_ZAP_ENCODERCONFIG_MESSAGEKEY", "env-test-msg-key")
+	t.Setenv("PD_LOG_ZAP_DISABLECALLER", "true")
+	t.Setenv("PD_ETCD_TICKMS", "4321")
+	t.Setenv("PD_ETCD_CLUSTERSTATE", "env-test-cluster-state")
 
 	config, err := NewConfig([]string{
 		"--config=./test/test-config.toml",
@@ -392,14 +392,14 @@ func TestConfig_Adjust(t *testing.T) {
 			want: &Config{
 				Etcd: func() *embed.Config {
 					config := embed.NewConfig()
-					config.Name = fmt.Sprintf("pm-%s", hostname)
-					config.Dir = fmt.Sprintf("default.pm-%s", hostname)
-					config.InitialCluster = fmt.Sprintf("pm-%s=http://127.0.0.1:12380", hostname)
+					config.Name = fmt.Sprintf("pd-%s", hostname)
+					config.Dir = fmt.Sprintf("default.pd-%s", hostname)
+					config.InitialCluster = fmt.Sprintf("pd-%s=http://127.0.0.1:12380", hostname)
 					config.LPUrls, _ = parseUrls("http://127.0.0.1:12380")
 					config.LCUrls, _ = parseUrls("http://127.0.0.1:12379")
 					config.APUrls, _ = parseUrls("http://127.0.0.1:12380")
 					config.ACUrls, _ = parseUrls("http://127.0.0.1:12379")
-					config.InitialClusterToken = "pm-cluster"
+					config.InitialClusterToken = "pd-cluster"
 					config.LogLevel = "warn"
 					config.AutoCompactionMode = "periodic"
 					config.AutoCompactionRetention = "1h"
@@ -412,11 +412,11 @@ func TestConfig_Adjust(t *testing.T) {
 				ClientUrls:                  "http://127.0.0.1:12379",
 				AdvertisePeerUrls:           "http://127.0.0.1:12380",
 				AdvertiseClientUrls:         "http://127.0.0.1:12379",
-				Name:                        fmt.Sprintf("pm-%s", hostname),
-				DataDir:                     fmt.Sprintf("default.pm-%s", hostname),
-				InitialCluster:              fmt.Sprintf("pm-%s=http://127.0.0.1:12380", hostname),
-				PMAddr:                      "127.0.0.1:12378",
-				AdvertisePMAddr:             "127.0.0.1:12378",
+				Name:                        fmt.Sprintf("pd-%s", hostname),
+				DataDir:                     fmt.Sprintf("default.pd-%s", hostname),
+				InitialCluster:              fmt.Sprintf("pd-%s=http://127.0.0.1:12380", hostname),
+				PDAddr:                      "127.0.0.1:12378",
+				AdvertisePDAddr:             "127.0.0.1:12378",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
 			},
@@ -427,7 +427,7 @@ func TestConfig_Adjust(t *testing.T) {
 				config, _ := NewConfig([]string{}, io.Discard)
 				config.PeerUrls = "http://example.com:12380,http://10.0.0.1:12380"
 				config.ClientUrls = "http://example.com:12379,http://10.0.0.1:12379"
-				config.PMAddr = "example.com:12378"
+				config.PDAddr = "example.com:12378"
 				config.Name = "test-name"
 				return config
 			}(),
@@ -441,7 +441,7 @@ func TestConfig_Adjust(t *testing.T) {
 					config.LCUrls, _ = parseUrls("http://example.com:12379,http://10.0.0.1:12379")
 					config.APUrls, _ = parseUrls("http://example.com:12380,http://10.0.0.1:12380")
 					config.ACUrls, _ = parseUrls("http://example.com:12379,http://10.0.0.1:12379")
-					config.InitialClusterToken = "pm-cluster"
+					config.InitialClusterToken = "pd-cluster"
 					config.LogLevel = "warn"
 					config.AutoCompactionMode = "periodic"
 					config.AutoCompactionRetention = "1h"
@@ -457,8 +457,8 @@ func TestConfig_Adjust(t *testing.T) {
 				Name:                        "test-name",
 				DataDir:                     "default.test-name",
 				InitialCluster:              "test-name=http://example.com:12380,test-name=http://10.0.0.1:12380",
-				PMAddr:                      "example.com:12378",
-				AdvertisePMAddr:             "example.com:12378",
+				PDAddr:                      "example.com:12378",
+				AdvertisePDAddr:             "example.com:12378",
 				LeaderLease:                 3,
 				LeaderPriorityCheckInterval: time.Minute,
 			},

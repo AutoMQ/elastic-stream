@@ -44,7 +44,7 @@ const (
 	_priorityPathPrefix = "priority"
 	_infoPathPrefix     = "info"
 
-	_leaderElectionPurpose = "PM leader election"
+	_leaderElectionPurpose = "PD leader election"
 
 	_moveLeaderTimeout = 5 * time.Second // The timeout to wait transfer etcd leader to complete
 )
@@ -59,10 +59,10 @@ type Member struct {
 	id              uint64 // etcd server id.
 	clusterRootPath string // cluster root path in etcd
 
-	// info is current PM's Info.
-	// It will be serialized (infoValue) and saved in etcd leader key when the PM node
-	// is successfully elected as the PM leader of the cluster.
-	// Every write will use it to check PM leadership.
+	// info is current PD's Info.
+	// It will be serialized (infoValue) and saved in etcd leader key when the PD node
+	// is successfully elected as the PD leader of the cluster.
+	// Every write will use it to check PD leadership.
 	info      *Info
 	infoValue []byte
 
@@ -87,7 +87,7 @@ func (m *Member) Init(ctx context.Context, cfg *config.Config, name string, clus
 		MemberID:        m.id,
 		ClientUrls:      strings.Split(cfg.AdvertiseClientUrls, config.URLSeparator),
 		PeerUrls:        strings.Split(cfg.AdvertisePeerUrls, config.URLSeparator),
-		AdvertisePMAddr: cfg.AdvertisePMAddr,
+		AdvertisePDAddr: cfg.AdvertisePDAddr,
 	}
 	logger := m.lg.With(zap.Object("member-info", info))
 
@@ -117,25 +117,25 @@ func (m *Member) CheckLeader(ctx context.Context) (*Info, etcdutil.ModRevision, 
 	logger := m.lg
 
 	if m.EtcdLeaderID() == 0 {
-		logger.Info("no etcd leader, check PM leader later")
+		logger.Info("no etcd leader, check PD leader later")
 		time.Sleep(CheckAgainInterval)
 		return nil, 0, true
 	}
 
 	leader, rev, err := m.GetLeader(ctx)
 	if err != nil {
-		logger.Warn("failed to get PM leader", zap.Error(err))
+		logger.Warn("failed to get PD leader", zap.Error(err))
 		time.Sleep(CheckAgainInterval)
 		return nil, 0, true
 	}
 
 	if leader != nil && leader.MemberID == m.id {
-		// oh, we are already a PM leader, which indicates we may meet something wrong
+		// oh, we are already a PD leader, which indicates we may meet something wrong
 		// in previous CampaignLeader. We should delete the leadership and campaign again.
-		logger.Warn("PM leader has not changed, delete and campaign again", zap.Object("old-pm-leader", leader))
+		logger.Warn("PD leader has not changed, delete and campaign again", zap.Object("old-pd-leader", leader))
 		// Delete the leader itself and let others start a new election again.
 		if err = m.leadership.DeleteLeaderKey(ctx); err != nil {
-			logger.Warn("deleting PM leader key meets error", zap.Error(err))
+			logger.Warn("deleting PD leader key meets error", zap.Error(err))
 			time.Sleep(CheckAgainInterval)
 			return nil, 0, true
 		}
@@ -176,7 +176,7 @@ func (m *Member) WatchLeader(serverCtx context.Context, leader *Info, revision e
 	m.unsetLeader()
 }
 
-// CampaignLeader is used to campaign a PM member's leadership and make it become a PM leader.
+// CampaignLeader is used to campaign a PD member's leadership and make it become a PD leader.
 // returns true if successfully campaign leader
 func (m *Member) CampaignLeader(ctx context.Context, leaseTimeout int64) (bool, error) {
 	return m.leadership.Campaign(ctx, leaseTimeout, string(m.Info()))
@@ -186,17 +186,17 @@ func (m *Member) Info() []byte {
 	return m.infoValue
 }
 
-// KeepLeader is used to keep the PM leader's leadership.
+// KeepLeader is used to keep the PD leader's leadership.
 func (m *Member) KeepLeader(ctx context.Context) {
 	m.leadership.Keep(ctx)
 }
 
-// EnableLeader sets the member itself to a PM leader.
+// EnableLeader sets the member itself to a PD leader.
 func (m *Member) EnableLeader() {
 	m.setLeader(m.info)
 }
 
-// ResetLeader is used to reset the PM member's current leadership.
+// ResetLeader is used to reset the PD member's current leadership.
 // Basically it will reset the leader lease and unset leader info.
 func (m *Member) ResetLeader() {
 	m.leadership.Reset()
@@ -276,7 +276,7 @@ func (m *Member) IsLeader() bool {
 	return leader != nil && leader.MemberID == m.info.MemberID && m.leadership.Check()
 }
 
-// Leader returns current PM leader of PM cluster.
+// Leader returns current PD leader of PD cluster.
 func (m *Member) Leader() *Info {
 	leader := m.leader.Load()
 	if leader == nil {
@@ -310,7 +310,7 @@ func (m *Member) ClusterInfo(ctx context.Context) ([]*Info, error) {
 			MemberID:        em.ID,
 			PeerUrls:        em.PeerURLs,
 			ClientUrls:      em.ClientURLs,
-			AdvertisePMAddr: info.AdvertisePMAddr,
+			AdvertisePDAddr: info.AdvertisePDAddr,
 		}
 		if leader != nil && member.MemberID == leader.MemberID {
 			member.IsLeader = true

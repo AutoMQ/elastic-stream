@@ -167,5 +167,5 @@ func (c *SbpClient) format() format.Format {
 
 func newClientID() string {
 	hostname, _ := os.Hostname()
-	return fmt.Sprintf("pm|%s|%d|%d|%d", hostname, os.Getpid(), clientIDCounter.Add(1), time.Now().UnixNano())
+	return fmt.Sprintf("pd|%s|%d|%d|%d", hostname, os.Getpid(), clientIDCounter.Add(1), time.Now().UnixNano())
 }

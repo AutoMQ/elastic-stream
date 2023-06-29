@@ -34,7 +34,7 @@ func NewHandler(c Cluster, lg *zap.Logger) *Handler {
 }
 
 // Check checks if the current node is the leader
-// If not, it sets "PM_NOT_LEADER" error in the response and returns false
+// If not, it sets "PD_NOT_LEADER" error in the response and returns false
 func (h *Handler) Check(req protocol.InRequest, resp protocol.OutResponse) (pass bool) {
 	if h.c.IsLeader() {
 		return true
@@ -48,8 +48,8 @@ func (h *Handler) Check(req protocol.InRequest, resp protocol.OutResponse) (pass
 }
 
 func (h *Handler) notLeaderError(ctx context.Context) *rpcfb.StatusT {
-	pmCluster := h.pdCluster(ctx)
-	return &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: fbutil.Marshal(pmCluster)}
+	pdCluster := h.pdCluster(ctx)
+	return &rpcfb.StatusT{Code: rpcfb.ErrorCodePM_NOT_LEADER, Message: "not leader", Detail: fbutil.Marshal(pdCluster)}
 }
 
 func (h *Handler) pdCluster(ctx context.Context) *rpcfb.PlacementManagerClusterT {
@@ -61,7 +61,7 @@ func (h *Handler) pdCluster(ctx context.Context) *rpcfb.PlacementManagerClusterT
 	for _, member := range members {
 		pd.Nodes = append(pd.Nodes, &rpcfb.PlacementManagerNodeT{
 			Name:          member.Name,
-			AdvertiseAddr: member.AdvertisePMAddr,
+			AdvertiseAddr: member.AdvertisePDAddr,
 			IsLeader:      member.IsLeader,
 		})
 	}

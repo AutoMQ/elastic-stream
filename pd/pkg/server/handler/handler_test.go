@@ -60,7 +60,7 @@ func (m *mockServer) ClusterInfo(_ context.Context) ([]*member.Info, error) {
 		MemberID:        1,
 		PeerUrls:        []string{"test-member-peer-urls"},
 		ClientUrls:      []string{"test-member-client-urls"},
-		AdvertisePMAddr: "test-member-sbp-addr",
+		AdvertisePDAddr: "test-member-sbp-addr",
 		IsLeader:        true,
 	}}, nil
 }

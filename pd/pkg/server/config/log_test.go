@@ -97,7 +97,7 @@ func TestLogRotation(t *testing.T) {
 	l.EnableRotation = true
 	l.Rotate.MaxSize = 1
 	l.Rotate.MaxBackups = 3
-	l.Zap.OutputPaths = []string{filepath.Join(tempDir, "test1", "pm.log")}
+	l.Zap.OutputPaths = []string{filepath.Join(tempDir, "test1", "pd.log")}
 
 	err := l.Adjust()
 	re.NoError(err)

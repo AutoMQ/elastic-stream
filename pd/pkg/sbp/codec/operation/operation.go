@@ -27,7 +27,7 @@ const (
 	OpTrimStream     uint16 = 0x3005
 
 	OpReportMetrics     uint16 = 0x4001
-	OpDescribePMCluster uint16 = 0x4002
+	OpDescribePDCluster uint16 = 0x4002
 )
 
 // Operation is enumeration of Frame.OpCode
@@ -78,8 +78,8 @@ func (o Operation) String() string {
 		return "TrimStream"
 	case OpReportMetrics:
 		return "ReportMetrics"
-	case OpDescribePMCluster:
-		return "DescribePMCluster"
+	case OpDescribePDCluster:
+		return "DescribePDCluster"
 	default:
 		return fmt.Sprintf("Unknown(%#04x)", o.Code)
 	}

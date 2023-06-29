@@ -53,21 +53,21 @@ func NewEtcdConfig(tb testing.TB) *embed.Config {
 	return cfg
 }
 
-func NewPMConfig(tb testing.TB) *config.Config {
+func NewPDConfig(tb testing.TB) *config.Config {
 	re := require.New(tb)
 
 	peerURL := tempurl.Alloc(tb)
 	clientURL := tempurl.Alloc(tb)
-	pmAddr := tempurl.AllocAddr(tb)
+	pdAddr := tempurl.AllocAddr(tb)
 
 	cfg, err := config.NewConfig([]string{
 		"--peer-urls", peerURL,
 		"--client-urls", clientURL,
-		"--pm-addr", pmAddr,
+		"--pd-addr", pdAddr,
 	}, io.Discard)
 	re.NoError(err)
 
-	cfg.Name = fmt.Sprintf("test_pm_%s", tb.Name())
+	cfg.Name = fmt.Sprintf("test_pd_%s", tb.Name())
 	cfg.DataDir = tb.TempDir()
 
 	return cfg

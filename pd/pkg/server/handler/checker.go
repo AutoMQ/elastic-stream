@@ -17,7 +17,7 @@ type Checker struct {
 }
 
 func (c Checker) Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.HeartbeatResponse) {
-	// all pm nodes will handle heartbeat request, so we don't need to check leader here.
+	// all pd nodes will handle heartbeat request, so we don't need to check leader here.
 	c.Handler.Heartbeat(req, resp)
 }
 
@@ -78,11 +78,11 @@ func (c Checker) DescribeStream(req *protocol.DescribeStreamRequest, resp *proto
 }
 
 func (c Checker) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protocol.ReportMetricsResponse) {
-	// all pm nodes will handle report metrics request, so we don't need to check leader here.
+	// all pd nodes will handle report metrics request, so we don't need to check leader here.
 	c.Handler.ReportMetrics(req, resp)
 }
 
-func (c Checker) DescribePMCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse) {
-	// all pm nodes will handle describe PM cluster request, so we don't need to check leader here.
-	c.Handler.DescribePMCluster(req, resp)
+func (c Checker) DescribePDCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse) {
+	// all pd nodes will handle describe PD cluster request, so we don't need to check leader here.
+	c.Handler.DescribePDCluster(req, resp)
 }

@@ -288,7 +288,7 @@ func (rm *ReportMetricsRequest) Timeout() int32 {
 	return 0
 }
 
-// DescribePDClusterRequest is a request to operation.OpDescribePMCluster
+// DescribePDClusterRequest is a request to operation.OpDescribePDCluster
 type DescribePDClusterRequest struct {
 	baseRequest
 	baseUnmarshaler

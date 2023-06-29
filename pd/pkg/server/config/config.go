@@ -24,18 +24,18 @@ var (
 const (
 	URLSeparator = "," // URLSeparator is the separator in fields such as PeerUrls, ClientUrls, etc.
 
-	_envPrefix = "PM"
+	_envPrefix = "PD"
 
 	_defaultPeerUrls                          = "http://127.0.0.1:12380"
 	_defaultClientUrls                        = "http://127.0.0.1:12379"
 	_defaultEtcdLogLevel                      = "warn"
 	_defaultCompactionMode                    = "periodic"
 	_defaultAutoCompactionRetention           = "1h"
-	_defaultNameFormat                        = "pm-%s"
+	_defaultNameFormat                        = "pd-%s"
 	_defaultDataDirFormat                     = "default.%s"
 	_defaultInitialClusterFormat              = "%s=%s"
-	_defaultInitialClusterToken               = "pm-cluster"
-	_defaultPMAddr                            = "127.0.0.1:12378"
+	_defaultInitialClusterToken               = "pd-cluster"
+	_defaultPDAddr                            = "127.0.0.1:12378"
 	_defaultLeaderLease                 int64 = 3
 	_defaultLeaderPriorityCheckInterval       = time.Minute
 
@@ -64,8 +64,8 @@ type Config struct {
 	Name            string
 	DataDir         string
 	InitialCluster  string
-	PMAddr          string
-	AdvertisePMAddr string
+	PDAddr          string
+	AdvertisePDAddr string
 
 	// LeaderLease time, if leader doesn't update its TTL
 	// in etcd after lease time, etcd will expire the leader key
@@ -150,8 +150,8 @@ func (c *Config) Adjust() error {
 		c.DataDir = fmt.Sprintf(_defaultDataDirFormat, c.Name)
 	}
 	if c.InitialCluster == "" {
-		// For example, when Name is set "my-pm" and AdvertisePeerUrls is set to "http://127.0.0.1:12380,http://127.0.0.1:12381",
-		// the InitialCluster is "my-pm=http://127.0.0.1:12380,my-pm=http://127.0.0.1:12381".
+		// For example, when Name is set "my-pd" and AdvertisePeerUrls is set to "http://127.0.0.1:12380,http://127.0.0.1:12381",
+		// the InitialCluster is "my-pd=http://127.0.0.1:12380,my-pd=http://127.0.0.1:12381".
 		urls := strings.Split(c.AdvertisePeerUrls, URLSeparator)
 		nodes := make([]string, 0, len(urls))
 		for _, u := range urls {
@@ -159,8 +159,8 @@ func (c *Config) Adjust() error {
 		}
 		c.InitialCluster = strings.Join(nodes, URLSeparator)
 	}
-	if c.AdvertisePMAddr == "" {
-		c.AdvertisePMAddr = c.PMAddr
+	if c.AdvertisePDAddr == "" {
+		c.AdvertisePDAddr = c.PDAddr
 	}
 
 	// set etcd config
@@ -264,23 +264,23 @@ func configure(v *viper.Viper, fs *pflag.FlagSet) {
 	_ = v.BindPFlag("etcd.autoCompactionMode", fs.Lookup("etcd-auto-compaction-mode"))
 	_ = v.BindPFlag("etcd.autoCompactionRetention", fs.Lookup("etcd-auto-compaction-retention"))
 
-	// PM members settings
-	fs.String("name", "", "human-readable name for this PM member (default 'pm-${hostname}')")
+	// PD members settings
+	fs.String("name", "", "human-readable name for this PD member (default 'pd-${hostname}')")
 	fs.String("data-dir", "", "path to the data directory (default 'default.${name}')")
-	fs.String("initial-cluster", "", "initial cluster configuration for bootstrapping, e.g. pm=http://127.0.0.1:12380. (default '${name}=${advertise-peer-urls}')")
+	fs.String("initial-cluster", "", "initial cluster configuration for bootstrapping, e.g. pd=http://127.0.0.1:12380. (default '${name}=${advertise-peer-urls}')")
 	fs.Int64("leader-lease", _defaultLeaderLease, "expiration time of the leader, in seconds")
 	fs.Duration("leader-priority-check-interval", _defaultLeaderPriorityCheckInterval, "time interval for checking the leader's priority")
-	fs.String("etcd-initial-cluster-token", _defaultInitialClusterToken, "set different tokens to prevent communication between PMs in different clusters")
-	fs.String("pm-addr", _defaultPMAddr, "the address of PM")
-	fs.String("advertise-pm-addr", "", "advertise address of PM (default '${pm-addr}')")
+	fs.String("etcd-initial-cluster-token", _defaultInitialClusterToken, "set different tokens to prevent communication between PD nodes in different clusters")
+	fs.String("pd-addr", _defaultPDAddr, "the address of PD")
+	fs.String("advertise-pd-addr", "", "advertise address of PD (default '${pd-addr}')")
 	_ = v.BindPFlag("name", fs.Lookup("name"))
 	_ = v.BindPFlag("dataDir", fs.Lookup("data-dir"))
 	_ = v.BindPFlag("initialCluster", fs.Lookup("initial-cluster"))
 	_ = v.BindPFlag("leaderLease", fs.Lookup("leader-lease"))
 	_ = v.BindPFlag("leaderPriorityCheckInterval", fs.Lookup("leader-priority-check-interval"))
 	_ = v.BindPFlag("etcd.initialClusterToken", fs.Lookup("etcd-initial-cluster-token"))
-	_ = v.BindPFlag("pmAddr", fs.Lookup("pm-addr"))
-	_ = v.BindPFlag("advertisePMAddr", fs.Lookup("advertise-pm-addr"))
+	_ = v.BindPFlag("pdAddr", fs.Lookup("pd-addr"))
+	_ = v.BindPFlag("advertisePDAddr", fs.Lookup("advertise-pd-addr"))
 
 	// bind env not set before
 	_ = v.BindEnv("etcd.clusterState")

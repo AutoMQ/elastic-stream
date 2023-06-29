@@ -74,7 +74,7 @@ type Server struct {
 
 	member    *member.Member   // for leader election
 	client    *clientv3.Client // etcd client
-	clusterID uint64           // pm cluster id
+	clusterID uint64           // PD cluster id
 	rootPath  string           // root path in etcd
 
 	storage   storage.Storage
@@ -85,7 +85,7 @@ type Server struct {
 	lg *zap.Logger // logger
 }
 
-// NewServer creates the UNINITIALIZED PM server with given configuration.
+// NewServer creates the UNINITIALIZED PD server with given configuration.
 func NewServer(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Server, error) {
 	s := &Server{
 		cfg:    cfg,
@@ -201,10 +201,10 @@ func (s *Server) startServer() error {
 	s.cluster = cluster.NewRaftCluster(s.ctx, s.cfg.Cluster, s.member, logger)
 	s.sbpClient = sbpClient.NewClient(s.cfg.Sbp.Client, logger)
 
-	pmAddr := s.cfg.PMAddr
-	listener, err := net.Listen("tcp", pmAddr)
+	pdAddr := s.cfg.PDAddr
+	listener, err := net.Listen("tcp", pdAddr)
 	if err != nil {
-		return errors.Wrapf(err, "listen on %s", pmAddr)
+		return errors.Wrapf(err, "listen on %s", pdAddr)
 	}
 	go s.serveSbp(listener, s.cluster)
 
@@ -282,15 +282,15 @@ func (s *Server) leaderLoop() {
 		}
 
 		if leader != nil {
-			logger.Info("start to watch PM leader", zap.Object("pm-leader", leader))
-			// WatchLeader will keep looping and never return unless the PM leader has changed.
+			logger.Info("start to watch PD leader", zap.Object("pd-leader", leader))
+			// WatchLeader will keep looping and never return unless the PD leader has changed.
 			s.member.WatchLeader(s.loopCtx, leader, rev)
-			logger.Info("PM leader has changed, try to re-campaign a PM leader")
+			logger.Info("PD leader has changed, try to re-campaign a PD leader")
 		}
 
-		// To make sure the etcd leader and PM leader are on the same server.
+		// To make sure the etcd leader and PD leader are on the same server.
 		if leaderID := s.member.EtcdLeaderID(); leaderID != s.member.ID() {
-			logger.Info("etcd leader and PM leader are not on the same server, skip campaigning of PM leader and check later",
+			logger.Info("etcd leader and PD leader are not on the same server, skip campaigning of PD leader and check later",
 				zap.String("server-name", s.Name()), zap.Uint64("etcd-leader-id", leaderID), zap.Uint64("member-id", s.member.ID()))
 			time.Sleep(member.CheckAgainInterval)
 			continue
@@ -301,16 +301,16 @@ func (s *Server) leaderLoop() {
 
 func (s *Server) campaignLeader() {
 	logger := s.lg
-	logger.Info("start to campaign PM leader", zap.String("campaign-pm-leader-name", s.Name()))
+	logger.Info("start to campaign PD leader", zap.String("campaign-pd-leader-name", s.Name()))
 
 	// campaign leader
 	success, err := s.member.CampaignLeader(s.ctx, s.cfg.LeaderLease)
 	if err != nil {
-		logger.Error("an error when campaign leader", zap.String("campaign-pm-leader-name", s.Name()), zap.Error(err))
+		logger.Error("an error when campaign leader", zap.String("campaign-pd-leader-name", s.Name()), zap.Error(err))
 		return
 	}
 	if !success {
-		logger.Info("failed to campaign leader", zap.String("campaign-pm-leader-name", s.Name()))
+		logger.Info("failed to campaign leader", zap.String("campaign-pd-leader-name", s.Name()))
 		return
 	}
 
@@ -322,9 +322,9 @@ func (s *Server) campaignLeader() {
 		s.member.ResetLeader()
 	}
 	defer resetLeaderOnce.Do(resetLeaderFunc)
-	// maintain the PM leadership
+	// maintain the PD leadership
 	s.member.KeepLeader(ctx)
-	logger.Info("success to campaign leader", zap.String("campaign-pm-leader-name", s.Name()))
+	logger.Info("success to campaign leader", zap.String("campaign-pd-leader-name", s.Name()))
 
 	err = s.cluster.Start(s)
 	if err != nil {
@@ -337,7 +337,7 @@ func (s *Server) campaignLeader() {
 	s.member.EnableLeader()
 	// as soon as cancel the leadership keepalive, then other member have chance to be new leader.
 	defer resetLeaderOnce.Do(resetLeaderFunc)
-	logger.Info("PM cluster leader is ready to serve", zap.String("pm-leader-name", s.Name()))
+	logger.Info("PD cluster leader is ready to serve", zap.String("pd-leader-name", s.Name()))
 
 	s.checkLeaderLoop(ctx)
 }
@@ -352,11 +352,11 @@ func (s *Server) checkLeaderLoop(ctx context.Context) {
 		select {
 		case <-leaderTicker.C:
 			if !s.member.IsLeader() {
-				logger.Info("no longer a leader because lease has expired, pm leader will step down")
+				logger.Info("no longer a leader because lease has expired, pd leader will step down")
 				return
 			}
 			if etcdLeader := s.member.EtcdLeaderID(); etcdLeader != s.member.ID() {
-				logger.Info("etcd leader changed, resigns pm leadership", zap.String("old-pm-leader-name", s.Name()))
+				logger.Info("etcd leader changed, resigns pd leadership", zap.String("old-pd-leader-name", s.Name()))
 				return
 			}
 		case <-ctx.Done():
@@ -507,8 +507,8 @@ func initOrGetClusterID(c *clientv3.Client, key string) (uint64, error) {
 	ID := (ts << 32) + rd
 	value := typeutil.Uint64ToBytes(ID)
 
-	// Multiple PMs may try to init the cluster ID at the same time.
-	// Only one PM can commit this transaction, then other PMs can get
+	// Multiple PD nodes may try to init the cluster ID at the same time.
+	// Only one PD can commit this transaction, then other PD nodes can get
 	// the committed cluster ID.
 	resp, err := c.Txn(ctx).
 		If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).

@@ -19,7 +19,7 @@ import (
 	"github.com/AutoMQ/pd/pkg/server/storage/kv"
 )
 
-// Storage is the interface for the backend storage of the PM.
+// Storage is the interface for the backend storage of the PD.
 type Storage interface {
 	// KV is used to provide the basic key-value read/write ability.
 	kv.KV

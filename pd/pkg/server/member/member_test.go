@@ -18,12 +18,12 @@ func TestMember_ClusterInfo(t *testing.T) {
 	defer closeFunc()
 
 	member := NewMember(etcd, client, zap.NewNop())
-	cfg := &config.Config{AdvertisePMAddr: "test-sbp-addr"}
+	cfg := &config.Config{AdvertisePDAddr: "test-sbp-addr"}
 	err := member.Init(context.Background(), cfg, "test-member", "/test-member")
 	re.NoError(err)
 
 	members, err := member.ClusterInfo(context.Background())
 	re.NoError(err)
 	re.Len(members, 1)
-	re.Equal("test-sbp-addr", members[0].AdvertisePMAddr)
+	re.Equal("test-sbp-addr", members[0].AdvertisePDAddr)
 }

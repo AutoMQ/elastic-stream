@@ -45,7 +45,7 @@ type Range interface {
 // 1. a stream
 // 2. a data node
 // 3. a data node and a stream
-// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrNotLeader if the current PD node is not the leader.
 func (c *RaftCluster) ListRange(ctx context.Context, criteria *rpcfb.ListRangeCriteriaT) (ranges []*rpcfb.RangeT, err error) {
 	byStream := criteria.StreamId >= endpoint.MinStreamID
 	byDataNode := criteria.NodeId >= endpoint.MinDataNodeID
@@ -118,7 +118,7 @@ func (c *RaftCluster) listRangeOnDataNode(ctx context.Context, dataNodeID int32)
 }
 
 // SealRange seals a range. It returns the sealed range if success.
-// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrNotLeader if the current PD node is not the leader.
 // It returns ErrStreamNotFound if the stream does not exist.
 // It returns ErrRangeNotFound if the range does not exist.
 // It returns ErrRangeAlreadySealed if the range is already sealed.
@@ -178,7 +178,7 @@ func (c *RaftCluster) SealRange(ctx context.Context, r *rpcfb.RangeT) (*rpcfb.Ra
 }
 
 // CreateRange creates a range. It returns the created range if success.
-// It returns ErrNotLeader if the current PM node is not the leader.
+// It returns ErrNotLeader if the current PD node is not the leader.
 // It returns ErrStreamNotFound if the stream does not exist.
 // It returns ErrInvalidRangeIndex if the range index is invalid.
 // It returns ErrCreateBeforeSeal if the last range is not sealed.

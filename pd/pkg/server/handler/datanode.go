@@ -22,7 +22,7 @@ func (h *Handler) Heartbeat(req *protocol.HeartbeatRequest, resp *protocol.Heart
 		if err != nil {
 			switch {
 			case errors.Is(err, cluster.ErrNotLeader):
-				// It's ok to ignore this error, as all pm nodes will receive this request.
+				// It's ok to ignore this error, as all pd nodes will receive this request.
 				break
 			default:
 				resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
@@ -70,7 +70,7 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 	if err != nil {
 		switch {
 		case errors.Is(err, cluster.ErrNotLeader):
-			// It's ok to ignore this error, as all pm nodes will receive this request.
+			// It's ok to ignore this error, as all pd nodes will receive this request.
 		default:
 			resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodePM_INTERNAL_SERVER_ERROR, Message: err.Error()})
 		}
@@ -79,7 +79,7 @@ func (h *Handler) ReportMetrics(req *protocol.ReportMetricsRequest, resp *protoc
 	resp.OK()
 }
 
-func (h *Handler) DescribePMCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse) {
+func (h *Handler) DescribePDCluster(req *protocol.DescribePDClusterRequest, resp *protocol.DescribePDClusterResponse) {
 	ctx := req.Context()
 	resp.Cluster = h.pdCluster(ctx)
 	resp.OK()

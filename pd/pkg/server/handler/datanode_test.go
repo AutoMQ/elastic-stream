@@ -13,7 +13,7 @@ import (
 func TestHandler_Heartbeat(t *testing.T) {
 	re := require.New(t)
 
-	// send heartbeats to a pm node which is not leader
+	// send heartbeats to a pd node which is not leader
 	h, closeFunc := startSbpHandler(t, nil, false)
 	defer closeFunc()
 
@@ -29,7 +29,7 @@ func TestHandler_Heartbeat(t *testing.T) {
 	re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code)
 }
 
-func TestHandler_DescribePMCluster(t *testing.T) {
+func TestHandler_DescribePDCluster(t *testing.T) {
 	re := require.New(t)
 
 	h, closeFunc := startSbpHandler(t, nil, true)
@@ -42,7 +42,7 @@ func TestHandler_DescribePMCluster(t *testing.T) {
 		},
 	}}
 	resp := &protocol.DescribePDClusterResponse{}
-	h.DescribePMCluster(req, resp)
+	h.DescribePDCluster(req, resp)
 
 	re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code)
 	re.Len(resp.Cluster.Nodes, 1)

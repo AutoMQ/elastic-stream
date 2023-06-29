@@ -81,9 +81,9 @@ spec:
               value: "/data/placement-driver/default.$(NAME)"
             - name: PD_INITIALCLUSTER
               value: "pd-0=http://pd-0.pd:12380,pd-1=http://pd-1.pd:12380,pd-2=http://pd-2.pd:12380"
-            - name: PD_PMADDR
+            - name: PD_PDADDR
               value: "0.0.0.0:12378"
-            - name: PD_ADVERTISEPMADDR
+            - name: PD_ADVERTISEPDADDR
               value: "$(NAME).pd:12378"
             - name: PD_ETCD_INITIALCLUSTERTOKEN
               value: "pd-cluster"

@@ -338,7 +338,7 @@ func (rm *ReportMetricsResponse) OK() {
 	rm.Status = &rpcfb.StatusT{Code: rpcfb.ErrorCodeOK}
 }
 
-// DescribePDClusterResponse is a response to operation.OpDescribePMCluster
+// DescribePDClusterResponse is a response to operation.OpDescribePDCluster
 type DescribePDClusterResponse struct {
 	baseMarshaller
 	singleResponse
