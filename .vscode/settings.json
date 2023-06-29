@@ -44,13 +44,10 @@
         "Uring",
         "writev"
     ],
-    "[rust]": {
-        "editor.defaultFormatter": "rust-lang.rust-analyzer",
-        "editor.formatOnSave": true,
-        "editor.formatOnSaveMode": "modificationsIfAvailable"
-    },
     "terminal.integrated.cursorStyle": "line",
     "terminal.integrated.cursorBlinking": true,
     "files.insertFinalNewline": true,
     "editor.renderWhitespace": "trailing",
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true,
 }
