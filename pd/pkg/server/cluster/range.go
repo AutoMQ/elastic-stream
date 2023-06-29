@@ -322,7 +322,7 @@ func (c *RaftCluster) newRangeLocked(ctx context.Context, newRange *rpcfb.RangeT
 	for _, n := range servers {
 		ids = append(ids, n.ServerId)
 	}
-	logger = logger.With(zap.Int32s("node-ids", ids))
+	logger = logger.With(zap.Int32s("server-ids", ids))
 
 	nr := &rpcfb.RangeT{
 		StreamId:     newRange.StreamId,

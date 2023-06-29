@@ -20,24 +20,24 @@ var (
 )
 
 type RangeServer interface {
-	Heartbeat(ctx context.Context, node *rpcfb.RangeServerT) error
+	Heartbeat(ctx context.Context, rangeServer *rpcfb.RangeServerT) error
 	AllocateID(ctx context.Context) (int32, error)
-	Metrics(ctx context.Context, node *rpcfb.RangeServerT, metrics *rpcfb.RangeServerMetricsT) error
+	Metrics(ctx context.Context, rangeServer *rpcfb.RangeServerT, metrics *rpcfb.RangeServerMetricsT) error
 }
 
 // Heartbeat updates RangeServer's last active time, and save it to storage if its info changed.
 // It returns ErrNotLeader if the current PD node is not the leader.
-func (c *RaftCluster) Heartbeat(ctx context.Context, node *rpcfb.RangeServerT) error {
+func (c *RaftCluster) Heartbeat(ctx context.Context, rangeServer *rpcfb.RangeServerT) error {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
 	updated, old := c.cache.SaveRangeServer(&cache.RangeServer{
-		RangeServerT:   *node,
+		RangeServerT:   *rangeServer,
 		LastActiveTime: time.Now(),
 	})
 	if updated && c.IsLeader() {
-		logger.Info("range server updated, start to save it", zap.Any("new", node), zap.Any("old", old))
-		_, err := c.storage.SaveRangeServer(ctx, node)
-		logger.Info("finish saving range server", zap.Int32("node-id", node.ServerId), zap.Error(err))
+		logger.Info("range server updated, start to save it", zap.Any("new", rangeServer), zap.Any("old", old))
+		_, err := c.storage.SaveRangeServer(ctx, rangeServer)
+		logger.Info("finish saving range server", zap.Int32("server-id", rangeServer.ServerId), zap.Error(err))
 		if err != nil {
 			if errors.Is(err, kv.ErrTxnFailed) {
 				return ErrNotLeader
@@ -67,18 +67,18 @@ func (c *RaftCluster) AllocateID(ctx context.Context) (int32, error) {
 
 // Metrics receives metrics from range servers.
 // It returns ErrNotLeader if the current PD node is not the leader.
-func (c *RaftCluster) Metrics(ctx context.Context, node *rpcfb.RangeServerT, metrics *rpcfb.RangeServerMetricsT) error {
+func (c *RaftCluster) Metrics(ctx context.Context, rangeServer *rpcfb.RangeServerT, metrics *rpcfb.RangeServerMetricsT) error {
 	logger := c.lg.With(traceutil.TraceLogField(ctx))
 
 	updated, old := c.cache.SaveRangeServer(&cache.RangeServer{
-		RangeServerT:   *node,
+		RangeServerT:   *rangeServer,
 		LastActiveTime: time.Now(),
 		Metrics:        metrics,
 	})
 	if updated && c.IsLeader() {
-		logger.Info("range server updated when reporting metrics, start to save it", zap.Any("new", node), zap.Any("old", old))
-		_, err := c.storage.SaveRangeServer(ctx, node)
-		logger.Info("finish saving range server", zap.Int32("node-id", node.ServerId), zap.Error(err))
+		logger.Info("range server updated when reporting metrics, start to save it", zap.Any("new", rangeServer), zap.Any("old", old))
+		_, err := c.storage.SaveRangeServer(ctx, rangeServer)
+		logger.Info("finish saving range server", zap.Int32("server-id", rangeServer.ServerId), zap.Error(err))
 		if err != nil {
 			if errors.Is(err, kv.ErrTxnFailed) {
 				return ErrNotLeader
@@ -98,21 +98,21 @@ func (c *RaftCluster) chooseRangeServers(cnt int) ([]*rpcfb.RangeServerT, error)
 		return nil, nil
 	}
 
-	nodes := c.cache.ActiveRangeServers(c.cfg.RangeServerTimeout)
-	if cnt > len(nodes) {
-		return nil, errors.Wrapf(ErrNotEnoughRangeServers, "required %d, available %d", cnt, len(nodes))
+	rangeServers := c.cache.ActiveRangeServers(c.cfg.RangeServerTimeout)
+	if cnt > len(rangeServers) {
+		return nil, errors.Wrapf(ErrNotEnoughRangeServers, "required %d, available %d", cnt, len(rangeServers))
 	}
 
-	perm := rand.Perm(len(nodes))
+	perm := rand.Perm(len(rangeServers))
 	chose := make([]*rpcfb.RangeServerT, cnt)
 	for i := 0; i < cnt; i++ {
-		// select two random nodes and choose the one with higher score
-		node1 := nodes[perm[i]]
-		id := node1.ServerId
+		// select two random range servers and choose the one with higher score
+		rangeServer1 := rangeServers[perm[i]]
+		id := rangeServer1.ServerId
 		if cnt+i < len(perm) {
-			node2 := nodes[perm[cnt+i]]
-			if node2.Score() > node1.Score() {
-				id = node2.ServerId
+			rangeServer2 := rangeServers[perm[cnt+i]]
+			if rangeServer2.Score() > rangeServer1.Score() {
+				id = rangeServer2.ServerId
 			}
 		}
 		chose[i] = &rpcfb.RangeServerT{
@@ -120,32 +120,32 @@ func (c *RaftCluster) chooseRangeServers(cnt int) ([]*rpcfb.RangeServerT, error)
 		}
 	}
 
-	idx := c.nodeIdx.Add(uint64(cnt))
+	idx := c.rangeServerIdx.Add(uint64(cnt))
 	for i := 0; i < cnt; i++ {
 		chose[i] = &rpcfb.RangeServerT{
-			ServerId: nodes[(idx-uint64(i))%uint64(len(nodes))].ServerId,
+			ServerId: rangeServers[(idx-uint64(i))%uint64(len(rangeServers))].ServerId,
 		}
 	}
 
 	return chose, nil
 }
 
-func (c *RaftCluster) fillRangeServersInfo(nodes []*rpcfb.RangeServerT) {
-	for _, node := range nodes {
-		c.fillRangeServerInfo(node)
+func (c *RaftCluster) fillRangeServersInfo(rangeServers []*rpcfb.RangeServerT) {
+	for _, rangeServer := range rangeServers {
+		c.fillRangeServerInfo(rangeServer)
 	}
 }
 
-func (c *RaftCluster) fillRangeServerInfo(node *rpcfb.RangeServerT) {
-	if node == nil {
+func (c *RaftCluster) fillRangeServerInfo(rangeServer *rpcfb.RangeServerT) {
+	if rangeServer == nil {
 		return
 	}
-	n := c.cache.RangeServer(node.ServerId)
+	n := c.cache.RangeServer(rangeServer.ServerId)
 	if n == nil {
-		c.lg.Warn("range server not found", zap.Int32("node-id", node.ServerId))
+		c.lg.Warn("range server not found", zap.Int32("server-id", rangeServer.ServerId))
 		return
 	}
-	node.AdvertiseAddr = n.AdvertiseAddr
+	rangeServer.AdvertiseAddr = n.AdvertiseAddr
 }
 
 func eraseRangeServersInfo(o []*rpcfb.RangeServerT) (n []*rpcfb.RangeServerT) {
@@ -153,9 +153,9 @@ func eraseRangeServersInfo(o []*rpcfb.RangeServerT) (n []*rpcfb.RangeServerT) {
 		return
 	}
 	n = make([]*rpcfb.RangeServerT, len(o))
-	for i, node := range o {
+	for i, rangeServer := range o {
 		n[i] = &rpcfb.RangeServerT{
-			ServerId: node.ServerId,
+			ServerId: rangeServer.ServerId,
 		}
 	}
 	return

@@ -56,13 +56,13 @@ type RaftCluster struct {
 	runningCtx    context.Context
 	runningCancel context.CancelFunc
 
-	storage storage.Storage
-	sAlloc  id.Allocator // stream id allocator
-	dnAlloc id.Allocator // range server id allocator
-	member  Member
-	cache   *cache.Cache
-	nodeIdx atomic.Uint64
-	client  sbpClient.Client
+	storage        storage.Storage
+	sAlloc         id.Allocator // stream id allocator
+	dnAlloc        id.Allocator // range server id allocator
+	member         Member
+	cache          *cache.Cache
+	rangeServerIdx atomic.Uint64
+	client         sbpClient.Client
 	// sealMus is used to protect the stream being sealed.
 	// Each mu is a 1-element semaphore channel controlling access to seal range. Write to lock it, and read to unlock.
 	sealMus cmap.ConcurrentMap[int64, chan struct{}]
@@ -140,12 +140,12 @@ func (c *RaftCluster) loadInfo() error {
 
 	// load range servers
 	start := time.Now()
-	err := c.storage.ForEachRangeServer(c.ctx, func(nodeT *rpcfb.RangeServerT) error {
+	err := c.storage.ForEachRangeServer(c.ctx, func(serverT *rpcfb.RangeServerT) error {
 		updated, old := c.cache.SaveRangeServer(&cache.RangeServer{
-			RangeServerT: *nodeT,
+			RangeServerT: *serverT,
 		})
 		if updated {
-			logger.Warn("different range server in storage and cache", zap.Any("node-in-storage", nodeT), zap.Any("node-in-cache", old))
+			logger.Warn("different range server in storage and cache", zap.Any("range-server-in-storage", serverT), zap.Any("range-server-in-cache", old))
 		}
 		return nil
 	})

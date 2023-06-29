@@ -70,8 +70,8 @@ func (n *RangeServer) Score() (score int) {
 // SaveRangeServer saves a range server to the cache.
 // It returns true if the range server is new or its info is updated.
 // If its info is updated, the old value is returned.
-func (c *Cache) SaveRangeServer(node *RangeServer) (updated bool, old rpcfb.RangeServerT) {
-	_ = c.rangeServers.Upsert(node.ServerId, node, func(exist bool, valueInMap, newValue *RangeServer) *RangeServer {
+func (c *Cache) SaveRangeServer(rangeServer *RangeServer) (updated bool, old rpcfb.RangeServerT) {
+	_ = c.rangeServers.Upsert(rangeServer.ServerId, rangeServer, func(exist bool, valueInMap, newValue *RangeServer) *RangeServer {
 		if exist {
 			if !isRangeServerEqual(valueInMap.RangeServerT, newValue.RangeServerT) {
 				updated = true
@@ -90,30 +90,30 @@ func (c *Cache) SaveRangeServer(node *RangeServer) (updated bool, old rpcfb.Rang
 	return
 }
 
-// RangeServer returns the range server by node ID.
+// RangeServer returns the range server by server ID.
 // The returned value is nil if the range server is not found.
 // The returned value should not be modified.
-func (c *Cache) RangeServer(nodeID int32) *RangeServer {
-	node, ok := c.rangeServers.Get(nodeID)
+func (c *Cache) RangeServer(serverID int32) *RangeServer {
+	rangeServer, ok := c.rangeServers.Get(serverID)
 	if !ok {
 		return nil
 	}
-	return node
+	return rangeServer
 }
 
 // ActiveRangeServers returns all active range servers.
 func (c *Cache) ActiveRangeServers(timeout time.Duration) []*RangeServer {
-	nodes := make([]*RangeServer, 0)
-	c.rangeServers.IterCb(func(_ int32, node *RangeServer) {
-		if node.LastActiveTime.IsZero() || time.Since(node.LastActiveTime) > timeout {
+	rangeServers := make([]*RangeServer, 0)
+	c.rangeServers.IterCb(func(_ int32, rangeServer *RangeServer) {
+		if rangeServer.LastActiveTime.IsZero() || time.Since(rangeServer.LastActiveTime) > timeout {
 			return
 		}
-		if node.Metrics != nil && node.Metrics.DiskFreeSpace == 0 {
+		if rangeServer.Metrics != nil && rangeServer.Metrics.DiskFreeSpace == 0 {
 			return
 		}
-		nodes = append(nodes, node)
+		rangeServers = append(rangeServers, rangeServer)
 	})
-	return nodes
+	return rangeServers
 }
 
 // RangeServerCount returns the count of range servers in the cache.

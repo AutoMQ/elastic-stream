@@ -33,7 +33,7 @@ type RangeServer interface {
 
 // SaveRangeServer creates or updates the given range server and returns it.
 func (e *Endpoint) SaveRangeServer(ctx context.Context, rangeServer *rpcfb.RangeServerT) (*rpcfb.RangeServerT, error) {
-	logger := e.lg.With(zap.Int32("node-id", rangeServer.ServerId), traceutil.TraceLogField(ctx))
+	logger := e.lg.With(zap.Int32("server-id", rangeServer.ServerId), traceutil.TraceLogField(ctx))
 
 	if rangeServer.ServerId < MinRangeServerID {
 		logger.Error("invalid range server id")
@@ -97,8 +97,8 @@ func (e *Endpoint) endRangeServerPath() []byte {
 	return e.GetPrefixRangeEnd([]byte(_rangeServerPrefix))
 }
 
-func rangeServerPath(nodeID int32) []byte {
+func rangeServerPath(serverID int32) []byte {
 	res := make([]byte, 0, _rangeServerKeyLen)
-	res = fmt.Appendf(res, _rangeServerFormat, nodeID)
+	res = fmt.Appendf(res, _rangeServerFormat, serverID)
 	return res
 }

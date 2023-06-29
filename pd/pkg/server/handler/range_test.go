@@ -13,8 +13,8 @@ import (
 
 func TestHandler_ListRange(t *testing.T) {
 	type args struct {
-		StreamID int64
-		NodeID   int32
+		StreamID      int64
+		RangeServerID int32
 	}
 	tests := []struct {
 		name string
@@ -23,7 +23,7 @@ func TestHandler_ListRange(t *testing.T) {
 	}{
 		{
 			name: "list range by stream id",
-			args: args{StreamID: 1, NodeID: -1},
+			args: args{StreamID: 1, RangeServerID: -1},
 			want: []*rpcfb.RangeT{
 				{StreamId: 1, Epoch: 1, Index: 0, Start: 0, End: 42},
 				{StreamId: 1, Epoch: 2, Index: 1, Start: 42, End: -1},
@@ -31,12 +31,12 @@ func TestHandler_ListRange(t *testing.T) {
 		},
 		{
 			name: "list range by non-exist stream id",
-			args: args{StreamID: 10, NodeID: -1},
+			args: args{StreamID: 10, RangeServerID: -1},
 			want: []*rpcfb.RangeT{},
 		},
 		{
-			name: "list range by node id",
-			args: args{StreamID: -1, NodeID: 1},
+			name: "list range by range server id",
+			args: args{StreamID: -1, RangeServerID: 1},
 			want: []*rpcfb.RangeT{
 				{StreamId: 0, Epoch: 1, Index: 0, Start: 0, End: 42},
 				{StreamId: 0, Epoch: 2, Index: 1, Start: 42, End: -1},
@@ -47,13 +47,13 @@ func TestHandler_ListRange(t *testing.T) {
 			},
 		},
 		{
-			name: "list range by non-exist node id",
-			args: args{StreamID: -1, NodeID: 10},
+			name: "list range by non-exist range server id",
+			args: args{StreamID: -1, RangeServerID: 10},
 			want: []*rpcfb.RangeT{},
 		},
 		{
-			name: "list range by stream id and node id",
-			args: args{StreamID: 2, NodeID: 2},
+			name: "list range by stream id and range server id",
+			args: args{StreamID: 2, RangeServerID: 2},
 			want: []*rpcfb.RangeT{
 				{StreamId: 2, Epoch: 1, Index: 0, Start: 0, End: 42},
 				{StreamId: 2, Epoch: 2, Index: 1, Start: 42, End: -1},
@@ -69,7 +69,7 @@ func TestHandler_ListRange(t *testing.T) {
 			h, closeFunc := startSbpHandler(t, nil, true)
 			defer closeFunc()
 
-			// prepare: 3 nodes, 3 streams, 1 sealed range and 1 writable range per stream
+			// prepare: 3 range servers, 3 streams, 1 sealed range and 1 writable range per stream
 			preHeartbeats(t, h, 0, 1, 2)
 			streamIDs := preCreateStreams(t, h, 3, 3)
 			re.Equal([]int64{0, 1, 2}, streamIDs)
@@ -81,14 +81,14 @@ func TestHandler_ListRange(t *testing.T) {
 			}
 
 			req := &protocol.ListRangeRequest{ListRangeRequestT: rpcfb.ListRangeRequestT{
-				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: tt.args.StreamID, ServerId: tt.args.NodeID},
+				Criteria: &rpcfb.ListRangeCriteriaT{StreamId: tt.args.StreamID, ServerId: tt.args.RangeServerID},
 			}}
 			resp := &protocol.ListRangeResponse{}
 			h.ListRange(req, resp)
 
 			re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code, resp.Status.Message)
 			for _, r := range resp.Ranges {
-				fmtNodes(r)
+				fmtRangeServers(r)
 			}
 			for _, r := range tt.want {
 				fillRangeInfo(r)
@@ -298,7 +298,7 @@ func TestSealRange(t *testing.T) {
 				re.Contains(resp.Status.Message, tt.want.errMsg)
 			} else {
 				re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code, resp.Status.Message)
-				fmtNodes(resp.Range)
+				fmtRangeServers(resp.Range)
 				fillRangeInfo(tt.want.returned)
 				re.Equal(tt.want.returned, resp.Range)
 			}
@@ -313,7 +313,7 @@ func TestSealRange(t *testing.T) {
 
 			// check list range response
 			for _, r := range lResp.Ranges {
-				fmtNodes(r)
+				fmtRangeServers(r)
 			}
 			for _, r := range tt.want.after {
 				fillRangeInfo(r)
@@ -474,7 +474,7 @@ func TestHandler_CreateRange(t *testing.T) {
 				re.Contains(resp.Status.Message, tt.want.errMsg)
 			} else {
 				re.Equal(rpcfb.ErrorCodeOK, resp.Status.Code, resp.Status.Message)
-				fmtNodes(resp.Range)
+				fmtRangeServers(resp.Range)
 				fillRangeInfo(tt.want.returned)
 				re.Equal(tt.want.returned, resp.Range)
 			}
@@ -489,7 +489,7 @@ func TestHandler_CreateRange(t *testing.T) {
 
 			// check list range response
 			for _, r := range lResp.Ranges {
-				fmtNodes(r)
+				fmtRangeServers(r)
 			}
 			for _, r := range tt.want.after {
 				fillRangeInfo(r)
@@ -499,20 +499,20 @@ func TestHandler_CreateRange(t *testing.T) {
 	}
 }
 
-func preHeartbeats(tb testing.TB, h *Handler, nodeIDs ...int32) {
-	for _, nodeID := range nodeIDs {
-		preHeartbeat(tb, h, nodeID)
+func preHeartbeats(tb testing.TB, h *Handler, serverIDs ...int32) {
+	for _, serverID := range serverIDs {
+		preHeartbeat(tb, h, serverID)
 	}
 }
 
-func preHeartbeat(tb testing.TB, h *Handler, nodeID int32) {
+func preHeartbeat(tb testing.TB, h *Handler, serverID int32) {
 	re := require.New(tb)
 
 	req := &protocol.HeartbeatRequest{HeartbeatRequestT: rpcfb.HeartbeatRequestT{
 		ClientRole: rpcfb.ClientRoleCLIENT_ROLE_RANGE_SERVER,
 		RangeServer: &rpcfb.RangeServerT{
-			ServerId:      nodeID,
-			AdvertiseAddr: fmt.Sprintf("addr-%d", nodeID),
+			ServerId:      serverID,
+			AdvertiseAddr: fmt.Sprintf("addr-%d", serverID),
 		}}}
 	resp := &protocol.HeartbeatResponse{}
 
@@ -618,12 +618,12 @@ func getLastRange(tb testing.TB, h *Handler, streamID int64) *rpcfb.RangeT {
 	return r
 }
 
-func fmtNodes(r *rpcfb.RangeT) {
+func fmtRangeServers(r *rpcfb.RangeT) {
 	// erase advertise addr
 	for _, s := range r.Servers {
 		s.AdvertiseAddr = ""
 	}
-	// sort by node id
+	// sort by server id
 	sort.Slice(r.Servers, func(i, j int) bool {
 		return r.Servers[i].ServerId < r.Servers[j].ServerId
 	})

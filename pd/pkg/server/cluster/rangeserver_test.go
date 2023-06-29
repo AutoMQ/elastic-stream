@@ -17,19 +17,19 @@ func TestRaftCluster_fillRangeServersInfo(t *testing.T) {
 	t.Parallel()
 	re := require.New(t)
 
-	var node rpcfb.RangeServerT
-	_ = gofakeit.New(1).Struct(&node)
+	var rangeServer rpcfb.RangeServerT
+	_ = gofakeit.New(1).Struct(&rangeServer)
 	cluster := NewRaftCluster(context.Background(), nil, nil, zap.NewNop())
 	cluster.cache.SaveRangeServer(&cache.RangeServer{
-		RangeServerT: node,
+		RangeServerT: rangeServer,
 	})
 
-	node2 := rpcfb.RangeServerT{
-		ServerId: node.ServerId,
+	rangeServer2 := rpcfb.RangeServerT{
+		ServerId: rangeServer.ServerId,
 	}
-	cluster.fillRangeServersInfo([]*rpcfb.RangeServerT{&node2})
+	cluster.fillRangeServersInfo([]*rpcfb.RangeServerT{&rangeServer2})
 
-	re.Equal(node, node2)
+	re.Equal(rangeServer, rangeServer2)
 }
 
 // Test_eraseRangeServersInfo will fail if there are new fields in rpcfb.RangeServerT
@@ -37,16 +37,16 @@ func Test_eraseRangeServersInfo(t *testing.T) {
 	t.Parallel()
 	re := require.New(t)
 
-	var node rpcfb.RangeServerT
-	_ = gofakeit.New(1).Struct(&node)
+	var rangeServer rpcfb.RangeServerT
+	_ = gofakeit.New(1).Struct(&rangeServer)
 
-	nodes := eraseRangeServersInfo([]*rpcfb.RangeServerT{&node})
+	servers := eraseRangeServersInfo([]*rpcfb.RangeServerT{&rangeServer})
 
 	// `AdvertiseAddr` should not be copied
-	node.AdvertiseAddr = ""
-	re.Equal(node, *nodes[0])
+	rangeServer.AdvertiseAddr = ""
+	re.Equal(rangeServer, *servers[0])
 
-	// returned nodes should be a copy
-	node.AdvertiseAddr = "modified"
-	re.Equal("", nodes[0].AdvertiseAddr)
+	// returned servers should be a copy
+	rangeServer.AdvertiseAddr = "modified"
+	re.Equal("", servers[0].AdvertiseAddr)
 }

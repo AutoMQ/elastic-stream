@@ -26,12 +26,12 @@ const (
 	_rangeStreamKeyLen       = len(_rangeStreamPrefix) + len(kv.KeySeparator) + _streamIDLen + len(kv.KeySeparator) + len(_rangeStreamPath) + len(kv.KeySeparator) + _rangeIDLen
 
 	// ranges on range server
-	_rangeNodePath               = "stream-range"
-	_rangeNodePrefix             = "n"
-	_rangeNodePrefixFormat       = _rangeNodePrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeNodePath + kv.KeySeparator
-	_rangeNodeStreamPrefixFormat = _rangeNodePrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeNodePath + kv.KeySeparator + _streamIDFormat + kv.KeySeparator
-	_rangeNodeFormat             = _rangeNodePrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeNodePath + kv.KeySeparator + _streamIDFormat + kv.KeySeparator + _rangeIDFormat
-	_rangeNodeKeyLen             = len(_rangeNodePrefix) + len(kv.KeySeparator) + _rangeServerIDLen + len(kv.KeySeparator) + len(_rangeNodePath) + len(kv.KeySeparator) + _streamIDLen + len(kv.KeySeparator) + _rangeIDLen
+	_rangeOnServerPath               = "stream-range"
+	_rangeOnServerPrefix             = "n"
+	_rangeOnServerPrefixFormat       = _rangeOnServerPrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeOnServerPath + kv.KeySeparator
+	_rangeOnServerStreamPrefixFormat = _rangeOnServerPrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeOnServerPath + kv.KeySeparator + _streamIDFormat + kv.KeySeparator
+	_rangeOnServerFormat             = _rangeOnServerPrefix + kv.KeySeparator + _rangeServerIDFormat + kv.KeySeparator + _rangeOnServerPath + kv.KeySeparator + _streamIDFormat + kv.KeySeparator + _rangeIDFormat
+	_rangeOnServerKeyLen             = len(_rangeOnServerPrefix) + len(kv.KeySeparator) + _rangeServerIDLen + len(kv.KeySeparator) + len(_rangeOnServerPath) + len(kv.KeySeparator) + _streamIDLen + len(kv.KeySeparator) + _rangeIDLen
 
 	_rangeByRangeLimit = 1e4
 )
@@ -315,7 +315,7 @@ func (e *Endpoint) forEachRangeIDOnRangeServerLimited(ctx context.Context, range
 }
 
 func (e *Endpoint) endRangePathOnRangeServer(rangeServerID int32) []byte {
-	return e.GetPrefixRangeEnd([]byte(fmt.Sprintf(_rangeNodePrefixFormat, rangeServerID)))
+	return e.GetPrefixRangeEnd([]byte(fmt.Sprintf(_rangeOnServerPrefixFormat, rangeServerID)))
 }
 
 func (e *Endpoint) GetRangeIDsByRangeServerAndStream(ctx context.Context, streamID int64, rangeServerID int32) ([]*RangeID, error) {
@@ -341,17 +341,17 @@ func (e *Endpoint) GetRangeIDsByRangeServerAndStream(ctx context.Context, stream
 }
 
 func (e *Endpoint) endRangePathOnRangeServerInStream(rangeServerID int32, streamID int64) []byte {
-	return e.GetPrefixRangeEnd([]byte(fmt.Sprintf(_rangeNodeStreamPrefixFormat, rangeServerID, streamID)))
+	return e.GetPrefixRangeEnd([]byte(fmt.Sprintf(_rangeOnServerStreamPrefixFormat, rangeServerID, streamID)))
 }
 
 func rangePathOnRangeServer(rangeServerID int32, streamID int64, index int32) []byte {
-	res := make([]byte, 0, _rangeNodeKeyLen)
-	res = fmt.Appendf(res, _rangeNodeFormat, rangeServerID, streamID, index)
+	res := make([]byte, 0, _rangeOnServerKeyLen)
+	res = fmt.Appendf(res, _rangeOnServerFormat, rangeServerID, streamID, index)
 	return res
 }
 
 func rangeIDFromPathOnRangeServer(path []byte) (rangeServerID int32, streamID int64, index int32, err error) {
-	_, err = fmt.Sscanf(string(path), _rangeNodeFormat, &rangeServerID, &streamID, &index)
+	_, err = fmt.Sscanf(string(path), _rangeOnServerFormat, &rangeServerID, &streamID, &index)
 	if err != nil {
 		err = errors.Wrapf(err, "parse range path: %s", string(path))
 	}
