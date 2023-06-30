@@ -136,13 +136,25 @@ all-push: $(addprefix push-, $(subst /,_, $(ALL_PLATFORMS)))
 all-deb: # @HELP builds debian packages for all platforms
 all-deb: $(addprefix deb-, $(subst /,_, $(ALL_PLATFORMS)))
 
-build: # @HELP builds the binary for the current platform
-build: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION)
-	echo -ne "binary: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION)"
-	echo
+TARGETS = $(foreach bin,$(BINS),target/$(TARGET)/$(PROFILE_PATH)/$(bin)$(BIN_EXTENSION))
 
-target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION): .flatc
-	cross build --target $(TARGET) --profile $(PROFILE)
+# We print the target names here, rather than in TARGETS so
+# they are always at the end of the output.
+build: # @HELP builds the binary for the current platform
+build: $(TARGETS)
+	for bin in $(BINS); do                                                      \
+	    echo "build: target/$(TARGET)/$(PROFILE_PATH)/$${bin}$(BIN_EXTENSION)"; \
+	done
+
+$(foreach bin,$(BINS),$(eval $(strip                                       \
+	target/$(TARGET)/$(PROFILE_PATH)/$(bin)$(BIN_EXTENSION): BIN = $(bin)  \
+)))
+
+# Force to build targets even if they are up-to-date.
+FORCE: ;
+
+$(TARGETS): .flatc FORCE
+	cross build --target $(TARGET) --profile $(PROFILE) --bin $(BIN)
 
 container:
 	echo "TODO"
@@ -164,15 +176,15 @@ $(foreach bin,$(BINS),$(eval $(strip                      \
 	dist/$(bin)_$(DEB_VERSION)_$(ARCH).deb: BIN = $(bin)  \
 )))
 $(foreach bin,$(BINS),$(eval  \
-	dist/$(bin)_$(DEB_VERSION)_$(ARCH).deb: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION) $$(shell find ./dist/$(bin) -type f)  \
+	dist/$(bin)_$(DEB_VERSION)_$(ARCH).deb: target/$(TARGET)/$(PROFILE_PATH)/$(bin)$(BIN_EXTENSION) $$(shell find ./dist/$(bin) -type f)  \
 ))
 
 # This is the target definition for all deb-files.
 # These are used to track build state in hidden files.
 $(DEB_FILES):
-	if [ "$(OS)" != "linux" ]; then         \
-	    echo "deb: invalid OS: $(OS)";      \
-	    exit 1;                             \
+	if [ "$(OS)" != "linux" ]; then     \
+	    echo "deb: invalid OS: $(OS)";  \
+	    exit 1;                         \
 	fi
 	if [[ ! "$(DEB_VERSION)" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then   \
 	    echo "deb: invalid version: $(DEB_VERSION)";               \
@@ -183,12 +195,12 @@ $(DEB_FILES):
 	cp -r dist/$(BIN) .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 
 	find .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp -type f -name .gitignore -delete
-	find .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp -type f -exec \
-	sed -i                                                     \
-	    -e 's|{ARG_VERSION}|$(DEB_VERSION)|g'                  \
-	    -e 's|{ARG_ARCH}|$(ARCH)|g'                            \
+	find .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp -type f -exec  \
+	sed -i                                                      \
+	    -e 's|{ARG_VERSION}|$(DEB_VERSION)|g'                   \
+	    -e 's|{ARG_ARCH}|$(ARCH)|g'                             \
 	    {} +
-	cp target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION) .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/usr/local/bin/$(BIN)$(BIN_EXTENSION)
+	cp target/$(TARGET)/$(PROFILE_PATH)/$(BIN)$(BIN_EXTENSION) .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/usr/local/bin/$(BIN)$(BIN_EXTENSION)
 	cp etc/*.yaml .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/etc/$(BIN)/
 
 	dpkg-deb --root-owner-group --build .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp dist/$(BIN)_$(DEB_VERSION)_$(ARCH).deb
@@ -196,13 +208,13 @@ $(DEB_FILES):
 	rm -rf .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 
 .flatc: $(shell find components/protocol/fbs -type f)
-	if [ -z "$(FLATC)" ]; then \
-	    echo "flatc not found"; \
-	    exit 1; \
+	if [ -z "$(FLATC)" ]; then   \
+	    echo "flatc not found";  \
+	    exit 1;                  \
 	fi
-	if [ "$$($(FLATC) --version | cut -d' ' -f3)" != "23.3.3" ]; then \
-	    echo "flatc version must be 23.3.3"; \
-	    exit 1; \
+	if [ "$$($(FLATC) --version | cut -d' ' -f3)" != "23.3.3" ]; then  \
+	    echo "flatc version must be 23.3.3";                           \
+	    exit 1;                                                        \
 	fi
 	cargo build --package protocol
 	date > $@
