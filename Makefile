@@ -127,6 +127,10 @@ target/$(TARGET)/$(BUILD_TYPE)/$(BINS)$(BIN_EXTENSION):
 container:
 	echo "TODO"
 
+version: # @HELP outputs the version string
+version:
+	echo $(VERSION)
+
 help: # @HELP prints this message
 help:
 	echo "VARIABLES:"
