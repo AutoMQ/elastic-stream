@@ -37,6 +37,7 @@ jobs:
       - name: Install Deps
         run: |
           ./scripts/install_deps.sh
+          cargo install cross --git https://github.com/cross-rs/cross
       - name: Build Range Server Debian Packages
         run: |
           make all-deb PROFILE=release
