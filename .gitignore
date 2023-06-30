@@ -12,3 +12,5 @@ default.pd*
 
 # Makefile output
 /.flatc
+/.dist
+/dist/*.deb

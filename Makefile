@@ -24,6 +24,9 @@ REGISTRY ?= docker.io/elasticstream
 # This version-strategy uses git tags to set the version string
 VERSION ?= $(shell git describe --tags --always --dirty)
 
+# Version of the package, start with digits
+DEB_VERSION ?= $(shell echo $(VERSION) | sed -e 's/^[^0-9]*//')
+
 PROFILE ?= dev
 
 # https://doc.rust-lang.org/cargo/guide/build-cache.html
@@ -115,6 +118,12 @@ push-%:
 	    RUST_OS=$(firstword $(subst _, ,$*)) \
 	    RUST_ARCH=$(lastword $(subst _, ,$*))
 
+deb-%:
+	$(MAKE) deb                           \
+	    --no-print-directory              \
+	    RUST_OS=$(firstword $(subst _, ,$*)) \
+	    RUST_ARCH=$(lastword $(subst _, ,$*))
+
 all-build: # @HELP builds binaries for all platforms
 all-build: $(addprefix build-, $(subst /,_, $(ALL_PLATFORMS)))
 
@@ -123,6 +132,9 @@ all-container: $(addprefix container-, $(subst /,_, $(ALL_PLATFORMS)))
 
 all-push: # @HELP pushes containers for all platforms to the defined registry
 all-push: $(addprefix push-, $(subst /,_, $(ALL_PLATFORMS)))
+
+all-deb: # @HELP builds debian packages for all platforms
+all-deb: $(addprefix deb-, $(subst /,_, $(ALL_PLATFORMS)))
 
 build: # @HELP builds the binary for the current platform
 build: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION)
@@ -134,6 +146,53 @@ target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION): .flatc
 
 container:
 	echo "TODO"
+
+DEB_FILES = $(foreach bin,$(BINS),dist/$(bin)_$(DEB_VERSION)_$(ARCH).deb)
+
+# We print the deb package names here, rather than in DEB_FILES so
+# they are always at the end of the output.
+deb debs: # @HELP builds deb packages for one platform ($OS/$ARCH)
+deb debs: $(DEB_FILES)
+	for bin in $(BINS); do                                    \
+	    echo "deb: dist/$${bin}_$(DEB_VERSION)_$(ARCH).deb";  \
+	done
+	echo
+
+# Each deb-file target can reference a $(BIN) variable.
+# This is done in 2 steps to enable target-specific variables.
+$(foreach bin,$(BINS),$(eval $(strip                      \
+	dist/$(bin)_$(DEB_VERSION)_$(ARCH).deb: BIN = $(bin)  \
+)))
+$(foreach bin,$(BINS),$(eval  \
+	dist/$(bin)_$(DEB_VERSION)_$(ARCH).deb: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION) $$(shell find ./dist/$(bin) -type f)  \
+))
+
+# This is the target definition for all deb-files.
+# These are used to track build state in hidden files.
+$(DEB_FILES):
+	if [ "$(OS)" != "linux" ]; then         \
+	    echo "deb: invalid OS: $(OS)";      \
+	    exit 1;                             \
+	fi
+	if [[ ! "$(DEB_VERSION)" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then   \
+	    echo "deb: invalid version: $(DEB_VERSION)";               \
+	    exit 1;                                                    \
+	fi
+	rm -rf .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
+	mkdir -p .dist
+	cp -r dist/$(BIN) .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
+
+	find .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp -type f -exec \
+	sed -i                                                     \
+	    -e 's|{ARG_VERSION}|$(DEB_VERSION)|g'                  \
+	    -e 's|{ARG_ARCH}|$(ARCH)|g'                            \
+	    {} +
+	cp target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION) .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/usr/local/bin/$(BIN)$(BIN_EXTENSION)
+	cp etc/*.yaml .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/etc/$(BIN)/
+
+	dpkg-deb --root-owner-group --build .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp dist/$(BIN)_$(DEB_VERSION)_$(ARCH).deb
+
+	rm -rf .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 
 .flatc: $(shell find components/protocol/fbs -type f)
 	if [ -z "$(FLATC)" ]; then \
@@ -152,13 +211,16 @@ version:
 	echo $(VERSION)
 
 clean: # @HELP removes built binaries and temporary files
-clean: cargo-clean flatc-clean
+clean: flatc-clean cargo-clean deb-clean
+
+flatc-clean:
+	rm -f .flatc
 
 cargo-clean:
 	cargo clean
 
-flatc-clean:
-	rm -f .flatc
+deb-clean:
+	rm -rf .dist dist/*.deb
 
 help: # @HELP prints this message
 help:

@@ -377,7 +377,7 @@ $(DEB_FILES):
 	    echo "deb: invalid OS: $(OS)";      \
 	    exit 1;                             \
 	fi
-	if [[ ! "$(DEB_VERSION)}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then  \
+	if [[ ! "$(DEB_VERSION)" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then   \
 	    echo "deb: invalid version: $(DEB_VERSION)";               \
 	    exit 1;                                                    \
 	fi
