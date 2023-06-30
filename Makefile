@@ -151,6 +151,15 @@ version: # @HELP outputs the version string
 version:
 	echo $(VERSION)
 
+clean: # @HELP removes built binaries and temporary files
+clean: cargo-clean flatc-clean
+
+cargo-clean:
+	cargo clean
+
+flatc-clean:
+	rm -f .flatc
+
 help: # @HELP prints this message
 help:
 	echo "VARIABLES:"
