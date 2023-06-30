@@ -86,6 +86,8 @@ TAG := $(VERSION)__$(OS)_$(ARCH)
 # This is used in docker buildx commands
 BUILDX_NAME := $(shell basename $$(pwd))
 
+FLATC := $(shell command -v flatc 2> /dev/null)
+
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -127,11 +129,23 @@ build: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION)
 	echo -ne "binary: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION)"
 	echo
 
-target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION):
+target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION): .flatc
 	cross build --target $(TARGET) --profile $(PROFILE)
 
 container:
 	echo "TODO"
+
+.flatc: $(shell find components/protocol/fbs -type f)
+	if [ -z "$(FLATC)" ]; then \
+	    echo "flatc not found"; \
+	    exit 1; \
+	fi
+	if [ "$$($(FLATC) --version | cut -d' ' -f3)" != "23.3.3" ]; then \
+	    echo "flatc version must be 23.3.3"; \
+	    exit 1; \
+	fi
+	cargo build --package protocol
+	date > $@
 
 version: # @HELP outputs the version string
 version:

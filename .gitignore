@@ -9,3 +9,6 @@ sdks/java/flatc
 log
 logs
 default.pd*
+
+# Makefile output
+/.flatc
