@@ -12,7 +12,7 @@ BINS ?= range-server
 
 # The platforms we support.  In theory this can be used for Windows platforms,
 # too, but they require specific base images, which we do not have.
-ALL_PLATFORMS ?= linux/amd64 linux/arm64
+ALL_PLATFORMS ?= linux/amd64 linux/arm64 linux/ppc64le linux/s390x
 
 # The "FROM" part of the Dockerfile.  This should be a manifest-list which
 # supports all of the platforms listed in ALL_PLATFORMS.
@@ -75,6 +75,10 @@ ifeq ($(OS)_$(ARCH),linux_amd64)
   TARGET := x86_64-unknown-linux-gnu
 else ifeq ($(OS)_$(ARCH),linux_arm64)
   TARGET := aarch64-unknown-linux-gnu
+else ifeq ($(OS)_$(ARCH),linux_ppc64le)
+  TARGET := powerpc64le-unknown-linux-gnu
+else ifeq ($(OS)_$(ARCH),linux_s390x)
+  TARGET := s390x-unknown-linux-gnu
 else
   $(error Unsupported OS/ARCH $(OS)/$(ARCH))
 endif
