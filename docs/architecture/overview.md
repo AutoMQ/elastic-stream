@@ -30,3 +30,4 @@ RPO = 0 and RTO -> 0
 4. [More Than Capacity: Performance-oriented Evolution of Pangu in Alibaba](https://www.usenix.org/conference/fast23/presentation/li-qiang-deployed)
 4. [SPDK: Message Passing and Concurrency Theory](https://spdk.io/doc/concurrency.html)
 5. [The-5-minute-rule](https://www.allthingsdistributed.com/2012/08/the-5-minute-rule.html)
+6. [Windows Azure Storage](https://www.cs.purdue.edu/homes/csjgwang/CloudNativeDB/AzureStorageSOSP11.pdf)
