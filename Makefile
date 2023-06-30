@@ -118,7 +118,6 @@ all-push: $(addprefix push-, $(subst /,_, $(ALL_PLATFORMS)))
 build: # @HELP builds the binary for the current platform
 build: target/$(TARGET)/$(BUILD_TYPE)/$(BINS)$(BIN_EXTENSION)
 
-.PHONY: target/$(TARGET)/$(BUILD_TYPE)/$(BINS)$(BIN_EXTENSION)
 target/$(TARGET)/$(BUILD_TYPE)/$(BINS)$(BIN_EXTENSION):
 	cross build --target $(TARGET) $(BUILD_TYPE)
 	echo -ne "binary: target/$(TARGET)/$(BUILD_TYPE)/$(BINS)$(BIN_EXTENSION)"

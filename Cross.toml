@@ -4,4 +4,7 @@ pre-build = [
 ]
 
 [build.env]
-passthrough = ["SKIP_FLATC=1"]
+passthrough = [
+    "SKIP_FLATC=1",
+    "ROCKSDB_COMPILE=1", # compile rocksdb from source
+]
