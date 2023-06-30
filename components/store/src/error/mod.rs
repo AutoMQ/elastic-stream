@@ -39,7 +39,7 @@ pub enum StoreError {
     #[error("System error with errno: `{0}`")]
     System(i32),
 
-    #[error("Create to create I/O Uring instance")]
+    #[error("Failed to create I/O Uring instance")]
     IoUring,
 
     #[error("Required io_uring opcode `{0}` is not supported")]
