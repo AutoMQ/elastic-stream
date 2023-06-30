@@ -7,28 +7,28 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 built = { workspace = true, features = ["chrono", "semver"] }
-byteorder =  { workspace = true }
-bytes =  { workspace = true }
+byteorder = { workspace = true }
+bytes = { workspace = true }
 cfg-if = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 client = { path = "../components/client" }
 codec = { path = "../components/codec" }
 config = { path = "../components/config" }
-core_affinity =  { workspace = true }
-crc =  { workspace = true }
+core_affinity = { workspace = true }
+crc = { workspace = true }
 crossbeam = { workspace = true }
 ctrlc = { workspace = true }
 flatbuffers = { workspace = true }
 futures = { workspace = true }
 io-uring = { workspace = true }
 lazy_static = { version = "1.4.0" }
-log =  { workspace = true }
+log = { workspace = true }
 log4rs = { workspace = true }
 minstant = { workspace = true }
 model = { path = "../components/model" }
-num_cpus =  { workspace = true }
-num_enum =  { workspace = true }
+num_cpus = { workspace = true }
+num_enum = { workspace = true }
 observation = { path = "../components/observation" }
 polling = { path = "../components/polling" }
 pprof = { workspace = true }
@@ -38,7 +38,7 @@ replication = { path = "../components/replication" }
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = { workspace = true }
 store = { path = "../components/store" }
-thiserror =  { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
 transport = { path = "../components/transport" }

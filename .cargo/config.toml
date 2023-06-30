@@ -2,4 +2,4 @@
 protocol = "sparse"
 
 [env]
-ROCKSDB_LIB_DIR="/usr/local/lib"
+ROCKSDB_LIB_DIR = "/usr/local/lib"

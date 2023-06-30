@@ -5,11 +5,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-byteorder =  { workspace = true }
-bytes =  { workspace = true }
+byteorder = { workspace = true }
+bytes = { workspace = true }
 log = { workspace = true }
-num_enum =  { workspace = true }
-thiserror =  { workspace = true }
+num_enum = { workspace = true }
+thiserror = { workspace = true }
 util = { path = "../util" }
 
 [dev-dependencies]
