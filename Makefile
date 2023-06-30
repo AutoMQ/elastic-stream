@@ -182,6 +182,7 @@ $(DEB_FILES):
 	mkdir -p .dist
 	cp -r dist/$(BIN) .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 
+	find .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp -type f -name .gitignore -delete
 	find .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp -type f -exec \
 	sed -i                                                     \
 	    -e 's|{ARG_VERSION}|$(DEB_VERSION)|g'                  \
