@@ -8,8 +8,7 @@ use super::replication_range::ReplicationRange;
 use crate::ReplicationError;
 use bytes::Bytes;
 use log::{error, info, warn};
-use model::fetch::FetchRequestEntry;
-use model::RangeServer;
+use model::{request::fetch::FetchRequest, RangeServer};
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
 use tokio::time::sleep;
@@ -160,26 +159,27 @@ impl Replicator {
                 let result = client
                     .fetch(
                         &self.range_server.advertise_address,
-                        FetchRequestEntry {
-                            stream_id: range.metadata().stream_id(),
-                            index: range.metadata().index(),
-                            start_offset,
-                            end_offset,
-                            batch_max_bytes,
+                        FetchRequest {
+                            max_wait: std::time::Duration::from_secs(3),
+                            range: range.metadata().clone(),
+                            offset: start_offset,
+                            limit: end_offset,
+                            min_bytes: None,
+                            max_bytes: if batch_max_bytes > 0 {
+                                Some(batch_max_bytes as usize)
+                            } else {
+                                None
+                            },
                         },
                     )
                     .await;
                 match result {
-                    Ok(result) => {
-                        let status = result.status;
-                        if status.code != ErrorCode::OK {
-                            warn!(
-                                "{}Failed to fetch entries: status {:?}",
-                                self.log_ident, status
-                            );
-                            Err(ReplicationError::Internal)
+                    Ok(rs) => {
+                        // TODO: handle throttle
+                        if let Some(vec) = rs.payload {
+                            Ok(vec)
                         } else {
-                            Ok(result.data.unwrap_or_default())
+                            Err(ReplicationError::Internal)
                         }
                     }
                     Err(_) => Err(ReplicationError::Internal),

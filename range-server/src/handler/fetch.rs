@@ -1,20 +1,15 @@
-use bytes::{BufMut, BytesMut};
+use super::util::{root_as_rpc_request, MIN_BUFFER_SIZE};
+use crate::stream_manager::{fetcher::PlacementFetcher, StreamManager};
 use codec::frame::Frame;
-
 use flatbuffers::FlatBufferBuilder;
-use futures::{future, Future};
 use log::{trace, warn};
 use minstant::Instant;
 use protocol::rpc::header::{
-    ErrorCode, FetchRequest, FetchResponse, FetchResponseArgs, FetchResultEntry,
-    FetchResultEntryArgs, Status, StatusArgs,
+    ErrorCode, FetchRequest, FetchResponse, FetchResponseArgs, FetchResponseT, Status, StatusArgs,
+    StatusT,
 };
-use std::{cell::UnsafeCell, fmt, pin::Pin, rc::Rc};
-use store::{error::FetchError, option::ReadOptions, FetchResult, Store};
-
-use crate::stream_manager::{fetcher::PlacementFetcher, StreamManager};
-
-use super::util::{finish_response_builder, root_as_rpc_request, MIN_BUFFER_SIZE};
+use std::{cell::UnsafeCell, fmt, rc::Rc};
+use store::{error::FetchError, option::ReadOptions, Store};
 
 #[derive(Debug)]
 pub(crate) struct Fetch<'a> {
@@ -59,168 +54,106 @@ impl<'a> Fetch<'a> {
         S: Store,
         F: PlacementFetcher,
     {
-        let store_requests = self.build_store_requests(unsafe { &mut *stream_manager.get() });
-        let futures = store_requests
-            .into_iter()
-            .map(|fetch_option| match fetch_option {
-                Ok(fetch_option) => Box::pin(store.fetch(fetch_option))
-                    as Pin<Box<dyn Future<Output = Result<store::FetchResult, FetchError>>>>,
-                Err(fetch_err) => {
-                    let res: Result<store::FetchResult, FetchError> = Err(fetch_err);
-                    Box::pin(future::ready(res))
-                        as Pin<Box<dyn Future<Output = Result<store::FetchResult, FetchError>>>>
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut builder = FlatBufferBuilder::with_capacity(MIN_BUFFER_SIZE);
+
+        let option = match self.build_read_opt(unsafe { &mut *stream_manager.get() }) {
+            Ok(opt) => opt,
+            Err(_e) => {
+                Self::handle_fetch_error(_e, &mut builder, response);
+                return;
+            }
+        };
 
         // TODO: handle store timeout
         let start = Instant::now();
-        let res_from_store: Vec<Result<FetchResult, FetchError>> = future::join_all(futures).await;
-        trace!(
-            "Fetch records from store took {:?}us",
-            start.elapsed().as_micros()
-        );
-
-        let mut builder = FlatBufferBuilder::with_capacity(MIN_BUFFER_SIZE);
-        let mut payloads = Vec::new();
-        let ok_status = Status::create(
-            &mut builder,
-            &StatusArgs {
-                code: ErrorCode::OK,
-                message: None,
-                detail: None,
-            },
-        );
-        let fetch_results: Vec<_> = res_from_store
-            .into_iter()
-            .map(|res| match res {
-                Ok(fetch_result) => {
-                    let fetch_result_args = FetchResultEntryArgs {
-                        stream_id: fetch_result.stream_id,
-                        batch_count: fetch_result.results.len() as i32,
-                        status: Some(ok_status),
-                    };
-                    trace!(
-                        "Fetch Stream[id={}] returns {} buffer slices",
-                        fetch_result.stream_id,
-                        fetch_result.results.len()
-                    );
-                    payloads.push(fetch_result.results);
-                    FetchResultEntry::create(&mut builder, &fetch_result_args)
-                }
-                Err(e) => {
-                    warn!("Failed to fetch from store. Cause: {:?}", e);
-
-                    let (err_code, err_message) = self.convert_store_error(&e);
-                    let mut err_message_fb = None;
-                    if let Some(err_message) = err_message {
-                        err_message_fb = Some(builder.create_string(err_message.as_str()));
-                    }
-                    let status = Status::create(
-                        &mut builder,
-                        &StatusArgs {
-                            code: err_code,
-                            message: err_message_fb,
-                            detail: None,
-                        },
-                    );
-                    let fetch_result_args = FetchResultEntryArgs {
-                        stream_id: 0,
-                        batch_count: 0,
-                        status: Some(status),
-                    };
-                    FetchResultEntry::create(&mut builder, &fetch_result_args)
-                }
-            })
-            .collect();
-
-        let fetch_results_fb = builder.create_vector(&fetch_results);
-        let fetch_response_args = FetchResponseArgs {
-            throttle_time_ms: 0,
-            entries: Some(fetch_results_fb),
-            status: Some(ok_status),
-        };
-        let fetch_response = FetchResponse::create(&mut builder, &fetch_response_args);
-        response.header = Some(finish_response_builder(&mut builder, fetch_response));
-
-        // Flatten the payloads, since we already identified the sequence of the payloads
-        let payloads: Vec<_> = payloads
-            .into_iter()
-            .flatten()
-            .map(|payload| {
-                // Copy all the buffer from the SingleFetchResult.
-                // TODO: Find a efficient way to avoid copying the payload
-                let mut bytes = BytesMut::with_capacity(
-                    payload.total_len() - store::RECORD_PREFIX_LENGTH as usize,
+        match store.fetch(option).await {
+            Ok(fetch_result) => {
+                trace!(
+                    "Fetch records from store took {:?}us",
+                    start.elapsed().as_micros()
                 );
+                let status_args = StatusArgs {
+                    code: ErrorCode::OK,
+                    ..Default::default()
+                };
+                let status = Status::create(&mut builder, &status_args);
 
-                // Strip the first `RECORD_PREFIX_LENGTH` bytes of the storage prefix
-                let mut prefix = store::RECORD_PREFIX_LENGTH as usize;
-
-                payload.iter().for_each(|buf| {
-                    if prefix < buf.len() {
-                        bytes.put_slice(&buf[prefix..]);
-                        prefix = 0;
-                    } else {
-                        prefix -= buf.len();
-                    }
-                });
-
-                bytes.freeze()
-            })
-            .collect();
-        response.payload = Some(payloads);
+                let fetch_response_args = FetchResponseArgs {
+                    status: Some(status),
+                    throttle_time_ms: -1,
+                };
+                let fetch_response = FetchResponse::create(&mut builder, &fetch_response_args);
+                builder.finish(fetch_response, None);
+                let data = builder.finished_data();
+                response.header = Some(bytes::Bytes::copy_from_slice(data));
+                let buffers = fetch_result
+                    .results
+                    .into_iter()
+                    .flat_map(|i| i.into_iter())
+                    .collect::<Vec<_>>();
+                response.payload = Some(buffers);
+            }
+            Err(e) => {
+                Self::handle_fetch_error(e, &mut builder, response);
+            }
+        }
     }
 
-    /// TODO: this method is out of sync with new replication protocol.
-    fn build_store_requests<S, F>(
+    fn handle_fetch_error(
+        e: FetchError,
+        builder: &mut FlatBufferBuilder<'_>,
+        response: &mut Frame,
+    ) {
+        let mut fetch_response = FetchResponseT::default();
+        let mut status = StatusT::default();
+        Self::convert_store_error(&e, &mut status);
+        fetch_response.status = Box::new(status);
+        let fetch_response = fetch_response.pack(builder);
+        builder.finish(fetch_response, None);
+        let data = builder.finished_data();
+        response.header = Some(bytes::Bytes::copy_from_slice(data));
+    }
+
+    fn build_read_opt<S, F>(
         &self,
         stream_manager: &mut StreamManager<S, F>,
-    ) -> Vec<Result<ReadOptions, FetchError>>
+    ) -> Result<ReadOptions, FetchError>
     where
         S: Store,
         F: PlacementFetcher,
     {
-        self.fetch_request
-            .entries()
-            .iter()
-            .flatten()
-            .map(|req| {
-                // Retrieve stream id from req.range
-                let stream_id = req.range().stream_id();
-                let range_index = req.range().index();
+        // Retrieve stream id from req.range
+        let stream_id = self.fetch_request.range().stream_id();
+        let range_index = self.fetch_request.range().index();
+        let offset = self.fetch_request.offset();
+        let limit = self.fetch_request.limit();
 
-                // If the stream-range exists and contains the requested offset, build the read options
-                // FIXME: Use range_manager instead of stream_manager
-                if stream_manager.get_range(stream_id, range_index).is_some() {
-                    return Ok(ReadOptions {
-                        stream_id,
-                        range: range_index as u32,
-                        offset: req.fetch_offset(),
-                        max_offset: req.end_offset() as u64,
-                        max_wait_ms: self.fetch_request.max_wait_ms(),
-                        max_bytes: req.batch_max_bytes(),
-                    });
-                }
-                // Cannot find the range in the current range server
-                Err(FetchError::RangeNotFound)
+        // If the stream-range exists and contains the requested offset, build the read options
+        // FIXME: Use range_manager instead of stream_manager
+        if stream_manager.get_range(stream_id, range_index).is_some() {
+            Ok(ReadOptions {
+                stream_id,
+                range: range_index as u32,
+                offset,
+                max_offset: limit as u64,
+                max_wait_ms: self.fetch_request.max_wait_ms(),
+                max_bytes: self.fetch_request.max_wait_ms(),
             })
-            .collect()
+        } else {
+            Err(FetchError::RangeNotFound)
+        }
     }
 
-    fn convert_store_error(&self, err: &FetchError) -> (ErrorCode, Option<String>) {
-        match err {
-            FetchError::SubmissionQueue => {
-                (ErrorCode::RS_INTERNAL_SERVER_ERROR, Some(err.to_string()))
-            }
-            FetchError::ChannelRecv => (ErrorCode::RS_INTERNAL_SERVER_ERROR, Some(err.to_string())),
-            FetchError::TranslateIndex => {
-                (ErrorCode::RS_INTERNAL_SERVER_ERROR, Some(err.to_string()))
-            }
-            FetchError::NoRecord => (ErrorCode::NO_NEW_RECORD, Some(err.to_string())),
-            FetchError::RangeNotFound => (ErrorCode::RANGE_NOT_FOUND, Some(err.to_string())),
-            FetchError::BadRequest => (ErrorCode::BAD_REQUEST, Some(err.to_string())),
-        }
+    fn convert_store_error(err: &FetchError, status: &mut StatusT) {
+        status.code = match err {
+            FetchError::SubmissionQueue => ErrorCode::RS_INTERNAL_SERVER_ERROR,
+            FetchError::ChannelRecv => ErrorCode::RS_INTERNAL_SERVER_ERROR,
+            FetchError::TranslateIndex => ErrorCode::RS_INTERNAL_SERVER_ERROR,
+            FetchError::NoRecord => ErrorCode::NO_NEW_RECORD,
+            FetchError::RangeNotFound => ErrorCode::RANGE_NOT_FOUND,
+            FetchError::BadRequest => ErrorCode::BAD_REQUEST,
+        };
+        status.message = Some(err.to_string());
     }
 }
 

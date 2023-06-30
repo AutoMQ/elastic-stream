@@ -6,13 +6,14 @@ pub mod append_result_entry;
 pub mod batch;
 pub mod client_role;
 pub mod error;
-pub mod fetch;
 pub mod list_range_criteria;
 pub mod payload;
 pub mod placement_driver_node;
 pub mod range;
 pub mod range_server;
 pub mod record;
+pub mod request;
+pub mod response;
 pub mod status;
 pub mod stream;
 

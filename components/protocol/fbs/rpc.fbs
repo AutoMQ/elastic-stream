@@ -196,48 +196,28 @@ table FetchRequest {
     // The maximum time in milliseconds to wait for the response.
     max_wait_ms: int32 (id: 0);
 
-    // The minimum bytes to accumulate before returning a response.
-    min_bytes: int32 (id: 1);
-
-    // A batch of fetch requests to fetch data from different streams.
-    entries: [FetchEntry] (id: 2);
-}
-
-table FetchEntry {
     // The stream range to fetch.
-    range: Range (id: 0, required);
+    range: Range (id: 1, required);
 
     // The offset to fetch from.
-    fetch_offset: int64 (id: 1);
+    offset: int64 (id: 2);
 
-    // The exclusive end offset to fetch.
-    end_offset: int64 (id: 2);
+    // Records within `[range.start_offset, limit)` are confirmed by replication
+    // algorithm. It is safe to deliver them to the downstream.
+    limit: int64 (id: 3);
+
+    // The minimum bytes to accumulate before returning a response.
+    min_bytes: int32 = -1 (id: 4);
 
     // The maximum number of bytes to fetch.
-    batch_max_bytes: int32 (id: 3);
+    max_bytes: int32 = -1 (id: 5);
 }
 
 table FetchResponse {
     status: Status (id: 0, required);
 
-    // A batch of `FetchResultEntry`.
-    entries: [FetchResultEntry] (id: 1);
-
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
-    throttle_time_ms: int32 (id: 2);
-}
-
-table FetchResultEntry {
-    status: Status (id: 0, required);
-
-    // The id of the stream
-    stream_id: int64 = -1 (id: 1);
-
-    // The quantity of record batches to be decoded from the payload for current fetch result.
-    //
-    // Note: Record batches MUST be decoded sequentially.
-    // This field defines the quantity of record batches that are belonging to the current FetchResult.
-    batch_count: int32 (id: 2);
+    throttle_time_ms: int32 (id: 1);
 }
 
 // Used to fetch the ranges from a specific range server or a specific stream list.

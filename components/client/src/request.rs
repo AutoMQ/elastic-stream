@@ -1,12 +1,12 @@
 use bytes::{Bytes, BytesMut};
-use model::fetch::FetchRequestEntry;
+use model::request::fetch::FetchRequest;
 use model::stream::StreamMetadata;
 use model::{
     client_role::ClientRole, range::RangeMetadata, range_server::RangeServer, ListRangeCriteria,
 };
 use protocol::rpc::header::{
     AppendRequestT, CreateRangeRequestT, CreateStreamRequestT,
-    DescribePlacementDriverClusterRequestT, DescribeStreamRequestT, FetchEntryT, FetchRequestT,
+    DescribePlacementDriverClusterRequestT, DescribeStreamRequestT, FetchRequestT,
     HeartbeatRequestT, IdAllocationRequestT, ListRangeCriteriaT, ListRangeRequestT,
     RangeServerMetricsT, RangeT, ReportMetricsRequestT, SealKind, SealRangeRequestT,
 };
@@ -66,7 +66,7 @@ pub enum Headers {
     Append,
 
     Fetch {
-        entries: Vec<FetchRequestEntry>,
+        request: FetchRequest,
     },
 
     ReportMetrics {
@@ -193,27 +193,10 @@ impl From<&Request> for Bytes {
                 builder.finish(request, None);
             }
 
-            Headers::Fetch { entries } => {
-                let mut request = FetchRequestT::default();
-                request.max_wait_ms = req.timeout.as_millis() as i32;
-                request.entries = Some(
-                    entries
-                        .iter()
-                        .map(|entry| {
-                            let mut entry_t = FetchEntryT::default();
-                            let mut range_t = RangeT::default();
-                            range_t.stream_id = entry.stream_id;
-                            range_t.index = entry.index;
-                            entry_t.range = Box::new(range_t);
-                            entry_t.fetch_offset = entry.start_offset as i64;
-                            entry_t.end_offset = entry.end_offset as i64;
-                            entry_t.batch_max_bytes = entry.batch_max_bytes as i32;
-                            entry_t
-                        })
-                        .collect(),
-                );
-                let request = request.pack(&mut builder);
-                builder.finish(request, None);
+            Headers::Fetch { request } => {
+                let req: FetchRequestT = request.into();
+                let req = req.pack(&mut builder);
+                builder.finish(req, None);
             }
 
             Headers::ReportMetrics {

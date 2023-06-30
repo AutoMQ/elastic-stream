@@ -45,6 +45,15 @@ impl SingleFetchResult {
     }
 }
 
+impl IntoIterator for SingleFetchResult {
+    type Item = Bytes;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.payload.into_iter()
+    }
+}
+
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(crate) struct WriteTask {

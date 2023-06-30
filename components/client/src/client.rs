@@ -5,8 +5,8 @@ use crate::{composite_session::CompositeSession, error::ClientError};
 use bytes::Bytes;
 use log::{error, trace, warn};
 use model::{
-    client_role::ClientRole, fetch::FetchRequestEntry, fetch::FetchResultEntry,
-    range::RangeMetadata, stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
+    client_role::ClientRole, range::RangeMetadata, request::fetch::FetchRequest,
+    response::fetch::FetchResultSet, stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
 };
 use observation::metrics::{
     store_metrics::RangeServerStatistics,
@@ -240,8 +240,8 @@ impl Client {
     pub async fn fetch(
         &self,
         target: &str,
-        request: FetchRequestEntry,
-    ) -> Result<FetchResultEntry, ClientError> {
+        request: FetchRequest,
+    ) -> Result<FetchResultSet, ClientError> {
         let session_manager = unsafe { &mut *self.session_manager.get() };
         let session = session_manager.get_composite_session(target).await?;
         let future = session.fetch(request);

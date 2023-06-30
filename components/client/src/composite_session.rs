@@ -6,8 +6,8 @@ use itertools::Itertools;
 use local_sync::oneshot;
 use log::{debug, error, info, trace, warn};
 use model::{
-    client_role::ClientRole, fetch::FetchRequestEntry, fetch::FetchResultEntry,
-    range::RangeMetadata, stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
+    client_role::ClientRole, range::RangeMetadata, request::fetch::FetchRequest,
+    response::fetch::FetchResultSet, stream::StreamMetadata, AppendResultEntry, ListRangeCriteria,
     PlacementDriverNode,
 };
 use observation::metrics::{
@@ -907,10 +907,7 @@ impl CompositeSession {
         }
     }
 
-    pub(crate) async fn fetch(
-        &self,
-        request: FetchRequestEntry,
-    ) -> Result<FetchResultEntry, ClientError> {
+    pub(crate) async fn fetch(&self, request: FetchRequest) -> Result<FetchResultSet, ClientError> {
         // TODO: support fetch request group in session level.
         self.try_reconnect().await;
         let session = self
@@ -919,10 +916,8 @@ impl CompositeSession {
             .ok_or(ClientError::ConnectFailure(self.target.clone()))?;
 
         let request = request::Request {
-            timeout: self.config.client_io_timeout(),
-            headers: request::Headers::Fetch {
-                entries: vec![request],
-            },
+            timeout: request.max_wait,
+            headers: request::Headers::Fetch { request },
             body: None,
         };
         let (tx, rx) = oneshot::channel();
@@ -938,18 +933,11 @@ impl CompositeSession {
             return Err(ClientError::ServerInternal);
         }
 
-        if let Some(response::Headers::Fetch { entries }) = response.headers {
-            trace!("Fetch entries {:?}", entries);
-            if entries.len() != 1 {
-                error!("Expect exactly one entry in fetch response");
-                Err(ClientError::ClientInternal)
-            } else {
-                let entry = FetchResultEntry {
-                    status: entries[0].status.clone(),
-                    data: response.payload,
-                };
-                Ok(entry)
-            }
+        if let Some(response::Headers::Fetch { throttle }) = response.headers {
+            Ok(FetchResultSet {
+                throttle,
+                payload: response.payload,
+            })
         } else {
             Err(ClientError::ClientInternal)
         }

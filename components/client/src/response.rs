@@ -7,7 +7,6 @@ use log::error;
 use log::info;
 use log::trace;
 use log::warn;
-use model::fetch::FetchResultEntry;
 use model::stream::StreamMetadata;
 use model::AppendResultEntry;
 use protocol::rpc::header::AppendResponse;
@@ -75,7 +74,7 @@ pub enum Headers {
     },
 
     Fetch {
-        entries: Vec<FetchResultEntry>,
+        throttle: Option<std::time::Duration>,
     },
 
     CreateRange {
@@ -211,14 +210,15 @@ impl Response {
                         return;
                     }
                     self.status = Status::ok();
-                    if let Some(entries) = response.entries {
-                        let entries = entries
-                            .into_iter()
-                            .map(Into::<FetchResultEntry>::into)
-                            .collect();
-                        self.headers = Some(Headers::Fetch { entries });
-                        self.payload = frame.payload.clone();
-                    }
+                    let throttle = if response.throttle_time_ms < 0 {
+                        None
+                    } else {
+                        Some(std::time::Duration::from_millis(
+                            response.throttle_time_ms as u64,
+                        ))
+                    };
+                    self.headers = Some(Headers::Fetch { throttle });
+                    self.payload = frame.payload.clone();
                 }
                 Err(e) => {
                     error!(
