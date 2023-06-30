@@ -1,7 +1,7 @@
 # GC vs Native
 1. Predicable latency
 2. Access to modern storage API without overhead
-3. Custom management of memory, cache
+3. Custom management of memory, cache: key to multi-tenant system
 
 # Rust Offerings(vs C++)
 1. Memory safety without garbage collection.
