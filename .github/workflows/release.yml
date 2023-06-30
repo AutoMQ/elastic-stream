@@ -37,11 +37,9 @@ jobs:
       - name: Install Deps
         run: |
           ./scripts/install_deps.sh
-      - name: Cargo Build and Package
-        working-directory: ./dist
+      - name: Build Range Server Debian Packages
         run: |
-          cargo build --release
-          ../scripts/package_deb.sh
+          make all-deb PROFILE=release
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -49,5 +47,5 @@ jobs:
           draft: false
           generate_release_notes: true
           files: |
-            ./dist/range-server.deb
+            ./dist/*.deb
             ./pd/distribution/*.deb
