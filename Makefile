@@ -24,8 +24,20 @@ REGISTRY ?= docker.io/elasticstream
 # This version-strategy uses git tags to set the version string
 VERSION ?= $(shell git describe --tags --always --dirty)
 
-# Set this to 1 to build in release mode.
-RELEASE ?=
+PROFILE ?= dev
+
+# https://doc.rust-lang.org/cargo/guide/build-cache.html
+# > For historical reasons, the dev and test profiles are stored in the debug directory,
+# > and the release and bench profiles are stored in the release directory.
+# > User-defined profiles are stored in a directory with the same name as the profile.
+PROFILE_PATH := $(PROFILE)
+ifeq ($(PROFILE),dev)
+  PROFILE_PATH := debug
+else ifeq ($(PROFILE),test)
+  PROFILE_PATH := debug
+else ifeq ($(PROFILE),bench)
+  PROFILE_PATH := release
+endif
 
 ###
 ### These variables should not need tweaking.
@@ -62,11 +74,6 @@ else ifeq ($(OS)_$(ARCH),linux_arm64)
   TARGET := aarch64-unknown-linux-gnu
 else
   $(error Unsupported OS/ARCH $(OS)/$(ARCH))
-endif
-
-BUILD_TYPE :=
-ifeq ($(RELEASE),1)
-  BUILD_TYPE := --release
 endif
 
 BIN_EXTENSION :=
@@ -116,12 +123,12 @@ all-push: # @HELP pushes containers for all platforms to the defined registry
 all-push: $(addprefix push-, $(subst /,_, $(ALL_PLATFORMS)))
 
 build: # @HELP builds the binary for the current platform
-build: target/$(TARGET)/$(BUILD_TYPE)/$(BINS)$(BIN_EXTENSION)
-
-target/$(TARGET)/$(BUILD_TYPE)/$(BINS)$(BIN_EXTENSION):
-	cross build --target $(TARGET) $(BUILD_TYPE)
-	echo -ne "binary: target/$(TARGET)/$(BUILD_TYPE)/$(BINS)$(BIN_EXTENSION)"
+build: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION)
+	echo -ne "binary: target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION)"
 	echo
+
+target/$(TARGET)/$(PROFILE_PATH)/$(BINS)$(BIN_EXTENSION):
+	cross build --target $(TARGET) --profile $(PROFILE)
 
 container:
 	echo "TODO"
@@ -137,7 +144,7 @@ help:
 	echo "  OS = $(OS)"
 	echo "  ARCH = $(ARCH)"
 	echo "  TARGET = $(TARGET)"
-	echo "  BUILD_TYPE = $(BUILD_TYPE)"
+	echo "  PROFILE = $(PROFILE)"
 	echo "  REGISTRY = $(REGISTRY)"
 	echo
 	echo "TARGETS:"

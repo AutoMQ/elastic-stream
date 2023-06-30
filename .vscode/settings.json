@@ -49,7 +49,6 @@
     "files.insertFinalNewline": true,
     "files.trimFinalNewlines": true,
     "files.trimTrailingWhitespace": true,
-    "editor.renderWhitespace": "trailing",
     "editor.formatOnSave": true,
     "[rust]": {
         "editor.defaultFormatter": "rust-lang.rust-analyzer"
