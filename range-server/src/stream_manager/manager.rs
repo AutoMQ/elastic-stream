@@ -10,9 +10,9 @@ use store::Store;
 
 use crate::error::ServiceError;
 
-use super::{fetcher::PlacementFetcher, range::Range, stream::Stream};
+use super::{fetcher::PlacementFetcher, range::Range, stream::Stream, StreamManager};
 
-pub(crate) struct StreamManager<S, F> {
+pub(crate) struct DefaultStreamManager<S, F> {
     streams: HashMap<i64, Stream>,
 
     fetcher: F,
@@ -20,7 +20,7 @@ pub(crate) struct StreamManager<S, F> {
     store: Rc<S>,
 }
 
-impl<S, F> StreamManager<S, F>
+impl<S, F> DefaultStreamManager<S, F>
 where
     S: Store,
     F: PlacementFetcher,
@@ -31,11 +31,6 @@ where
             fetcher,
             store,
         }
-    }
-
-    pub(crate) async fn start(&mut self) -> Result<(), ServiceError> {
-        self.bootstrap().await?;
-        Ok(())
     }
 
     /// Bootstrap all stream ranges that are assigned to current range server.
@@ -77,9 +72,20 @@ where
         }
         Ok(())
     }
+}
+
+impl<S, F> StreamManager for DefaultStreamManager<S, F>
+where
+    S: Store,
+    F: PlacementFetcher,
+{
+    async fn start(&mut self) -> Result<(), ServiceError> {
+        self.bootstrap().await?;
+        Ok(())
+    }
 
     /// Create a new range for the specified stream.
-    pub(crate) fn create_range(&mut self, range: RangeMetadata) -> Result<(), ServiceError> {
+    fn create_range(&mut self, range: RangeMetadata) -> Result<(), ServiceError> {
         info!("Create range={:?}", range);
 
         match self.streams.entry(range.stream_id()) {
@@ -101,11 +107,13 @@ where
         Ok(())
     }
 
-    pub(crate) fn commit(
+    fn commit(
         &mut self,
         stream_id: i64,
         range_index: i32,
         offset: u64,
+        _last_offset_delta: u32,
+        _bytes_len: u32,
     ) -> Result<(), ServiceError> {
         if let Some(range) = self.get_range(stream_id, range_index) {
             range.commit(offset);
@@ -118,7 +126,7 @@ where
         }
     }
 
-    pub(crate) fn seal(&mut self, range: &mut RangeMetadata) -> Result<(), ServiceError> {
+    fn seal(&mut self, range: &mut RangeMetadata) -> Result<(), ServiceError> {
         if let Some(stream) = self.streams.get_mut(&range.stream_id()) {
             if !stream.has_range(range.index()) {
                 stream.create_range(range.clone());
@@ -151,11 +159,11 @@ where
     ///
     /// # Returns
     /// The stream if it exists, otherwise `None`.
-    pub(crate) fn get_stream(&mut self, stream_id: i64) -> Option<&mut Stream> {
+    fn get_stream(&mut self, stream_id: i64) -> Option<&mut Stream> {
         self.streams.get_mut(&stream_id)
     }
 
-    pub fn get_range(&mut self, stream_id: i64, index: i32) -> Option<&mut Range> {
+    fn get_range(&mut self, stream_id: i64, index: i32) -> Option<&mut Range> {
         if let Some(stream) = self.get_stream(stream_id) {
             stream.get_range(index)
         } else {

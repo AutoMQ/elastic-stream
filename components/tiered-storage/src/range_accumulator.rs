@@ -1,4 +1,3 @@
-use opendal::Operator;
 use std::{
     cell::RefCell,
     rc::Rc,
@@ -9,7 +8,10 @@ use tokio::{
     time::sleep,
 };
 
-use crate::{range_offload::RangeOffload, RangeFetcher, RangeKey};
+use crate::{
+    object_storage::ObjectTieredStorageConfig, range_offload::RangeOffload, ObjectManager,
+    RangeFetcher, RangeKey,
+};
 
 pub trait RangeAccumulator {
     fn accumulate(&self, end_offset: u64, records_size: u32) -> (i32, bool);
@@ -88,23 +90,21 @@ impl RangeAccumulator for DefaultRangeAccumulator {
 }
 
 impl DefaultRangeAccumulator {
-    pub fn new<F: RangeFetcher + 'static>(
+    pub fn new<F: RangeFetcher + 'static, M: ObjectManager + 'static>(
         range: RangeKey,
         start_offset: u64,
         end_offset: u64,
-        op: Operator,
         range_fetcher: Rc<F>,
-        object_size: u32,
-        part_size: u32,
+        config: ObjectTieredStorageConfig,
+        range_offload: Rc<RangeOffload<M>>,
     ) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        let range_offload = Rc::new(RangeOffload::new(op, object_size));
 
         Self::read_loop(
             range,
             start_offset,
             end_offset,
-            object_size,
+            config.object_size,
             rx,
             range_fetcher,
             range_offload,
@@ -114,20 +114,20 @@ impl DefaultRangeAccumulator {
             size: RefCell::new(0),
             end_offset: RefCell::new(end_offset),
             tx,
-            object_size,
-            part_size,
+            object_size: config.object_size,
+            part_size: config.part_size,
             timestamp: RefCell::new(Instant::now()),
         }
     }
 
-    fn read_loop<F: RangeFetcher + 'static>(
+    fn read_loop<F: RangeFetcher + 'static, M: ObjectManager + 'static>(
         range: RangeKey,
         start_offset: u64,
         end_offset: u64,
         object_size: u32,
         mut rx: UnboundedReceiver<EventKind>,
         range_fetcher: Rc<F>,
-        range_offload: Rc<RangeOffload>,
+        range_offload: Rc<RangeOffload<M>>,
     ) {
         tokio_uring::spawn(async move {
             let stream_id = range.stream_id;

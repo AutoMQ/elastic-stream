@@ -1,7 +1,7 @@
 use crate::{
     stream_manager::{
         fetcher::{DelegatePlacementClient, PlacementClient},
-        StreamManager,
+        manager::DefaultStreamManager,
     },
     worker::Worker,
     worker_config::WorkerConfig,
@@ -10,6 +10,7 @@ use config::Configuration;
 use log::{error, info};
 use std::{cell::UnsafeCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
 use store::{ElasticStore, Store};
+
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub fn launch(
@@ -75,7 +76,7 @@ pub fn launch(
                     ));
 
                     let fetcher = DelegatePlacementClient::new(tx);
-                    let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(
+                    let stream_manager = Rc::new(UnsafeCell::new(DefaultStreamManager::new(
                         fetcher,
                         Rc::clone(&store),
                     )));
@@ -113,7 +114,7 @@ pub fn launch(
                 let fetcher = PlacementClient::new(Rc::clone(&client));
                 let store = Rc::new(store);
 
-                let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(
+                let stream_manager = Rc::new(UnsafeCell::new(DefaultStreamManager::new(
                     fetcher,
                     Rc::clone(&store),
                 )));

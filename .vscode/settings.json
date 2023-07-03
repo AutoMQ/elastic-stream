@@ -25,6 +25,7 @@
         "memtable",
         "minstant",
         "mkdirs",
+        "mockall",
         "monoio",
         "MPMC",
         "NODROP",

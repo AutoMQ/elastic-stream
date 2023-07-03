@@ -5,7 +5,7 @@ use log::error;
 use protocol::rpc::header::ErrorCode;
 use store::Store;
 
-use crate::stream_manager::{fetcher::PlacementFetcher, StreamManager};
+use crate::stream_manager::StreamManager;
 
 use super::{
     append::Append, create_range::CreateRange, fetch::Fetch, heartbeat::Heartbeat, ping::Ping,
@@ -94,14 +94,14 @@ impl<'a> Command<'a> {
         }
     }
 
-    pub(crate) async fn apply<S, F>(
+    pub(crate) async fn apply<S, M>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
+        stream_manager: Rc<UnsafeCell<M>>,
         response: &mut Frame,
     ) where
         S: Store,
-        F: PlacementFetcher,
+        M: StreamManager,
     {
         match self {
             Command::Append(cmd) => cmd.apply(store, stream_manager, response).await,

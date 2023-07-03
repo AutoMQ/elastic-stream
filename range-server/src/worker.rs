@@ -8,10 +8,7 @@ use std::{
 
 use crate::{
     connection_tracker::ConnectionTracker,
-    stream_manager::{
-        fetcher::{FetchRangeTask, PlacementFetcher},
-        StreamManager,
-    },
+    stream_manager::{fetcher::FetchRangeTask, StreamManager},
     worker_config::WorkerConfig,
 };
 use client::Client;
@@ -34,24 +31,24 @@ use util::metrics::http_serve;
 /// and communication with the placement driver.
 ///
 /// Inter-worker communications are achieved via channels.
-pub(crate) struct Worker<S, F> {
+pub(crate) struct Worker<S, M> {
     config: WorkerConfig,
     store: Rc<S>,
-    stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
+    stream_manager: Rc<UnsafeCell<M>>,
     client: Rc<Client>,
     #[allow(dead_code)]
     channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
 }
 
-impl<S, F> Worker<S, F>
+impl<S, M> Worker<S, M>
 where
     S: Store + 'static,
-    F: PlacementFetcher + 'static,
+    M: StreamManager + 'static,
 {
     pub fn new(
         config: WorkerConfig,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
+        stream_manager: Rc<UnsafeCell<M>>,
         client: Rc<Client>,
         channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
     ) -> Self {

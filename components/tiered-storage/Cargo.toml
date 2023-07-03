@@ -12,3 +12,4 @@ opendal = { workspace = true }
 store = { path = "../store" }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
+mockall = { workspace = true }

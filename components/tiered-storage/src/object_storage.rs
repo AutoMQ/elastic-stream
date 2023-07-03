@@ -11,34 +11,43 @@ use std::{
 use tokio::time::sleep;
 
 use crate::range_accumulator::{DefaultRangeAccumulator, RangeAccumulator};
-use crate::TieredStorage;
+use crate::range_offload::RangeOffload;
+use crate::{ObjectManager, TieredStorage};
 use crate::{RangeFetcher, RangeKey};
 
-pub struct ObjectTieredStorage<F: RangeFetcher> {
+pub struct ObjectTieredStorage<F: RangeFetcher, M: ObjectManager> {
     config: ObjectTieredStorageConfig,
     ranges: RefCell<HashMap<RangeKey, Rc<DefaultRangeAccumulator>>>,
     part_full_ranges: RefCell<HashSet<RangeKey>>,
     cache_size: RefCell<i64>,
     op: Operator,
+    object_manager: Rc<M>,
     range_fetcher: Rc<F>,
 }
 
-impl<F> TieredStorage for ObjectTieredStorage<F>
+impl<F, M> TieredStorage for ObjectTieredStorage<F, M>
 where
     F: RangeFetcher + 'static,
+    M: ObjectManager + 'static,
 {
     fn add_range(&self, stream_id: u64, range_index: u32, start_offset: u64, end_offset: u64) {
         let range = RangeKey::new(stream_id, range_index);
+        let range_offload = Rc::new(RangeOffload::new(
+            stream_id,
+            range_index,
+            self.op.clone(),
+            self.object_manager.clone(),
+            self.config.object_size,
+        ));
         self.ranges.borrow_mut().insert(
             range,
             Rc::new(DefaultRangeAccumulator::new(
                 range,
                 start_offset,
                 end_offset,
-                self.op.clone(),
                 self.range_fetcher.clone(),
-                self.config.object_size,
-                self.config.part_size,
+                self.config.clone(),
+                range_offload,
             )),
         );
     }
@@ -89,13 +98,15 @@ where
     }
 }
 
-impl<F> ObjectTieredStorage<F>
+impl<F, M> ObjectTieredStorage<F, M>
 where
     F: RangeFetcher + 'static,
+    M: ObjectManager + 'static,
 {
     pub fn new(
         config: ObjectTieredStorageConfig,
         range_fetcher: Rc<F>,
+        object_manager: Rc<M>,
     ) -> Result<Rc<Self>, Box<dyn Error>> {
         // construct opendal operator
         let mut s3_builder = S3::default();
@@ -120,6 +131,7 @@ where
             part_full_ranges: RefCell::new(HashSet::new()),
             cache_size: RefCell::new(0),
             op,
+            object_manager,
             range_fetcher,
         });
 
@@ -128,7 +140,7 @@ where
         Ok(this)
     }
 
-    pub fn run_force_flush_task(storage: Rc<ObjectTieredStorage<F>>, max_duration: Duration) {
+    pub fn run_force_flush_task(storage: Rc<ObjectTieredStorage<F, M>>, max_duration: Duration) {
         tokio_uring::spawn(async move {
             loop {
                 storage.ranges.borrow().iter().for_each(|(_, range)| {
@@ -140,6 +152,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct ObjectTieredStorageConfig {
     pub endpoint: String,
     pub bucket: String,

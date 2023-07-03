@@ -27,13 +27,14 @@ impl<'a> Heartbeat<'a> {
         Ok(Self { request })
     }
 
-    pub(crate) async fn apply<S, F>(
+    pub(crate) async fn apply<S, M>(
         &self,
         _store: Rc<S>,
-        _stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
+        _stream_manager: Rc<UnsafeCell<M>>,
         response: &mut Frame,
     ) where
         S: Store,
+        M: StreamManager,
     {
         trace!("Prepare heartbeat response header for {:?}", self.request);
 

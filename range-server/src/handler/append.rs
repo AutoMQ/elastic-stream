@@ -10,10 +10,7 @@ use protocol::rpc::header::{AppendResponseArgs, AppendResultEntryArgs, ErrorCode
 use std::{cell::UnsafeCell, fmt, rc::Rc};
 use store::{error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, Store};
 
-use crate::{
-    error::ServiceError,
-    stream_manager::{fetcher::PlacementFetcher, StreamManager},
-};
+use crate::{error::ServiceError, stream_manager::StreamManager};
 
 use super::util::{finish_response_builder, system_error_frame_bytes, MIN_BUFFER_SIZE};
 
@@ -61,14 +58,14 @@ impl Append {
     ///
     /// `response` - Mutable response frame reference, into which required business data are filled.
     ///
-    pub(crate) async fn apply<S, F>(
+    pub(crate) async fn apply<S, M>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
+        stream_manager: Rc<UnsafeCell<M>>,
         response: &mut Frame,
     ) where
         S: Store,
-        F: PlacementFetcher,
+        M: StreamManager,
     {
         let to_store_requests = match self.build_store_requests() {
             Ok(requests) => requests,
@@ -133,6 +130,8 @@ impl Append {
                             result.stream_id,
                             result.range_index as i32,
                             result.offset as u64,
+                            result.last_offset_delta,
+                            result.bytes_len,
                         ) {
                             warn!(
                                 "Failed to ack offset on store completion to stream manager: {:?}",

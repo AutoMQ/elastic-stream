@@ -18,13 +18,14 @@ impl<'a> Ping<'a> {
         Self { request: frame }
     }
 
-    pub(crate) async fn apply<S, F>(
+    pub(crate) async fn apply<S, M>(
         &self,
         _store: Rc<S>,
-        _stream_manager: Rc<UnsafeCell<StreamManager<S, F>>>,
+        _stream_manager: Rc<UnsafeCell<M>>,
         response: &mut Frame,
     ) where
         S: Store,
+        M: StreamManager,
     {
         trace!("Ping[stream-id={}] received", self.request.stream_id);
         response.header = self.request.header.clone();
@@ -45,7 +46,7 @@ mod tests {
     use codec::frame::{Frame, OperationCode};
     use store::Store;
 
-    use crate::stream_manager::{fetcher::PlacementFetcher, StreamManager};
+    use crate::stream_manager::{fetcher::PlacementFetcher, MockStreamManager};
 
     struct MockStore {}
 
@@ -145,10 +146,7 @@ mod tests {
         tokio_uring::start(async move {
             let ping = super::Ping::new(&request);
             let store = Rc::new(MockStore {});
-            let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(
-                MockPlacementFetcher {},
-                Rc::clone(&store),
-            )));
+            let stream_manager = Rc::new(UnsafeCell::new(MockStreamManager::new()));
             ping.apply(Rc::clone(&store), stream_manager, &mut response)
                 .await;
             Ok(())

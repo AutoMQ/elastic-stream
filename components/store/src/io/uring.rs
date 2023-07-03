@@ -1153,7 +1153,9 @@ impl IO {
             stream_id: task.stream_id,
             range_index: task.range,
             offset: task.offset,
+            last_offset_delta: task.len,
             wal_offset,
+            bytes_len: task.buffer.len() as u32,
         };
         trace!(
             "Ack `WriteTask` {{ stream-id: {}, offset: {} }}",
