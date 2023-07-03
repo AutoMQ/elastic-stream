@@ -162,7 +162,9 @@ impl<'a> fmt::Display for Fetch<'a> {
 #[cfg(test)]
 mod tests {
 
-    use crate::stream_manager::{fetcher::PlacementFetcher, StreamManager};
+    use crate::stream_manager::{
+        fetcher::PlacementFetcher, manager::DefaultStreamManager, StreamManager,
+    };
     use codec::frame::{Frame, OperationCode};
     use config::Configuration;
     use model::stream::StreamMetadata;
@@ -285,7 +287,7 @@ mod tests {
             let store = Rc::new(MockStore {
                 config: Arc::new(Configuration::default()),
             });
-            let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(
+            let stream_manager = Rc::new(UnsafeCell::new(DefaultStreamManager::new(
                 MockPlacementFetcher {},
                 Rc::clone(&store),
             )));

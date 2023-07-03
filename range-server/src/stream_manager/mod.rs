@@ -35,7 +35,9 @@ pub(crate) trait StreamManager {
     ///
     /// # Returns
     /// The stream if it exists, otherwise `None`.
+    #[allow(clippy::needless_lifetimes)]
     fn get_stream<'a>(&'a mut self, stream_id: i64) -> Option<&'a mut Stream>;
 
+    #[allow(clippy::needless_lifetimes)]
     fn get_range<'a>(&'a mut self, stream_id: i64, index: i32) -> Option<&'a mut range::Range>;
 }
