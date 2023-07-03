@@ -13,7 +13,6 @@ members = [
     "components/protocol",
     "components/replication",
     "components/store",
-    "components/test-util",
     "components/tool",
     "components/transport",
     "components/util",

@@ -32,7 +32,6 @@ util = { path = "../../components/util" }
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }
-test-util = { path = "../../components/test-util" }
 env_logger = { workspace = true }
 
 [lib]

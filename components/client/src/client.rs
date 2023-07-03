@@ -284,6 +284,7 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use crate::mocks::run_listener;
     use bytes::BytesMut;
     use log::trace;
     use model::client_role::ClientRole;
@@ -300,7 +301,6 @@ mod tests {
     };
     use protocol::rpc::header::SealKind;
     use std::{error::Error, sync::Arc};
-    use test_util::run_listener;
     use tokio::sync::broadcast;
 
     use crate::{

@@ -49,7 +49,6 @@ tikv-jemallocator = "0.5"
 
 [dev-dependencies]
 mockall = { workspace = true }
-test-util = { path = "../components/test-util" }
 
 [build-dependencies]
 built = { workspace = true, features = ["git2", "chrono", "semver"] }

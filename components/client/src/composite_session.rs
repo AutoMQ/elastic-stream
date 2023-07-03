@@ -1027,17 +1027,17 @@ impl CompositeSession {
 
 #[cfg(test)]
 mod tests {
-    use tokio::sync::broadcast;
-
     use super::CompositeSession;
     use crate::lb_policy::LbPolicy;
+    use crate::mocks::run_listener;
     use std::{error::Error, sync::Arc};
+    use tokio::sync::broadcast;
 
     #[test]
     fn test_new() -> Result<(), Box<dyn Error>> {
         let config = Arc::new(config::Configuration::default());
         tokio_uring::start(async {
-            let port = test_util::run_listener().await;
+            let port = run_listener().await;
             let target = format!("{}:{}", "localhost", port);
             let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
             let _session =
@@ -1054,7 +1054,7 @@ mod tests {
         config.server.server_id = 1;
         let config = Arc::new(config);
         tokio_uring::start(async {
-            let port = test_util::run_listener().await;
+            let port = run_listener().await;
             let target = format!("{}:{}", "localhost", port);
             let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
             let composite_session =

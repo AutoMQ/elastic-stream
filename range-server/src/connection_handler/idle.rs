@@ -95,13 +95,12 @@ impl IdleHandler {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, error::Error, net::SocketAddr, rc::Rc, sync::Arc};
-
+    use crate::connection_tracker::ConnectionTracker;
+    use crate::mocks::run_listener;
     use config::Configuration;
+    use std::{cell::RefCell, error::Error, net::SocketAddr, rc::Rc, sync::Arc};
     use tokio_uring::net::TcpStream;
     use transport::connection::Connection;
-
-    use crate::connection_tracker::ConnectionTracker;
 
     #[test]
     fn test_read_idle() -> Result<(), Box<dyn Error>> {
@@ -109,7 +108,7 @@ mod tests {
         config.server.connection_idle_duration = 1;
         let config = Arc::new(config);
         tokio_uring::start(async {
-            let port = test_util::run_listener().await;
+            let port = run_listener().await;
             let target = format!("127.0.0.1:{}", port);
             let addr = target.parse::<SocketAddr>().unwrap();
             let stream = TcpStream::connect(addr.clone()).await.unwrap();

@@ -13,7 +13,6 @@ tokio-uring = { workspace = true }
 
 [dev-dependencies]
 cargo-llvm-cov = { workspace = true }
-test-util = { path = "../test-util" }
 tokio = { workspace = true }
 env_logger = { workspace = true }
 chrono = { workspace = true }
