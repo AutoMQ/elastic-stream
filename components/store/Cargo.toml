@@ -36,13 +36,13 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 cargo-llvm-cov = { workspace = true }
-criterion = { workspace = true }
-uuid = { workspace = true }
-tempfile = { workspace = true }
 chrono = { workspace = true }
-env_logger = { workspace = true }
-transport = { path = "../transport" }
 codec = { path = "../codec" }
+criterion = { workspace = true }
+env_logger = { workspace = true }
+tempfile = { workspace = true }
+transport = { path = "../transport" }
+uuid = { workspace = true }
 
 [[bench]]
 name = "benchmark"

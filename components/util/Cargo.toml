@@ -12,11 +12,9 @@ lazy_static = { version = "1.4.0" }
 libc = "0.2.141"
 log = { workspace = true }
 procfs = "0.15.1"
-
 prometheus = { workspace = true }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
-
 uuid = { workspace = true }
 
 [dev-dependencies]

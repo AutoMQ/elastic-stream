@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-store = { path = "../store" }
-opendal = { workspace = true }
 bytes = { workspace = true }
+clap = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
+opendal = { workspace = true }
+store = { path = "../store" }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
-log = { workspace = true }
-env_logger = { workspace = true }
-clap = { workspace = true }
