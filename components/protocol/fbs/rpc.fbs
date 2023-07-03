@@ -536,3 +536,156 @@ table DescribePlacementDriverClusterResponse {
 
     cluster: PlacementDriverCluster (id: 1, required);
 }
+
+table KeyValue {
+    // key is the key in bytes. An empty key is not allowed.
+    key: [ubyte] (id: 0);
+
+    // value is the value held by the key, in bytes.
+    value: [ubyte] (id: 1);
+}
+
+table RangeRequest {
+    // The timeout in milliseconds to wait for the response.
+    timeout_ms: int32 (id: 0);
+
+    // key is the first key for the range. If range_end is not given, the request only looks up key.
+    key: [ubyte] (id: 1);
+
+    // range_end is the upper bound on the requested range [key, range_end).
+    // If range_end is '\0', the range is all keys >= key.
+    // If range_end is key plus one (e.g., "aa"+1 == "ab", "a\xff"+1 == "b"),
+    // then the range request gets all keys prefixed with key.
+    // If both key and range_end are '\0', then the range request returns all keys.
+    range_end: [ubyte] (id: 2);
+
+    // limit is a limit on the number of keys returned for the request. When limit is set to 0,
+    // it is treated as no limit.
+    limit: int64 (id: 3);
+}
+
+table RangeResponse {
+    status: Status (id: 0, required);
+
+    // kvs is the list of key-value pairs matched by the range request.
+    // kvs is empty when count is requested.
+    kvs: [KeyValue] (id: 1);
+
+    // more indicates if there are more keys to return in the requested range.
+    more: bool (id: 2);
+
+    // count is set to the number of keys within the range when requested.
+    count: int64 (id: 3);
+}
+
+table PutRequest {
+    // The timeout in milliseconds to wait for the response.
+    timeout_ms: int32 (id: 0);
+
+    // key is the key, in bytes, to put into the key-value store.
+    key: [ubyte] (id: 1);
+
+    // value is the value, in bytes, to associate with the key in the key-value store.
+    value: [ubyte] (id: 2);
+}
+
+table PutResponse {
+    status: Status (id: 0, required);
+}
+
+table DeleteRangeRequest {
+    // The timeout in milliseconds to wait for the response.
+    timeout_ms: int32 (id: 0);
+
+    // key is the first key to delete in the range.
+    key: [ubyte] (id: 1);
+
+    // range_end is the key following the last key to delete for the range [key, range_end).
+    // If range_end is not given, the range is defined to contain only the key argument.
+    // If range_end is one bit larger than the given key, then the range is all the keys
+    // with the prefix (the given key).
+    // If range_end is '\0', the range is all keys greater than or equal to the key argument.
+    range_end: [ubyte] (id: 2);
+}
+
+table DeleteRangeResponse {
+    status: Status (id: 0, required);
+
+    // deleted is the number of keys deleted by the delete range request.
+    deleted: int64 (id: 1);
+}
+
+// As vectors of unions are not yet supported in rust, we use a struct to wrap the union like
+// `union RequestOp {RangeRequest, PutRequest, DeleteRangeRequest, TxnRequest}`
+enum RequestOpType: ubyte { RANGE = 0, PUT = 1, DELETE_RANGE = 2, TXN = 3 }
+table RequestOp {
+    type: RequestOpType (id: 0);
+    range_request: RangeRequest (id: 1);
+    put_request: PutRequest (id: 2);
+    delete_range_request: DeleteRangeRequest (id: 3);
+    txn_request: TxnRequest (id: 4);
+}
+
+// As vectors of unions are not yet supported in rust, we use a struct to wrap the union like
+// `union ResponseOp {RangeResponse, PutResponse, DeleteRangeResponse, TxnResponse}`
+enum ResponseOpType: ubyte { RANGE = 0, PUT = 1, DELETE_RANGE = 2, TXN = 3 }
+table ResponseOp {
+    type: ResponseOpType (id: 0);
+    range_response: RangeResponse (id: 1);
+    put_response: PutResponse (id: 2);
+    delete_range_response: DeleteRangeResponse (id: 3);
+    txn_response: TxnResponse (id: 4);
+}
+
+enum CompareResult: ubyte { EQUAL = 0, GREATER = 1, LESS = 2, NOT_EQUAL = 3 }
+
+enum CompareTarget: ubyte { VALUE = 0 }
+
+union CompareTargetUnion {CompareTargetValue}
+
+table CompareTargetValue {
+    // value is the value of the given key, in bytes.
+    value: [ubyte] (id: 0);
+}
+
+table Compare {
+    // result is logical comparison operation for this comparison.
+    result: CompareResult (id: 0);
+
+    // target is the key-value field to inspect for the comparison.
+    target: CompareTarget (id: 1);
+
+    // key is the subject key for the comparison operation.
+    key: [ubyte] (id: 2);
+
+    target_union: CompareTargetUnion (id: 4);
+}
+
+table TxnRequest {
+    // The timeout in milliseconds to wait for the response.
+    timeout_ms: int32 (id: 0);
+
+    // compare is a list of predicates representing a conjunction of terms.
+    // If the comparisons succeed, then the success requests will be processed in order,
+    // and the response will contain their respective responses in order.
+    // If the comparisons fail, then the failure requests will be processed in order,
+    // and the response will contain their respective responses in order.
+    compare: [Compare] (id: 1);
+
+    // success is a list of requests which will be applied when compare evaluates to true.
+    success: [RequestOp] (id: 2);
+
+    // failure is a list of requests which will be applied when compare evaluates to false.
+    failure: [RequestOp] (id: 3);
+}
+
+table TxnResponse {
+    status: Status (id: 0, required);
+
+    // succeeded is set to true if the compare evaluated to true or false otherwise.
+    succeeded: bool (id: 1);
+
+    // responses is a list of responses corresponding to the results from applying
+    // success if succeeded is true or failure if succeeded is false.
+    responses: [ResponseOp] (id: 2);
+}
