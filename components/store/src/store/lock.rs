@@ -116,9 +116,6 @@ mod tests {
 
     #[test]
     fn test_lock_normal() -> Result<(), Box<dyn Error>> {
-        let store_base = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(store_base.as_path());
-
         let (stop_tx, stop_rx) = oneshot::channel();
         let (port_tx, port_rx) = oneshot::channel();
 

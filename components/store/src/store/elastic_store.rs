@@ -375,11 +375,10 @@ impl AsRawFd for ElasticStore {
 /// Some tests for ElasticStore.
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, path::Path};
-
     use bytes::{Bytes, BytesMut};
     use futures::future::join_all;
     use log::trace;
+    use std::error::Error;
     use tokio::sync::oneshot;
 
     use crate::{
@@ -409,11 +408,8 @@ mod tests {
     /// Test the basic append and fetch operations.
     #[tokio::test]
     async fn test_run_store() -> Result<(), Box<dyn Error>> {
-        let store_dir = test_util::create_random_path()?;
-        let store_path = store_dir.as_path().to_str().unwrap().to_owned();
-
-        let store_path_g = store_path.clone();
-        let _guard = test_util::DirectoryRemovalGuard::new(&Path::new(&store_path_g));
+        let store_dir = tempfile::tempdir()?;
+        let store_path = store_dir.path().to_str().unwrap().to_owned();
 
         let (tx, rx) = oneshot::channel();
 

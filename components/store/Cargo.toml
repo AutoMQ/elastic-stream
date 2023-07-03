@@ -39,6 +39,7 @@ cargo-llvm-cov = { workspace = true }
 criterion = { workspace = true }
 test-util = { path = "../test-util" }
 uuid = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 name = "benchmark"

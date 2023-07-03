@@ -495,6 +495,4 @@ fn allocate_id(request: &IdAllocationRequest, response_frame: &mut Frame) {
     response_frame.header = Some(Bytes::copy_from_slice(data));
 }
 
-pub mod fs;
 pub mod log_util;
-pub mod store;

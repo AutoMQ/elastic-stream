@@ -323,14 +323,13 @@ mod tests {
 
     #[test]
     fn test_index_driver() -> Result<(), Box<dyn Error>> {
-        let db_path = test_util::create_random_path()?;
-        let _dir_guard = test_util::DirectoryRemovalGuard::new(db_path.as_path());
+        let db_path = tempfile::tempdir()?;
         let min_offset = Arc::new(TestMinOffset {});
         let mut configuration = Configuration::default();
         configuration
             .store
             .path
-            .set_base(db_path.as_os_str().to_str().unwrap());
+            .set_base(db_path.path().as_os_str().to_str().unwrap());
         let config = Arc::new(Configuration::default());
         let index_driver = super::IndexDriver::new(&config, min_offset, 128)?;
         assert_eq!(0, index_driver.get_wal_checkpoint()?);

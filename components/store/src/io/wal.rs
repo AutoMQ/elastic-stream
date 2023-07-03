@@ -759,7 +759,6 @@ mod tests {
     use percentage::Percentage;
     use std::error::Error;
     use std::fs::File;
-    use std::path::PathBuf;
     use std::sync::Arc;
 
     use super::Wal;
@@ -773,18 +772,11 @@ mod tests {
         Ok(Wal::new(control_ring, cfg))
     }
 
-    fn random_wal_dir() -> Result<PathBuf, StoreError> {
-        test_util::create_random_path().map_err(|e| StoreError::IO(e))
-    }
-
     #[test]
     fn test_load_wals() -> Result<(), StoreError> {
-        let store_base = random_wal_dir()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(store_base.as_path());
+        let store_base = tempfile::tempdir().map_err(|e| StoreError::IO(e))?;
         let mut cfg = config::Configuration::default();
-        cfg.store
-            .path
-            .set_base(store_base.as_path().to_str().unwrap());
+        cfg.store.path.set_base(store_base.path().to_str().unwrap());
         cfg.check_and_apply()
             .expect("Failed to check-and-apply configuration");
         let config = Arc::new(cfg);
@@ -810,11 +802,9 @@ mod tests {
 
     #[test]
     fn test_alloc_segment() -> Result<(), StoreError> {
-        let wal_dir = random_wal_dir()?;
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
-
+        let wal_dir = tempfile::tempdir().map_err(|e| StoreError::IO(e))?;
         let mut cfg = config::Configuration::default();
-        cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
+        cfg.store.path.set_wal(wal_dir.path().to_str().unwrap());
         let config = Arc::new(cfg);
         let mut wal = create_wal(&config)?;
 
@@ -829,11 +819,9 @@ mod tests {
 
     #[test]
     fn test_writable_segment_count() -> Result<(), StoreError> {
-        let wal_dir = random_wal_dir()?;
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
-
+        let wal_dir = tempfile::tempdir().map_err(|e| StoreError::IO(e))?;
         let mut cfg = config::Configuration::default();
-        cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
+        cfg.store.path.set_wal(wal_dir.path().to_str().unwrap());
         let config = Arc::new(cfg);
         let mut wal = create_wal(&config)?;
 
@@ -852,10 +840,9 @@ mod tests {
 
     #[test]
     fn test_segment_file_of() -> Result<(), StoreError> {
-        let wal_dir = random_wal_dir()?;
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
+        let wal_dir = tempfile::tempdir().map_err(|e| StoreError::IO(e))?;
         let mut cfg = config::Configuration::default();
-        cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
+        cfg.store.path.set_wal(wal_dir.path().to_str().unwrap());
         let config = Arc::new(cfg);
         let mut wal = create_wal(&config)?;
 
@@ -885,10 +872,9 @@ mod tests {
 
     #[test]
     fn test_delete_segments() -> Result<(), Box<dyn Error>> {
-        let wal_dir = random_wal_dir()?;
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
+        let wal_dir = tempfile::tempdir().map_err(|e| StoreError::IO(e))?;
         let mut cfg = config::Configuration::default();
-        cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
+        cfg.store.path.set_wal(wal_dir.path().to_str().unwrap());
         let config = Arc::new(cfg);
         let mut wal = create_wal(&config)?;
 
@@ -911,10 +897,9 @@ mod tests {
     /// Test try_reclaim_segments
     #[test]
     fn test_try_reclaim_segments() -> Result<(), StoreError> {
-        let wal_dir = random_wal_dir()?;
-        let _wal_dir_guard = test_util::DirectoryRemovalGuard::new(wal_dir.as_path());
+        let wal_dir = tempfile::tempdir().map_err(|e| StoreError::IO(e))?;
         let mut cfg = config::Configuration::default();
-        cfg.store.path.set_wal(wal_dir.as_path().to_str().unwrap());
+        cfg.store.path.set_wal(wal_dir.path().to_str().unwrap());
         let config = Arc::new(cfg);
         let mut wal = create_wal(&config)?;
 

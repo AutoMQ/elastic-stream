@@ -17,7 +17,6 @@ model = { path = "../model" }
 protocol = { path = "../protocol" }
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = { workspace = true }
-store = { path = "../store" }
 tokio = { workspace = true, features = ["full"] }
 tokio-uring = { workspace = true }
 tracing = { workspace = true }
@@ -28,3 +27,4 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 crc = { workspace = true }
+tempfile = { workspace = true }

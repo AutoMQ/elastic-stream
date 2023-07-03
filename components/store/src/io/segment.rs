@@ -547,10 +547,8 @@ mod tests {
         error::Error,
         fs::File,
         os::{fd::FromRawFd, unix::prelude::FileExt},
-        path::{self, Path},
         sync::Arc,
     };
-    use uuid::Uuid;
 
     use super::{LogSegment, Status};
 
@@ -564,13 +562,12 @@ mod tests {
 
     #[test]
     fn test_append_record() -> Result<(), Box<dyn Error>> {
-        let wal_path = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(wal_path.as_path());
+        let wal_path = tempfile::tempdir()?;
         let mut cfg = config::Configuration::default();
-        cfg.store.path.set_wal(wal_path.as_path().to_str().unwrap());
+        cfg.store.path.set_wal(wal_path.path().to_str().unwrap());
         let config = Arc::new(cfg);
 
-        let mut segment = super::LogSegment::new(&config, 0, 1024 * 1024, wal_path.as_path())?;
+        let mut segment = super::LogSegment::new(&config, 0, 1024 * 1024, wal_path.path())?;
         segment.status = Status::ReadWrite;
 
         let mut buf_writer = AlignedBufWriter::new(0, 512);
@@ -610,23 +607,22 @@ mod tests {
         // Start offset of current segment
         let wal_offset = 1024 * 1024;
 
-        let uuid = Uuid::new_v4();
-
         // Generate some random data
         let buf_w = AlignedBuf::new(wal_offset, 4 * alignment as usize, alignment).unwrap();
 
         rand::thread_rng().fill_bytes(buf_w.slice_mut(..));
         buf_w.increase_written(buf_w.capacity);
 
-        let mut store_dir = test_util::create_random_path().unwrap();
-        let store_dir_c = store_dir.clone();
-        let _store_dir_guard =
-            test_util::DirectoryRemovalGuard::new(&Path::new(store_dir_c.as_os_str()));
+        let store_dir = tempfile::tempdir()?;
+        let segment_file_path = store_dir.path().join(format!("{}", wal_offset));
 
-        store_dir.push(path::PathBuf::from(uuid.simple().to_string()));
-
-        let mut segment =
-            super::LogSegment::new(&config, wal_offset, 1024 * 1024, store_dir.as_path()).unwrap();
+        let mut segment = super::LogSegment::new(
+            &config,
+            wal_offset,
+            1024 * 1024,
+            &segment_file_path.as_path(),
+        )
+        .unwrap();
         segment.open().unwrap();
 
         let sd = segment.sd.as_ref().unwrap();
@@ -701,23 +697,21 @@ mod tests {
         // Start offset of current segment
         let wal_offset = 1024 * 1024;
 
-        let uuid = Uuid::new_v4();
-
         // Generate some random data
         let buf_w = AlignedBuf::new(wal_offset, 4 * alignment, alignment).unwrap();
 
         rand::thread_rng().fill_bytes(buf_w.slice_mut(..));
         buf_w.increase_written(buf_w.capacity);
 
-        let mut store_dir = test_util::create_random_path().unwrap();
-        let store_dir_c = store_dir.clone();
-        let _store_dir_guard =
-            test_util::DirectoryRemovalGuard::new(&Path::new(store_dir_c.as_os_str()));
-
-        store_dir.push(path::PathBuf::from(uuid.simple().to_string()));
-
-        let mut segment =
-            super::LogSegment::new(&config, wal_offset, 1024 * 1024, store_dir.as_path()).unwrap();
+        let store_dir = tempfile::tempdir()?;
+        let segment_file_path = store_dir.path().join(format!("{}", wal_offset));
+        let mut segment = super::LogSegment::new(
+            &config,
+            wal_offset,
+            1024 * 1024,
+            segment_file_path.as_path(),
+        )
+        .unwrap();
         segment.open().unwrap();
 
         let sd = segment.sd.as_ref().unwrap();
