@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_write_frame() -> Result<(), Box<dyn Error>> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let (counter_tx, counter_rx) = tokio::sync::oneshot::channel();
         let (port_tx, port_rx) = tokio::sync::oneshot::channel();
 

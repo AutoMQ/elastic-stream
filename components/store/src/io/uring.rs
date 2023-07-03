@@ -1513,7 +1513,7 @@ mod tests {
     use crate::offset_manager::WalOffsetManager;
     use bytes::BytesMut;
     use crossbeam::channel::Sender;
-    use log::trace;
+    use log::{info, trace};
     use model::record::flat_record::FlatRecordBatch;
     use model::record::RecordBatchBuilder;
     use std::cell::RefCell;
@@ -1600,7 +1600,7 @@ mod tests {
             let io = RefCell::new(io);
 
             let _ = super::IO::run(io, recovery_completion_tx);
-            println!("Module io stopped");
+            info!("Module io stopped");
         });
 
         if let Err(_) = recovery_completion_rx.blocking_recv() {
@@ -1615,7 +1615,7 @@ mod tests {
 
     #[test]
     fn test_receive_io_tasks() -> Result<(), StoreError> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let tmp_dir = tempfile::tempdir()?;
         let store_dir = tmp_dir.path();
         let mut io = create_default_io(store_dir)?;
@@ -1666,7 +1666,7 @@ mod tests {
 
     #[test]
     fn test_reserve_write_buffers() -> Result<(), Box<dyn Error>> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let store_path = tempfile::tempdir()?;
 
         let file_size = 1024 * 1024;
@@ -1754,7 +1754,7 @@ mod tests {
 
     #[test]
     fn test_build_sqe() -> Result<(), StoreError> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let tmp_dir = tempfile::tempdir()?;
         let store_dir = tmp_dir.path();
         let mut io = create_default_io(store_dir)?;
@@ -1794,7 +1794,7 @@ mod tests {
 
     #[test]
     fn test_run_basic() -> Result<(), Box<dyn Error>> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let (handle, sender) = create_and_run_io(create_default_io)?;
         let records: Vec<_> = (0..16)
             .into_iter()
@@ -1814,7 +1814,7 @@ mod tests {
 
     #[test]
     fn test_run_on_small_io() -> Result<(), Box<dyn Error>> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let (handle, sender) = create_and_run_io(create_small_io)?;
         // Will cost at least 4K * 1024 = 4M bytes, which means at least 4 segments will be allocated
         // And the cache reclaim will be triggered since a small io only has 1M cache
@@ -1835,7 +1835,7 @@ mod tests {
 
     #[test]
     fn test_send_and_receive_half_page() -> Result<(), Box<dyn Error>> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let (handle, sender) = create_and_run_io(create_default_io)?;
         send_and_receive_with_records(sender.clone(), 0, 0, vec![create_random_bytes(199)]);
         drop(sender);
@@ -1845,7 +1845,7 @@ mod tests {
 
     #[test]
     fn test_recover() -> Result<(), Box<dyn Error>> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let (tx, rx) = oneshot::channel();
         let tmp_dir = tempfile::tempdir()?;
         let store_dir = tmp_dir.path();
@@ -1866,7 +1866,7 @@ mod tests {
             let io = RefCell::new(io);
 
             let _ = super::IO::run(io, recovery_completion_tx);
-            println!("Module io stopped");
+            info!("Module io stopped");
         });
 
         if let Err(_) = recovery_completion_rx.blocking_recv() {
@@ -1916,7 +1916,7 @@ mod tests {
 
     #[test]
     fn test_multiple_run_with_random_bytes() -> Result<(), Box<dyn Error>> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let (handle, sender) = create_and_run_io(create_small_io)?;
         let mut records: Vec<_> = vec![];
         records.push(create_random_bytes(4096 - 8));
@@ -1945,7 +1945,7 @@ mod tests {
 
     #[test]
     fn test_run_with_random_bytes() -> Result<(), Box<dyn Error>> {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let (handle, sender) = create_and_run_io(create_small_io)?;
         let mut records: Vec<_> = vec![];
         let count = 1000;

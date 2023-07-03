@@ -101,3 +101,24 @@ pub fn init_log() {
 
     log4rs::init_config(config).expect("Failed to init log4rs config");
 }
+
+#[cfg(test)]
+use std::io::Write;
+
+#[cfg(test)]
+pub fn try_init_log() {
+    let _ = env_logger::builder()
+        .is_test(true)
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{}:{} {} [{}] - {}",
+                record.file().unwrap_or("unknown"),
+                record.line().unwrap_or(0),
+                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
+                record.level(),
+                record.args()
+            )
+        })
+        .try_init();
+}

@@ -36,7 +36,7 @@ mod tests {
 
     #[test]
     fn test_stopwatch() {
-        test_util::try_init_log();
+        crate::log::try_init_log();
         let _stopwatch = Stopwatch::new("test", Duration::from_millis(1));
     }
 }

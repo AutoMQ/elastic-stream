@@ -31,3 +31,5 @@ mockall = { workspace = true }
 test-util = { path = "../test-util" }
 util = { path = "../util" }
 tempfile = { workspace = true }
+env_logger = { workspace = true }
+chrono = { workspace = true }

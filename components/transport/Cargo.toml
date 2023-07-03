@@ -15,3 +15,5 @@ tokio-uring = { workspace = true }
 cargo-llvm-cov = { workspace = true }
 test-util = { path = "../test-util" }
 tokio = { workspace = true }
+env_logger = { workspace = true }
+chrono = { workspace = true }
