@@ -177,7 +177,7 @@ mod mocks {
         let buf = Bytes::copy_from_slice(hdr);
         frame.header = Some(buf);
     }
-    
+
     /// Run a dummy listening server.
     /// Once it accepts a connection, it quits immediately.
     pub async fn run_listener() -> u16 {

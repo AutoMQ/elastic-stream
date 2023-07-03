@@ -120,7 +120,6 @@ mod log {
 
 #[cfg(test)]
 mod mocks {
-    use std::time::{self, Duration, UNIX_EPOCH};
     use bytes::Bytes;
     use codec::frame::{Frame, OperationCode};
     use log::{debug, error, info, trace, warn};
@@ -134,6 +133,7 @@ mod mocks {
         PlacementDriverNodeT, RangeT, ReportMetricsRequest, ReportMetricsResponseT, SealKind,
         SealRangeRequest, SealRangeResponseT, StatusT, StreamT,
     };
+    use std::time::{self, Duration, UNIX_EPOCH};
     use tokio::sync::oneshot;
     use tokio_uring::net::TcpListener;
     use transport::connection::Connection;
