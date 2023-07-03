@@ -162,3 +162,153 @@ impl<'a> fmt::Display for Fetch<'a> {
         write!(f, "Fetch[{:?}]", self.fetch_request)
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::stream_manager::{fetcher::PlacementFetcher, StreamManager};
+    use codec::frame::{Frame, OperationCode};
+    use config::Configuration;
+    use model::stream::StreamMetadata;
+    use protocol::rpc::header::{ErrorCode, FetchRequestT, FetchResponse, RangeT};
+    use std::{cell::UnsafeCell, error::Error, rc::Rc, sync::Arc};
+    use store::{
+        error::{AppendError, FetchError, StoreError},
+        option::WriteOptions,
+        Store,
+    };
+
+    struct MockStore {
+        config: Arc<Configuration>,
+    }
+
+    #[allow(unused_variables)]
+    impl Store for MockStore {
+        async fn append(
+            &self,
+            options: WriteOptions,
+            request: store::AppendRecordRequest,
+        ) -> Result<store::AppendResult, AppendError> {
+            todo!()
+        }
+
+        async fn fetch(
+            &self,
+            options: store::option::ReadOptions,
+        ) -> Result<store::FetchResult, FetchError> {
+            Err(FetchError::NoRecord)
+        }
+
+        async fn list<F>(&self, filter: F) -> Result<Vec<model::range::RangeMetadata>, StoreError>
+        where
+            F: Fn(&model::range::RangeMetadata) -> bool,
+        {
+            todo!()
+        }
+
+        async fn list_by_stream<F>(
+            &self,
+            stream_id: i64,
+            filter: F,
+        ) -> Result<Vec<model::range::RangeMetadata>, StoreError>
+        where
+            F: Fn(&model::range::RangeMetadata) -> bool,
+        {
+            todo!()
+        }
+
+        async fn seal(&self, range: model::range::RangeMetadata) -> Result<(), StoreError> {
+            todo!()
+        }
+
+        async fn create(&self, range: model::range::RangeMetadata) -> Result<(), StoreError> {
+            todo!()
+        }
+
+        fn max_record_offset(&self, stream_id: i64, range: u32) -> Result<Option<u64>, StoreError> {
+            Ok(Some(100))
+        }
+
+        fn id(&self) -> i32 {
+            0
+        }
+
+        fn config(&self) -> Arc<Configuration> {
+            Arc::clone(&self.config)
+        }
+    }
+
+    struct MockPlacementFetcher {}
+
+    #[allow(unused_variables)]
+    impl PlacementFetcher for MockPlacementFetcher {
+        async fn bootstrap(
+            &mut self,
+            node_id: u32,
+        ) -> Result<Vec<model::range::RangeMetadata>, crate::error::ServiceError> {
+            let range = model::range::RangeMetadata::new(1, 0, 0, 0, Some(100));
+            Ok(vec![range])
+        }
+
+        async fn describe_stream(
+            &self,
+            stream_id: u64,
+        ) -> Result<StreamMetadata, crate::error::ServiceError> {
+            Ok(StreamMetadata {
+                stream_id: Some(1),
+                replica: 3,
+                ack_count: 2,
+                retention_period: std::time::Duration::from_secs(1),
+            })
+        }
+    }
+
+    fn build_fetch_request() -> Frame {
+        let mut request = Frame::new(OperationCode::Fetch);
+        let mut builder = flatbuffers::FlatBufferBuilder::new();
+        let mut fetch_request = FetchRequestT::default();
+        let mut range = RangeT::default();
+        range.stream_id = 1;
+        range.index = 0;
+        range.start = 0;
+        range.end = 100;
+        fetch_request.range = Box::new(range);
+        fetch_request.offset = 0;
+        fetch_request.limit = 100;
+        fetch_request.max_wait_ms = 1000;
+        let fetch_request = fetch_request.pack(&mut builder);
+        builder.finish(fetch_request, None);
+        let data = builder.finished_data();
+        request.header = Some(bytes::Bytes::copy_from_slice(data));
+        request
+    }
+
+    #[test]
+    fn test_fetch_no_new_record() -> Result<(), Box<dyn Error>> {
+        tokio_uring::start(async move {
+            let store = Rc::new(MockStore {
+                config: Arc::new(Configuration::default()),
+            });
+            let stream_manager = Rc::new(UnsafeCell::new(StreamManager::new(
+                MockPlacementFetcher {},
+                Rc::clone(&store),
+            )));
+
+            let sm = unsafe { &mut *stream_manager.get() };
+            sm.start().await.unwrap();
+
+            let request = build_fetch_request();
+            let mut response = Frame::new(OperationCode::Fetch);
+            let handler =
+                super::Fetch::parse_frame(&request).expect("Failed to parse request frame");
+            handler
+                .apply(Rc::clone(&store), stream_manager, &mut response)
+                .await;
+            let header = response.header.unwrap();
+            let fetch_response = flatbuffers::root::<FetchResponse>(&header).unwrap();
+            let status = fetch_response.status();
+            assert_eq!(status.code(), ErrorCode::NO_NEW_RECORD);
+            Ok(())
+        })
+    }
+}

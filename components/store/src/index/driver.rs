@@ -232,7 +232,7 @@ impl IndexDriverRunner {
                         } => {
                             while let Err(e) = self.indexer.index(stream_id, range, offset, &handle)
                             {
-                                error!("Failed to index: stream_id={}, offset={}, record_handle={:?}, cause: {}", 
+                                error!("Failed to index: stream_id={}, offset={}, record_handle={:?}, cause: {}",
                                 stream_id, offset, handle, e);
                                 sleep(std::time::Duration::from_millis(100));
                             }

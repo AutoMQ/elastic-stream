@@ -102,6 +102,8 @@ serde_yaml = "0.9"
 
 local-sync = "0.1"
 
+tempfile = "3"
+
 [profile.dev]
 panic = "unwind"
 

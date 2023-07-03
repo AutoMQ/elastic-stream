@@ -29,6 +29,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-uring = { workspace = true }
 util = { path = "../../components/util" }
+
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }
 test-util = { path = "../../components/test-util" }

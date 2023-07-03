@@ -68,9 +68,6 @@ mod tests {
     #[test]
     fn test_generate() -> Result<(), Box<dyn Error>> {
         test_util::try_init_log();
-        let path = test_util::create_random_path()?;
-        let _guard = test_util::DirectoryRemovalGuard::new(path.as_path());
-
         let (stop_tx, stop_rx) = oneshot::channel();
         let (port_tx, port_rx) = oneshot::channel();
 
