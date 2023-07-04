@@ -16,6 +16,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
+    - name: Prepare
+      run: |
+        ./scripts/install_deps.sh
+        make .flatc
     - name: Code Format Check
       run: cargo fmt --all -- --check
     - name: Dependencies Sorted Check
