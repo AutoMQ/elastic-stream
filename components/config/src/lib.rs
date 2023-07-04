@@ -324,9 +324,15 @@ impl Store {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Uring {
+    /// Enable polling for SQ completions and I/O completion events.
+    /// The network uring doesn't support polling mode.
+    #[serde(rename = "enable-polling", default)]
+    pub enable_polling: bool,
+
     #[serde(rename = "queue-depth")]
     pub queue_depth: u32,
 
+    /// The below two options are only valid when `enable-polling` is true.
     #[serde(rename = "sqpoll-idle-ms", default)]
     pub sqpoll_idle_ms: u32,
 
@@ -343,6 +349,7 @@ pub struct Uring {
 impl Default for Uring {
     fn default() -> Self {
         Self {
+            enable_polling: false,
             queue_depth: 128,
             sqpoll_idle_ms: 2000,
             sqpoll_cpu: 0,

@@ -175,12 +175,18 @@ impl IO {
             StoreError::IoUring
         })?;
 
-        let data_ring = io_uring::IoUring::builder()
-            .dontfork()
-            .setup_iopoll()
-            .setup_sqpoll(config.store.uring.sqpoll_idle_ms)
-            .setup_sqpoll_cpu(config.store.uring.sqpoll_cpu)
-            .setup_r_disabled()
+        let mut binding = io_uring::IoUring::builder();
+        let data_ring_builder = binding.dontfork().setup_r_disabled();
+
+        // If polling is enabled, setup the iopoll and sqpoll flags
+        if config.store.uring.enable_polling {
+            data_ring_builder
+                .setup_iopoll()
+                .setup_sqpoll(config.store.uring.sqpoll_idle_ms)
+                .setup_sqpoll_cpu(config.store.uring.sqpoll_cpu);
+        }
+
+        let data_ring = data_ring_builder
             .build(config.store.uring.queue_depth)
             .map_err(|e| {
                 error!("Failed to build polling I/O Uring instance: {:?}", e);
@@ -878,8 +884,14 @@ impl IO {
             return;
         }
 
+        // For polling mode, there are two rules to set the `wanted` value:
+        //   1. default to zero, which means that io_uring_enter only submits the SQEs without waiting for completion.
+        //   2. if the inflight tasks are more than the queue depth, set the `wanted` to 1.
+        // For non-polling mode, the `wanted` is always one, to reduce the CPU usage of our uring driver thread.
         let mut wanted = 0;
-        if self.inflight as u32 >= self.options.store.uring.queue_depth {
+        if !self.options.store.uring.enable_polling
+            || self.inflight as u32 >= self.options.store.uring.queue_depth
+        {
             wanted = 1;
         }
 
