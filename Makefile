@@ -207,6 +207,11 @@ $(DEB_FILES):
 
 	rm -rf .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 
+sort-deps: # @HELP sorts dependencies in Cargo.toml
+sort-deps:
+	cargo install cargo-sort
+	cargo sort --workspace
+
 .flatc: $(shell find components/protocol/fbs -type f)
 	if [ -z "$(FLATC)" ]; then   \
 	    echo "flatc not found";  \
