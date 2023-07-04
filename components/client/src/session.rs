@@ -448,7 +448,7 @@ impl Clone for Session {
 mod tests {
 
     use super::*;
-    use crate::mocks::run_listener;
+    use mock_server::run_listener;
     use std::error::Error;
 
     /// Verify it's OK to create a new session.

@@ -1029,7 +1029,7 @@ impl CompositeSession {
 mod tests {
     use super::CompositeSession;
     use crate::lb_policy::LbPolicy;
-    use crate::mocks::run_listener;
+    use mock_server::run_listener;
     use std::{error::Error, sync::Arc};
     use tokio::sync::broadcast;
 

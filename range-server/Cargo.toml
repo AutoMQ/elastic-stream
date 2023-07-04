@@ -49,6 +49,7 @@ util = { path = "../components/util" }
 tikv-jemallocator = "0.5"
 
 [dev-dependencies]
+mock-server = { path = "../components/mock-server" }
 mockall = { workspace = true }
 store = { path = "../components/store", features = ["mock"] }
 

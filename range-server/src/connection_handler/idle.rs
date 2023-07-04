@@ -96,8 +96,8 @@ impl IdleHandler {
 #[cfg(test)]
 mod tests {
     use crate::connection_tracker::ConnectionTracker;
-    use crate::mocks::run_listener;
     use config::Configuration;
+    use mock_server::run_listener;
     use std::{cell::RefCell, error::Error, net::SocketAddr, rc::Rc, sync::Arc};
     use tokio_uring::net::TcpStream;
     use transport::connection::Connection;

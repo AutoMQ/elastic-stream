@@ -60,7 +60,7 @@ impl IdGenerator for PlacementDriverIdGenerator {
 #[cfg(test)]
 mod tests {
     use super::{IdGenerator, PlacementDriverIdGenerator};
-    use crate::mocks::run_listener;
+    use mock_server::run_listener;
     use std::{error::Error, sync::Arc};
     use tokio::sync::oneshot;
 

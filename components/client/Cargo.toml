@@ -29,6 +29,7 @@ transport = { path = "../transport" }
 cargo-llvm-cov = { workspace = true }
 chrono = { workspace = true }
 env_logger = { workspace = true }
+mock-server = { path = "../mock-server" }
 mockall = { workspace = true }
 tempfile = { workspace = true }
 util = { path = "../util" }

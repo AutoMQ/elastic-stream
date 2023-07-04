@@ -109,8 +109,8 @@ impl Drop for Lock {
 #[cfg(test)]
 mod tests {
     use super::Lock;
-    use crate::mocks::run_listener;
     use client::PlacementDriverIdGenerator;
+    use mock_server::run_listener;
     use std::{error::Error, sync::Arc};
     use tokio::sync::oneshot;
 

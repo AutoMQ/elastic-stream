@@ -1,0 +1,16 @@
+[package]
+name = "mock-server"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bytes = { workspace = true }
+codec = { path = "../codec" }
+flatbuffers = { workspace = true }
+log = { workspace = true }
+model = { path = "../model" }
+protocol = { path = "../protocol" }
+tokio = { workspace = true }
+tokio-uring = { workspace = true }
+transport = { path = "../transport" }

@@ -378,7 +378,6 @@ mod tests {
     use crate::{
         error::{AppendError, FetchError},
         io::task::SingleFetchResult,
-        mocks::run_listener,
         option::{ReadOptions, WriteOptions},
         store::{append_result::AppendResult, fetch_result::FetchResult},
         AppendRecordRequest, ElasticStore, Store,
@@ -386,6 +385,7 @@ mod tests {
     use bytes::{Bytes, BytesMut};
     use futures::future::join_all;
     use log::trace;
+    use mock_server::run_listener;
     use std::error::Error;
     use tokio::sync::oneshot;
 

@@ -284,9 +284,9 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::mocks::run_listener;
     use bytes::BytesMut;
     use log::trace;
+    use mock_server::run_listener;
     use model::client_role::ClientRole;
     use model::stream::StreamMetadata;
     use model::ListRangeCriteria;

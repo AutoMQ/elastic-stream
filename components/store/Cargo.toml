@@ -41,6 +41,7 @@ chrono = { workspace = true }
 codec = { path = "../codec" }
 criterion = { workspace = true }
 env_logger = { workspace = true }
+mock-server = { path = "../mock-server" }
 mockall = { workspace = true }
 tempfile = { workspace = true }
 transport = { path = "../transport" }

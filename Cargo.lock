@@ -699,6 +699,7 @@ dependencies = [
  "itertools",
  "local-sync",
  "log",
+ "mock-server",
  "mockall",
  "model",
  "observation",
@@ -2113,6 +2114,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-server"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "codec",
+ "flatbuffers",
+ "log",
+ "model",
+ "protocol",
+ "tokio",
+ "tokio-uring",
+ "transport",
+]
+
+[[package]]
 name = "mockall"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2910,6 +2926,7 @@ dependencies = [
  "log",
  "log4rs",
  "minstant",
+ "mock-server",
  "mockall",
  "model",
  "num_cpus",
@@ -3570,6 +3587,7 @@ dependencies = [
  "libc",
  "log",
  "minstant",
+ "mock-server",
  "mockall",
  "model",
  "nix",
