@@ -5,15 +5,29 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_LOG: trace
 
 jobs:
-  build:
+  format:
+    name: Cargo Fmt and Cargo Sort
     strategy:
       matrix:
         os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }}
-    env:
-      RUST_LOG: trace
+    steps:
+    - uses: actions/checkout@v3
+    - name: Code Format Check
+      run: cargo fmt --all -- --check
+    - name: Dependencies Sorted Check
+      run: |
+        cargo install cargo-sort
+        cargo sort --check --workspace
+  clippy:
+    name: Cargo Clippy
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
     - name: Rust Cache
@@ -24,26 +38,35 @@ jobs:
     - name: Install Deps
       run: |
         ./scripts/install_deps.sh
-    - name: Code Format Check
-      run: cargo fmt --all -- --check
-    - name: Dependencies Sorted Check
-      run: |
-        cargo install cargo-sort
-        cargo sort --check --workspace
     - name: Clippy Check
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         args: --all-features -- -D warnings
-    - name: Build
-      run: cargo build
-  test:
+  build:
+    name: Cargo Build
     strategy:
       matrix:
         os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }}
-    env:
-      RUST_LOG: trace
+    steps:
+    - uses: actions/checkout@v3
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2.4.0
+      with:
+        prefix-key: ""
+        env-vars: ""
+    - name: Install Deps
+      run: |
+        ./scripts/install_deps.sh
+    - name: Build
+      run: cargo build
+  test:
+    name: Cargo Test
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
     - name: Rust Cache
