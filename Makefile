@@ -203,7 +203,7 @@ $(DEB_FILES):
 	cp target/$(TARGET)/$(PROFILE_PATH)/$(BIN)$(BIN_EXTENSION) .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/usr/local/bin/$(BIN)$(BIN_EXTENSION)
 	cp etc/*.yaml .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp/etc/$(BIN)/
 
-	dpkg-deb --root-owner-group --build .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp dist/$(BIN)_$(DEB_VERSION)_$(ARCH).deb
+	dpkg-deb -Zxz --root-owner-group --build .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp dist/$(BIN)_$(DEB_VERSION)_$(ARCH).deb
 
 	rm -rf .dist/$(BIN)_$(DEB_VERSION)_$(ARCH).tmp
 
