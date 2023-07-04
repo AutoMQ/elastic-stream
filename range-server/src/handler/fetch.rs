@@ -163,103 +163,13 @@ impl<'a> fmt::Display for Fetch<'a> {
 mod tests {
 
     use crate::stream_manager::{
-        fetcher::PlacementFetcher, manager::DefaultStreamManager, StreamManager,
+        fetcher::MockPlacementFetcher, manager::DefaultStreamManager, StreamManager,
     };
     use codec::frame::{Frame, OperationCode};
-    use config::Configuration;
     use model::stream::StreamMetadata;
     use protocol::rpc::header::{ErrorCode, FetchRequestT, FetchResponse, RangeT};
     use std::{cell::UnsafeCell, error::Error, rc::Rc, sync::Arc};
-    use store::{
-        error::{AppendError, FetchError, StoreError},
-        option::WriteOptions,
-        Store,
-    };
-
-    struct MockStore {
-        config: Arc<Configuration>,
-    }
-
-    #[allow(unused_variables)]
-    impl Store for MockStore {
-        async fn append(
-            &self,
-            options: WriteOptions,
-            request: store::AppendRecordRequest,
-        ) -> Result<store::AppendResult, AppendError> {
-            todo!()
-        }
-
-        async fn fetch(
-            &self,
-            options: store::option::ReadOptions,
-        ) -> Result<store::FetchResult, FetchError> {
-            Err(FetchError::NoRecord)
-        }
-
-        async fn list<F>(&self, filter: F) -> Result<Vec<model::range::RangeMetadata>, StoreError>
-        where
-            F: Fn(&model::range::RangeMetadata) -> bool,
-        {
-            todo!()
-        }
-
-        async fn list_by_stream<F>(
-            &self,
-            stream_id: i64,
-            filter: F,
-        ) -> Result<Vec<model::range::RangeMetadata>, StoreError>
-        where
-            F: Fn(&model::range::RangeMetadata) -> bool,
-        {
-            todo!()
-        }
-
-        async fn seal(&self, range: model::range::RangeMetadata) -> Result<(), StoreError> {
-            todo!()
-        }
-
-        async fn create(&self, range: model::range::RangeMetadata) -> Result<(), StoreError> {
-            todo!()
-        }
-
-        fn max_record_offset(&self, stream_id: i64, range: u32) -> Result<Option<u64>, StoreError> {
-            Ok(Some(100))
-        }
-
-        fn id(&self) -> i32 {
-            0
-        }
-
-        fn config(&self) -> Arc<Configuration> {
-            Arc::clone(&self.config)
-        }
-    }
-
-    struct MockPlacementFetcher {}
-
-    #[allow(unused_variables)]
-    impl PlacementFetcher for MockPlacementFetcher {
-        async fn bootstrap(
-            &mut self,
-            node_id: u32,
-        ) -> Result<Vec<model::range::RangeMetadata>, crate::error::ServiceError> {
-            let range = model::range::RangeMetadata::new(1, 0, 0, 0, Some(100));
-            Ok(vec![range])
-        }
-
-        async fn describe_stream(
-            &self,
-            stream_id: u64,
-        ) -> Result<StreamMetadata, crate::error::ServiceError> {
-            Ok(StreamMetadata {
-                stream_id: Some(1),
-                replica: 3,
-                ack_count: 2,
-                retention_period: std::time::Duration::from_secs(1),
-            })
-        }
-    }
+    use store::error::FetchError;
 
     fn build_fetch_request() -> Frame {
         let mut request = Frame::new(OperationCode::Fetch);
@@ -283,12 +193,38 @@ mod tests {
 
     #[test]
     fn test_fetch_no_new_record() -> Result<(), Box<dyn Error>> {
+        let mut mock_store = store::MockStore::new();
+        mock_store
+            .expect_max_record_offset()
+            .returning(|_, _| Ok(Some(100)));
+        mock_store.expect_id().return_const(0);
+        mock_store
+            .expect_fetch()
+            .returning(|_| Err(FetchError::NoRecord));
+
+        mock_store
+            .expect_config()
+            .returning(|| Arc::new(config::Configuration::default()));
+
+        let mut mock_fetcher = MockPlacementFetcher::new();
+        mock_fetcher.expect_bootstrap().returning(|_| {
+            let range = model::range::RangeMetadata::new(1, 0, 0, 0, Some(100));
+            Ok(vec![range])
+        });
+
+        mock_fetcher.expect_describe_stream().returning(|_| {
+            Ok(StreamMetadata {
+                stream_id: Some(1),
+                replica: 3,
+                ack_count: 2,
+                retention_period: std::time::Duration::from_secs(1),
+            })
+        });
+
         tokio_uring::start(async move {
-            let store = Rc::new(MockStore {
-                config: Arc::new(Configuration::default()),
-            });
+            let store = Rc::new(mock_store);
             let stream_manager = Rc::new(UnsafeCell::new(DefaultStreamManager::new(
-                MockPlacementFetcher {},
+                mock_fetcher,
                 Rc::clone(&store),
             )));
 

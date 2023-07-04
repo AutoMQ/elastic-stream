@@ -3570,6 +3570,7 @@ dependencies = [
  "libc",
  "log",
  "minstant",
+ "mockall",
  "model",
  "nix",
  "num_enum",

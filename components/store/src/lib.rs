@@ -24,23 +24,20 @@
 #![feature(iterator_try_collect)]
 #![feature(io_error_more)]
 
+pub mod cursor;
 pub mod error;
+mod index;
+mod io;
+mod offset_manager;
+pub mod option;
+mod request;
+mod store;
 pub mod util;
-
-use std::sync::Arc;
 
 use self::option::{ReadOptions, WriteOptions};
 use error::{AppendError, FetchError, StoreError};
 use model::range::RangeMetadata;
-
-pub mod cursor;
-pub mod option;
-
-mod index;
-mod io;
-mod offset_manager;
-mod request;
-mod store;
+use std::sync::Arc;
 
 pub use crate::io::record::RECORD_PREFIX_LENGTH;
 pub use crate::store::append_result::AppendResult;
@@ -48,7 +45,11 @@ pub use crate::store::elastic_store::ElasticStore;
 pub use crate::store::fetch_result::FetchResult;
 pub use request::AppendRecordRequest;
 
+#[cfg(any(test, feature = "mock"))]
+use mockall::automock;
+
 /// Definition of core storage trait.
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait Store {
     /// Append a new record into store.
     ///
@@ -69,7 +70,7 @@ pub trait Store {
     /// if `filter` returns true, the range is kept in the final result vector; dropped otherwise.
     async fn list<F>(&self, filter: F) -> Result<Vec<RangeMetadata>, StoreError>
     where
-        F: Fn(&RangeMetadata) -> bool;
+        F: Fn(&RangeMetadata) -> bool + 'static;
 
     /// List all ranges pertaining to the specified stream in the store
     ///
@@ -80,7 +81,7 @@ pub trait Store {
         filter: F,
     ) -> Result<Vec<RangeMetadata>, StoreError>
     where
-        F: Fn(&RangeMetadata) -> bool;
+        F: Fn(&RangeMetadata) -> bool + 'static;
 
     /// Seal stream range in metadata column family after cross check with placement driver.
     async fn seal(&self, range: RangeMetadata) -> Result<(), StoreError>;

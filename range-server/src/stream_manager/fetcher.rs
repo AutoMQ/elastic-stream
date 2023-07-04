@@ -1,10 +1,12 @@
+use crate::error::ServiceError;
 use client::Client;
 use log::{error, trace};
 use model::{range::RangeMetadata, stream::StreamMetadata};
 use std::rc::Rc;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::error::ServiceError;
+#[cfg(test)]
+use mockall::automock;
 
 /// Non-primary `Range Server` uses this task to delegate query range task to the primary one.
 pub struct FetchRangeTask {
@@ -16,6 +18,7 @@ pub struct FetchRangeTask {
     pub tx: oneshot::Sender<Result<Vec<RangeMetadata>, ServiceError>>,
 }
 
+#[cfg_attr(test, automock)]
 pub trait PlacementFetcher {
     async fn bootstrap(&mut self, server_id: u32) -> Result<Vec<RangeMetadata>, ServiceError>;
 
