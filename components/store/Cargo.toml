@@ -19,6 +19,7 @@ lazy_static = { version = "1.4.0" }
 libc = { workspace = true }
 log = { workspace = true }
 minstant = { workspace = true }
+mockall = { workspace = true, optional = true }
 model = { path = "../model" }
 nix = { workspace = true }
 num_enum = { workspace = true }
@@ -33,7 +34,6 @@ tokio = { workspace = true }
 tokio-uring = { workspace = true }
 util = { path = "../util" }
 uuid = { workspace = true }
-mockall = { workspace = true, optional = true }
 
 [dev-dependencies]
 cargo-llvm-cov = { workspace = true }
@@ -41,10 +41,10 @@ chrono = { workspace = true }
 codec = { path = "../codec" }
 criterion = { workspace = true }
 env_logger = { workspace = true }
+mockall = { workspace = true }
 tempfile = { workspace = true }
 transport = { path = "../transport" }
 uuid = { workspace = true }
-mockall = { workspace = true }
 
 [features]
 default = []
