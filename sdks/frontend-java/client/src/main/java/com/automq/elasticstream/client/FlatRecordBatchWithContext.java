@@ -50,7 +50,10 @@ public class FlatRecordBatchWithContext implements RecordBatchWithContext {
 
     @Override
     public long lastOffset() {
-        return meta.getBaseOffset() + meta.getLastOffsetDelta();
+        if (meta.getBaseOffset() >= 0) {
+            return meta.getBaseOffset() + meta.getLastOffsetDelta();
+        }
+        return meta.getLastOffsetDelta();
     }
 
 }
