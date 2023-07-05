@@ -8,6 +8,7 @@ use crate::io::task::WriteTask;
 use crate::io::wal::Wal;
 use crate::io::write_window::WriteWindow;
 use crate::AppendResult;
+use io_uring::types::{SubmitArgs, Timespec};
 use minstant::Instant;
 use observation::metrics::uring_metrics::{
     UringStatistics, COMPLETED_READ_IO, COMPLETED_WRITE_IO, INFLIGHT_IO, IO_DEPTH, PENDING_TASK,
@@ -895,8 +896,14 @@ impl IO {
             wanted = 1;
         }
 
+        // Build the submit args, which contains the timeout value to avoid blocking by io_uring_enter.
+        let args = SubmitArgs::new();
+        let ts = Timespec::new();
+        ts.nsec(self.options.store.uring.enter_timeout_ns);
+        args.timespec(&ts);
+
         loop {
-            match self.data_ring.submit_and_wait(wanted) {
+            match self.data_ring.submitter().submit_with_args(wanted, &args) {
                 Ok(_submitted) => {
                     break;
                 }
@@ -912,13 +919,19 @@ impl IO {
                             // application may want to handle the signal before we can wait again.
                             // We can't go to sleep with a pending signal.
                             warn!("io_uring_enter got an error: {:?}", e);
+
+                            // Continue to retry.
                             continue;
+                        }
+                        io::ErrorKind::TimedOut => {
+                            // io_uring_enter timed out, IO hang detected, just break the loop and focus on the other tasks.
+                            break;
                         }
                         io::ErrorKind::WouldBlock => {
                             // The kernel was unable to allocate memory for the request, or otherwise ran out of resources to handle it.
                             // The application should wait for some completions and try again.
                             warn!("io_uring_enter got an error: {:?}", e);
-                            continue;
+                            break;
                         }
                         io::ErrorKind::ResourceBusy => {
                             // If the IORING_FEAT_NODROP feature flag is set, then EBUSY will be returned if there were overflow entries,
@@ -928,6 +941,10 @@ impl IO {
                             // requests than we have room for in the CQ ring, or if the application attempts to wait for more events without
                             // having reaped the ones already present in the CQ ring.
                             warn!("io_uring_enter got an error: {:?}", e);
+
+                            // For EBUSY, we should break the loop and the subsequent `reap_data_tasks` will try clean the completion queue.
+                            // After that, we will get a new chance to submit the SQEs.
+                            break;
                         }
                         _ => {
                             // Fatal errors, crash the process and let watchdog to restart.
