@@ -47,6 +47,16 @@ impl Append {
         })
     }
 
+    fn replicated(&self) -> Result<bool, ErrorCode> {
+        if let (Some(entry), _) =
+            Payload::parse_append_entry(&self.payload).map_err(|_| ErrorCode::BAD_REQUEST)?
+        {
+            Ok(entry.offset.is_some())
+        } else {
+            unreachable!("Append request should at least contain one append-entry")
+        }
+    }
+
     /// Process message publish request
     ///
     /// On receiving a message publish request, it wraps the incoming request to a `Record`.
@@ -67,6 +77,22 @@ impl Append {
         S: Store,
         M: RangeManager,
     {
+        match self.replicated() {
+            Ok(replicated) => {
+                if !replicated {
+                    // TODO: replicate records for multi-writers
+                    return;
+                }
+            }
+
+            Err(e) => {
+                error!("Failed to parse append request payload: {:?}", e);
+                response.flag_system_err();
+                response.header = Some(system_error_frame_bytes(e, "Bad Request"));
+                return;
+            }
+        }
+
         let to_store_requests = match self.build_store_requests() {
             Ok(requests) => requests,
             Err(err_code) => {
@@ -202,7 +228,7 @@ impl Append {
             let request = AppendRecordRequest {
                 stream_id: entry.stream_id as i64,
                 range_index: entry.index as i32,
-                offset: entry.offset as i64,
+                offset: entry.offset.map(|value| value as i64).unwrap_or(-1),
                 len: entry.len,
                 buffer: self.payload.slice(pos..pos + len),
             };
@@ -267,10 +293,11 @@ impl fmt::Display for Append {
             ),
             Ok(entries) => entries.iter().fold(Ok(()), |result, entry| {
                 result.and_then(|_| {
+                    let offset = entry.offset.map(|value| value as i64).unwrap_or(-1);
                     write!(
                         f,
                         "AppendEntry: stream-id={}, range-index={}, offset={}, len={}",
-                        entry.stream_id, entry.index, entry.offset, entry.len
+                        entry.stream_id, entry.index, offset, entry.len
                     )
                 })
             }),

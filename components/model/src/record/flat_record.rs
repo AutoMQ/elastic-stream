@@ -216,7 +216,7 @@ mod tests {
             assert_eq!(len, batch_buf.len());
             assert_eq!(entry.stream_id as i64, stream_id);
             assert_eq!(entry.index, 0);
-            assert_eq!(entry.offset, 1024);
+            assert_eq!(entry.offset, Some(1024));
             assert_eq!(entry.len, 10);
         } else {
             panic!("parse_append_entry failed");

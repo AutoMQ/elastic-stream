@@ -1,30 +1,32 @@
-/// Don't delete any field from the schema once released.
-/// Assign a id for each filed to keep compatibility easily.
+// Don't delete any field from the schema once released.
+// Assign a id for each filed to keep compatibility easily.
 
 namespace records;
 
 // The below definitions of Record and RecordBatch are inspired by Kafka's protocols
 table RecordBatchMeta {
-    /// The stream id of this record batch.
+    // The stream id of this record batch.
     stream_id: int64 (id: 0);
 
-    /// The range index of this record batch.
+    // The range index of this record batch.
     range_index: int32 (id: 1);
 
-    /// The flags of this record batch. Each bit is used to indicate a specific flag.
+    // The flags of this record batch. Each bit is used to indicate a specific flag.
     flags: short (id: 2);
 
-    /// The base offset of the batch record, also is the logical offset of the first record.
-    /// This field may be empty, since rust flatbuffers doesn't support update in place.
-    base_offset: int64 (id: 3);
+    // The base offset of the batch record, also is the logical offset of the first record.
+    //
+    // If the base_offset is -1, current record batch is not yet properly replicated. The record
+    // batch should then go through the replication layer and forward to range servers accordingly.
+    base_offset: int64 = -1 (id: 3);
 
-    /// The delta value between the last offset and the base offset.
+    // The delta value between the last offset and the base offset.
     last_offset_delta: int32 (id: 4);
 
-    /// The create timestamp of the first record in this batch.
+    // The create timestamp of the first record in this batch.
     base_timestamp: int64 (id: 5);
 
-    /// Other attributes that may not be corresponding with the storage layer.
+    // Other attributes that may not be corresponding with the storage layer.
     properties: [KeyValue] (id: 6);
 }
 

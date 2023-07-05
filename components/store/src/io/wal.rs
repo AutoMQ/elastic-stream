@@ -224,7 +224,7 @@ impl Wal {
                 Ok((Some(entry), len)) => {
                     let stream_id = entry.stream_id as i64;
                     let range = entry.index;
-                    let offset = entry.offset;
+                    let offset = entry.offset.expect("base-offset should have been assigned");
                     let handle = RecordHandle {
                         wal_offset: segment.wal_offset + file_pos - len as u64 - 8,
                         len: len as u32 + 8,

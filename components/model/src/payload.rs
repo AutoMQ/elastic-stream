@@ -51,10 +51,17 @@ impl Payload {
         // Partial decode via Flatbuffers
         let metadata = flatbuffers::root::<RecordBatchMeta>(&remaining[..metadata_len])?;
 
+        let base_offset = metadata.base_offset();
+        let offset = if base_offset >= 0 {
+            Some(base_offset as u64)
+        } else {
+            None
+        };
+
         let entry = AppendEntry {
             stream_id: metadata.stream_id() as u64,
             index: metadata.range_index() as u32,
-            offset: metadata.base_offset() as u64,
+            offset,
             len: metadata.last_offset_delta() as u32,
         };
 
