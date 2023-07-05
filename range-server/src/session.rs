@@ -14,7 +14,7 @@ use transport::connection::Connection;
 
 use crate::{
     connection_handler, connection_tracker::ConnectionTracker, handler::ServerCall,
-    stream_manager::StreamManager,
+    range_manager::RangeManager,
 };
 
 pub(crate) struct Session<S, M> {
@@ -29,7 +29,7 @@ pub(crate) struct Session<S, M> {
 impl<S, M> Session<S, M>
 where
     S: Store + 'static,
-    M: StreamManager + 'static,
+    M: RangeManager + 'static,
 {
     pub(crate) fn new(
         config: Arc<Configuration>,

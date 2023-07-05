@@ -6,7 +6,7 @@ use log::trace;
 use protocol::rpc::header::{ErrorCode, HeartbeatRequest, HeartbeatResponseT, StatusT};
 use store::Store;
 
-use crate::stream_manager::StreamManager;
+use crate::range_manager::RangeManager;
 
 use super::util::root_as_rpc_request;
 
@@ -30,11 +30,11 @@ impl<'a> Heartbeat<'a> {
     pub(crate) async fn apply<S, M>(
         &self,
         _store: Rc<S>,
-        _stream_manager: Rc<UnsafeCell<M>>,
+        _range_manager: Rc<UnsafeCell<M>>,
         response: &mut Frame,
     ) where
         S: Store,
-        M: StreamManager,
+        M: RangeManager,
     {
         trace!("Prepare heartbeat response header for {:?}", self.request);
 

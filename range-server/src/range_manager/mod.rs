@@ -11,7 +11,7 @@ use mockall::automock;
 use model::range::RangeMetadata;
 
 #[cfg_attr(test, automock)]
-pub(crate) trait StreamManager {
+pub(crate) trait RangeManager {
     async fn start(&mut self) -> Result<(), ServiceError>;
 
     /// Create a new range for the specified stream.

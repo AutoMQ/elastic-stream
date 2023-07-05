@@ -15,5 +15,5 @@ pub trait PollingService<Observer> {
     /// A typical use case is to drain all inflight requests that are about to time out.
     fn drain_if<F>(&mut self, pred: F) -> Vec<ClientCall<Observer>>
     where
-        F: Fn(&ClientCall<Observer>) -> bool;
+        F: Fn(&ClientCall<Observer>) -> bool + 'static;
 }

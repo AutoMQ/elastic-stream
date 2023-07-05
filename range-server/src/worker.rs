@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     connection_tracker::ConnectionTracker,
-    stream_manager::{fetcher::FetchRangeTask, StreamManager},
+    range_manager::{fetcher::FetchRangeTask, RangeManager},
     worker_config::WorkerConfig,
 };
 use client::Client;
@@ -34,7 +34,7 @@ use util::metrics::http_serve;
 pub(crate) struct Worker<S, M> {
     config: WorkerConfig,
     store: Rc<S>,
-    stream_manager: Rc<UnsafeCell<M>>,
+    range_manager: Rc<UnsafeCell<M>>,
     client: Rc<Client>,
     #[allow(dead_code)]
     channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
@@ -43,19 +43,19 @@ pub(crate) struct Worker<S, M> {
 impl<S, M> Worker<S, M>
 where
     S: Store + 'static,
-    M: StreamManager + 'static,
+    M: RangeManager + 'static,
 {
     pub fn new(
         config: WorkerConfig,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<M>>,
+        range_manager: Rc<UnsafeCell<M>>,
         client: Rc<Client>,
         channels: Option<Vec<mpsc::UnboundedReceiver<FetchRangeTask>>>,
     ) -> Self {
         Self {
             config,
             store,
-            stream_manager,
+            range_manager,
             client,
             channels,
         }
@@ -97,7 +97,7 @@ where
                         }
                     };
 
-                unsafe { &mut *self.stream_manager.get() }
+                unsafe { &mut *self.range_manager.get() }
                     .start()
                     .await
                     .expect("Failed to bootstrap stream ranges from placement drivers");
@@ -209,7 +209,7 @@ where
                         Arc::clone(&self.config.server_config),
                         stream, peer_socket_address,
                         Rc::clone(&self.store),
-                        Rc::clone(&self.stream_manager),
+                        Rc::clone(&self.range_manager),
                         Rc::clone(&connection_tracker)
                        );
                     session.process();

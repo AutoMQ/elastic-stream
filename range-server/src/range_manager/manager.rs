@@ -10,9 +10,9 @@ use store::Store;
 
 use crate::error::ServiceError;
 
-use super::{fetcher::PlacementFetcher, range::Range, stream::Stream, StreamManager};
+use super::{fetcher::PlacementFetcher, range::Range, stream::Stream, RangeManager};
 
-pub(crate) struct DefaultStreamManager<S, F> {
+pub(crate) struct DefaultRangeManager<S, F> {
     streams: HashMap<i64, Stream>,
 
     fetcher: F,
@@ -20,7 +20,7 @@ pub(crate) struct DefaultStreamManager<S, F> {
     store: Rc<S>,
 }
 
-impl<S, F> DefaultStreamManager<S, F>
+impl<S, F> DefaultRangeManager<S, F>
 where
     S: Store,
     F: PlacementFetcher,
@@ -74,7 +74,7 @@ where
     }
 }
 
-impl<S, F> StreamManager for DefaultStreamManager<S, F>
+impl<S, F> RangeManager for DefaultRangeManager<S, F>
 where
     S: Store,
     F: PlacementFetcher,

@@ -13,7 +13,7 @@ mod util;
 use self::cmd::Command;
 use crate::{
     metrics::{APPEND_LATENCY, FETCH_LATENCY},
-    stream_manager::StreamManager,
+    range_manager::RangeManager,
 };
 use bytes::Bytes;
 use codec::frame::Frame;
@@ -45,7 +45,7 @@ pub(crate) struct ServerCall<S, M> {
 impl<S, M> ServerCall<S, M>
 where
     S: Store,
-    M: StreamManager,
+    M: RangeManager,
 {
     /// Serve the incoming request
     ///

@@ -1,7 +1,7 @@
 use crate::{
-    stream_manager::{
+    range_manager::{
         fetcher::{DelegatePlacementClient, PlacementClient},
-        manager::DefaultStreamManager,
+        manager::DefaultRangeManager,
     },
     worker::Worker,
     worker_config::WorkerConfig,
@@ -76,7 +76,7 @@ pub fn launch(
                     ));
 
                     let fetcher = DelegatePlacementClient::new(tx);
-                    let stream_manager = Rc::new(UnsafeCell::new(DefaultStreamManager::new(
+                    let stream_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                         fetcher,
                         Rc::clone(&store),
                     )));
@@ -114,7 +114,7 @@ pub fn launch(
                 let fetcher = PlacementClient::new(Rc::clone(&client));
                 let store = Rc::new(store);
 
-                let stream_manager = Rc::new(UnsafeCell::new(DefaultStreamManager::new(
+                let stream_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                     fetcher,
                     Rc::clone(&store),
                 )));

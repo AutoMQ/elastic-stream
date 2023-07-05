@@ -10,7 +10,7 @@ use protocol::rpc::header::{AppendResponseArgs, AppendResultEntryArgs, ErrorCode
 use std::{cell::UnsafeCell, fmt, rc::Rc};
 use store::{error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, Store};
 
-use crate::{error::ServiceError, stream_manager::StreamManager};
+use crate::{error::ServiceError, range_manager::RangeManager};
 
 use super::util::{finish_response_builder, system_error_frame_bytes, MIN_BUFFER_SIZE};
 
@@ -61,11 +61,11 @@ impl Append {
     pub(crate) async fn apply<S, M>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<M>>,
+        range_manager: Rc<UnsafeCell<M>>,
         response: &mut Frame,
     ) where
         S: Store,
-        M: StreamManager,
+        M: RangeManager,
     {
         let to_store_requests = match self.build_store_requests() {
             Ok(requests) => requests,
@@ -83,7 +83,7 @@ impl Append {
             .map(|req| {
                 trace!("{}", req);
                 let result = async {
-                    if let Some(range) = unsafe { &mut *stream_manager.get() }
+                    if let Some(range) = unsafe { &mut *range_manager.get() }
                         .get_range(req.stream_id, req.range_index)
                     {
                         if let Some(window) = range.window_mut() {
@@ -126,7 +126,7 @@ impl Append {
             .map(|res| {
                 match res {
                     Ok(result) => {
-                        if let Err(e) = unsafe { &mut *stream_manager.get() }.commit(
+                        if let Err(e) = unsafe { &mut *range_manager.get() }.commit(
                             result.stream_id,
                             result.range_index as i32,
                             result.offset as u64,

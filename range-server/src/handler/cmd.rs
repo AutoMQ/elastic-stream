@@ -5,7 +5,7 @@ use log::error;
 use protocol::rpc::header::ErrorCode;
 use store::Store;
 
-use crate::stream_manager::StreamManager;
+use crate::range_manager::RangeManager;
 
 use super::{
     append::Append, create_range::CreateRange, fetch::Fetch, heartbeat::Heartbeat, ping::Ping,
@@ -97,19 +97,19 @@ impl<'a> Command<'a> {
     pub(crate) async fn apply<S, M>(
         &self,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<M>>,
+        range_manager: Rc<UnsafeCell<M>>,
         response: &mut Frame,
     ) where
         S: Store,
-        M: StreamManager,
+        M: RangeManager,
     {
         match self {
-            Command::Append(cmd) => cmd.apply(store, stream_manager, response).await,
-            Command::Fetch(cmd) => cmd.apply(store, stream_manager, response).await,
-            Command::Heartbeat(cmd) => cmd.apply(store, stream_manager, response).await,
-            Command::Ping(cmd) => cmd.apply(store, stream_manager, response).await,
-            Command::CreateRange(cmd) => cmd.apply(store, stream_manager, response).await,
-            Command::SealRange(cmd) => cmd.apply(store, stream_manager, response).await,
+            Command::Append(cmd) => cmd.apply(store, range_manager, response).await,
+            Command::Fetch(cmd) => cmd.apply(store, range_manager, response).await,
+            Command::Heartbeat(cmd) => cmd.apply(store, range_manager, response).await,
+            Command::Ping(cmd) => cmd.apply(store, range_manager, response).await,
+            Command::CreateRange(cmd) => cmd.apply(store, range_manager, response).await,
+            Command::SealRange(cmd) => cmd.apply(store, range_manager, response).await,
         }
     }
 }

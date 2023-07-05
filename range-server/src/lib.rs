@@ -10,7 +10,7 @@ mod delegate_task;
 pub mod error;
 pub mod handler;
 pub mod server;
-pub(crate) mod stream_manager;
+pub(crate) mod range_manager;
 mod worker;
 mod worker_config;
 pub use crate::cli::Cli;
