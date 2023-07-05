@@ -158,12 +158,7 @@ impl DefaultRangeAccumulator {
                             .await
                         {
                             Ok(records) => {
-                                range_offload.write(
-                                    next_offset,
-                                    records.end_offset,
-                                    records.payload,
-                                );
-                                next_offset = records.end_offset;
+                                next_offset = range_offload.write(next_offset, records.payload);
                             }
                             Err(e) => {
                                 log::error!(

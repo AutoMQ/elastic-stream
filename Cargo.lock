@@ -3787,12 +3787,16 @@ dependencies = [
  "bytes",
  "clap 4.3.10",
  "env_logger",
+ "flatbuffers",
  "log",
  "mockall",
+ "model",
  "opendal",
+ "protocol",
  "store",
  "tokio",
  "tokio-uring",
+ "util",
 ]
 
 [[package]]

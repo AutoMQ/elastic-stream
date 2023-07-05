@@ -7,6 +7,7 @@ pub mod batch;
 pub mod client_role;
 pub mod error;
 pub mod list_range_criteria;
+pub mod object;
 pub mod payload;
 pub mod placement_driver_node;
 pub mod range;

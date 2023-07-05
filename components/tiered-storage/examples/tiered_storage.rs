@@ -91,9 +91,6 @@ impl RangeFetcher for RangeFetcherMock {
             let bytes = bytes.freeze();
             v.push(bytes);
         }
-        Ok(RangeFetchResult {
-            payload: v,
-            end_offset,
-        })
+        Ok(RangeFetchResult { payload: v })
     }
 }

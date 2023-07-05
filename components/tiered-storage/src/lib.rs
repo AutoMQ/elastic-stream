@@ -4,10 +4,12 @@
 pub mod object_manager;
 pub mod object_storage;
 mod range_accumulator;
+mod range_fetcher;
 mod range_offload;
+pub use range_fetcher::RangeFetchResult;
+pub use range_fetcher::RangeFetcher;
 
 use bytes::Bytes;
-use store::error::FetchError;
 
 #[cfg(test)]
 use mockall::{automock, predicate::*};
@@ -26,37 +28,7 @@ pub trait TieredStorage {
     );
 }
 
-pub trait RangeFetcher {
-    async fn fetch(
-        &self,
-        stream_id: u64,
-        range_index: u32,
-        start_offset: u64,
-        end_offset: u64,
-        max_size: u32,
-    ) -> Result<RangeFetchResult, FetchError>;
-}
-
-pub struct MockRangeFetcher;
-
-impl RangeFetcher for MockRangeFetcher {
-    async fn fetch(
-        &self,
-        _stream_id: u64,
-        _range_index: u32,
-        _start_offset: u64,
-        _end_offset: u64,
-        _max_size: u32,
-    ) -> Result<RangeFetchResult, FetchError> {
-        unimplemented!()
-    }
-}
-
-pub struct RangeFetchResult {
-    pub payload: Vec<Bytes>,
-    pub end_offset: u64,
-}
-
+#[cfg_attr(test, automock)]
 pub trait ObjectManager {
     fn campaign(&self, stream_id: u64, range_index: u32);
 
