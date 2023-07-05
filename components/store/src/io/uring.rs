@@ -1030,93 +1030,99 @@ impl IO {
                         match e {
                             StoreError::System(errno) => {
                                 error!(
-                                    "io_uring opcode `{}` failed. errno: `{}`",
+                                    "Failed to complete IO task, opcode: {}, errno: {}",
                                     context.opcode, errno
                                 );
 
                                 let error = io::Error::from_raw_os_error(errno);
-                                // Some errors are not fatal, we should retry the task.
-                                // TODO: Add more error kinds to retry.
-                                if error.kind() == io::ErrorKind::Interrupted
-                                    || error.kind() == io::ErrorKind::WouldBlock
-                                {
-                                    if self.blocked.contains_key(&context.wal_offset) {
-                                        // There is a pending write task for this block, skip this task.
-                                        trace!(
-                                            "Skip retrying the failed write task for wal offset {} as there is a pending write task for this block",
-                                            context.wal_offset
-                                        );
+                                match error.kind() {
+                                    // Some errors are not fatal, we should retry the task.
+                                    io::ErrorKind::Interrupted | io::ErrorKind::WouldBlock => {
+                                        if self.blocked.contains_key(&context.wal_offset) {
+                                            // There is a pending write task for this block, skip this task.
+                                            trace!(
+                                                "Skip retrying the failed write task for wal offset {} as there is a pending write task for this block",
+                                                context.wal_offset
+                                            );
+                                            continue;
+                                        }
+
+                                        let wal_offset = context.wal_offset;
+                                        let buf = context.buf.clone();
+
+                                        if buf.partial() {
+                                            // Partial write, set the barrier.
+                                            self.barrier.borrow_mut().insert(buf.wal_offset);
+                                            trace!(
+                                                "Insert a barrier with wal_offset={}",
+                                                buf.wal_offset
+                                            );
+                                        }
+
+                                        let sg = match self.wal.segment_file_of(wal_offset) {
+                                            Some(sg) => sg,
+                                            None => {
+                                                error!(
+                                                    "Log segment not found for wal offset {}",
+                                                    wal_offset
+                                                );
+                                                continue;
+                                            }
+                                        };
+
+                                        let sd = match &sg.sd {
+                                            Some(sd) => sd,
+                                            None => {
+                                                error!(
+                                                    "Log segment {} does not have a valid descriptor",
+                                                    sg.wal_offset
+                                                );
+                                                continue;
+                                            }
+                                        };
+
+                                        let file_offset = wal_offset - sg.wal_offset;
+                                        let buf_ptr = buf.as_ptr() as *mut u8;
+
+                                        match context.opcode {
+                                            opcode::Read::CODE => {
+                                                let sqe = opcode::Read::new(
+                                                    types::Fd(sd.fd),
+                                                    buf_ptr,
+                                                    context.len,
+                                                )
+                                                .offset(file_offset as libc::off_t)
+                                                .build()
+                                                .user_data(Box::into_raw(context) as u64);
+
+                                                self.resubmit_sqes.push_back(sqe);
+                                            }
+                                            opcode::Write::CODE => {
+                                                let sqe = opcode::Write::new(
+                                                    types::Fd(sd.fd),
+                                                    buf_ptr,
+                                                    buf.capacity as u32,
+                                                )
+                                                .offset64(file_offset as libc::off_t)
+                                                .build()
+                                                .user_data(Box::into_raw(context) as u64);
+
+                                                self.resubmit_sqes.push_back(sqe);
+                                            }
+                                            _ => (),
+                                        };
+
                                         continue;
                                     }
-
-                                    let wal_offset = context.wal_offset;
-                                    let buf = context.buf.clone();
-
-                                    if buf.partial() {
-                                        // Partial write, set the barrier.
-                                        self.barrier.borrow_mut().insert(buf.wal_offset);
-                                        trace!(
-                                            "Insert a barrier with wal_offset={}",
-                                            buf.wal_offset
+                                    _ => {
+                                        // More CQE errors please refer to: https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html#CQE_ERRORS
+                                        // Fatal errors, crash the process and let the supervisor restart it.
+                                        panic!(
+                                            "Panic due to fatal IO error, opcode: {}, errno: {}",
+                                            context.opcode, errno
                                         );
                                     }
-
-                                    let sg = match self.wal.segment_file_of(wal_offset) {
-                                        Some(sg) => sg,
-                                        None => {
-                                            error!(
-                                                "Log segment not found for wal offset {}",
-                                                wal_offset
-                                            );
-                                            continue;
-                                        }
-                                    };
-
-                                    let sd = match &sg.sd {
-                                        Some(sd) => sd,
-                                        None => {
-                                            error!(
-                                                "Log segment {} does not have a valid descriptor",
-                                                sg.wal_offset
-                                            );
-                                            continue;
-                                        }
-                                    };
-
-                                    let file_offset = wal_offset - sg.wal_offset;
-                                    let buf_ptr = buf.as_ptr() as *mut u8;
-
-                                    match context.opcode {
-                                        opcode::Read::CODE => {
-                                            let sqe = opcode::Read::new(
-                                                types::Fd(sd.fd),
-                                                buf_ptr,
-                                                context.len,
-                                            )
-                                            .offset(file_offset as libc::off_t)
-                                            .build()
-                                            .user_data(Box::into_raw(context) as u64);
-
-                                            self.resubmit_sqes.push_back(sqe);
-                                        }
-                                        opcode::Write::CODE => {
-                                            let sqe = opcode::Write::new(
-                                                types::Fd(sd.fd),
-                                                buf_ptr,
-                                                buf.capacity as u32,
-                                            )
-                                            .offset64(file_offset as libc::off_t)
-                                            .build()
-                                            .user_data(Box::into_raw(context) as u64);
-
-                                            self.resubmit_sqes.push_back(sqe);
-                                        }
-                                        _ => (),
-                                    };
-
-                                    continue;
                                 }
-                                // TODO: handle the error that can't be recovered.
                             }
 
                             StoreError::WriteWindow => {
