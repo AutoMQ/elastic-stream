@@ -30,7 +30,7 @@ public class FlatRecordBatchCodecTest {
         RecordBatchWithContext dst = list.get(0);
         Assert.assertEquals(src.count(), dst.count());
         Assert.assertEquals(src.baseTimestamp(), dst.baseTimestamp());
-        Assert.assertEquals(0, dst.baseOffset());
+        Assert.assertEquals(-1, dst.baseOffset());
         Assert.assertEquals(src.count(), dst.lastOffset());
         Assert.assertEquals(properties, dst.properties());
         Assert.assertEquals(buffer, dst.rawPayload());
