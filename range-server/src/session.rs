@@ -22,7 +22,7 @@ pub(crate) struct Session<S, M> {
     stream: TcpStream,
     addr: SocketAddr,
     store: Rc<S>,
-    stream_manager: Rc<UnsafeCell<M>>,
+    range_manager: Rc<UnsafeCell<M>>,
     connection_tracker: Rc<RefCell<ConnectionTracker>>,
 }
 
@@ -36,7 +36,7 @@ where
         stream: TcpStream,
         addr: SocketAddr,
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<M>>,
+        range_manager: Rc<UnsafeCell<M>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
     ) -> Self {
         Self {
@@ -44,7 +44,7 @@ where
             stream,
             addr,
             store,
-            stream_manager,
+            range_manager,
             connection_tracker,
         }
     }
@@ -53,7 +53,7 @@ where
         tokio_uring::spawn(async move {
             Self::process0(
                 self.store,
-                self.stream_manager,
+                self.range_manager,
                 self.connection_tracker,
                 self.addr,
                 self.stream,
@@ -65,7 +65,7 @@ where
 
     async fn process0(
         store: Rc<S>,
-        stream_manager: Rc<UnsafeCell<M>>,
+        range_manager: Rc<UnsafeCell<M>>,
         connection_tracker: Rc<RefCell<ConnectionTracker>>,
         peer_address: SocketAddr,
         stream: TcpStream,
@@ -101,12 +101,12 @@ where
                         read_idle_handler.on_read();
                         let sender = tx.clone();
                         let store = Rc::clone(&store);
-                        let stream_manager = Rc::clone(&stream_manager);
+                        let range_manager = Rc::clone(&range_manager);
                         let mut server_call = ServerCall {
                             request: frame,
                             sender,
                             store,
-                            stream_manager,
+                            range_manager,
                         };
                         tokio_uring::spawn(async move {
                             server_call.call().await;

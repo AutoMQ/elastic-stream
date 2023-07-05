@@ -114,7 +114,7 @@ impl<'a> Fetch<'a> {
         response.header = Some(bytes::Bytes::copy_from_slice(data));
     }
 
-    fn build_read_opt<M>(&self, stream_manager: &mut M) -> Result<ReadOptions, FetchError>
+    fn build_read_opt<M>(&self, range_manager: &mut M) -> Result<ReadOptions, FetchError>
     where
         M: RangeManager,
     {
@@ -125,8 +125,7 @@ impl<'a> Fetch<'a> {
         let limit = self.fetch_request.limit();
 
         // If the stream-range exists and contains the requested offset, build the read options
-        // FIXME: Use range_manager instead of stream_manager
-        if stream_manager.get_range(stream_id, range_index).is_some() {
+        if range_manager.get_range(stream_id, range_index).is_some() {
             Ok(ReadOptions {
                 stream_id,
                 range: range_index as u32,
@@ -223,12 +222,12 @@ mod tests {
 
         tokio_uring::start(async move {
             let store = Rc::new(mock_store);
-            let stream_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
+            let range_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                 mock_fetcher,
                 Rc::clone(&store),
             )));
 
-            let sm = unsafe { &mut *stream_manager.get() };
+            let sm = unsafe { &mut *range_manager.get() };
             sm.start().await.unwrap();
 
             let request = build_fetch_request();
@@ -236,7 +235,7 @@ mod tests {
             let handler =
                 super::Fetch::parse_frame(&request).expect("Failed to parse request frame");
             handler
-                .apply(Rc::clone(&store), stream_manager, &mut response)
+                .apply(Rc::clone(&store), range_manager, &mut response)
                 .await;
             let header = response.header.unwrap();
             let fetch_response = flatbuffers::root::<FetchResponse>(&header).unwrap();

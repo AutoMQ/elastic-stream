@@ -76,12 +76,11 @@ pub fn launch(
                     ));
 
                     let fetcher = DelegatePlacementClient::new(tx);
-                    let stream_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
+                    let range_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                         fetcher,
                         Rc::clone(&store),
                     )));
-                    let mut worker =
-                        Worker::new(worker_config, store, stream_manager, client, None);
+                    let mut worker = Worker::new(worker_config, store, range_manager, client, None);
                     worker.serve(shutdown_tx)
                 })
         })
@@ -114,13 +113,13 @@ pub fn launch(
                 let fetcher = PlacementClient::new(Rc::clone(&client));
                 let store = Rc::new(store);
 
-                let stream_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
+                let range_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                     fetcher,
                     Rc::clone(&store),
                 )));
 
                 let mut worker =
-                    Worker::new(worker_config, store, stream_manager, client, Some(channels));
+                    Worker::new(worker_config, store, range_manager, client, Some(channels));
                 worker.serve(shutdown_tx)
             });
         handles.push(handle);

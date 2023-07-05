@@ -55,8 +55,8 @@ mod tests {
         tokio_uring::start(async move {
             let ping = super::Ping::new(&request);
             let store = Rc::new(mock_store);
-            let stream_manager = Rc::new(UnsafeCell::new(MockRangeManager::new()));
-            ping.apply(Rc::clone(&store), stream_manager, &mut response)
+            let range_manager = Rc::new(UnsafeCell::new(MockRangeManager::new()));
+            ping.apply(Rc::clone(&store), range_manager, &mut response)
                 .await;
             Ok(())
         })
