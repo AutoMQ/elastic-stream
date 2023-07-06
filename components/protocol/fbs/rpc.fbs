@@ -218,6 +218,19 @@ table FetchResponse {
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
     throttle_time_ms: int32 (id: 1);
+
+    // when range server don't have the data in local, range server will return object metadata list which conver the fetch range.
+    object_metadata_list: [ObjectMetadata] (id: 2);
+}
+
+table ObjectMetadata {
+    key: string (id: 0, required);
+
+    start_offset: int64 = -1 (id: 1);
+
+    end_offset: int64 = -1 (id: 2);
+
+    sparse_index: [ubyte] (id: 3);
 }
 
 // Used to fetch the ranges from a specific range server or a specific stream list.

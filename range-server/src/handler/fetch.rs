@@ -81,6 +81,7 @@ impl<'a> Fetch<'a> {
                 let fetch_response_args = FetchResponseArgs {
                     status: Some(status),
                     throttle_time_ms: -1,
+                    object_metadata_list: None,
                 };
                 let fetch_response = FetchResponse::create(&mut builder, &fetch_response_args);
                 builder.finish(fetch_response, None);
