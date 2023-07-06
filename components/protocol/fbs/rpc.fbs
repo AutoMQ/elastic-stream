@@ -37,6 +37,12 @@ enum ErrorCode : int16 {
     RANGE_NOT_FOUND = 1462,
     // For a sealed range, the requested offset is out of range bounds. For an open range, the requested offset < start_offset.
     OFFSET_OUT_OF_RANGE_BOUNDS = 1463,
+    // The offset associated with the append request is already committed.
+    APPEND_TO_COMMITTED_OFFSET = 1464,
+    // The append request is already on the fly, which means there is a pending append request with the same offset.
+    APPEND_TO_PENDING_OFFSET = 1465,
+    // The append request is out of order, which means the associated offset is beyond the next append offset.
+    APPEND_TO_OVERTAKEN_OFFSET = 1466,
     // Try to create a new range when the last range in the stream is not sealed.
     CREATE_RANGE_BEFORE_SEAL = 1470,
     // Try to seal a range with an epoch which is smaller than the current range's epoch.

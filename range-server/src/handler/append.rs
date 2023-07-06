@@ -105,21 +105,23 @@ impl Append {
         };
 
         let futures: Vec<_> = to_store_requests
-            .iter()
+            .into_iter()
             .map(|req| {
-                trace!("{}", req);
+                trace!("Received append request: {:?}", req);
                 let result = async {
                     if let Some(range) = unsafe { &mut *range_manager.get() }
                         .get_range(req.stream_id, req.range_index)
                     {
                         if let Some(window) = range.window_mut() {
-                            window.check_barrier(req)?;
+                            // Check write barrier to ensure that the incoming requests arrive in order.
+                            // Some ServiceError is returned if the request is out of order.
+                            window.check_barrier(&req)?;
                         } else {
                             warn!(
-                                "try append to sealed range[{}#{}]",
+                                "Try append to a sealed range[{}#{}]",
                                 req.stream_id, req.range_index
                             );
-                            return Err(AppendError::BadRequest);
+                            return Err(AppendError::RangeSealed);
                         }
                     } else {
                         warn!(
@@ -129,7 +131,9 @@ impl Append {
                         return Err(AppendError::RangeNotFound);
                     }
                     let options = WriteOptions::default();
-                    let append_result = store.append(options, req.clone()).await?;
+
+                    // Append to store
+                    let append_result = store.append(options, req).await?;
                     Ok(append_result)
                 };
                 Box::pin(result)
@@ -172,13 +176,11 @@ impl Append {
                     }
                     Err(e) => {
                         // TODO: what to do with the offset on failure?
-                        warn!("Append failed: {:?}", e);
-                        let (err_code, error_message) = self.convert_store_error(e);
+                        warn!("Failed to append records to store: {:?}", e);
 
-                        let mut error_message_fb = None;
-                        if let Some(error_message) = error_message {
-                            error_message_fb = Some(builder.create_string(error_message.as_str()));
-                        }
+                        let (err_code, error_message) = Self::convert_store_error(e);
+
+                        let error_message_fb = Some(builder.create_string(error_message.as_str()));
                         let status = protocol::rpc::header::Status::create(
                             &mut builder,
                             &StatusArgs {
@@ -208,6 +210,7 @@ impl Append {
 
         let response_header =
             protocol::rpc::header::AppendResponse::create(&mut builder, &res_args);
+
         trace!("AppendResponseHeader: {:?}", response_header);
         let res_header = finish_response_builder(&mut builder, response_header);
         response.header = Some(res_header);
@@ -240,38 +243,24 @@ impl Append {
         Ok(append_requests)
     }
 
-    fn convert_store_error(&self, err: &AppendError) -> (ErrorCode, Option<String>) {
-        match err {
-            AppendError::SubmissionQueue => (
-                ErrorCode::PD_NO_AVAILABLE_RS,
-                Some(AppendError::SubmissionQueue.to_string()),
-            ),
-            AppendError::ChannelRecv => (
-                ErrorCode::PD_NO_AVAILABLE_RS,
-                Some(AppendError::ChannelRecv.to_string()),
-            ),
-            AppendError::System(inner) => (
-                ErrorCode::PD_NO_AVAILABLE_RS,
-                Some(AppendError::System(*inner).to_string()),
-            ),
-            AppendError::BadRequest => (
-                ErrorCode::BAD_REQUEST,
-                Some(AppendError::BadRequest.to_string()),
-            ),
-            AppendError::Internal => (
-                ErrorCode::RS_INTERNAL_SERVER_ERROR,
-                Some(AppendError::Internal.to_string()),
-            ),
-            // TODO: this is a workaround for now, return ok for a committed error to pass the test
-            AppendError::Committed => (ErrorCode::OK, None),
-            _ => (
-                ErrorCode::RS_INTERNAL_SERVER_ERROR,
-                Some(AppendError::Internal.to_string()),
-            ),
-        }
+    fn convert_store_error(err: &AppendError) -> (ErrorCode, String) {
+        let code = match err {
+            AppendError::RangeNotFound => ErrorCode::RANGE_NOT_FOUND,
+            AppendError::RangeSealed => ErrorCode::RANGE_ALREADY_SEALED,
+            AppendError::BadRequest => ErrorCode::BAD_REQUEST,
+            // For the committed error, the client could regard it as success.
+            AppendError::Committed => ErrorCode::APPEND_TO_COMMITTED_OFFSET,
+            AppendError::Inflight => ErrorCode::APPEND_TO_PENDING_OFFSET,
+            AppendError::OutOfOrder => ErrorCode::APPEND_TO_OVERTAKEN_OFFSET,
+            // For other errors, return internal server error
+            _ => ErrorCode::RS_INTERNAL_SERVER_ERROR,
+        };
+
+        (code, err.to_string())
     }
 }
 
+/// Converts ServiceError which is returned from RangeManager to AppendError.
 impl From<ServiceError> for AppendError {
     fn from(err: ServiceError) -> Self {
         match err {

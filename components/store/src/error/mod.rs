@@ -114,17 +114,20 @@ pub enum AppendError {
     #[error("The request is illegal")]
     BadRequest,
 
-    #[error("The request is already committed")]
+    #[error("The append request is already committed")]
     Committed,
 
-    #[error("The request is on the fly")]
+    #[error("The append request is on the fly")]
     Inflight,
 
-    #[error("The request is out of order")]
+    #[error("The append request is out of order")]
     OutOfOrder,
 
     #[error("The specified range is not found")]
     RangeNotFound,
+
+    #[error("The specified range is sealed")]
+    RangeSealed,
 
     #[error("Internal error")]
     Internal,
