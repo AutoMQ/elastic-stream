@@ -2,6 +2,7 @@ use byteorder::ReadBytesExt;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use log::{trace, warn};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use protocol::rpc::header::{CommonFlags, GoAwayFlags};
 use std::cell::RefCell;
 use std::fmt::{self, Display};
 use std::io::Cursor;
@@ -15,10 +16,6 @@ pub(crate) const MIN_FRAME_LENGTH: u32 = 16;
 // Max frame length 16MB
 pub(crate) const MAX_FRAME_LENGTH: u32 = 16 * 1024 * 1024;
 
-const FLAG_RESPONSE: u8 = 0x01;
-const FLAG_END_OF_STREAM: u8 = 0x01 << 1;
-const FLAG_SYSTEM_ERROR: u8 = 0x01 << 2;
-
 thread_local! {
     static STREAM_ID: RefCell<u32> = RefCell::new(1);
 }
@@ -27,10 +24,13 @@ thread_local! {
 pub struct Frame {
     pub operation_code: OperationCode,
 
-    pub flag: u8,
+    /// Further refine semantic of the opcode.
+    ///
+    /// Semantics of flag is defined per opcode basis.
+    flag: u8,
 
-    // Stream-ID, starting from 1.
-    // stream-id `0` is used as placeholder only.
+    /// Stream-ID, starting from 1.
+    /// stream-id `0` is used as placeholder only.
     pub stream_id: u32,
 
     pub header_format: HeaderFormat,
@@ -60,30 +60,50 @@ impl Frame {
     }
 
     pub fn is_response(&self) -> bool {
-        self.flag & FLAG_RESPONSE == FLAG_RESPONSE
+        self.has_common_flag(CommonFlags::RESPONSE)
     }
 
     pub fn flag_response(&mut self) {
-        self.flag |= FLAG_RESPONSE;
+        self.flag_common(CommonFlags::RESPONSE);
     }
 
     pub fn end_of_stream(&self) -> bool {
-        self.flag & FLAG_END_OF_STREAM == FLAG_END_OF_STREAM
+        self.has_common_flag(CommonFlags::END_OF_STREAM)
     }
 
     pub fn flag_end_of_response_stream(&mut self) {
-        self.flag |= FLAG_RESPONSE;
-        self.flag |= FLAG_END_OF_STREAM;
+        self.flag_common(CommonFlags::RESPONSE);
+        self.flag_common(CommonFlags::END_OF_STREAM);
     }
 
     pub fn system_error(&self) -> bool {
-        self.flag & FLAG_SYSTEM_ERROR == FLAG_SYSTEM_ERROR
+        self.has_common_flag(CommonFlags::SYSTEM_ERROR)
     }
 
     pub fn flag_system_err(&mut self) {
-        self.flag |= FLAG_END_OF_STREAM;
-        self.flag |= FLAG_RESPONSE;
-        self.flag |= FLAG_SYSTEM_ERROR;
+        self.flag_common(CommonFlags::END_OF_STREAM);
+        self.flag_common(CommonFlags::RESPONSE);
+        self.flag_common(CommonFlags::SYSTEM_ERROR);
+    }
+
+    #[inline]
+    fn flag_common(&mut self, flag: CommonFlags) {
+        self.flag |= flag.0 as u8;
+    }
+
+    #[inline]
+    fn has_common_flag(&self, flag: CommonFlags) -> bool {
+        self.flag & flag.0 as u8 == flag.0 as u8
+    }
+
+    #[inline]
+    pub fn flag_go_away(&mut self, flag: GoAwayFlags) {
+        self.flag |= flag.0 as u8;
+    }
+
+    #[inline]
+    pub fn has_go_away_flag(&self, flag: GoAwayFlags) -> bool {
+        self.flag & flag.0 as u8 == flag.0 as u8
     }
 
     pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), FrameError> {

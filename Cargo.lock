@@ -722,6 +722,7 @@ dependencies = [
  "cargo-llvm-cov",
  "log",
  "num_enum",
+ "protocol",
  "thiserror",
  "util",
 ]

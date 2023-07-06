@@ -2,6 +2,7 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use codec::frame::{Frame, OperationCode};
 use log::{info, warn};
+use protocol::rpc::header::GoAwayFlags;
 use tokio::sync::mpsc::UnboundedSender;
 
 /// Track all existing connections and send the `GoAway` farewell frame to peers if graceful shutdown is desirable.
@@ -44,6 +45,7 @@ impl ConnectionTracker {
             let mut frame = Frame::new(OperationCode::GoAway);
             // Go away frame has stream_id == 0.
             frame.stream_id = 0;
+            frame.flag_go_away(GoAwayFlags::SERVER_MAINTENANCE);
             match sender.send(frame) {
                 Ok(_) => {
                     info!(

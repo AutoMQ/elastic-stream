@@ -121,6 +121,7 @@ where
                 }
             });
     }
+
     fn report_metrics(&self, mut shutdown_rx: broadcast::Receiver<()>) {
         let client = Rc::clone(&self.client);
         let config = Arc::clone(&self.config.server_config);

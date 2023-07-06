@@ -72,6 +72,35 @@ enum ErrorCode : int16 {
     RS_NOT_IMPLEMENTED = 2501,
 }
 
+// Flag variants shared by multiple opcodes
+enum CommonFlags : byte {
+    // Mark type of the frame is request.
+    REQUEST = 0,
+
+    // Mark frame is a response to a prior request.
+    RESPONSE = 1,
+
+    // Mark end-of-stream
+    END_OF_STREAM = 2,
+
+    // Mark the frame is carrying a system error. For example, if decoding header fails, server would
+    // flag system error in response.
+    SYSTEM_ERROR = 4,
+}
+
+
+// Flag variants for GOAWAY frame
+enum GoAwayFlags : byte {
+    // The underlynig connection/stream has been idle for the configured period of time. An endpoint, who
+    // detects this idleness, is going to close the idle connection/stream.
+    CONNECTION_IDLE = 0,
+
+    // Server is going to perform maintenance shortly. No new connection/stream will be served for current
+    // epoch. Servers will broadcast GOAWAY frames to existing streams/connections, instructing clients to
+    // conduct fail-over as soon as possible.
+    SERVER_MAINTENANCE = 1,
+}
+
 // The Status type defines a logical error model.
 // Each `Status` message contains three pieces of data: error code, error message, and error detail.
 table Status {

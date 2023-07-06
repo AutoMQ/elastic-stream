@@ -9,6 +9,7 @@ byteorder = { workspace = true }
 bytes = { workspace = true }
 log = { workspace = true }
 num_enum = { workspace = true }
+protocol = { path = "../protocol" }
 thiserror = { workspace = true }
 util = { path = "../util" }
 
