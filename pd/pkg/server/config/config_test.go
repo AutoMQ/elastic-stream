@@ -57,7 +57,7 @@ var (
 			AdvertiseClientUrls:         "http://127.0.0.1:12379",
 			Name:                        "pd-hostname",
 			DataDir:                     "default.pd-hostname",
-			InitialCluster:              "pd=http://127.0.0.1:12380",
+			InitialCluster:              "pd-hostname=http://127.0.0.1:12380",
 			PDAddr:                      "127.0.0.1:12378",
 			AdvertisePDAddr:             "127.0.0.1:12378",
 			LeaderLease:                 3,
