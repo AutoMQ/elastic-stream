@@ -219,16 +219,12 @@ impl Response {
                             response.throttle_time_ms as u64,
                         ))
                     };
-                    let object_metadata_list = if let Some(items) = response.object_metadata_list {
-                        Some(
-                            items
-                                .iter()
-                                .map(|item| Into::<ObjectMetadata>::into(item))
-                                .collect(),
-                        )
-                    } else {
-                        None
-                    };
+                    let object_metadata_list = response.object_metadata_list.map(|items| {
+                        items
+                            .iter()
+                            .map(Into::<ObjectMetadata>::into)
+                            .collect::<Vec<_>>()
+                    });
                     self.headers = Some(Headers::Fetch {
                         throttle,
                         object_metadata_list,

@@ -269,7 +269,7 @@ impl ReplicationRange {
             match result {
                 Ok(rs) => {
                     // TODO: fetch from object storage when payload not exist
-                    let mut payload = rs.payload.unwrap_or_else(|| vec![]);
+                    let mut payload = rs.payload.unwrap_or_default();
                     fetch_data.append(&mut payload);
                     let elapse = now.elapsed().as_millis();
                     if elapse > 10 {
