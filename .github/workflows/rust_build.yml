@@ -81,5 +81,7 @@ jobs:
     - name: Install Deps
       run: |
         ./scripts/install_deps.sh
+    - name: Install Nextest
+      uses: taiki-e/install-action@nextest
     - name: Run tests
-      run: cargo test -- --nocapture
+      run: cargo nextest run
