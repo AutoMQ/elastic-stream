@@ -10,3 +10,10 @@ if ! git diff --cached --diff-filter=ACMR --quiet -- '*Cargo.toml'; then
 	make sort-deps
 	git add $staged_cargo_files
 fi
+
+# Run flatc for Golang
+if ! git diff --cached --diff-filter=ACMR --quiet -- 'components/protocol/fbs/rpc.fbs'; then
+	echo "Running flatc for Golang..."
+	(cd pd; make flatc)
+	git add pd/api/rpcfb/rpcfb
+fi
