@@ -84,4 +84,4 @@ jobs:
     - name: Install Nextest
       uses: taiki-e/install-action@nextest
     - name: Run tests
-      run: cargo nextest run
+      run: cargo nextest run --profile default
