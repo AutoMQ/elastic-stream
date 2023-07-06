@@ -35,6 +35,8 @@ impl<'a> Buf for BytesSliceCursor<'a> {
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
+
     use super::*;
 
     #[test]
