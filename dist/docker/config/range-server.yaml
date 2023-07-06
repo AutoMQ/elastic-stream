@@ -1,0 +1,104 @@
+---
+# Unit of interval in milliseconds
+tick: 100
+# Placement driver address
+placement-driver: "pd:12378"
+# Client configuration
+client:
+  # Connect timeout duration in ticks
+  connect-timeout: 10
+  # IO timeout duration in ticks
+  io-timeout: 10
+  # Client ID
+  client-id: ""
+  # Max attempts in case of transparent retry
+  max-attempt: 3
+  # Heartbeat interval in ticks
+  heartbeat-interval: 30
+  # Refresh placement driver cluster interval in ticks
+  refresh-pd-cluster-interval: 300
+# Server configuration
+server:
+  # Advertise host address
+  host: "127.0.0.1"
+  # Listening port
+  port: 10911
+  # Number of Thread-per-Core Nodes
+  worker-cpu-set: "1"
+  uring:
+    # Network io_uring queue depth
+    queue-depth: 128
+  # Connection idle duration in ticks
+  connection-idle-duration: 60
+  # grace period in ticks, after this period of time, disconnect lingering client connections
+  grace-period: 120
+  profiling:
+    enable: false
+    # profiler sampling frequency
+    sampling-frequency: 1000
+    # Generate flamegraph interval in seconds
+    report-interval: 3000
+    # Path to save flamegraph files: if a relative path is configured, it will be relative to current working directory;
+    # If an absolute path is configured, the absolute path is used.
+    report-path: "/tmp"
+    # max backup reports
+    max-report-backup: 3
+# Store configuration
+store:
+  # Whether mkdirs if missing
+  mkdirs-if-missing: true
+  # Store directory
+  path:
+    # Base path of the store, containing lock, immutable properties and other configuration files
+    base: "/data/store"
+    # Directory of WAL segment files. It could be absolute or relative to `base`
+    wal: "wal"
+    # Directory of metadata RocksDB files. It could be absolute or relative to `base`
+    metadata: "metadata"
+  # 1GiB
+  segment-size: 1073741824
+  # Max block cache size
+  max-cache-size: 1073741824
+  # Preferred IO read size: 128KiB
+  read-block-size: 131072
+  # Pre-allocated number of segment files
+  pre-allocate-segment-file-number: 2
+  # The total size of Status::Read segment files
+  # 100GiB
+  total-segment-file-size: 107374182400
+  # Policy to reclaim segment files
+  reclaim-policy: "Delete"
+  io-cpu: 2
+  # io_uring setup
+  uring:
+    # IO io_uring queue depth
+    queue-depth: 1024
+    # Kernel SQ Poll thread will quit if it remains idle for 2 seconds.
+    sqpoll-idle-ms: 2000
+    # Bind the kernel's poll thread to the specified cpu.
+    sqpoll-cpu: 1
+    # Kernel thread pool size for bounded tasks. Note this thread pool is
+    # shared with server `Node`s.
+    max-bounded-worker: 2
+    # Kernel thread pool size for unbounded tasks. Note this thread pool is
+    # shared with server `Node`s.
+    max-unbounded-worker: 2
+  # RocksDB configuration items
+  rocksdb:
+    # Create column families if missing
+    create-if-missing: true
+    # Flush index entries of record-batch every `flush_threshold`
+    flush-threshold: 32768
+    # cpu-set for RocksDB threads to run on, sample value: "0-2,4-6,8"
+    cpu-set: "0"
+
+replication:
+  connection-pool-size: 2
+  thread-count: 4
+
+observation:
+  metrics:
+    # Host address
+    host: "127.0.0.1"
+    # Listening port
+    port: 9898

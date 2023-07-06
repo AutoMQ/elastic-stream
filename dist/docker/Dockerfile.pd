@@ -1,0 +1,11 @@
+FROM ubuntu:22.04
+
+RUN apt-get update \
+    && apt-get install -y wget \
+    && wget -q -O /tmp/pd.deb https://github.com/AutoMQ/elastic-stream/releases/download/v0.2.1/pd_0.2.1_amd64.deb \
+    && dpkg -i /tmp/pd.deb \
+    && rm /tmp/pd.deb
+
+COPY config/config.yaml /etc/pd/
+
+ENTRYPOINT ["/usr/local/bin/pd", "--config", "/etc/pd/config.yaml"]

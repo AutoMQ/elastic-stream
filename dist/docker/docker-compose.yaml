@@ -1,0 +1,17 @@
+services:
+  range-server:
+    image: "elasticstream/range-server:0.2.1"
+    ports:
+      - "10911:10911"
+    depends_on:
+      - pd
+    volumes:
+      - rs_data:/data
+  pd:
+    image: "elasticstream/pd-server:0.2.1"
+    ports:
+      - "12378:12378"
+
+volumes:
+  rs_data:
+    driver: local
