@@ -1,6 +1,7 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use crate::{ObjectManager, ObjectMetadata, RangeKey};
+use crate::{ObjectManager, RangeKey};
+use model::object::ObjectMetadata;
 
 pub struct MemoryObjectManager {
     map: RefCell<HashMap<RangeKey, Vec<ObjectMetadata>>>,

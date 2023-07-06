@@ -8,7 +8,7 @@ use super::replication_range::ReplicationRange;
 use crate::ReplicationError;
 use bytes::Bytes;
 use log::{error, info, warn};
-use model::{request::fetch::FetchRequest, RangeServer};
+use model::{request::fetch::FetchRequest, response::fetch::FetchResultSet, RangeServer};
 use protocol::rpc::header::ErrorCode;
 use protocol::rpc::header::SealKind;
 use tokio::time::sleep;
@@ -153,7 +153,7 @@ impl Replicator {
         start_offset: u64,
         end_offset: u64,
         batch_max_bytes: u32,
-    ) -> Result<Vec<Bytes>, ReplicationError> {
+    ) -> Result<FetchResultSet, ReplicationError> {
         if let Some(range) = self.range.upgrade() {
             if let Some(client) = range.client() {
                 let result = client
@@ -174,14 +174,7 @@ impl Replicator {
                     )
                     .await;
                 match result {
-                    Ok(rs) => {
-                        // TODO: handle throttle
-                        if let Some(vec) = rs.payload {
-                            Ok(vec)
-                        } else {
-                            Err(ReplicationError::Internal)
-                        }
-                    }
+                    Ok(rs) => Ok(rs),
                     Err(_) => Err(ReplicationError::Internal),
                 }
             } else {

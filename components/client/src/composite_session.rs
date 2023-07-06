@@ -933,10 +933,15 @@ impl CompositeSession {
             return Err(ClientError::ServerInternal);
         }
 
-        if let Some(response::Headers::Fetch { throttle }) = response.headers {
+        if let Some(response::Headers::Fetch {
+            throttle,
+            object_metadata_list,
+        }) = response.headers
+        {
             Ok(FetchResultSet {
                 throttle,
                 payload: response.payload,
+                object_metadata_list,
             })
         } else {
             Err(ClientError::ClientInternal)

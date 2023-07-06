@@ -9,7 +9,7 @@ mod range_offload;
 pub use range_fetcher::RangeFetchResult;
 pub use range_fetcher::RangeFetcher;
 
-use bytes::Bytes;
+use model::object::ObjectMetadata;
 
 #[cfg(test)]
 use mockall::{automock, predicate::*};
@@ -41,27 +41,6 @@ pub trait ObjectManager {
         start_offset: u64,
         end_offset: u64,
     ) -> Vec<ObjectMetadata>;
-}
-
-#[derive(Debug, Clone)]
-pub struct ObjectMetadata {
-    pub stream_id: u64,
-    pub range_index: u32,
-    pub start_offset: u64,
-    pub end_offset_delta: u32,
-    pub sparse_index: Bytes,
-}
-
-impl ObjectMetadata {
-    pub fn new(stream_id: u64, range_index: u32, start_offset: u64) -> Self {
-        Self {
-            stream_id,
-            range_index,
-            start_offset,
-            end_offset_delta: 0,
-            sparse_index: Bytes::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
