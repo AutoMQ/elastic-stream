@@ -14,7 +14,7 @@ name = "pd-hostname"
 # path to the data directory
 dataDir = "default.pd-hostname"
 # the initial cluster configuration for bootstrapping
-initialCluster = "pd=http://127.0.0.1:12380"
+initialCluster = "pd-hostname=http://127.0.0.1:12380"
 # the address of PD
 pdAddr = "127.0.0.1:12378"
 # advertise address of PD
