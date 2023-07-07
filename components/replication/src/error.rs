@@ -26,3 +26,15 @@ pub enum ReplicationError {
     #[error("Stream is not exist")]
     StreamNotExist,
 }
+
+#[derive(Debug, Error)]
+pub enum ObjectReadError {
+    #[error("request object storage fail")]
+    ReqStoreFail(crate::Error),
+
+    #[error("cannot find object for the offset")]
+    NotFound(crate::Error),
+
+    #[error("unexpected error")]
+    Unexpected(crate::Error),
+}

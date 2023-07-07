@@ -251,6 +251,7 @@ impl MultiPartObject {
                                         debug!("{key} complete multi-part object success");
                                         object_metadata.end_offset_delta =
                                             (end_offset - object_metadata.start_offset) as u32;
+                                        object_metadata.data_len = data_len as u32;
                                         object_manager.commit_object(object_metadata);
                                         break;
                                     }
@@ -321,6 +322,7 @@ where
             object_metadata.end_offset_delta = (end_offset - object_metadata.start_offset) as u32;
             // data block
             let payload_length: usize = payload.iter().map(|p| p.len()).sum();
+            object_metadata.data_len = payload_length as u32;
             let mut bytes =
                 BytesMut::with_capacity(payload_length + 256 /* sparse index + footer */);
             for b in payload.iter() {

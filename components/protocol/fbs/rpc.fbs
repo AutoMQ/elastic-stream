@@ -263,9 +263,11 @@ table ObjectMetadata {
 
     start_offset: int64 = -1 (id: 1);
 
-    end_offset: int64 = -1 (id: 2);
+    end_offset_delta: int32 = -1 (id: 2);
 
-    sparse_index: [ubyte] (id: 3);
+    data_len: int32 = -1 (id: 3);
+
+    sparse_index: [ubyte] (id: 4);
 }
 
 // Used to fetch the ranges from a specific range server or a specific stream list.
