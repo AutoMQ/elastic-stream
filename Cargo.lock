@@ -2116,7 +2116,7 @@ dependencies = [
 
 [[package]]
 name = "mock-server"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "bytes",
  "codec",
@@ -2378,7 +2378,7 @@ dependencies = [
 
 [[package]]
 name = "observation"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "lazy_static",
  "log",
@@ -2650,7 +2650,7 @@ dependencies = [
 
 [[package]]
 name = "polling"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "codec",
  "log",
@@ -2828,7 +2828,7 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "protocol"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "flatbuffers",
  "flatc-rust",
@@ -2933,7 +2933,7 @@ dependencies = [
  "num_cpus",
  "num_enum",
  "observation",
- "polling 0.1.0",
+ "polling 0.2.1",
  "pprof",
  "prometheus",
  "protocol",
@@ -4052,7 +4052,7 @@ dependencies = [
 
 [[package]]
 name = "transport"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "bytes",
  "cargo-llvm-cov",

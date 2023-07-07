@@ -24,7 +24,7 @@ members = [
 
 [workspace.package]
 version = "0.2.1"
-authors = ["Li Zhanhui", "Ning Yu", "Hang Xu", "Daniel", "Ping'an Tian", "Curtis Wan"]
+authors = ["Li Zhanhui", "Ning Yu", "Han Xu", "Daniel", "Ping'an Tian", "Curtis Wan"]
 description = "A Cloud-Native Distributed Storage System For Messaging and Streaming"
 
 [workspace.dependencies]
