@@ -209,7 +209,7 @@ impl IO {
 
         check_io_uring(&probe, data_ring.params())?;
 
-        trace!("I/O Uring instance created");
+        trace!("I/O Uring instances created");
 
         let (sender, receiver) = crossbeam::channel::unbounded();
 
