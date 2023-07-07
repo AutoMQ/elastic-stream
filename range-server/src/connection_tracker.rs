@@ -1,8 +1,8 @@
 use std::{collections::HashMap, net::SocketAddr};
 
-use codec::frame::{Frame, OperationCode};
+use codec::frame::Frame;
 use log::{info, warn};
-use protocol::rpc::header::GoAwayFlags;
+use protocol::rpc::header::{GoAwayFlags, OperationCode};
 use tokio::sync::mpsc::UnboundedSender;
 
 /// Track all existing connections and send the `GoAway` farewell frame to peers if graceful shutdown is desirable.
@@ -42,7 +42,7 @@ impl ConnectionTracker {
     /// 3. Await until all connections are terminated after client migrated to other range servers.
     pub(crate) fn go_away(&mut self) {
         self.connections.iter().for_each(|(peer_address, sender)| {
-            let mut frame = Frame::new(OperationCode::GoAway);
+            let mut frame = Frame::new(OperationCode::GOAWAY);
             // Go away frame has stream_id == 0.
             frame.stream_id = 0;
             frame.flag_go_away(GoAwayFlags::SERVER_MAINTENANCE);

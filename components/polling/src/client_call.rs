@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use codec::frame::{Frame, OperationCode};
+use codec::frame::Frame;
+use protocol::rpc::header::OperationCode;
 
 use super::stream_observer::StreamObserver;
 
@@ -32,7 +33,7 @@ where
         offset: u64,
         timeout: minstant::Instant,
     ) -> Self {
-        debug_assert_eq!(OperationCode::Fetch, request.operation_code);
+        debug_assert_eq!(OperationCode::FETCH, request.operation_code);
         Self {
             request,
             observer,

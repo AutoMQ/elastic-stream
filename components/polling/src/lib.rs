@@ -11,6 +11,7 @@ mod tests {
 
     use codec::frame::Frame;
     use log::trace;
+    use protocol::rpc::header::OperationCode;
 
     use super::{
         client_call::ClientCall,
@@ -71,7 +72,7 @@ mod tests {
         service.put(
             0,
             ClientCall::new(
-                Frame::new(codec::frame::OperationCode::Fetch),
+                Frame::new(OperationCode::FETCH),
                 TestResponseObserver,
                 0,
                 minstant::Instant::now() + std::time::Duration::from_secs(1),
@@ -81,7 +82,7 @@ mod tests {
             assert_eq!(1, client_calls.len());
             for call in client_calls {
                 call.stream_observer()
-                    .on_next(&Frame::new(codec::frame::OperationCode::Fetch))?;
+                    .on_next(&Frame::new(OperationCode::FETCH))?;
                 call.stream_observer().on_complete();
             }
         } else {

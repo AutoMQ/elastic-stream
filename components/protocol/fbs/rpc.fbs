@@ -107,6 +107,64 @@ enum GoAwayFlags : byte {
     SERVER_MAINTENANCE = 1,
 }
 
+enum OperationCode : short {
+    // 0x0000 is reserved for unknown
+    UNKNOWN = 0x0000,
+
+    // 0x0000 ~ 0x0FFF is reserved for system
+
+    // Measure a minimal round-trip time from the sender.
+    PING = 0x0001,
+    // Initiate a shutdown of a connection or signal serious error conditions.
+    GOAWAY = 0x0002,
+    // To keep clients alive through periodic heartbeat frames.
+    HEARTBEAT = 0x0003,
+
+    // Allocate a unique ID from placement drivers.
+    ALLOCATE_ID = 0x0004,
+
+    // 0x1000 ~ 0x1FFF is reserved for data communication
+
+    // Append records to the range server.
+    APPEND = 0x1001,
+    // Fetch records from the range server.
+    FETCH = 0x1002,
+
+    // 0x2000 ~ 0x2FFF is reserved for range management
+
+    // List ranges from the PD of a batch of streams.
+    LIST_RANGE = 0x2001,
+    // Request seal ranges of a batch of streams.
+    // The PD will provide the `SEAL_AND_NEW` semantic while Range Server only provide the `SEAL` semantic.
+    SEAL_RANGE = 0x2002,
+    // Syncs newly writable ranges to a range server to accelerate the availability of a newly created writable range.
+    SYNC_RANGE = 0x2003,
+
+    // Create a new range for a stream.
+    CREATE_RANGE = 0x2004,
+
+    // 0x3000 ~ 0x3FFF is reserved for stream management
+
+    // Create a batch of streams.
+    CREATE_STREAM = 0x3001,
+    // Delete a batch of streams.
+    DELETE_STREAM = 0x3002,
+    // Update a batch of streams.
+    UPDATE_STREAM = 0x3003,
+    // Describe the details of a batch of streams.
+    DESCRIBE_STREAM = 0x3004,
+    // Trim the min offset of a batch of streams.
+    TRIM_STREAM = 0x3005,
+
+    // 0x4000 ~ 0x4FFF is reserved for observability
+
+    // Range Server reports metrics to the PD.
+    REPORT_METRICS = 0x4001,
+
+    // Describe placement driver cluster membership.
+    DESCRIBE_PLACEMENT_DRIVER = 0x4002,
+}
+
 // The Status type defines a logical error model.
 // Each `Status` message contains three pieces of data: error code, error message, and error detail.
 table Status {

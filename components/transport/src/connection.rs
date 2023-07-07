@@ -336,6 +336,7 @@ mod tests {
     use std::{error::Error, thread::JoinHandle};
 
     use bytes::{Buf, BufMut, BytesMut};
+    use protocol::rpc::header::OperationCode;
     use tokio::{io::AsyncReadExt, net::TcpListener};
 
     #[test]
@@ -422,7 +423,7 @@ mod tests {
                     .unwrap();
                 tcp_stream.set_nodelay(true).unwrap();
                 let connection = super::Connection::new(tcp_stream, &address);
-                let mut frame = codec::frame::Frame::new(codec::frame::OperationCode::AllocateId);
+                let mut frame = codec::frame::Frame::new(OperationCode::ALLOCATE_ID);
                 let mut payload = vec![];
                 (0..8).for_each(|_| {
                     let mut buf = BytesMut::with_capacity(1024 * 1024);

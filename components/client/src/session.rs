@@ -1,10 +1,8 @@
 use crate::{request, response, NodeState};
-use codec::{
-    error::FrameError,
-    frame::{Frame, OperationCode},
-};
+use codec::{error::FrameError, frame::Frame};
 
 use model::client_role::ClientRole;
+use protocol::rpc::header::OperationCode;
 use transport::connection::Connection;
 
 use local_sync::oneshot;
@@ -181,7 +179,7 @@ impl Session {
 
         // Update last read/write instant.
         *self.idle_since.borrow_mut() = Instant::now();
-        let mut frame = Frame::new(OperationCode::Unknown);
+        let mut frame = Frame::new(OperationCode::UNKNOWN);
 
         // Set frame header
         frame.header = Some((&request).into());
@@ -189,47 +187,47 @@ impl Session {
         // Set operation code
         match &request.headers {
             request::Headers::Heartbeat { .. } => {
-                frame.operation_code = OperationCode::Heartbeat;
+                frame.operation_code = OperationCode::HEARTBEAT;
             }
 
             request::Headers::CreateStream { .. } => {
-                frame.operation_code = OperationCode::CreateStream;
+                frame.operation_code = OperationCode::CREATE_STREAM;
             }
 
             request::Headers::DescribeStream { .. } => {
-                frame.operation_code = OperationCode::DescribeStream;
+                frame.operation_code = OperationCode::DESCRIBE_STREAM;
             }
 
             request::Headers::ListRange { .. } => {
-                frame.operation_code = OperationCode::ListRange;
+                frame.operation_code = OperationCode::LIST_RANGE;
             }
 
             request::Headers::AllocateId { .. } => {
-                frame.operation_code = OperationCode::AllocateId;
+                frame.operation_code = OperationCode::ALLOCATE_ID;
             }
 
             request::Headers::DescribePlacementDriver { .. } => {
-                frame.operation_code = OperationCode::DescribePlacementDriver;
+                frame.operation_code = OperationCode::DESCRIBE_PLACEMENT_DRIVER;
             }
 
             request::Headers::CreateRange { .. } => {
-                frame.operation_code = OperationCode::CreateRange;
+                frame.operation_code = OperationCode::CREATE_RANGE;
             }
 
             request::Headers::SealRange { .. } => {
-                frame.operation_code = OperationCode::SealRange;
+                frame.operation_code = OperationCode::SEAL_RANGE;
             }
 
             request::Headers::Append => {
-                frame.operation_code = OperationCode::Append;
+                frame.operation_code = OperationCode::APPEND;
             }
 
             request::Headers::Fetch { .. } => {
-                frame.operation_code = OperationCode::Fetch;
+                frame.operation_code = OperationCode::FETCH;
             }
 
             request::Headers::ReportMetrics { .. } => {
-                frame.operation_code = OperationCode::ReportMetrics;
+                frame.operation_code = OperationCode::REPORT_METRICS;
             }
         };
 
@@ -246,7 +244,7 @@ impl Session {
             Ok(_) => {
                 trace!(
                     "Write request[opcode={}] bounded for {} using stream-id={} to socket buffer",
-                    opcode,
+                    opcode.variant_name().unwrap_or("INVALID_OPCODE"),
                     self.connection.peer_address(),
                     stream_id,
                 );
@@ -254,7 +252,7 @@ impl Session {
             Err(e) => {
                 error!(
                     "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}",
-                    opcode, self.connection.peer_address(), e
+                    opcode.variant_name().unwrap_or("INVALID_OPCODE"), self.connection.peer_address(), e
                 );
                 if let Some(ctx) = inflight_requests.remove(&stream_id) {
                     return Err(ctx);
@@ -285,7 +283,7 @@ impl Session {
             body: None,
         };
 
-        let mut frame = Frame::new(OperationCode::Heartbeat);
+        let mut frame = Frame::new(OperationCode::HEARTBEAT);
         frame.header = Some((&request).into());
         let stream_id = frame.stream_id;
         let opcode = frame.operation_code;
@@ -293,7 +291,7 @@ impl Session {
             Ok(_) => {
                 trace!(
                     "Write request[opcode={}] bounded for {} using stream-id={} to socket buffer",
-                    opcode,
+                    opcode.variant_name().unwrap_or("INVALID_OPCODE"),
                     self.connection.peer_address(),
                     stream_id,
                 );
@@ -302,7 +300,7 @@ impl Session {
             Err(e) => {
                 error!(
                     "Failed to write request[opcode={}] bounded for {} to socket buffer. Cause: {:?}",
-                    opcode, self.connection.peer_address(), e
+                    opcode.variant_name().unwrap_or("INVALID_OPCODE"), self.connection.peer_address(), e
                 );
             }
         }
@@ -331,12 +329,15 @@ impl Session {
         let stream_id = frame.stream_id;
         trace!(
             "Received {} response for stream-id={} from {}",
-            frame.operation_code,
+            frame
+                .operation_code
+                .variant_name()
+                .unwrap_or("INVALID_OPCODE"),
             stream_id,
             target
         );
 
-        if frame.operation_code == OperationCode::Heartbeat {
+        if frame.operation_code == OperationCode::HEARTBEAT {
             return;
         }
 
@@ -347,74 +348,78 @@ impl Session {
                     response.on_system_error(&frame);
                 } else {
                     match frame.operation_code {
-                        OperationCode::ListRange => {
+                        OperationCode::LIST_RANGE => {
                             response.on_list_ranges(&frame);
                         }
 
-                        OperationCode::Unknown => {
+                        OperationCode::UNKNOWN => {
                             warn!("Received an unknown operation code");
                             return;
                         }
 
-                        OperationCode::Ping => todo!(),
+                        OperationCode::PING => todo!(),
 
-                        OperationCode::GoAway => todo!(),
+                        OperationCode::GOAWAY => todo!(),
 
-                        OperationCode::AllocateId => {
+                        OperationCode::ALLOCATE_ID => {
                             response.on_allocate_id(&frame);
                         }
 
-                        OperationCode::Append => {
+                        OperationCode::APPEND => {
                             response.on_append(&frame, &ctx);
                         }
 
-                        OperationCode::Fetch => {
+                        OperationCode::FETCH => {
                             response.on_fetch(&frame, &ctx);
                         }
 
-                        OperationCode::CreateRange => {
+                        OperationCode::CREATE_RANGE => {
                             response.on_create_range(&frame, &ctx);
                         }
 
-                        OperationCode::SealRange => {
+                        OperationCode::SEAL_RANGE => {
                             response.on_seal_range(&frame, &ctx);
                         }
 
-                        OperationCode::SyncRange => {
+                        OperationCode::SYNC_RANGE => {
                             warn!("Received an unexpected `SyncRanges` response");
                             return;
                         }
 
-                        OperationCode::CreateStream => {
+                        OperationCode::CREATE_STREAM => {
                             response.on_create_stream(&frame, &ctx);
                         }
 
-                        OperationCode::DescribeStream => {
+                        OperationCode::DESCRIBE_STREAM => {
                             response.on_describe_stream(&frame, &ctx);
                         }
 
-                        OperationCode::DeleteStream => {
+                        OperationCode::DELETE_STREAM => {
                             warn!("Received an unexpected `DeleteStreams` response");
                             return;
                         }
 
-                        OperationCode::UpdateStream => {
+                        OperationCode::UPDATE_STREAM => {
                             warn!("Received an unexpected `UpdateStreams` response");
                             return;
                         }
 
-                        OperationCode::TrimStream => todo!(),
+                        OperationCode::TRIM_STREAM => todo!(),
 
-                        OperationCode::ReportMetrics => {
+                        OperationCode::REPORT_METRICS => {
                             response.on_report_metrics(&frame);
                         }
 
-                        OperationCode::DescribePlacementDriver => {
+                        OperationCode::DESCRIBE_PLACEMENT_DRIVER => {
                             response.on_describe_placement_driver(&frame);
                         }
 
-                        OperationCode::Heartbeat => {
+                        OperationCode::HEARTBEAT => {
                             unreachable!();
+                        }
+
+                        _ => {
+                            unreachable!("Unsupported operation code");
                         }
                     }
                 }

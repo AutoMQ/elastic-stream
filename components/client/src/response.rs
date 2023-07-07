@@ -1,7 +1,6 @@
 use crate::request;
 use bytes::Bytes;
 use codec::frame::Frame;
-use codec::frame::OperationCode;
 use log::debug;
 use log::error;
 use log::info;
@@ -20,6 +19,7 @@ use protocol::rpc::header::FetchResponse;
 use protocol::rpc::header::HeartbeatResponse;
 use protocol::rpc::header::IdAllocationResponse;
 use protocol::rpc::header::ListRangeResponse;
+use protocol::rpc::header::OperationCode;
 use protocol::rpc::header::ReportMetricsResponse;
 use protocol::rpc::header::SealRangeResponse;
 use protocol::rpc::header::SystemError;

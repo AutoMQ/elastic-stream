@@ -1,7 +1,6 @@
 use super::{lb_policy::LbPolicy, session::Session};
 use crate::{error::ClientError, invocation_context::InvocationContext};
 use bytes::Bytes;
-use codec::frame::OperationCode;
 use itertools::Itertools;
 use local_sync::oneshot;
 use log::{debug, error, info, trace, warn};
@@ -15,8 +14,8 @@ use observation::metrics::{
     sys_metrics::{DiskStatistics, MemoryStatistics},
     uring_metrics::UringStatistics,
 };
-use protocol::rpc::header::SealKind;
 use protocol::rpc::header::{ErrorCode, PlacementDriverCluster};
+use protocol::rpc::header::{OperationCode, SealKind};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -670,8 +669,8 @@ impl CompositeSession {
                 Ok(response) => {
                     debug_assert_eq!(
                         response.operation_code,
-                        OperationCode::DescribePlacementDriver,
-                        "Unexpected operation code"
+                        OperationCode::DESCRIBE_PLACEMENT_DRIVER,
+                        "Operation code should be describe-placement-driver"
                     );
                     if !response.ok() {
                         warn!(

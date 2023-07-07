@@ -165,14 +165,14 @@ mod tests {
     use crate::range_manager::{
         fetcher::MockPlacementFetcher, manager::DefaultRangeManager, RangeManager,
     };
-    use codec::frame::{Frame, OperationCode};
+    use codec::frame::Frame;
     use model::stream::StreamMetadata;
-    use protocol::rpc::header::{ErrorCode, FetchRequestT, FetchResponse, RangeT};
+    use protocol::rpc::header::{ErrorCode, FetchRequestT, FetchResponse, OperationCode, RangeT};
     use std::{cell::UnsafeCell, error::Error, rc::Rc, sync::Arc};
     use store::error::FetchError;
 
     fn build_fetch_request() -> Frame {
-        let mut request = Frame::new(OperationCode::Fetch);
+        let mut request = Frame::new(OperationCode::FETCH);
         let mut builder = flatbuffers::FlatBufferBuilder::new();
         let mut fetch_request = FetchRequestT::default();
         let mut range = RangeT::default();
@@ -232,7 +232,7 @@ mod tests {
             sm.start().await.unwrap();
 
             let request = build_fetch_request();
-            let mut response = Frame::new(OperationCode::Fetch);
+            let mut response = Frame::new(OperationCode::FETCH);
             let handler =
                 super::Fetch::parse_frame(&request).expect("Failed to parse request frame");
             handler

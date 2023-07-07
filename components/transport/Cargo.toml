@@ -19,3 +19,4 @@ cargo-llvm-cov = { workspace = true }
 chrono = { workspace = true }
 env_logger = { workspace = true }
 tokio = { workspace = true }
+protocol = { path = "../protocol" }

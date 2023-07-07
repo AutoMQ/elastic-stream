@@ -44,13 +44,14 @@ mod tests {
     use std::{cell::UnsafeCell, error::Error, rc::Rc};
 
     use crate::range_manager::MockRangeManager;
-    use codec::frame::{Frame, OperationCode};
+    use codec::frame::Frame;
+    use protocol::rpc::header::OperationCode;
     use store::MockStore;
 
     #[test]
     fn test_ping() -> Result<(), Box<dyn Error>> {
-        let request = Frame::new(OperationCode::Ping);
-        let mut response = Frame::new(OperationCode::Unknown);
+        let request = Frame::new(OperationCode::PING);
+        let mut response = Frame::new(OperationCode::UNKNOWN);
         let mock_store = MockStore::new();
         tokio_uring::start(async move {
             let ping = super::Ping::new(&request);

@@ -55,7 +55,10 @@ where
         trace!(
             "Receive a request. stream-id={}, opcode={}",
             self.request.stream_id,
-            self.request.operation_code
+            self.request
+                .operation_code
+                .variant_name()
+                .unwrap_or("INVALID_OPCODE")
         );
         let now = std::time::Instant::now();
         let mut response = Frame::new(self.request.operation_code);

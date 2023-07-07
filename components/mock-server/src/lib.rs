@@ -4,7 +4,7 @@
 use std::time::{self, Duration, UNIX_EPOCH};
 
 use bytes::Bytes;
-use codec::frame::{Frame, OperationCode};
+use codec::frame::Frame;
 use log::{debug, error, info, trace, warn};
 use model::payload::Payload;
 use protocol::rpc::header::{
@@ -12,9 +12,9 @@ use protocol::rpc::header::{
     CreateStreamRequest, CreateStreamResponseT, DescribePlacementDriverClusterRequest,
     DescribePlacementDriverClusterResponseT, DescribeStreamRequest, DescribeStreamResponseT,
     ErrorCode, HeartbeatRequest, HeartbeatResponseT, IdAllocationRequest, IdAllocationResponseT,
-    ListRangeRequest, ListRangeResponseT, PlacementDriverClusterT, PlacementDriverNodeT, RangeT,
-    ReportMetricsRequest, ReportMetricsResponseT, SealKind, SealRangeRequest, SealRangeResponseT,
-    StatusT, StreamT,
+    ListRangeRequest, ListRangeResponseT, OperationCode, PlacementDriverClusterT,
+    PlacementDriverNodeT, RangeT, ReportMetricsRequest, ReportMetricsResponseT, SealKind,
+    SealRangeRequest, SealRangeResponseT, StatusT, StreamT,
 };
 
 use tokio::sync::oneshot;
@@ -23,7 +23,7 @@ use transport::connection::Connection;
 
 fn serve_heartbeat(request: &HeartbeatRequest, frame: &mut Frame) {
     debug!("{:?}", request);
-    frame.operation_code = OperationCode::Heartbeat;
+    frame.operation_code = OperationCode::HEARTBEAT;
     let mut response = HeartbeatResponseT::default();
     response.client_id = request.client_id().map(|client_id| client_id.to_owned());
     response.client_role = request.client_role();
@@ -107,7 +107,7 @@ fn serve_describe_placement_driver_cluster(
 
 fn serve_report_metrics(request: &ReportMetricsRequest, frame: &mut Frame) {
     debug!("{:?}", request);
-    frame.operation_code = OperationCode::ReportMetrics;
+    frame.operation_code = OperationCode::REPORT_METRICS;
     let mut response = ReportMetricsResponseT::default();
     response.range_server = request
         .range_server()
@@ -146,15 +146,18 @@ pub async fn run_listener() -> u16 {
                         if let Some(frame) = frame {
                             info!(
                                 "TestServer is processing a `{}` request",
-                                frame.operation_code
+                                frame
+                                    .operation_code
+                                    .variant_name()
+                                    .unwrap_or("INVALID_OPCODE")
                             );
 
-                            let mut response_frame = Frame::new(OperationCode::Unknown);
+                            let mut response_frame = Frame::new(OperationCode::UNKNOWN);
                             response_frame.flag_response();
                             response_frame.stream_id = frame.stream_id;
 
                             match frame.operation_code {
-                                OperationCode::Heartbeat => {
+                                OperationCode::HEARTBEAT => {
                                     if let Some(buf) = &frame.header {
                                         if let Ok(heartbeat) =
                                             flatbuffers::root::<HeartbeatRequest>(buf)
@@ -169,8 +172,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::ListRange => {
-                                    response_frame.operation_code = OperationCode::ListRange;
+                                OperationCode::LIST_RANGE => {
+                                    response_frame.operation_code = OperationCode::LIST_RANGE;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) = flatbuffers::root::<ListRangeRequest>(buf)
                                         {
@@ -181,8 +184,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::AllocateId => {
-                                    response_frame.operation_code = OperationCode::AllocateId;
+                                OperationCode::ALLOCATE_ID => {
+                                    response_frame.operation_code = OperationCode::ALLOCATE_ID;
                                     if let Some(buf) = frame.header.as_ref() {
                                         match flatbuffers::root::<IdAllocationRequest>(buf) {
                                             Ok(request) => {
@@ -197,9 +200,9 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::DescribePlacementDriver => {
+                                OperationCode::DESCRIBE_PLACEMENT_DRIVER => {
                                     response_frame.operation_code =
-                                        OperationCode::DescribePlacementDriver;
+                                        OperationCode::DESCRIBE_PLACEMENT_DRIVER;
                                     if let Some(ref buf) = frame.header {
                                         match flatbuffers::root::<
                                             DescribePlacementDriverClusterRequest,
@@ -219,8 +222,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::CreateStream => {
-                                    response_frame.operation_code = OperationCode::CreateStream;
+                                OperationCode::CREATE_STREAM => {
+                                    response_frame.operation_code = OperationCode::CREATE_STREAM;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) =
                                             flatbuffers::root::<CreateStreamRequest>(buf)
@@ -232,8 +235,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::DescribeStream => {
-                                    response_frame.operation_code = OperationCode::DescribeStream;
+                                OperationCode::DESCRIBE_STREAM => {
+                                    response_frame.operation_code = OperationCode::DESCRIBE_STREAM;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) =
                                             flatbuffers::root::<DescribeStreamRequest>(buf)
@@ -247,8 +250,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::CreateRange => {
-                                    response_frame.operation_code = OperationCode::CreateRange;
+                                OperationCode::CREATE_RANGE => {
+                                    response_frame.operation_code = OperationCode::CREATE_RANGE;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) =
                                             flatbuffers::root::<CreateRangeRequest>(buf)
@@ -260,8 +263,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::SealRange => {
-                                    response_frame.operation_code = OperationCode::SealRange;
+                                OperationCode::SEAL_RANGE => {
+                                    response_frame.operation_code = OperationCode::SEAL_RANGE;
                                     if let Some(buf) = frame.header.as_ref() {
                                         if let Ok(req) = flatbuffers::root::<SealRangeRequest>(buf)
                                         {
@@ -272,8 +275,8 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::ReportMetrics => {
-                                    response_frame.operation_code = OperationCode::ReportMetrics;
+                                OperationCode::REPORT_METRICS => {
+                                    response_frame.operation_code = OperationCode::REPORT_METRICS;
                                     if let Some(buf) = &frame.header {
                                         if let Ok(reportmetrics) =
                                             flatbuffers::root::<ReportMetricsRequest>(buf)
@@ -291,13 +294,19 @@ pub async fn run_listener() -> u16 {
                                     }
                                 }
 
-                                OperationCode::Append => {
-                                    response_frame.operation_code = OperationCode::Append;
+                                OperationCode::APPEND => {
+                                    response_frame.operation_code = OperationCode::APPEND;
                                     serve_append(frame.payload, &mut response_frame);
                                 }
 
                                 _ => {
-                                    warn!("Unsupported operation code: {}", frame.operation_code);
+                                    warn!(
+                                        "Unsupported operation code: {}",
+                                        frame
+                                            .operation_code
+                                            .variant_name()
+                                            .unwrap_or("INVALID_OPCODE")
+                                    );
                                     unimplemented!("Unimplemented operation code");
                                 }
                             }
@@ -307,13 +316,14 @@ pub async fn run_listener() -> u16 {
                                 Ok(_) => {
                                     trace!(
                                         "TestServer writes the `{}` response back directly",
-                                        opcode
+                                        opcode.variant_name().unwrap_or("INVALID_OPCODE")
                                     );
                                 }
                                 Err(e) => {
                                     error!(
                                         "TestServer failed to process `{}`. Cause: {:?}",
-                                        opcode, e
+                                        opcode.variant_name().unwrap_or("INVALID_OPCODE"),
+                                        e
                                     );
                                 }
                             };

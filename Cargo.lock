@@ -2655,6 +2655,7 @@ dependencies = [
  "codec",
  "log",
  "minstant",
+ "protocol",
  "thiserror",
 ]
 
@@ -4061,6 +4062,7 @@ dependencies = [
  "env_logger",
  "local-sync",
  "log",
+ "protocol",
  "tokio",
  "tokio-uring",
 ]

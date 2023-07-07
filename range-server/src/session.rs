@@ -144,7 +144,7 @@ where
                                 trace!(
                                     "Response frame[stream-id={}, opcode={}] written to {}",
                                     stream_id,
-                                    opcode,
+                                    opcode.variant_name().unwrap_or("INVALID_OPCODE"),
                                     peer_address
                                 );
                             }
@@ -152,7 +152,7 @@ where
                                 warn!(
                                 "Failed to write response frame[stream-id={}, opcode={}] to {}. Cause: {:?}",
                                 stream_id,
-                                opcode,
+                                opcode.variant_name().unwrap_or("INVALID_OPCODE"),
                                 peer_address,
                                 e
                             );
