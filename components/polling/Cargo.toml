@@ -11,5 +11,5 @@ edition = "2021"
 codec = { path = "../codec" }
 log = { workspace = true }
 minstant = { workspace = true }
-thiserror = { workspace = true }
 protocol = { path = "../protocol" }
+thiserror = { workspace = true }
