@@ -14,11 +14,20 @@ import (
 
 	"github.com/AutoMQ/pd/pkg/server"
 	"github.com/AutoMQ/pd/pkg/server/config"
+	"github.com/AutoMQ/pd/pkg/version"
 )
 
 func main() {
 	cfg, err := config.NewConfig(os.Args[1:], os.Stderr)
 	if errors.Is(err, pflag.ErrHelp) {
+		os.Exit(0)
+	}
+
+	if cfg.Version {
+		fmt.Println("Version:", version.Version)
+		fmt.Println("BuildDate:", version.BuildDate)
+		fmt.Println("GoVersion:", version.GoVersion)
+		fmt.Println("Platform:", version.Platform)
 		os.Exit(0)
 	}
 

@@ -21,3 +21,15 @@ package version
 // Version is the app-global version string, which should be substituted with a
 // real value during build.
 var Version = "UNKNOWN"
+
+// BuildDate is the app-global build date, which should be substituted with a
+// real value during build.
+var BuildDate = "UNKNOWN"
+
+// GoVersion is the app-global Go version string, which should be substituted
+// with a real value during build.
+var GoVersion = "UNKNOWN"
+
+// Platform is the app-global platform string, which should be substituted with
+// a real value during build.
+var Platform = "UNKNOWN"

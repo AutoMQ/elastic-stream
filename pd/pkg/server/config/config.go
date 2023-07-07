@@ -75,7 +75,8 @@ type Config struct {
 
 	LeaderPriorityCheckInterval time.Duration
 
-	lg *zap.Logger
+	Version bool
+	lg      *zap.Logger
 }
 
 // NewConfig creates a new config.
@@ -246,6 +247,9 @@ func newFlagSet(errOutput io.Writer) *pflag.FlagSet {
 }
 
 func configure(v *viper.Viper, fs *pflag.FlagSet) {
+	fs.BoolP("version", "V", false, "print version information and exit")
+	_ = v.BindPFlag("version", fs.Lookup("version"))
+
 	// etcd urls settings
 	fs.String("peer-urls", _defaultPeerUrls, "urls for peer traffic")
 	fs.String("client-urls", _defaultClientUrls, "urls for client traffic")

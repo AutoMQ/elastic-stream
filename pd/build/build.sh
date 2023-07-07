@@ -48,7 +48,12 @@ else
     goldflags="-s -w"
 fi
 
-always_ldflags="-X $(go list -m)/pkg/version.Version=${VERSION}"
+always_ldflags="
+-X $(go list -m)/pkg/version.Version=${VERSION}
+-X $(go list -m)/pkg/version.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+-X $(go list -m)/pkg/version.GoVersion=$(go version | awk '{print $3}')
+-X $(go list -m)/pkg/version.Platform=$(go version | awk '{print $4}')
+"
 go install                                                      \
     -installsuffix "static"                                     \
     -gcflags="${gogcflags}"                                     \
