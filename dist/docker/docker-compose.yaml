@@ -4,13 +4,21 @@ services:
     ports:
       - "10911:10911"
     depends_on:
-      - pd
+      pd:
+        condition: service_started
     volumes:
       - rs_data:/data
   pd:
     image: "elasticstream/pd-server:0.2.1"
     ports:
       - "12378:12378"
+    healthcheck:
+      test: ["CMD-SHELL", "echo -e '\x1dclose\x0d' | telnet localhost 12378"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
+
 
 volumes:
   rs_data:
