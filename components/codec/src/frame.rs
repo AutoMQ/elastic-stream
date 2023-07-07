@@ -381,8 +381,8 @@ mod tests {
         let num: u8 = HeaderFormat::JSON.into();
         assert_eq!(3, num);
 
-        let res = Frame::to_opcode(0u16);
-        assert_eq!(Some(OperationCode::UNKNOWN), res);
+        let res = Frame::to_opcode_unchecked(0u16);
+        assert_eq!(OperationCode::UNKNOWN, res);
     }
 
     #[test]
