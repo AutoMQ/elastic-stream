@@ -22,6 +22,11 @@ members = [
     "sdks/frontend-rs",
 ]
 
+[workspace.package]
+version = "0.2.1"
+authors = ["Li Zhanhui", "Ning Yu", "Hang Xu", "Daniel", "Curtis Wan"]
+description = "A Cloud-Native Distributed Storage System For Messaging and Streaming"
+
 [workspace.dependencies]
 anyhow = "1.0"
 async-channel = "1.8.0"
