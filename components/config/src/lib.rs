@@ -327,7 +327,7 @@ pub struct Uring {
     /// Enable polling for SQ completions and I/O completion events.
     /// If this option is disabled, interrupt mode is used.
     /// Note that the network uring doesn't support polling mode, so this option will be ignored for network uring.
-    #[serde(rename = "enable-polling", default)]
+    #[serde(rename = "polling", default)]
     pub polling: bool,
 
     /// In interrupt mode, or when queue_depth is full, the uring driver will enter to syscall and wait for I/O completion events.

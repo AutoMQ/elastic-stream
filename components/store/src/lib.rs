@@ -23,6 +23,7 @@
 #![feature(result_flattening)]
 #![feature(iterator_try_collect)]
 #![feature(io_error_more)]
+#![feature(thread_id_value)]
 
 pub mod cursor;
 pub mod error;

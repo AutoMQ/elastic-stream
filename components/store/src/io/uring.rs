@@ -181,16 +181,19 @@ impl IO {
 
         // If polling is enabled, setup the iopoll and sqpoll flags
         if config.store.uring.polling {
+            info!("IO thread is in polling mode");
             data_ring_builder
                 .setup_iopoll()
                 .setup_sqpoll(config.store.uring.sqpoll_idle_ms)
                 .setup_sqpoll_cpu(config.store.uring.sqpoll_cpu);
+        } else {
+            info!("IO thread is in classic mode");
         }
 
         let data_ring = data_ring_builder
             .build(config.store.uring.queue_depth)
             .map_err(|e| {
-                error!("Failed to build polling I/O Uring instance: {:?}", e);
+                error!("Failed to build I/O Uring instance: {:?}", e);
                 StoreError::IoUring
             })?;
 
@@ -206,7 +209,7 @@ impl IO {
 
         check_io_uring(&probe, data_ring.params())?;
 
-        trace!("Polling I/O Uring instance created");
+        trace!("I/O Uring instance created");
 
         let (sender, receiver) = crossbeam::channel::unbounded();
 

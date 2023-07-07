@@ -65,7 +65,7 @@ opendal = "0.38.0"
 # Logging
 log = { version = "0.4", features = [
     "max_level_trace",
-    "release_max_level_warn",
+    "release_max_level_info",
 ] }
 env_logger = "0.10"
 log4rs = "1.2"

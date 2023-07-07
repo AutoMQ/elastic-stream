@@ -71,6 +71,7 @@ store:
   io-cpu: 2
   # io_uring setup
   uring:
+    polling: true
     # IO io_uring queue depth
     queue-depth: 1024
     # Kernel SQ Poll thread will quit if it remains idle for 2 seconds.
