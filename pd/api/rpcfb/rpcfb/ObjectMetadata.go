@@ -9,7 +9,8 @@ import (
 type ObjectMetadataT struct {
 	Key string `json:"key"`
 	StartOffset int64 `json:"start_offset"`
-	EndOffset int64 `json:"end_offset"`
+	EndOffsetDelta int32 `json:"end_offset_delta"`
+	DataLen int32 `json:"data_len"`
 	SparseIndex []byte `json:"sparse_index"`
 }
 
@@ -26,7 +27,8 @@ func (t *ObjectMetadataT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffset
 	ObjectMetadataStart(builder)
 	ObjectMetadataAddKey(builder, keyOffset)
 	ObjectMetadataAddStartOffset(builder, t.StartOffset)
-	ObjectMetadataAddEndOffset(builder, t.EndOffset)
+	ObjectMetadataAddEndOffsetDelta(builder, t.EndOffsetDelta)
+	ObjectMetadataAddDataLen(builder, t.DataLen)
 	ObjectMetadataAddSparseIndex(builder, sparseIndexOffset)
 	return ObjectMetadataEnd(builder)
 }
@@ -34,7 +36,8 @@ func (t *ObjectMetadataT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffset
 func (rcv *ObjectMetadata) UnPackTo(t *ObjectMetadataT) {
 	t.Key = string(rcv.Key())
 	t.StartOffset = rcv.StartOffset()
-	t.EndOffset = rcv.EndOffset()
+	t.EndOffsetDelta = rcv.EndOffsetDelta()
+	t.DataLen = rcv.DataLen()
 	t.SparseIndex = rcv.SparseIndexBytes()
 }
 
@@ -92,20 +95,32 @@ func (rcv *ObjectMetadata) MutateStartOffset(n int64) bool {
 	return rcv._tab.MutateInt64Slot(6, n)
 }
 
-func (rcv *ObjectMetadata) EndOffset() int64 {
+func (rcv *ObjectMetadata) EndOffsetDelta() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
-		return rcv._tab.GetInt64(o + rcv._tab.Pos)
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
 	}
 	return -1
 }
 
-func (rcv *ObjectMetadata) MutateEndOffset(n int64) bool {
-	return rcv._tab.MutateInt64Slot(8, n)
+func (rcv *ObjectMetadata) MutateEndOffsetDelta(n int32) bool {
+	return rcv._tab.MutateInt32Slot(8, n)
+}
+
+func (rcv *ObjectMetadata) DataLen() int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	if o != 0 {
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
+	}
+	return -1
+}
+
+func (rcv *ObjectMetadata) MutateDataLen(n int32) bool {
+	return rcv._tab.MutateInt32Slot(10, n)
 }
 
 func (rcv *ObjectMetadata) SparseIndex(j int) byte {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
 	if o != 0 {
 		a := rcv._tab.Vector(o)
 		return rcv._tab.GetByte(a + flatbuffers.UOffsetT(j*1))
@@ -114,7 +129,7 @@ func (rcv *ObjectMetadata) SparseIndex(j int) byte {
 }
 
 func (rcv *ObjectMetadata) SparseIndexLength() int {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
 	}
@@ -122,7 +137,7 @@ func (rcv *ObjectMetadata) SparseIndexLength() int {
 }
 
 func (rcv *ObjectMetadata) SparseIndexBytes() []byte {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
 	if o != 0 {
 		return rcv._tab.ByteVector(o + rcv._tab.Pos)
 	}
@@ -130,7 +145,7 @@ func (rcv *ObjectMetadata) SparseIndexBytes() []byte {
 }
 
 func (rcv *ObjectMetadata) MutateSparseIndex(j int, n byte) bool {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
 	if o != 0 {
 		a := rcv._tab.Vector(o)
 		return rcv._tab.MutateByte(a+flatbuffers.UOffsetT(j*1), n)
@@ -139,7 +154,7 @@ func (rcv *ObjectMetadata) MutateSparseIndex(j int, n byte) bool {
 }
 
 func ObjectMetadataStart(builder *flatbuffers.Builder) {
-	builder.StartObject(4)
+	builder.StartObject(5)
 }
 func ObjectMetadataAddKey(builder *flatbuffers.Builder, key flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(key), 0)
@@ -147,11 +162,14 @@ func ObjectMetadataAddKey(builder *flatbuffers.Builder, key flatbuffers.UOffsetT
 func ObjectMetadataAddStartOffset(builder *flatbuffers.Builder, startOffset int64) {
 	builder.PrependInt64Slot(1, startOffset, -1)
 }
-func ObjectMetadataAddEndOffset(builder *flatbuffers.Builder, endOffset int64) {
-	builder.PrependInt64Slot(2, endOffset, -1)
+func ObjectMetadataAddEndOffsetDelta(builder *flatbuffers.Builder, endOffsetDelta int32) {
+	builder.PrependInt32Slot(2, endOffsetDelta, -1)
+}
+func ObjectMetadataAddDataLen(builder *flatbuffers.Builder, dataLen int32) {
+	builder.PrependInt32Slot(3, dataLen, -1)
 }
 func ObjectMetadataAddSparseIndex(builder *flatbuffers.Builder, sparseIndex flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(3, flatbuffers.UOffsetT(sparseIndex), 0)
+	builder.PrependUOffsetTSlot(4, flatbuffers.UOffsetT(sparseIndex), 0)
 }
 func ObjectMetadataStartSparseIndexVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(1, numElems, 1)
