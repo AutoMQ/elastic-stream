@@ -3791,6 +3791,7 @@ version = "0.2.1"
 dependencies = [
  "bytes",
  "clap 4.3.10",
+ "config",
  "env_logger",
  "flatbuffers",
  "log",

@@ -10,6 +10,11 @@ use config::Configuration;
 use log::{error, info};
 use std::{cell::UnsafeCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
 use store::{ElasticStore, Store};
+use tiered_storage::{
+    object_manager::MemoryObjectManager,
+    object_storage::{self, AsyncObjectTieredStorage, ObjectTieredStorage},
+    range_fetcher::DefaultRangeFetcher,
+};
 
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -36,6 +41,9 @@ pub fn launch(
         info!("Continuous profiling starts");
     }
 
+    // Load object storage service
+    let object_storage = AsyncObjectTieredStorage::new(&config.object_storage, store.clone());
+
     recovery_completion_rx.blocking_recv()?;
 
     let mut channels = vec![];
@@ -55,6 +63,7 @@ pub fn launch(
         .map(|core_id| {
             let server_config = config.clone();
             let store = store.clone();
+            let object_storage = object_storage.clone();
             let (tx, rx) = mpsc::unbounded_channel();
             channels.push(rx);
 
@@ -76,6 +85,7 @@ pub fn launch(
                     ));
 
                     let fetcher = DelegatePlacementClient::new(tx);
+                    let object_storage = Rc::new(object_storage);
                     let range_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                         fetcher,
                         Rc::clone(&store),
@@ -112,6 +122,7 @@ pub fn launch(
                 ));
                 let fetcher = PlacementClient::new(Rc::clone(&client));
                 let store = Rc::new(store);
+                let object_storage = Rc::new(object_storage);
 
                 let range_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                     fetcher,

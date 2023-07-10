@@ -4,10 +4,8 @@
 pub mod object_manager;
 pub mod object_storage;
 mod range_accumulator;
-mod range_fetcher;
+pub mod range_fetcher;
 mod range_offload;
-pub use range_fetcher::RangeFetchResult;
-pub use range_fetcher::RangeFetcher;
 
 use model::object::ObjectMetadata;
 
@@ -16,8 +14,6 @@ use mockall::{automock, predicate::*};
 
 #[cfg_attr(test, automock)]
 pub trait TieredStorage {
-    fn add_range(&self, stream_id: u64, range_index: u32, start_offset: u64, end_offset: u64);
-
     /// new record arrived notify
     fn new_record_arrived(
         &self,
@@ -30,7 +26,7 @@ pub trait TieredStorage {
 
 #[cfg_attr(test, automock)]
 pub trait ObjectManager {
-    fn campaign(&self, stream_id: u64, range_index: u32);
+    fn is_owner(&self, stream_id: u64, range_index: u32) -> Option<Owner>;
 
     fn commit_object(&self, object_metadata: ObjectMetadata);
 
@@ -41,6 +37,11 @@ pub trait ObjectManager {
         start_offset: u64,
         end_offset: u64,
     ) -> Vec<ObjectMetadata>;
+}
+
+pub struct Owner {
+    pub epoch: u32,
+    pub start_offset: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

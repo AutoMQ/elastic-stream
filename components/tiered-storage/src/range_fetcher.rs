@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use bytes::Bytes;
 use store::{error::FetchError, option::ReadOptions, Store};
 
@@ -22,8 +24,8 @@ impl RangeFetchResult {
     }
 }
 
-struct DefaultRangeFetcher<S> {
-    store: S,
+pub struct DefaultRangeFetcher<S> {
+    store: Rc<S>,
 }
 
 impl<S> RangeFetcher for DefaultRangeFetcher<S>
@@ -37,7 +39,7 @@ where
         start_offset: u64,
         end_offset: u64,
         max_size: u32,
-    ) -> Result<crate::RangeFetchResult, store::error::FetchError> {
+    ) -> Result<RangeFetchResult, store::error::FetchError> {
         let read_option = ReadOptions {
             stream_id: stream_id as i64,
             range: range_index,
@@ -49,7 +51,7 @@ where
         let store_result = self.store.fetch(read_option).await?;
         assert_eq!(store_result.results.len(), 1);
         let payload: Vec<Bytes> = store_result.results[0].iter().cloned().collect();
-        Ok(crate::RangeFetchResult { payload })
+        Ok(RangeFetchResult { payload })
     }
 }
 
@@ -57,8 +59,7 @@ impl<S> DefaultRangeFetcher<S>
 where
     S: Store + 'static,
 {
-    #[allow(dead_code)]
-    pub fn new(store: S) -> Self {
+    pub fn new(store: Rc<S>) -> Self {
         Self { store }
     }
 }

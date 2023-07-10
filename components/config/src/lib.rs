@@ -425,6 +425,38 @@ impl Default for Replication {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ObjectStorageConfig {
+    pub endpoint: String,
+    pub bucket: String,
+    pub region: String,
+    #[serde(rename = "object-size")]
+    pub object_size: u32,
+    #[serde(rename = "part-size")]
+    pub part_size: u32,
+    #[serde(rename = "max-cache-size")]
+    pub max_cache_size: u64,
+    #[serde(rename = "cache-low-watermark")]
+    pub cache_low_watermark: u64,
+    #[serde(rename = "force-flush-interval")]
+    pub force_flush_interval: Duration,
+}
+
+impl Default for ObjectStorageConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: "".to_owned(),
+            bucket: "".to_owned(),
+            region: "".to_owned(),
+            object_size: 128 * 1024 * 1024,
+            part_size: 16 * 1024 * 1024,
+            max_cache_size: 1024 * 1024 * 1024,
+            cache_low_watermark: 7 * 128 * 1024 * 1024,
+            force_flush_interval: Duration::from_secs(60 * 20),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Configuration {
     /// Unit of time in milliseconds.
     pub tick: u64,
@@ -441,6 +473,8 @@ pub struct Configuration {
     pub replication: Replication,
 
     pub observation: Observation,
+
+    pub object_storage: ObjectStorageConfig,
 }
 
 impl Default for Configuration {
@@ -453,6 +487,7 @@ impl Default for Configuration {
             store: Default::default(),
             replication: Default::default(),
             observation: Default::default(),
+            object_storage: Default::default(),
         }
     }
 }

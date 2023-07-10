@@ -1,22 +1,88 @@
+use config::ObjectStorageConfig;
 use opendal::services::S3;
 use opendal::Operator;
-use std::env;
-use std::error::Error;
 use std::rc::Rc;
 use std::time::Duration;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
 };
+use std::{env, thread};
+use store::{ElasticStore, Store};
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 
+use crate::object_manager::MemoryObjectManager;
 use crate::range_accumulator::{DefaultRangeAccumulator, RangeAccumulator};
+use crate::range_fetcher::{DefaultRangeFetcher, RangeFetcher};
 use crate::range_offload::RangeOffload;
 use crate::{ObjectManager, TieredStorage};
-use crate::{RangeFetcher, RangeKey};
+use crate::{Owner, RangeKey};
+
+#[derive(Clone)]
+pub struct AsyncObjectTieredStorage {
+    tx: mpsc::UnboundedSender<Task>,
+}
+
+impl AsyncObjectTieredStorage {
+    pub fn new(config: &ObjectStorageConfig, store: ElasticStore) -> Self {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let config = config.clone();
+        let store = store.clone();
+        let _ = thread::Builder::new()
+            .name("ObjectStorage".to_owned())
+            .spawn(move || {
+                let _ = tokio_uring::start(async move {
+                    let range_fetcher = DefaultRangeFetcher::new(Rc::new(store));
+                    let object_manager = MemoryObjectManager::default();
+                    let object_storage =
+                        ObjectTieredStorage::new(&config, range_fetcher, object_manager);
+                    while let Some(task) = rx.recv().await {
+                        match task {
+                            Task::NewRecordArrived(
+                                stream_id,
+                                range_index,
+                                end_offset,
+                                record_size,
+                            ) => {
+                                object_storage.new_record_arrived(
+                                    stream_id,
+                                    range_index,
+                                    end_offset,
+                                    record_size,
+                                );
+                            }
+                        }
+                    }
+                });
+            });
+        Self { tx }
+    }
+}
+
+impl TieredStorage for AsyncObjectTieredStorage {
+    fn new_record_arrived(
+        &self,
+        stream_id: u64,
+        range_index: u32,
+        end_offset: u64,
+        record_size: u32,
+    ) {
+        let _ = self.tx.send(Task::NewRecordArrived(
+            stream_id,
+            range_index,
+            end_offset,
+            record_size,
+        ));
+    }
+}
+
+enum Task {
+    NewRecordArrived(u64, u32, u64, u32),
+}
 
 pub struct ObjectTieredStorage<F: RangeFetcher, M: ObjectManager> {
-    config: ObjectTieredStorageConfig,
+    config: ObjectStorageConfig,
     ranges: RefCell<HashMap<RangeKey, Rc<DefaultRangeAccumulator>>>,
     part_full_ranges: RefCell<HashSet<RangeKey>>,
     cache_size: RefCell<i64>,
@@ -25,12 +91,12 @@ pub struct ObjectTieredStorage<F: RangeFetcher, M: ObjectManager> {
     range_fetcher: Rc<F>,
 }
 
-impl<F, M> TieredStorage for ObjectTieredStorage<F, M>
+impl<F, M> ObjectTieredStorage<F, M>
 where
     F: RangeFetcher + 'static,
     M: ObjectManager + 'static,
 {
-    fn add_range(&self, stream_id: u64, range_index: u32, start_offset: u64, end_offset: u64) {
+    fn add_range(&self, stream_id: u64, range_index: u32, owner: Owner) {
         let range = RangeKey::new(stream_id, range_index);
         let range_offload = Rc::new(RangeOffload::new(
             stream_id,
@@ -43,15 +109,20 @@ where
             range,
             Rc::new(DefaultRangeAccumulator::new(
                 range,
-                start_offset,
-                end_offset,
+                owner.start_offset,
                 self.range_fetcher.clone(),
                 self.config.clone(),
                 range_offload,
             )),
         );
     }
+}
 
+impl<F, M> TieredStorage for ObjectTieredStorage<F, M>
+where
+    F: RangeFetcher + 'static,
+    M: ObjectManager + 'static,
+{
     fn new_record_arrived(
         &self,
         stream_id: u64,
@@ -59,8 +130,14 @@ where
         end_offset: u64,
         record_size: u32,
     ) {
+        let owner = self.object_manager.is_owner(stream_id, range_index);
         let range_key = RangeKey::new(stream_id, range_index);
-        if let Some(range) = self.ranges.borrow().get(&range_key) {
+        let mut range = self.ranges.borrow().get(&range_key).cloned();
+        if owner.is_some() && range.is_none() {
+            self.add_range(stream_id, range_index, owner.unwrap());
+            range = self.ranges.borrow().get(&range_key).cloned();
+        }
+        if let Some(range) = range {
             let (size_change, is_part_full) = range.accumulate(end_offset, record_size);
             let mut cache_size = self.cache_size.borrow_mut();
             *cache_size += size_change as i64;
@@ -103,12 +180,7 @@ where
     F: RangeFetcher + 'static,
     M: ObjectManager + 'static,
 {
-    pub fn new(
-        config: ObjectTieredStorageConfig,
-        range_fetcher: Rc<F>,
-        object_manager: Rc<M>,
-    ) -> Result<Rc<Self>, Box<dyn Error>> {
-        // construct opendal operator
+    pub fn new(config: &ObjectStorageConfig, range_fetcher: F, object_manager: M) -> Rc<Self> {
         let mut s3_builder = S3::default();
         s3_builder.root("/");
         s3_builder.bucket(&config.bucket);
@@ -116,28 +188,36 @@ where
         s3_builder.endpoint(&config.endpoint);
         s3_builder.access_key_id(
             &env::var("ES_S3_ACCESS_KEY_ID")
-                .map_err(|_| "ES_S3_ACCESS_KEY_ID cannot find in env")?,
+                .map_err(|_| "ES_S3_ACCESS_KEY_ID cannot find in env")
+                .unwrap(),
         );
         s3_builder.secret_access_key(
             &env::var("ES_S3_SECRET_ACCESS_KEY")
-                .map_err(|_| "ES_S3_SECRET_ACCESS_KEY cannot find in env")?,
+                .map_err(|_| "ES_S3_SECRET_ACCESS_KEY cannot find in env")
+                .unwrap(),
         );
-        let op = Operator::new(s3_builder)?.finish();
+        let op = Operator::new(s3_builder).unwrap().finish();
 
         let force_flush_interval = config.force_flush_interval;
         let this = Rc::new(ObjectTieredStorage {
-            config,
+            config: config.clone(),
             ranges: RefCell::new(HashMap::new()),
             part_full_ranges: RefCell::new(HashSet::new()),
             cache_size: RefCell::new(0),
             op,
-            object_manager,
-            range_fetcher,
+            object_manager: Rc::new(object_manager),
+            range_fetcher: Rc::new(range_fetcher),
         });
-
         Self::run_force_flush_task(this.clone(), force_flush_interval);
+        this
+    }
 
-        Ok(this)
+    pub fn object_manager() -> Rc<MemoryObjectManager> {
+        Rc::new(MemoryObjectManager::default())
+    }
+
+    pub fn range_fetcher<S: Store + 'static>(store: Rc<S>) -> Rc<DefaultRangeFetcher<S>> {
+        Rc::new(DefaultRangeFetcher::<S>::new(store))
     }
 
     pub fn run_force_flush_task(storage: Rc<ObjectTieredStorage<F, M>>, max_duration: Duration) {
@@ -150,18 +230,6 @@ where
             }
         });
     }
-}
-
-#[derive(Clone)]
-pub struct ObjectTieredStorageConfig {
-    pub endpoint: String,
-    pub bucket: String,
-    pub region: String,
-    pub object_size: u32,
-    pub part_size: u32,
-    pub max_cache_size: u64,
-    pub cache_low_watermark: u64,
-    pub force_flush_interval: Duration,
 }
 
 #[cfg(test)]

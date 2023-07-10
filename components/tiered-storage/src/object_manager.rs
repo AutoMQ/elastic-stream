@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use crate::{ObjectManager, RangeKey};
+use crate::{ObjectManager, Owner, RangeKey};
 use model::object::ObjectMetadata;
 
 pub struct MemoryObjectManager {
@@ -8,7 +8,12 @@ pub struct MemoryObjectManager {
 }
 
 impl ObjectManager for MemoryObjectManager {
-    fn campaign(&self, _stream_id: u64, _range_index: u32) {}
+    fn is_owner(&self, _stream_id: u64, _range_index: u32) -> Option<Owner> {
+        Some(Owner {
+            epoch: 0,
+            start_offset: 0,
+        })
+    }
 
     fn commit_object(&self, object_metadata: ObjectMetadata) {
         let key = RangeKey::new(object_metadata.stream_id, object_metadata.range_index);

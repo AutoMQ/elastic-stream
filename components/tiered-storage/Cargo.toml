@@ -20,3 +20,4 @@ store = { path = "../store" }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
 util = { path = "../util" }
+config = { path = "../config" }
