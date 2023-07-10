@@ -41,7 +41,7 @@ pub struct Response {
     /// Optional response extension, containing additional operation-code-specific data.
     pub headers: Option<Headers>,
 
-    pub payload: Option<Vec<Bytes>>,
+    pub payload: Option<Bytes>,
 }
 
 #[derive(Debug, Clone)]
@@ -229,7 +229,7 @@ impl Response {
                         throttle,
                         object_metadata_list,
                     });
-                    self.payload = frame.payload.clone();
+                    self.payload = frame.get_response_payload().clone();
                 }
                 Err(e) => {
                     error!(

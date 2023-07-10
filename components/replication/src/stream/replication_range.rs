@@ -269,8 +269,8 @@ impl ReplicationRange {
             match result {
                 Ok(rs) => {
                     // TODO: fetch from object storage when payload not exist
-                    let mut payload = rs.payload.unwrap_or_default();
-                    fetch_data.append(&mut payload);
+                    let payload = rs.payload.unwrap_or_default();
+                    fetch_data.push(payload);
                     let elapse = now.elapsed().as_millis();
                     if elapse > 10 {
                         warn!("{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes[{batch_max_bytes}] cost too much time, elapse: {elapse}ms", self.log_ident);

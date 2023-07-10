@@ -352,6 +352,23 @@ impl Frame {
 
         Ok(encode_result)
     }
+
+    pub fn get_response_payload(&self) -> Option<Bytes> {
+        if let Some(payload_parts) = &self.payload {
+            if payload_parts.len() == 1 {
+                // Response which passed by network payload is parsed as single bytes.
+                return Some(payload_parts[0].clone());
+            }
+            let mut bytes =
+                BytesMut::with_capacity(payload_parts.iter().map(|b| b.len()).sum::<usize>());
+            for b in payload_parts {
+                bytes.put(b.clone());
+            }
+            Some(bytes.freeze())
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, TryFromPrimitive, IntoPrimitive)]

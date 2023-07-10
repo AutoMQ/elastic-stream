@@ -6,6 +6,6 @@ use crate::object::ObjectMetadata;
 #[derive(Debug, Clone)]
 pub struct FetchResultSet {
     pub throttle: Option<Duration>,
-    pub payload: Option<Vec<Bytes>>,
+    pub payload: Option<Bytes>,
     pub object_metadata_list: Option<Vec<ObjectMetadata>>,
 }
