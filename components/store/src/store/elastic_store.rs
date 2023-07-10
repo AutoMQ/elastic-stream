@@ -15,7 +15,7 @@ use crate::{
             IoTask::{self, Read, Write},
             WriteTask,
         },
-        ReadTask,
+        ReadTask, record::RecordType,
     },
     offset_manager::WalOffsetManager,
     option::{ReadOptions, WriteOptions},
@@ -253,16 +253,30 @@ impl Store for ElasticStore {
                         );
 
                         // Verify data integrity
-                        if record_prefix.len() < crate::RECORD_PREFIX_LENGTH as usize {
-                            error!("FetchResult contains too few bytes");
+                        if record_prefix.len() != crate::RECORD_PREFIX_LENGTH as usize {
+                            error!("Data corrupted: Record does not even have a prefix");
                             return Err(FetchError::DataCorrupted);
                         }
-                        let actual = util::crc32::crc32_vectored(res.payload.iter());
-                        let expected = record_prefix.get_u32();
-                        if actual != expected {
+                        let expected_crc32 = record_prefix.get_u32();
+
+                        let length_type = record_prefix.get_u32();
+                        let _type = length_type & 0xFF;
+                        debug_assert_eq!(_type as u8, RecordType::Full.into());
+                        let expected_length = length_type >> 8;
+                        let actual_length = res.payload.iter().map(|buf|buf.len()).sum::<usize>();
+                        if expected_length != actual_length as u32 {
+                            error!(
+                                "Data corrupted: Record length mismatch. Expected: {}, Actual: {}",
+                                expected_length, actual_length
+                            );
+                            return Err(FetchError::DataCorrupted);
+                        }
+                        dbg!(&res.payload);
+                        let actual_crc32 = util::crc32::crc32_vectored(res.payload.iter());
+                        if actual_crc32 != expected_crc32 {
                             error!(
                                 "Data corrupted: CRC32 checksum failed. Expected: {}, Actual: {}",
-                                expected, actual
+                                expected_crc32, actual_crc32
                             );
                             return Err(FetchError::DataCorrupted);
                         }
@@ -488,7 +502,7 @@ mod tests {
                         let options = ReadOptions {
                             stream_id: 1,
                             range: 0,
-                            offset: 0,
+                            offset: res.offset,
                             max_offset: 1024,
                             max_bytes: 1,
                             max_wait_ms: 1000,
@@ -504,7 +518,8 @@ mod tests {
 
             let fetch_rs: Vec<Result<FetchResult, FetchError>> = join_all(fetch_futures).await;
             assert!(fetch_rs.len() == append_rs.len());
-            fetch_rs.iter().flatten().for_each(|res| {
+            fetch_rs.iter().for_each(|res| {
+                let res = res.as_ref().expect("Fetch should not fail");
                 let mut res_payload = BytesMut::new();
                 res.results.iter().for_each(|r| {
                     res_payload.extend_from_slice(&copy_single_fetch_result(r));
