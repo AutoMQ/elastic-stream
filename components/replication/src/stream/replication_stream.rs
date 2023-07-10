@@ -2,6 +2,7 @@ use crate::stream::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
 use super::cache::RecordBatchCache;
+use super::object_reader::ObjectReader;
 use super::replication_range::ReplicationRange;
 use bytes::Bytes;
 use client::Client;
@@ -26,7 +27,6 @@ pub(crate) struct ReplicationStream {
     epoch: u64,
     ranges: RefCell<BTreeMap<u64, Rc<ReplicationRange>>>,
     client: Weak<Client>,
-    cache: Rc<RecordBatchCache>,
     next_offset: RefCell<u64>,
     last_range: RefCell<Option<Rc<ReplicationRange>>>,
     /// #append send StreamAppendRequest to tx.
@@ -37,6 +37,9 @@ pub(crate) struct ReplicationStream {
     shutdown_signal_tx: broadcast::Sender<()>,
     // stream closed mark.
     closed: Rc<RefCell<bool>>,
+
+    cache: Rc<RecordBatchCache>,
+    object_reader: Rc<ObjectReader>,
 }
 
 impl ReplicationStream {
@@ -45,6 +48,7 @@ impl ReplicationStream {
         epoch: u64,
         client: Weak<Client>,
         cache: Rc<RecordBatchCache>,
+        object_reader: Rc<ObjectReader>,
     ) -> Rc<Self> {
         let (append_requests_tx, append_requests_rx) = mpsc::bounded::channel(1024);
         let (append_tasks_tx, append_tasks_rx) = mpsc::unbounded::channel();
@@ -56,13 +60,14 @@ impl ReplicationStream {
             epoch,
             ranges: RefCell::new(BTreeMap::new()),
             client,
-            cache,
             next_offset: RefCell::new(0),
             last_range: RefCell::new(Option::None),
             append_requests_tx,
             append_tasks_tx,
             shutdown_signal_tx,
             closed: Rc::new(RefCell::new(false)),
+            cache,
+            object_reader,
         });
 
         *(this.weak_self.borrow_mut()) = Rc::downgrade(&this);
@@ -109,6 +114,7 @@ impl ReplicationStream {
                         self.weak_self.borrow().clone(),
                         self.client.clone(),
                         self.cache.clone(),
+                        self.object_reader.clone(),
                     ),
                 );
             });
@@ -286,6 +292,7 @@ impl ReplicationStream {
                 self.weak_self.borrow().clone(),
                 self.client.clone(),
                 self.cache.clone(),
+                self.object_reader.clone(),
             );
             info!("{}Create new range: {:?}", range.metadata(), self.log_ident);
             self.ranges.borrow_mut().insert(start_offset, range.clone());

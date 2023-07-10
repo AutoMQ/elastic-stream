@@ -2,13 +2,13 @@ use std::{cell::RefCell, cmp::min, collections::BTreeMap, ops::Bound, rc::Rc};
 
 use bytes::{Buf, Bytes, BytesMut};
 use model::{error::DecodeError, object::ObjectMetadata, record::flat_record::RecordMagic};
-use opendal::Operator;
+use opendal::{services::Fs, Operator};
 use protocol::flat_model::records::RecordBatchMeta;
 
 use crate::error::ObjectReadError;
 use tokio::sync::oneshot;
 
-trait RangeObjectReader {
+pub(crate) trait RangeObjectReader {
     async fn read_block(
         &self,
         start_offset: u64,
@@ -19,8 +19,15 @@ trait RangeObjectReader {
     ) -> Result<Vec<ObjectBlock>, ObjectReadError>;
 }
 
-struct DefaultRangeObjectReader {
+#[derive(Debug)]
+pub(crate) struct DefaultRangeObjectReader {
     object_reader: Rc<ObjectReader>,
+}
+
+impl DefaultRangeObjectReader {
+    pub(crate) fn new(object_reader: Rc<ObjectReader>) -> Self {
+        Self { object_reader }
+    }
 }
 
 impl RangeObjectReader for DefaultRangeObjectReader {
@@ -76,7 +83,7 @@ impl RangeObjectReader for DefaultRangeObjectReader {
     }
 }
 
-struct ObjectBlock {
+pub(crate) struct ObjectBlock {
     records: Vec<ObjectBlockRecord>,
     end_offset: u64,
     end_position: u32,
@@ -88,27 +95,52 @@ impl ObjectBlock {
             .retain(|r| (r.start_offset + r.end_offset_delta as u64) > start_offset);
     }
 
+    pub(crate) fn get_records(&self, start_offset: u64, end_offset: u64) -> Vec<ObjectBlockRecord> {
+        let mut records = vec![];
+        for record in &self.records {
+            let record_end_offset = record.start_offset + record.end_offset_delta as u64;
+            if record_end_offset <= start_offset {
+                continue;
+            }
+            if record.start_offset >= end_offset {
+                break;
+            }
+            records.push(record.clone());
+        }
+        records
+    }
+
     fn len(&self) -> u32 {
         self.records.iter().map(|r| r.data.len()).sum::<usize>() as u32
     }
 }
 
-struct ObjectBlockRecord {
-    start_offset: u64,
-    end_offset_delta: u32,
-    data: Bytes,
+#[derive(Clone)]
+pub(crate) struct ObjectBlockRecord {
+    pub(crate) start_offset: u64,
+    pub(crate) end_offset_delta: u32,
+    pub(crate) data: Bytes,
 }
 
 #[derive(Clone)]
-struct ReadBlockHint {
+pub(crate) struct ReadBlockHint {
     prev_block_end_position: u32,
 }
 
-struct ObjectReader {
+#[derive(Debug)]
+pub(crate) struct ObjectReader {
     op: Operator,
 }
 
 impl ObjectReader {
+    pub(crate) fn new() -> Self {
+        // new op from config
+        let mut builder = Fs::default();
+        builder.root("/tmp");
+        let op: Operator = Operator::new(builder).unwrap().finish();
+        Self { op }
+    }
+
     async fn read(
         &self,
         object: &ObjectMetadata,
@@ -225,16 +257,24 @@ impl ObjectReader {
     }
 }
 
-struct RangeObjectMetadataManager {
+#[derive(Debug)]
+pub(crate) struct RangeObjectMetadataManager {
     metadata_map: RefCell<BTreeMap<u64, ObjectMetadata>>,
 }
 
 impl RangeObjectMetadataManager {
+    pub(crate) fn new() -> Self {
+        Self {
+            metadata_map: RefCell::new(BTreeMap::new()),
+        }
+    }
+
     #[allow(dead_code)]
-    fn add_object_metadata(&self, metadata: ObjectMetadata) {
-        self.metadata_map
-            .borrow_mut()
-            .insert(metadata.start_offset, metadata);
+    pub(crate) fn add_object_metadata(&self, metadata: &ObjectMetadata) {
+        let mut metadata_map = self.metadata_map.borrow_mut();
+        if !metadata_map.contains_key(&metadata.start_offset) {
+            metadata_map.insert(metadata.start_offset, metadata.clone());
+        }
     }
 
     fn find(

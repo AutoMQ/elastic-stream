@@ -6,19 +6,24 @@ use std::{
 };
 
 use crate::ReplicationError;
-use bytes::{Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use client::Client;
 use itertools::Itertools;
 use log::{debug, error, info, trace, warn};
-use model::range::RangeMetadata;
 use model::record::{flat_record::FlatRecordBatch, RecordBatch};
+use model::{error::DecodeError, object::ObjectMetadata, range::RangeMetadata};
 use std::cmp::min;
 use tokio::sync::broadcast;
 
 use super::{
-    cache::RecordBatchCache, replication_stream::ReplicationStream, replicator::Replicator,
+    cache::RecordBatchCache,
+    object_reader::{
+        DefaultRangeObjectReader, ObjectReader, RangeObjectMetadataManager, RangeObjectReader,
+    },
+    replication_stream::ReplicationStream,
+    replicator::Replicator,
 };
-use protocol::rpc::header::SealKind;
+use protocol::{flat_model::records::RecordBatchMeta, rpc::header::SealKind};
 
 const CORRUPTED_FLAG: u32 = 1 << 0;
 const SEALING_FLAG: u32 = 1 << 1;
@@ -48,6 +53,9 @@ pub(crate) struct ReplicationRange {
     /// Range status.
     status: RefCell<u32>,
     seal_task_tx: Rc<broadcast::Sender<Result<u64, ReplicationError>>>,
+
+    object_metadata_manager: RangeObjectMetadataManager,
+    object_reader: DefaultRangeObjectReader,
 }
 
 impl ReplicationRange {
@@ -57,6 +65,7 @@ impl ReplicationRange {
         stream: Weak<ReplicationStream>,
         client: Weak<Client>,
         cache: Rc<RecordBatchCache>,
+        object_reader: Rc<ObjectReader>,
     ) -> Rc<Self> {
         let confirm_offset = metadata.end().unwrap_or_else(|| metadata.start());
         let status = if metadata.end().is_some() {
@@ -81,6 +90,8 @@ impl ReplicationRange {
             next_offset: RefCell::new(confirm_offset),
             status: RefCell::new(status),
             seal_task_tx: Rc::new(seal_task_tx),
+            object_metadata_manager: RangeObjectMetadataManager::new(),
+            object_reader: DefaultRangeObjectReader::new(object_reader),
         });
 
         let mut replicators = Vec::with_capacity(this.metadata.replica().len());
@@ -266,24 +277,97 @@ impl ReplicationRange {
             let result = replicator
                 .fetch(next_start_offset, end_offset, next_batch_max_bytes)
                 .await;
-            match result {
-                Ok(rs) => {
-                    // TODO: fetch from object storage when payload not exist
-                    let payload = rs.payload.unwrap_or_default();
-                    fetch_data.push(payload);
-                    let elapse = now.elapsed().as_millis();
-                    if elapse > 10 {
-                        warn!("{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes[{batch_max_bytes}] cost too much time, elapse: {elapse}ms", self.log_ident);
-                    }
-                    return Ok(fetch_data);
-                }
+            let fetch_result = match result {
+                Ok(rs) => rs,
                 Err(e) => {
                     warn!("{}Fetch [{next_start_offset}, {end_offset}) with batch_max_bytes={next_batch_max_bytes} fail, err: {e}", self.log_ident);
                     continue;
                 }
+            };
+            let elapse = now.elapsed().as_millis();
+            if elapse > 10 {
+                warn!("{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes[{batch_max_bytes}] cost too much time, elapse: {elapse}ms", self.log_ident);
             }
+
+            // range server local records
+            let local_records = fetch_result.payload.unwrap_or_default();
+            // parse local records start offset and fill missing part from object storage.
+            let local_records_start_offset = first_record_start_offset(&local_records)
+                .map_err(|_| ReplicationError::Internal)?;
+            if local_records_start_offset > next_start_offset {
+                fetch_data.append(
+                    &mut self
+                        .fetch_from_object_storage(
+                            &fetch_result.object_metadata_list,
+                            next_start_offset,
+                            local_records_start_offset,
+                            batch_max_bytes,
+                        )
+                        .await?,
+                );
+            }
+            fetch_data.push(local_records);
+            return Ok(fetch_data);
         }
         Err(ReplicationError::Internal)
+    }
+
+    async fn fetch_from_object_storage(
+        &self,
+        object_metadata_list: &Option<Vec<ObjectMetadata>>,
+        mut start_offset: u64,
+        end_offset: u64,
+        size_hint: u32,
+    ) -> Result<Vec<Bytes>, ReplicationError> {
+        if let Some(object_metadata_list) = object_metadata_list {
+            for object_metadata in object_metadata_list.iter() {
+                self.object_metadata_manager
+                    .add_object_metadata(object_metadata);
+            }
+        } else {
+            error!(
+                "{}Fetch [{}, {}) fail, object metadata not found",
+                self.log_ident, start_offset, end_offset
+            );
+            return Err(ReplicationError::Internal);
+        }
+
+        // local records cannot fullfil the fetch range, fetch from object storage.
+        let object_blocks = self
+            .object_reader
+            .read_block(
+                start_offset,
+                Some(end_offset),
+                size_hint,
+                None,
+                &self.object_metadata_manager,
+            )
+            .await
+            .map_err(|e| {
+                warn!("Read object storage fail, {}", e);
+                ReplicationError::Internal
+            })?;
+        let mut fetch_data = vec![];
+        for object_block in object_blocks.into_iter() {
+            if start_offset >= end_offset {
+                break;
+            }
+            let records = object_block.get_records(start_offset, end_offset);
+            if let Some(first_record) = records.first() {
+                if first_record.start_offset > start_offset {
+                    error!(
+                        "{}Fetch [{}, {}) BUG, object block get records not cover start_offset",
+                        self.log_ident, start_offset, end_offset
+                    );
+                    return Err(ReplicationError::Internal);
+                }
+                for record in records.into_iter() {
+                    start_offset = record.start_offset + record.end_offset_delta as u64;
+                    fetch_data.push(record.data);
+                }
+            }
+        }
+        Ok(fetch_data)
     }
 
     /// update range confirm offset and invoke stream#try_ack.
@@ -531,7 +615,6 @@ impl RangeAppendContext {
     }
 }
 
-#[allow(dead_code)]
 fn vec_bytes_to_bytes(vec_bytes: &Vec<Bytes>) -> Bytes {
     let mut size = 0;
     for bytes in vec_bytes.iter() {
@@ -542,4 +625,20 @@ fn vec_bytes_to_bytes(vec_bytes: &Vec<Bytes>) -> Bytes {
         bytes_mut.extend_from_slice(&bytes[..]);
     }
     bytes_mut.freeze()
+}
+
+fn first_record_start_offset(records: &Bytes) -> Result<u64, DecodeError> {
+    let mut cursor = records.clone();
+    if cursor.remaining() < 9 {
+        return Err(DecodeError::DataLengthMismatch);
+    }
+    cursor.advance(1); // magic
+    let metadata_len = cursor.get_i32() as usize;
+    if cursor.remaining() < metadata_len {
+        return Err(DecodeError::DataLengthMismatch);
+    }
+    let metadata = cursor.slice(..metadata_len);
+    let metadata =
+        flatbuffers::root::<RecordBatchMeta>(&metadata).map_err(|e| DecodeError::Flatbuffer(e))?;
+    Ok(metadata.base_offset() as u64)
 }

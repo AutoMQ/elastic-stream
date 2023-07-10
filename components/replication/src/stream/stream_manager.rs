@@ -16,7 +16,7 @@ use crate::{
     ReplicationError,
 };
 
-use super::cache::RecordBatchCache;
+use super::{cache::RecordBatchCache, object_reader::ObjectReader};
 
 /// `StreamManager` is intended to be used in thread-per-core usage case. It is NOT `Send`.
 pub(crate) struct StreamManager {
@@ -24,6 +24,7 @@ pub(crate) struct StreamManager {
     round_robin: usize,
     streams: Rc<RefCell<HashMap<u64, Rc<ReplicationStream>>>>,
     cache: Rc<RecordBatchCache>,
+    object_reader: Rc<ObjectReader>,
 }
 
 impl StreamManager {
@@ -39,11 +40,14 @@ impl StreamManager {
             clients.push(client);
         }
 
+        let object_reader = Rc::new(ObjectReader::new());
+
         Self {
             clients,
             round_robin: 0,
             streams,
             cache,
+            object_reader,
         }
     }
 
@@ -162,10 +166,16 @@ impl StreamManager {
         };
         let streams = self.streams.clone();
         let cache = self.cache.clone();
+        let object_reader = self.object_reader.clone();
         tokio_uring::spawn(async move {
             let client = Rc::downgrade(&client);
-            let stream =
-                ReplicationStream::new(request.stream_id as i64, request.epoch, client, cache);
+            let stream = ReplicationStream::new(
+                request.stream_id as i64,
+                request.epoch,
+                client,
+                cache,
+                object_reader,
+            );
             if let Err(e) = stream.open().await {
                 let _ = tx.send(Err(e));
                 return;
