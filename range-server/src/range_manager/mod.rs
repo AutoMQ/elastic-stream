@@ -8,7 +8,7 @@ use self::stream::Stream;
 use crate::error::ServiceError;
 #[cfg(test)]
 use mockall::automock;
-use model::range::RangeMetadata;
+use model::{object::ObjectMetadata, range::RangeMetadata};
 
 #[cfg_attr(test, automock)]
 pub(crate) trait RangeManager {
@@ -40,4 +40,13 @@ pub(crate) trait RangeManager {
 
     #[allow(clippy::needless_lifetimes)]
     fn get_range<'a>(&'a mut self, stream_id: i64, index: i32) -> Option<&'a mut range::Range>;
+
+    async fn get_objects(
+        &self,
+        stream_id: u64,
+        range_index: u32,
+        start_offset: u64,
+        end_offset: u64,
+        size_hint: u32,
+    ) -> Vec<ObjectMetadata>;
 }

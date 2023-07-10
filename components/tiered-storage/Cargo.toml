@@ -9,6 +9,7 @@ edition = "2021"
 [dependencies]
 bytes = { workspace = true }
 clap = { workspace = true }
+config = { path = "../config" }
 env_logger = { workspace = true }
 flatbuffers = { workspace = true }
 log = { workspace = true }
@@ -20,4 +21,3 @@ store = { path = "../store" }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
 util = { path = "../util" }
-config = { path = "../config" }

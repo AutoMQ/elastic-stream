@@ -34,6 +34,7 @@ impl ObjectManager for MemoryObjectManager {
         range_index: u32,
         start_offset: u64,
         end_offset: u64,
+        _size_hint: u32,
     ) -> Vec<ObjectMetadata> {
         let key = RangeKey::new(stream_id, range_index);
         if let Some(metas) = self.map.borrow().get(&key) {

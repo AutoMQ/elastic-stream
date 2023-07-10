@@ -437,8 +437,8 @@ pub struct ObjectStorageConfig {
     pub max_cache_size: u64,
     #[serde(rename = "cache-low-watermark")]
     pub cache_low_watermark: u64,
-    #[serde(rename = "force-flush-interval")]
-    pub force_flush_interval: Duration,
+    #[serde(rename = "force-flush-secs")]
+    pub force_flush_secs: u64,
 }
 
 impl Default for ObjectStorageConfig {
@@ -451,7 +451,7 @@ impl Default for ObjectStorageConfig {
             part_size: 16 * 1024 * 1024,
             max_cache_size: 1024 * 1024 * 1024,
             cache_low_watermark: 7 * 128 * 1024 * 1024,
-            force_flush_interval: Duration::from_secs(60 * 20),
+            force_flush_secs: 60 * 20,
         }
     }
 }
@@ -474,6 +474,7 @@ pub struct Configuration {
 
     pub observation: Observation,
 
+    #[serde(rename = "object-storage", default = "ObjectStorageConfig::default")]
     pub object_storage: ObjectStorageConfig,
 }
 

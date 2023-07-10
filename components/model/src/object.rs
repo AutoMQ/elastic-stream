@@ -105,3 +105,15 @@ impl From<&ObjectMetadataT> for ObjectMetadata {
         }
     }
 }
+
+impl Into<ObjectMetadataT> for ObjectMetadata {
+    fn into(self) -> ObjectMetadataT {
+        let mut t = ObjectMetadataT::default();
+        t.key = self.key.unwrap_or_default();
+        t.start_offset = self.start_offset as i64;
+        t.end_offset_delta = self.end_offset_delta as i32;
+        t.sparse_index = Some(self.sparse_index.to_vec());
+        t.data_len = self.data_len as i32;
+        t
+    }
+}

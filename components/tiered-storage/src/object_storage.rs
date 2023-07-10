@@ -1,5 +1,6 @@
 use config::ObjectStorageConfig;
-use opendal::services::S3;
+use model::object::ObjectMetadata;
+use opendal::services::{Fs, S3};
 use opendal::Operator;
 use std::rc::Rc;
 use std::time::Duration;
@@ -9,22 +10,22 @@ use std::{
 };
 use std::{env, thread};
 use store::{ElasticStore, Store};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::sleep;
 
 use crate::object_manager::MemoryObjectManager;
 use crate::range_accumulator::{DefaultRangeAccumulator, RangeAccumulator};
 use crate::range_fetcher::{DefaultRangeFetcher, RangeFetcher};
 use crate::range_offload::RangeOffload;
-use crate::{ObjectManager, TieredStorage};
+use crate::{ObjectManager, ObjectStorage};
 use crate::{Owner, RangeKey};
 
 #[derive(Clone)]
-pub struct AsyncObjectTieredStorage {
+pub struct AsyncObjectStorage {
     tx: mpsc::UnboundedSender<Task>,
 }
 
-impl AsyncObjectTieredStorage {
+impl AsyncObjectStorage {
     pub fn new(config: &ObjectStorageConfig, store: ElasticStore) -> Self {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let config = config.clone();
@@ -36,21 +37,26 @@ impl AsyncObjectTieredStorage {
                     let range_fetcher = DefaultRangeFetcher::new(Rc::new(store));
                     let object_manager = MemoryObjectManager::default();
                     let object_storage =
-                        ObjectTieredStorage::new(&config, range_fetcher, object_manager);
+                        DefaultObjectStorage::new(&config, range_fetcher, object_manager);
                     while let Some(task) = rx.recv().await {
                         match task {
-                            Task::NewRecordArrived(
-                                stream_id,
-                                range_index,
-                                end_offset,
-                                record_size,
-                            ) => {
-                                object_storage.new_record_arrived(
-                                    stream_id,
-                                    range_index,
-                                    end_offset,
-                                    record_size,
-                                );
+                            Task::NewCommit(stream_id, range_index, record_size) => {
+                                object_storage.new_commit(stream_id, range_index, record_size);
+                            }
+                            Task::GetObjects(task) => {
+                                let object_storage = object_storage.clone();
+                                tokio_uring::spawn(async move {
+                                    let rst = object_storage
+                                        .get_objects(
+                                            task.stream_id,
+                                            task.range_index,
+                                            task.start_offset,
+                                            task.end_offset,
+                                            task.size_hint,
+                                        )
+                                        .await;
+                                    let _ = task.tx.send(rst);
+                                });
                             }
                         }
                     }
@@ -60,48 +66,74 @@ impl AsyncObjectTieredStorage {
     }
 }
 
-impl TieredStorage for AsyncObjectTieredStorage {
-    fn new_record_arrived(
+impl ObjectStorage for AsyncObjectStorage {
+    fn new_commit(&self, stream_id: u64, range_index: u32, record_size: u32) {
+        let _ = self
+            .tx
+            .send(Task::NewCommit(stream_id, range_index, record_size));
+    }
+
+    async fn get_objects(
         &self,
         stream_id: u64,
         range_index: u32,
+        start_offset: u64,
         end_offset: u64,
-        record_size: u32,
-    ) {
-        let _ = self.tx.send(Task::NewRecordArrived(
+        size_hint: u32,
+    ) -> Vec<ObjectMetadata> {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(Task::GetObjects(GetObjectsTask {
             stream_id,
             range_index,
+            start_offset,
             end_offset,
-            record_size,
-        ));
+            size_hint,
+            tx,
+        }));
+        rx.await.unwrap()
     }
 }
 
 enum Task {
-    NewRecordArrived(u64, u32, u64, u32),
+    NewCommit(u64, u32, u32),
+    GetObjects(GetObjectsTask),
 }
 
-pub struct ObjectTieredStorage<F: RangeFetcher, M: ObjectManager> {
+struct GetObjectsTask {
+    stream_id: u64,
+    range_index: u32,
+    start_offset: u64,
+    end_offset: u64,
+    size_hint: u32,
+    tx: oneshot::Sender<Vec<ObjectMetadata>>,
+}
+
+pub struct DefaultObjectStorage<F: RangeFetcher, M: ObjectManager> {
     config: ObjectStorageConfig,
     ranges: RefCell<HashMap<RangeKey, Rc<DefaultRangeAccumulator>>>,
     part_full_ranges: RefCell<HashSet<RangeKey>>,
     cache_size: RefCell<i64>,
-    op: Operator,
+    op: Option<Operator>,
     object_manager: Rc<M>,
     range_fetcher: Rc<F>,
 }
 
-impl<F, M> ObjectTieredStorage<F, M>
+impl<F, M> DefaultObjectStorage<F, M>
 where
     F: RangeFetcher + 'static,
     M: ObjectManager + 'static,
 {
     fn add_range(&self, stream_id: u64, range_index: u32, owner: Owner) {
+        let op = if let Some(op) = self.op.as_ref() {
+            op.clone()
+        } else {
+            return;
+        };
         let range = RangeKey::new(stream_id, range_index);
         let range_offload = Rc::new(RangeOffload::new(
             stream_id,
             range_index,
-            self.op.clone(),
+            op,
             self.object_manager.clone(),
             self.config.object_size,
         ));
@@ -116,29 +148,37 @@ where
             )),
         );
     }
+
+    fn remove_range(&self, stream_id: u64, range_index: u32) {
+        if self.op.is_none() {
+            return;
+        }
+        let range = RangeKey::new(stream_id, range_index);
+        let _ = self.ranges.borrow_mut().remove(&range);
+    }
 }
 
-impl<F, M> TieredStorage for ObjectTieredStorage<F, M>
+impl<F, M> ObjectStorage for DefaultObjectStorage<F, M>
 where
     F: RangeFetcher + 'static,
     M: ObjectManager + 'static,
 {
-    fn new_record_arrived(
-        &self,
-        stream_id: u64,
-        range_index: u32,
-        end_offset: u64,
-        record_size: u32,
-    ) {
+    fn new_commit(&self, stream_id: u64, range_index: u32, record_size: u32) {
+        if self.op.is_none() {
+            return;
+        }
         let owner = self.object_manager.is_owner(stream_id, range_index);
         let range_key = RangeKey::new(stream_id, range_index);
         let mut range = self.ranges.borrow().get(&range_key).cloned();
         if owner.is_some() && range.is_none() {
             self.add_range(stream_id, range_index, owner.unwrap());
             range = self.ranges.borrow().get(&range_key).cloned();
+        } else if owner.is_none() && range.is_some() {
+            self.remove_range(stream_id, range_index);
+            return;
         }
         if let Some(range) = range {
-            let (size_change, is_part_full) = range.accumulate(end_offset, record_size);
+            let (size_change, is_part_full) = range.accumulate(record_size);
             let mut cache_size = self.cache_size.borrow_mut();
             *cache_size += size_change as i64;
             if (*cache_size as u64) < self.config.max_cache_size {
@@ -173,33 +213,53 @@ where
             }
         }
     }
+
+    async fn get_objects(
+        &self,
+        stream_id: u64,
+        range_index: u32,
+        start_offset: u64,
+        end_offset: u64,
+        size_hint: u32,
+    ) -> Vec<ObjectMetadata> {
+        self.object_manager
+            .get_objects(stream_id, range_index, start_offset, end_offset, size_hint)
+    }
 }
 
-impl<F, M> ObjectTieredStorage<F, M>
+impl<F, M> DefaultObjectStorage<F, M>
 where
     F: RangeFetcher + 'static,
     M: ObjectManager + 'static,
 {
     pub fn new(config: &ObjectStorageConfig, range_fetcher: F, object_manager: M) -> Rc<Self> {
-        let mut s3_builder = S3::default();
-        s3_builder.root("/");
-        s3_builder.bucket(&config.bucket);
-        s3_builder.region(&config.region);
-        s3_builder.endpoint(&config.endpoint);
-        s3_builder.access_key_id(
-            &env::var("ES_S3_ACCESS_KEY_ID")
-                .map_err(|_| "ES_S3_ACCESS_KEY_ID cannot find in env")
-                .unwrap(),
-        );
-        s3_builder.secret_access_key(
-            &env::var("ES_S3_SECRET_ACCESS_KEY")
-                .map_err(|_| "ES_S3_SECRET_ACCESS_KEY cannot find in env")
-                .unwrap(),
-        );
-        let op = Operator::new(s3_builder).unwrap().finish();
+        let op = if config.endpoint.starts_with("fs://") {
+            let mut builder = Fs::default();
+            builder.root("/tmp/");
+            Some(Operator::new(builder).unwrap().finish())
+        } else if !config.endpoint.is_empty() {
+            let mut s3_builder = S3::default();
+            s3_builder.root("/");
+            s3_builder.bucket(&config.bucket);
+            s3_builder.region(&config.region);
+            s3_builder.endpoint(&config.endpoint);
+            s3_builder.access_key_id(
+                &env::var("ES_S3_ACCESS_KEY_ID")
+                    .map_err(|_| "ES_S3_ACCESS_KEY_ID cannot find in env")
+                    .unwrap(),
+            );
+            s3_builder.secret_access_key(
+                &env::var("ES_S3_SECRET_ACCESS_KEY")
+                    .map_err(|_| "ES_S3_SECRET_ACCESS_KEY cannot find in env")
+                    .unwrap(),
+            );
+            Some(Operator::new(s3_builder).unwrap().finish())
+        } else {
+            None
+        };
 
-        let force_flush_interval = config.force_flush_interval;
-        let this = Rc::new(ObjectTieredStorage {
+        let force_flush_secs = config.force_flush_secs;
+        let this = Rc::new(DefaultObjectStorage {
             config: config.clone(),
             ranges: RefCell::new(HashMap::new()),
             part_full_ranges: RefCell::new(HashSet::new()),
@@ -208,7 +268,7 @@ where
             object_manager: Rc::new(object_manager),
             range_fetcher: Rc::new(range_fetcher),
         });
-        Self::run_force_flush_task(this.clone(), force_flush_interval);
+        Self::run_force_flush_task(this.clone(), Duration::from_secs(force_flush_secs));
         this
     }
 
@@ -220,7 +280,7 @@ where
         Rc::new(DefaultRangeFetcher::<S>::new(store))
     }
 
-    pub fn run_force_flush_task(storage: Rc<ObjectTieredStorage<F, M>>, max_duration: Duration) {
+    pub fn run_force_flush_task(storage: Rc<DefaultObjectStorage<F, M>>, max_duration: Duration) {
         tokio_uring::spawn(async move {
             loop {
                 storage.ranges.borrow().iter().for_each(|(_, range)| {

@@ -12,7 +12,7 @@ use tokio::{
 use crate::{range_fetcher::RangeFetcher, range_offload::RangeOffload, ObjectManager, RangeKey};
 
 pub trait RangeAccumulator {
-    fn accumulate(&self, end_offset: u64, records_size: u32) -> (i32, bool);
+    fn accumulate(&self, records_size: u32) -> (i32, bool);
 
     fn try_flush(&self, max_duration: Duration) -> i32;
 
@@ -33,7 +33,7 @@ impl RangeAccumulator for DefaultRangeAccumulator {
     ///     range accumulator buffer size change,
     ///     whether the buffer length is large than part size.
     /// )
-    fn accumulate(&self, end_offset: u64, records_size: u32) -> (i32, bool) {
+    fn accumulate(&self, records_size: u32) -> (i32, bool) {
         let mut size = self.size.borrow_mut();
         if *size + records_size >= self.object_size {
             let old_size = *size;
@@ -91,6 +91,7 @@ impl DefaultRangeAccumulator {
         config: ObjectStorageConfig,
         range_offload: Rc<RangeOffload<M>>,
     ) -> Self {
+        // TODO: implement drop to close the read_loop
         let (tx, rx) = mpsc::unbounded_channel();
 
         Self::read_loop(

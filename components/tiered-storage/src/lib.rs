@@ -13,15 +13,18 @@ use model::object::ObjectMetadata;
 use mockall::{automock, predicate::*};
 
 #[cfg_attr(test, automock)]
-pub trait TieredStorage {
-    /// new record arrived notify
-    fn new_record_arrived(
+pub trait ObjectStorage {
+    /// new record commit notify
+    fn new_commit(&self, stream_id: u64, range_index: u32, record_size: u32);
+
+    async fn get_objects(
         &self,
         stream_id: u64,
         range_index: u32,
+        start_offset: u64,
         end_offset: u64,
-        record_size: u32,
-    );
+        size_hint: u32,
+    ) -> Vec<ObjectMetadata>;
 }
 
 #[cfg_attr(test, automock)]
@@ -36,6 +39,7 @@ pub trait ObjectManager {
         range_index: u32,
         start_offset: u64,
         end_offset: u64,
+        size_hint: u32,
     ) -> Vec<ObjectMetadata>;
 }
 

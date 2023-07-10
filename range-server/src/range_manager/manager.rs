@@ -5,31 +5,36 @@ use std::{
 };
 
 use log::{error, info};
-use model::{range::RangeMetadata, stream::StreamMetadata};
+use model::{object::ObjectMetadata, range::RangeMetadata, stream::StreamMetadata};
 use store::Store;
+use tiered_storage::ObjectStorage;
 
 use crate::error::ServiceError;
 
 use super::{fetcher::PlacementFetcher, range::Range, stream::Stream, RangeManager};
 
-pub(crate) struct DefaultRangeManager<S, F> {
+pub(crate) struct DefaultRangeManager<S, F, O> {
     streams: HashMap<i64, Stream>,
 
     fetcher: F,
 
     store: Rc<S>,
+
+    object_storage: Rc<O>,
 }
 
-impl<S, F> DefaultRangeManager<S, F>
+impl<S, F, O> DefaultRangeManager<S, F, O>
 where
     S: Store,
     F: PlacementFetcher,
+    O: ObjectStorage,
 {
-    pub(crate) fn new(fetcher: F, store: Rc<S>) -> Self {
+    pub(crate) fn new(fetcher: F, store: Rc<S>, object_storage: Rc<O>) -> Self {
         Self {
             streams: HashMap::new(),
             fetcher,
             store,
+            object_storage,
         }
     }
 
@@ -74,10 +79,11 @@ where
     }
 }
 
-impl<S, F> RangeManager for DefaultRangeManager<S, F>
+impl<S, F, O> RangeManager for DefaultRangeManager<S, F, O>
 where
     S: Store,
     F: PlacementFetcher,
+    O: ObjectStorage,
 {
     async fn start(&mut self) -> Result<(), ServiceError> {
         self.bootstrap().await?;
@@ -113,10 +119,12 @@ where
         range_index: i32,
         offset: u64,
         _last_offset_delta: u32,
-        _bytes_len: u32,
+        bytes_len: u32,
     ) -> Result<(), ServiceError> {
         if let Some(range) = self.get_range(stream_id, range_index) {
             range.commit(offset);
+            self.object_storage
+                .new_commit(stream_id as u64, range_index as u32, bytes_len);
             Ok(())
         } else {
             error!("Commit fail, range[{stream_id}#{range_index}] is not found");
@@ -169,6 +177,19 @@ where
         } else {
             None
         }
+    }
+
+    async fn get_objects(
+        &self,
+        stream_id: u64,
+        range_index: u32,
+        start_offset: u64,
+        end_offset: u64,
+        size_hint: u32,
+    ) -> Vec<ObjectMetadata> {
+        self.object_storage
+            .get_objects(stream_id, range_index, start_offset, end_offset, size_hint)
+            .await
     }
 }
 

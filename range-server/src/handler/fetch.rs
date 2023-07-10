@@ -1,12 +1,13 @@
 use super::util::{root_as_rpc_request, MIN_BUFFER_SIZE};
 use crate::range_manager::RangeManager;
+use bytes::BytesMut;
 use codec::frame::Frame;
 use flatbuffers::FlatBufferBuilder;
 use log::{trace, warn};
 use minstant::Instant;
 use protocol::rpc::header::{
-    ErrorCode, FetchRequest, FetchResponse, FetchResponseArgs, FetchResponseT, Status, StatusArgs,
-    StatusT,
+    ErrorCode, FetchRequest, FetchResponse, FetchResponseArgs, FetchResponseT, ObjectMetadataT,
+    Status, StatusArgs, StatusT,
 };
 use std::{cell::UnsafeCell, fmt, rc::Rc};
 use store::{error::FetchError, option::ReadOptions, Store};
@@ -63,6 +64,11 @@ impl<'a> Fetch<'a> {
                 return;
             }
         };
+        let stream_id = option.stream_id as u64;
+        let range_index = option.range;
+        let start_offset = option.offset as u64;
+        let end_offset = option.max_offset;
+        let size_hint = option.max_bytes as u32;
 
         // TODO: handle store timeout
         let start = Instant::now();
@@ -78,10 +84,19 @@ impl<'a> Fetch<'a> {
                 };
                 let status = Status::create(&mut builder, &status_args);
 
+                let objects = unsafe { &*range_manager.get() }
+                    .get_objects(stream_id, range_index, start_offset, end_offset, size_hint)
+                    .await;
+                let objects = objects
+                    .into_iter()
+                    .map(|o| Into::<ObjectMetadataT>::into(o).pack(&mut builder))
+                    .collect::<Vec<_>>();
+                let objects = builder.create_vector(&objects);
+
                 let fetch_response_args = FetchResponseArgs {
                     status: Some(status),
                     throttle_time_ms: -1,
-                    object_metadata_list: None,
+                    object_metadata_list: Some(objects),
                 };
                 let fetch_response = FetchResponse::create(&mut builder, &fetch_response_args);
                 builder.finish(fetch_response, None);
@@ -171,6 +186,7 @@ mod tests {
     use protocol::rpc::header::{ErrorCode, FetchRequestT, FetchResponse, OperationCode, RangeT};
     use std::{cell::UnsafeCell, error::Error, rc::Rc, sync::Arc};
     use store::error::FetchError;
+    use tiered_storage::MockObjectStorage;
 
     fn build_fetch_request() -> Frame {
         let mut request = Frame::new(OperationCode::FETCH);
@@ -224,9 +240,12 @@ mod tests {
 
         tokio_uring::start(async move {
             let store = Rc::new(mock_store);
+            let object_storage = MockObjectStorage::new();
+            object_storage.expect_get_objects().returning(|_| vec![]);
             let range_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                 mock_fetcher,
                 Rc::clone(&store),
+                Rc::new(object_storage),
             )));
 
             let sm = unsafe { &mut *range_manager.get() };

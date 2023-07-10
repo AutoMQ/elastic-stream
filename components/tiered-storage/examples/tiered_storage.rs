@@ -1,6 +1,7 @@
 #![feature(async_fn_in_trait)]
 
 use bytes::BytesMut;
+use config::ObjectStorageConfig;
 use std::env;
 use std::rc::Rc;
 use std::time::Duration;
@@ -10,9 +11,8 @@ use tiered_storage::RangeFetcher;
 
 use clap::Parser;
 use tiered_storage::object_manager::MemoryObjectManager;
-use tiered_storage::object_storage::ObjectTieredStorage;
-use tiered_storage::object_storage::ObjectTieredStorageConfig;
-use tiered_storage::TieredStorage;
+use tiered_storage::object_storage::DefaultObjectStorage;
+use tiered_storage::ObjectStorage;
 use tokio::time::sleep;
 
 fn main() {
@@ -20,7 +20,7 @@ fn main() {
     env_logger::init();
     let args = Args::parse();
     tokio_uring::start(async move {
-        let config = ObjectTieredStorageConfig {
+        let config = ObjectStorageConfig {
             endpoint: args.endpoint,
             bucket: args.bucket,
             region: args.region,
@@ -28,12 +28,13 @@ fn main() {
             part_size: args.part_size,
             max_cache_size: args.max_cache_size,
             cache_low_watermark: args.cache_low_watermark,
-            force_flush_interval: Duration::from_secs(60 * 60),
+            force_flush_secs: 60 * 60,
         };
         let range_fetcher = Rc::new(RangeFetcherMock {});
         let memory_object_manager: MemoryObjectManager = Default::default();
         let object_manager = Rc::new(memory_object_manager);
-        let object_store = ObjectTieredStorage::new(config, range_fetcher, object_manager).unwrap();
+        let object_store =
+            DefaultObjectStorage::new(&config, range_fetcher, object_manager).unwrap();
         object_store.add_range(1, 2, 0, 0);
         let mut end_offset = 1;
         loop {

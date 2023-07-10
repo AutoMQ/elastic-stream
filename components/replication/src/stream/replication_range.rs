@@ -292,8 +292,16 @@ impl ReplicationRange {
             // range server local records
             let local_records = fetch_result.payload.unwrap_or_default();
             // parse local records start offset and fill missing part from object storage.
-            let local_records_start_offset = first_record_start_offset(&local_records)
-                .map_err(|_| ReplicationError::Internal)?;
+            let local_records_start_offset =
+                first_record_start_offset(&local_records).map_err(|e| {
+                    error!(
+                        "{}Parse local records start offset fail, err: {}, bytes:{:?}",
+                        self.log_ident,
+                        e,
+                        local_records.to_vec(),
+                    );
+                    ReplicationError::Internal
+                })?;
             if local_records_start_offset > next_start_offset {
                 fetch_data.append(
                     &mut self
@@ -347,6 +355,7 @@ impl ReplicationRange {
                 warn!("Read object storage fail, {}", e);
                 ReplicationError::Internal
             })?;
+        // TODO: put remaining block to cache.
         let mut fetch_data = vec![];
         for object_block in object_blocks.into_iter() {
             if start_offset >= end_offset {

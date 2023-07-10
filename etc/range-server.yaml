@@ -65,7 +65,7 @@ store:
   pre-allocate-segment-file-number: 2
   # The total size of Status::Read segment files
   # 100GiB
-  total-segment-file-size: 107374182400
+  total-segment-file-size: 10737418240
   # Policy to reclaim segment files
   reclaim-policy: "Delete"
   io-cpu: 2
