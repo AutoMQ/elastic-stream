@@ -4,13 +4,21 @@
         {
             "label": "build",
             "command": "cargo",
-            "args": [ "build", "--features", "paranoid" ],
+            "args": [
+                "build",
+                "--bin",
+                "range-server"
+            ],
             "group": "build",
         },
         {
             "label": "build-frontend",
             "command": "cargo",
-            "args": [ "build", "-p", "frontend"],
+            "args": [
+                "build",
+                "-p",
+                "frontend"
+            ],
             "group": "build",
         }
     ]

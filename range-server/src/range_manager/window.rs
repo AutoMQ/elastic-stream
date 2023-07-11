@@ -1,4 +1,4 @@
-use log::{error, warn};
+use log::{error, trace, warn};
 use std::collections::BTreeMap;
 
 use model::Batch;
@@ -22,7 +22,9 @@ use crate::error::ServiceError;
 /// * The other requests should be responded with a `ServiceError::OffsetInWindow`.
 #[derive(Debug)]
 pub(crate) struct Window {
+    /// Identifier of the window. Currently is in form of {stream-id}#{range-index}.
     log_ident: String,
+
     /// The barrier offset, the requests beyond this offset should be blocked.
     next: u64,
 
@@ -120,6 +122,15 @@ impl Window {
     /// # Return
     /// * the committed offset.
     pub(crate) fn commit(&mut self, offset: u64) -> u64 {
+        trace!("{}-Window tries to commit: {}", self.log_ident, offset);
+
+        if self.committed != offset {
+            warn!(
+                "{}-Window committed: {}, offset: {}",
+                self.log_ident, self.committed, offset
+            );
+        }
+
         // The given offset to commit should be equal to the `committed` offset.
         debug_assert!(
             offset == self.committed,
@@ -144,6 +155,11 @@ impl Window {
                 first_key);
 
             self.committed = offset + len as u64;
+            trace!(
+                "{}-Window#committed is changed to: {}",
+                self.log_ident,
+                self.committed
+            );
         }
 
         self.committed
