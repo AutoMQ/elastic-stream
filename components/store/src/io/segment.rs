@@ -306,7 +306,14 @@ impl LogSegment {
         }
     }
 
-    pub fn calculate_record_crc32<T, U>(payload: U, file_offset: u64) -> u32
+    /// Calculate checksum of the record payload placed in log segment file.
+    ///
+    /// The algorithm includes two steps:
+    /// * Step-1: calculate CRC32 of the payload slices as crc0;
+    /// * Step-2: crc32([crc0, file-offset]);
+    ///
+    /// This algorithm makes particular sense in case the log segment files are recycled.
+    pub fn checksum_record<T, U>(payload: U, file_offset: u64) -> u32
     where
         U: AsRef<[T]>,
         T: AsRef<[u8]>,
@@ -325,7 +332,7 @@ impl LogSegment {
         writer: &mut AlignedBufWriter,
         payload: &[u8],
     ) -> Result<u64, StoreError> {
-        let crc = Self::calculate_record_crc32([payload], self.wal_offset);
+        let crc = Self::checksum_record([payload], self.wal_offset);
         let length_type = RecordType::Full.with_length(payload.len() as u32);
         writer.write_u32(crc)?;
         writer.write_u32(length_type)?;

@@ -15,7 +15,6 @@ use crate::{
     io::segment::{LogSegment, Medium, SegmentDescriptor, Status},
 };
 
-use bytes::BufMut;
 use io_uring::{opcode, squeue, types};
 use log::{debug, error, info, trace, warn};
 use model::payload::Payload;
@@ -205,11 +204,7 @@ impl Wal {
             buf.resize(len, 0);
             segment.read_exact_at(buf.as_mut(), file_pos)?;
 
-            let ckm = util::crc32::crc32(buf.as_ref());
-            let mut total_ckm = bytes::BytesMut::with_capacity(4 + 8);
-            total_ckm.put_u32(ckm);
-            total_ckm.put_u64(segment.wal_offset);
-            let ckm = util::crc32::crc32(total_ckm);
+            let ckm = LogSegment::checksum_record([&buf], segment.wal_offset);
 
             if ckm != crc {
                 file_pos -= 8;

@@ -277,7 +277,7 @@ impl Store for ElasticStore {
                         let segment_size = self.config.store.segment_size;
                         let base_file_offset = res.wal_offset as u64 / segment_size * segment_size;
                         let actual_crc =
-                            LogSegment::calculate_record_crc32(&res.payload, base_file_offset);
+                            LogSegment::checksum_record(&res.payload, base_file_offset);
                         if actual_crc != expected_crc32 {
                             error!(
                                 "Data corrupted: CRC32 checksum failed. Expected: {}, Actual: {}",
