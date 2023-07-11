@@ -6,8 +6,8 @@ use std::{
 
 use log::{error, info};
 use model::{object::ObjectMetadata, range::RangeMetadata, stream::StreamMetadata};
+use object_storage::ObjectStorage;
 use store::Store;
-use tiered_storage::ObjectStorage;
 
 use crate::error::ServiceError;
 

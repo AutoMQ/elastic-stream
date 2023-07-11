@@ -8,9 +8,9 @@ use crate::{
 };
 use config::Configuration;
 use log::{error, info};
+use object_storage::object_storage::AsyncObjectStorage;
 use std::{cell::UnsafeCell, error::Error, os::fd::AsRawFd, rc::Rc, sync::Arc, thread};
 use store::{ElasticStore, Store};
-use tiered_storage::object_storage::AsyncObjectStorage;
 
 use tokio::sync::{broadcast, mpsc, oneshot};
 

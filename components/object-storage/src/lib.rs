@@ -9,10 +9,9 @@ mod range_offload;
 
 use model::object::ObjectMetadata;
 
-#[cfg(test)]
 use mockall::{automock, predicate::*};
 
-#[cfg_attr(test, automock)]
+#[automock]
 pub trait ObjectStorage {
     /// new record commit notify
     fn new_commit(&self, stream_id: u64, range_index: u32, record_size: u32);

@@ -32,6 +32,7 @@ minstant = { workspace = true }
 model = { path = "../components/model" }
 num_cpus = { workspace = true }
 num_enum = { workspace = true }
+object-storage = { path = "../components/object-storage" }
 observation = { path = "../components/observation" }
 polling = { path = "../components/polling" }
 pprof = { workspace = true }
@@ -42,7 +43,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_yaml = { workspace = true }
 store = { path = "../components/store" }
 thiserror = { workspace = true }
-tiered-storage = { path = "../components/tiered-storage" }
 tokio = { workspace = true }
 tokio-uring = { workspace = true }
 transport = { path = "../components/transport" }

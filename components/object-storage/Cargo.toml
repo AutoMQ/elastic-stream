@@ -1,5 +1,5 @@
 [package]
-name = "tiered-storage"
+name = "object-storage"
 version = { workspace = true }
 authors = { workspace = true }
 description = { workspace = true }

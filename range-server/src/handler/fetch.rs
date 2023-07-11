@@ -182,10 +182,10 @@ mod tests {
     };
     use codec::frame::Frame;
     use model::stream::StreamMetadata;
+    use object_storage::MockObjectStorage;
     use protocol::rpc::header::{ErrorCode, FetchRequestT, FetchResponse, OperationCode, RangeT};
     use std::{cell::UnsafeCell, error::Error, rc::Rc, sync::Arc};
     use store::error::FetchError;
-    use tiered_storage::MockObjectStorage;
 
     fn build_fetch_request() -> Frame {
         let mut request = Frame::new(OperationCode::FETCH);
@@ -236,11 +236,13 @@ mod tests {
                 retention_period: std::time::Duration::from_secs(1),
             })
         });
+        let mut object_storage = MockObjectStorage::new();
+        object_storage
+            .expect_get_objects()
+            .returning(|_, _, _, _, _| vec![]);
 
         tokio_uring::start(async move {
             let store = Rc::new(mock_store);
-            let object_storage = MockObjectStorage::new();
-            object_storage.expect_get_objects().returning(|_| vec![]);
             let range_manager = Rc::new(UnsafeCell::new(DefaultRangeManager::new(
                 mock_fetcher,
                 Rc::clone(&store),

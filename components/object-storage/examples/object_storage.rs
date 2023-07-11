@@ -2,20 +2,20 @@
 
 use bytes::BytesMut;
 use config::ObjectStorageConfig;
+use object_storage::range_fetcher::RangeFetchResult;
+use object_storage::range_fetcher::RangeFetcher;
 use std::env;
 use std::time::Duration;
 use store::error::FetchError;
-use tiered_storage::range_fetcher::RangeFetchResult;
-use tiered_storage::range_fetcher::RangeFetcher;
 
 use clap::Parser;
-use tiered_storage::object_manager::MemoryObjectManager;
-use tiered_storage::object_storage::DefaultObjectStorage;
-use tiered_storage::ObjectStorage;
+use object_storage::object_manager::MemoryObjectManager;
+use object_storage::object_storage::DefaultObjectStorage;
+use object_storage::ObjectStorage;
 use tokio::time::sleep;
 
 fn main() {
-    env::set_var("RUST_LOG", "tiered_storage=debug");
+    env::set_var("RUST_LOG", "object_storage=debug");
     env_logger::init();
     let args = Args::parse();
     tokio_uring::start(async move {

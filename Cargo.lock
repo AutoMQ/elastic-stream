@@ -2377,6 +2377,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "object-storage"
+version = "0.2.1"
+dependencies = [
+ "bytes",
+ "clap 4.3.10",
+ "config",
+ "env_logger",
+ "flatbuffers",
+ "log",
+ "mockall",
+ "model",
+ "opendal",
+ "protocol",
+ "store",
+ "tokio",
+ "tokio-uring",
+ "util",
+]
+
+[[package]]
 name = "observation"
 version = "0.2.1"
 dependencies = [
@@ -2933,6 +2953,7 @@ dependencies = [
  "model",
  "num_cpus",
  "num_enum",
+ "object-storage",
  "observation",
  "polling 0.2.1",
  "pprof",
@@ -2943,7 +2964,6 @@ dependencies = [
  "serde_yaml 0.9.22",
  "store",
  "thiserror",
- "tiered-storage",
  "tikv-jemallocator",
  "tokio",
  "tokio-uring",
@@ -3783,26 +3803,6 @@ checksum = "fce3200b189fd4733eb2bb22235755c8aa0361ba1c66b67db54893144d147279"
 dependencies = [
  "byteorder",
  "trackable",
-]
-
-[[package]]
-name = "tiered-storage"
-version = "0.2.1"
-dependencies = [
- "bytes",
- "clap 4.3.10",
- "config",
- "env_logger",
- "flatbuffers",
- "log",
- "mockall",
- "model",
- "opendal",
- "protocol",
- "store",
- "tokio",
- "tokio-uring",
- "util",
 ]
 
 [[package]]
