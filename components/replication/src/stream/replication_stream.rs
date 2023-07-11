@@ -4,6 +4,7 @@ use crate::ReplicationError;
 use super::cache::RecordBatchCache;
 use super::object_reader::ObjectReader;
 use super::replication_range::ReplicationRange;
+use super::Stream;
 use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
@@ -86,199 +87,6 @@ impl ReplicationStream {
         });
 
         this
-    }
-
-    pub(crate) async fn open(&self) -> Result<(), ReplicationError> {
-        info!("{}Opening...", self.log_ident);
-        let client = self.client.upgrade().ok_or(ReplicationError::Internal)?;
-        // 1. load all ranges
-        client
-            .list_ranges(model::ListRangeCriteria::new(None, Some(self.id as u64)))
-            .await
-            .map_err(|e| {
-                error!(
-                    "{}Failed to list ranges from placement-driver: {e}",
-                    self.log_ident
-                );
-                ReplicationError::Internal
-            })?
-            .into_iter()
-            // skip old empty range when two range has the same start offset
-            .sorted_by(|a, b| Ord::cmp(&a.index(), &b.index()))
-            .for_each(|range| {
-                self.ranges.borrow_mut().insert(
-                    range.start(),
-                    ReplicationRange::new(
-                        range,
-                        false,
-                        self.weak_self.borrow().clone(),
-                        self.client.clone(),
-                        self.cache.clone(),
-                        self.object_reader.clone(),
-                    ),
-                );
-            });
-        // 2. seal the last range
-        let last_range = self
-            .ranges
-            .borrow_mut()
-            .last_entry()
-            .map(|e| e.get().clone());
-        if let Some(last_range) = last_range {
-            *(self.last_range.borrow_mut()) = Option::Some(last_range.clone());
-            let range_index = last_range.metadata().index();
-            match last_range.seal().await {
-                Ok(confirm_offset) => {
-                    // 3. set stream next offset to the exclusive end of the last range
-                    *self.next_offset.borrow_mut() = confirm_offset;
-                }
-                Err(e) => {
-                    error!("{}Failed to seal range[{range_index}], {e}", self.log_ident);
-                    return Err(ReplicationError::Internal);
-                }
-            }
-        }
-        let range_count = self.ranges.borrow().len();
-        let start_offset = self.start_offset();
-        let next_offset = self.next_offset();
-        info!("{}Opened with range_count={range_count} start_offset={start_offset} next_offset={next_offset}", self.log_ident);
-        Ok(())
-    }
-
-    /// Close the stream.
-    /// 1. send stop signal to append task.
-    /// 2. await append task to stop.
-    /// 3. close all ranges.
-    pub async fn close(&self) {
-        info!("{}Closing...", self.log_ident);
-        *self.closed.borrow_mut() = true;
-        let _ = self.shutdown_signal_tx.send(());
-        // TODO: await append task to stop.
-        let last_range = self.last_range.borrow().as_ref().cloned();
-        if let Some(range) = last_range {
-            let _ = range.seal().await;
-        }
-        info!("{}Closed...", self.log_ident);
-    }
-
-    pub fn start_offset(&self) -> u64 {
-        self.ranges
-            .borrow()
-            .first_key_value()
-            .map(|(k, _)| *k)
-            .unwrap_or(0)
-    }
-
-    /// next record offset to be appended.
-    pub fn next_offset(&self) -> u64 {
-        *self.next_offset.borrow()
-    }
-
-    pub(crate) async fn append(&self, record_batch: RecordBatch) -> Result<u64, ReplicationError> {
-        let start_timestamp = Instant::now();
-        if *self.closed.borrow() {
-            warn!("{}Keep append to a closed stream.", self.log_ident);
-            return Err(ReplicationError::AlreadyClosed);
-        }
-        let base_offset = *self.next_offset.borrow();
-        let count = record_batch.last_offset_delta();
-        *self.next_offset.borrow_mut() = base_offset + count as u64;
-
-        let (append_tx, append_rx) = oneshot::channel::<Result<(), ReplicationError>>();
-        // trigger background append task to handle the append request.
-        if self
-            .append_requests_tx
-            .send(StreamAppendRequest::new(
-                base_offset,
-                record_batch,
-                append_tx,
-            ))
-            .await
-            .is_err()
-        {
-            warn!("{}Send to append request channel fail.", self.log_ident);
-            return Err(ReplicationError::AlreadyClosed);
-        }
-        // await append result.
-        match append_rx.await {
-            Ok(result) => {
-                trace!(
-                    "{}Append new record with base_offset={base_offset} count={count} cost {}us",
-                    self.log_ident,
-                    start_timestamp.elapsed().as_micros()
-                );
-                result.map(|_| base_offset)
-            }
-            Err(_) => Err(ReplicationError::AlreadyClosed),
-        }
-    }
-
-    pub(crate) async fn fetch(
-        &self,
-        start_offset: u64,
-        end_offset: u64,
-        batch_max_bytes: u32,
-    ) -> Result<Vec<Bytes>, ReplicationError> {
-        trace!(
-            "{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes}",
-            self.log_ident
-        );
-        if start_offset == end_offset {
-            return Ok(Vec::new());
-        }
-        let last_range = match self.last_range.borrow().as_ref() {
-            Some(range) => range.clone(),
-            None => return Err(ReplicationError::FetchOutOfRange),
-        };
-        // Fetch range is out of stream range.
-        if last_range.confirm_offset() < end_offset {
-            return Err(ReplicationError::FetchOutOfRange);
-        }
-        // Fast path: if fetch range is in the last range, then fetch from it.
-        if last_range.start_offset() <= start_offset {
-            return last_range
-                .fetch(start_offset, end_offset, batch_max_bytes)
-                .await;
-        }
-
-        // Slow path
-        // 1. find all ranges that intersect with the fetch range.
-        // 2. fetch from each range.
-        let mut fetch_ranges: Vec<Rc<ReplicationRange>> = Vec::new();
-        {
-            let ranges = self.ranges.borrow();
-            let mut cursor = ranges.upper_bound(Included(&start_offset));
-            while let Some(range) = cursor.value() {
-                if range.start_offset() >= end_offset {
-                    break;
-                }
-                fetch_ranges.push(range.clone());
-                cursor.move_next();
-            }
-        }
-        if fetch_ranges.is_empty() || fetch_ranges[0].start_offset() > start_offset {
-            return Err(ReplicationError::FetchOutOfRange);
-        }
-        let mut records: Vec<Bytes> = Vec::new();
-        let mut max_bytes_hint = batch_max_bytes;
-        for range in fetch_ranges {
-            if max_bytes_hint == 0 {
-                break;
-            }
-            let mut range_records = range
-                .fetch(
-                    max(start_offset, range.start_offset()),
-                    min(end_offset, range.confirm_offset()),
-                    max_bytes_hint,
-                )
-                .await?;
-            for bytes in range_records.iter() {
-                max_bytes_hint -= min(max_bytes_hint, bytes.len() as u32);
-            }
-            // TODO: check data integrity.
-            records.append(&mut range_records);
-        }
-        Ok(records)
     }
 
     async fn new_range(&self, range_index: i32, start_offset: u64) -> Result<(), ReplicationError> {
@@ -438,10 +246,204 @@ impl ReplicationStream {
             }
         }
     }
+}
 
-    pub async fn trim(&self, _new_start_offset: u64) -> Result<(), ReplicationError> {
-        // TODO
+impl Stream for ReplicationStream {
+    async fn open(&self) -> Result<(), ReplicationError> {
+        info!("{}Opening...", self.log_ident);
+        let client = self.client.upgrade().ok_or(ReplicationError::Internal)?;
+        // 1. load all ranges
+        client
+            .list_ranges(model::ListRangeCriteria::new(None, Some(self.id as u64)))
+            .await
+            .map_err(|e| {
+                error!(
+                    "{}Failed to list ranges from placement-driver: {e}",
+                    self.log_ident
+                );
+                ReplicationError::Internal
+            })?
+            .into_iter()
+            // skip old empty range when two range has the same start offset
+            .sorted_by(|a, b| Ord::cmp(&a.index(), &b.index()))
+            .for_each(|range| {
+                self.ranges.borrow_mut().insert(
+                    range.start(),
+                    ReplicationRange::new(
+                        range,
+                        false,
+                        self.weak_self.borrow().clone(),
+                        self.client.clone(),
+                        self.cache.clone(),
+                        self.object_reader.clone(),
+                    ),
+                );
+            });
+        // 2. seal the last range
+        let last_range = self
+            .ranges
+            .borrow_mut()
+            .last_entry()
+            .map(|e| e.get().clone());
+        if let Some(last_range) = last_range {
+            *(self.last_range.borrow_mut()) = Option::Some(last_range.clone());
+            let range_index = last_range.metadata().index();
+            match last_range.seal().await {
+                Ok(confirm_offset) => {
+                    // 3. set stream next offset to the exclusive end of the last range
+                    *self.next_offset.borrow_mut() = confirm_offset;
+                }
+                Err(e) => {
+                    error!("{}Failed to seal range[{range_index}], {e}", self.log_ident);
+                    return Err(ReplicationError::Internal);
+                }
+            }
+        }
+        let range_count = self.ranges.borrow().len();
+        let start_offset = self.start_offset();
+        let next_offset = self.next_offset();
+        info!("{}Opened with range_count={range_count} start_offset={start_offset} next_offset={next_offset}", self.log_ident);
         Ok(())
+    }
+
+    /// Close the stream.
+    /// 1. send stop signal to append task.
+    /// 2. await append task to stop.
+    /// 3. close all ranges.
+    async fn close(&self) {
+        info!("{}Closing...", self.log_ident);
+        *self.closed.borrow_mut() = true;
+        let _ = self.shutdown_signal_tx.send(());
+        // TODO: await append task to stop.
+        let last_range = self.last_range.borrow().as_ref().cloned();
+        if let Some(range) = last_range {
+            let _ = range.seal().await;
+        }
+        info!("{}Closed...", self.log_ident);
+    }
+
+    fn start_offset(&self) -> u64 {
+        self.ranges
+            .borrow()
+            .first_key_value()
+            .map(|(k, _)| *k)
+            .unwrap_or(0)
+    }
+
+    /// next record offset to be appended.
+    fn next_offset(&self) -> u64 {
+        *self.next_offset.borrow()
+    }
+
+    async fn append(&self, record_batch: RecordBatch) -> Result<u64, ReplicationError> {
+        let start_timestamp = Instant::now();
+        if *self.closed.borrow() {
+            warn!("{}Keep append to a closed stream.", self.log_ident);
+            return Err(ReplicationError::AlreadyClosed);
+        }
+        let base_offset = *self.next_offset.borrow();
+        let count = record_batch.last_offset_delta();
+        *self.next_offset.borrow_mut() = base_offset + count as u64;
+
+        let (append_tx, append_rx) = oneshot::channel::<Result<(), ReplicationError>>();
+        // trigger background append task to handle the append request.
+        if self
+            .append_requests_tx
+            .send(StreamAppendRequest::new(
+                base_offset,
+                record_batch,
+                append_tx,
+            ))
+            .await
+            .is_err()
+        {
+            warn!("{}Send to append request channel fail.", self.log_ident);
+            return Err(ReplicationError::AlreadyClosed);
+        }
+        // await append result.
+        match append_rx.await {
+            Ok(result) => {
+                trace!(
+                    "{}Append new record with base_offset={base_offset} count={count} cost {}us",
+                    self.log_ident,
+                    start_timestamp.elapsed().as_micros()
+                );
+                result.map(|_| base_offset)
+            }
+            Err(_) => Err(ReplicationError::AlreadyClosed),
+        }
+    }
+
+    async fn fetch(
+        &self,
+        start_offset: u64,
+        end_offset: u64,
+        batch_max_bytes: u32,
+    ) -> Result<Vec<Bytes>, ReplicationError> {
+        trace!(
+            "{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes}",
+            self.log_ident
+        );
+        if start_offset == end_offset {
+            return Ok(Vec::new());
+        }
+        let last_range = match self.last_range.borrow().as_ref() {
+            Some(range) => range.clone(),
+            None => return Err(ReplicationError::FetchOutOfRange),
+        };
+        // Fetch range is out of stream range.
+        if last_range.confirm_offset() < end_offset {
+            return Err(ReplicationError::FetchOutOfRange);
+        }
+        // Fast path: if fetch range is in the last range, then fetch from it.
+        if last_range.start_offset() <= start_offset {
+            return last_range
+                .fetch(start_offset, end_offset, batch_max_bytes)
+                .await;
+        }
+
+        // Slow path
+        // 1. find all ranges that intersect with the fetch range.
+        // 2. fetch from each range.
+        let mut fetch_ranges: Vec<Rc<ReplicationRange>> = Vec::new();
+        {
+            let ranges = self.ranges.borrow();
+            let mut cursor = ranges.upper_bound(Included(&start_offset));
+            while let Some(range) = cursor.value() {
+                if range.start_offset() >= end_offset {
+                    break;
+                }
+                fetch_ranges.push(range.clone());
+                cursor.move_next();
+            }
+        }
+        if fetch_ranges.is_empty() || fetch_ranges[0].start_offset() > start_offset {
+            return Err(ReplicationError::FetchOutOfRange);
+        }
+        let mut records: Vec<Bytes> = Vec::new();
+        let mut max_bytes_hint = batch_max_bytes;
+        for range in fetch_ranges {
+            if max_bytes_hint == 0 {
+                break;
+            }
+            let mut range_records = range
+                .fetch(
+                    max(start_offset, range.start_offset()),
+                    min(end_offset, range.confirm_offset()),
+                    max_bytes_hint,
+                )
+                .await?;
+            for bytes in range_records.iter() {
+                max_bytes_hint -= min(max_bytes_hint, bytes.len() as u32);
+            }
+            // TODO: check data integrity.
+            records.append(&mut range_records);
+        }
+        Ok(records)
+    }
+
+    async fn trim(&self, _new_start_offset: u64) -> Result<(), ReplicationError> {
+        todo!()
     }
 }
 

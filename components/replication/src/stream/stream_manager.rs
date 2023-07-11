@@ -16,7 +16,7 @@ use crate::{
     ReplicationError,
 };
 
-use super::{cache::RecordBatchCache, object_reader::ObjectReader};
+use super::{cache::RecordBatchCache, object_reader::ObjectReader, Stream};
 
 /// `StreamManager` is intended to be used in thread-per-core usage case. It is NOT `Send`.
 pub(crate) struct StreamManager {
