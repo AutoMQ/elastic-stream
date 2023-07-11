@@ -3,11 +3,10 @@
 use bytes::BytesMut;
 use config::ObjectStorageConfig;
 use std::env;
-use std::rc::Rc;
 use std::time::Duration;
 use store::error::FetchError;
-use tiered_storage::RangeFetchResult;
-use tiered_storage::RangeFetcher;
+use tiered_storage::range_fetcher::RangeFetchResult;
+use tiered_storage::range_fetcher::RangeFetcher;
 
 use clap::Parser;
 use tiered_storage::object_manager::MemoryObjectManager;
@@ -30,15 +29,13 @@ fn main() {
             cache_low_watermark: args.cache_low_watermark,
             force_flush_secs: 60 * 60,
         };
-        let range_fetcher = Rc::new(RangeFetcherMock {});
+        let range_fetcher = RangeFetcherMock {};
         let memory_object_manager: MemoryObjectManager = Default::default();
-        let object_manager = Rc::new(memory_object_manager);
-        let object_store =
-            DefaultObjectStorage::new(&config, range_fetcher, object_manager).unwrap();
-        object_store.add_range(1, 2, 0, 0);
+        let object_manager = memory_object_manager;
+        let object_store = DefaultObjectStorage::new(&config, range_fetcher, object_manager);
         let mut end_offset = 1;
         loop {
-            object_store.new_record_arrived(1, 2, end_offset, 128 * 1024);
+            object_store.new_commit(1, 2, 128 * 1024);
             end_offset = end_offset + 1;
             sleep(Duration::from_millis(args.send_interval_millis)).await;
         }

@@ -648,6 +648,6 @@ fn first_record_start_offset(records: &Bytes) -> Result<u64, DecodeError> {
     }
     let metadata = cursor.slice(..metadata_len);
     let metadata =
-        flatbuffers::root::<RecordBatchMeta>(&metadata).map_err(|e| DecodeError::Flatbuffer(e))?;
+        flatbuffers::root::<RecordBatchMeta>(&metadata).map_err(DecodeError::Flatbuffer)?;
     Ok(metadata.base_offset() as u64)
 }

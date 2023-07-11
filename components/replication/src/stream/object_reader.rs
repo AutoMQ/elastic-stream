@@ -272,9 +272,9 @@ impl RangeObjectMetadataManager {
     #[allow(dead_code)]
     pub(crate) fn add_object_metadata(&self, metadata: &ObjectMetadata) {
         let mut metadata_map = self.metadata_map.borrow_mut();
-        if !metadata_map.contains_key(&metadata.start_offset) {
-            metadata_map.insert(metadata.start_offset, metadata.clone());
-        }
+        metadata_map
+            .entry(metadata.start_offset)
+            .or_insert_with(|| metadata.clone());
     }
 
     fn find(

@@ -29,11 +29,11 @@ impl AsyncObjectStorage {
     pub fn new(config: &ObjectStorageConfig, store: ElasticStore) -> Self {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let config = config.clone();
-        let store = store.clone();
+        let store = store;
         let _ = thread::Builder::new()
             .name("ObjectStorage".to_owned())
             .spawn(move || {
-                let _ = tokio_uring::start(async move {
+                tokio_uring::start(async move {
                     let range_fetcher = DefaultRangeFetcher::new(Rc::new(store));
                     let object_manager = MemoryObjectManager::default();
                     let object_storage =
@@ -170,10 +170,12 @@ where
         let owner = self.object_manager.is_owner(stream_id, range_index);
         let range_key = RangeKey::new(stream_id, range_index);
         let mut range = self.ranges.borrow().get(&range_key).cloned();
-        if owner.is_some() && range.is_none() {
-            self.add_range(stream_id, range_index, owner.unwrap());
-            range = self.ranges.borrow().get(&range_key).cloned();
-        } else if owner.is_none() && range.is_some() {
+        if let Some(owner) = owner {
+            if range.is_none() {
+                self.add_range(stream_id, range_index, owner);
+                range = self.ranges.borrow().get(&range_key).cloned();
+            }
+        } else if range.is_some() {
             self.remove_range(stream_id, range_index);
             return;
         }

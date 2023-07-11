@@ -229,7 +229,7 @@ impl Response {
                         throttle,
                         object_metadata_list,
                     });
-                    self.payload = frame.get_response_payload().clone();
+                    self.payload = frame.get_response_payload();
                 }
                 Err(e) => {
                     error!(

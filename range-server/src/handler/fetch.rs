@@ -1,6 +1,5 @@
 use super::util::{root_as_rpc_request, MIN_BUFFER_SIZE};
 use crate::range_manager::RangeManager;
-use bytes::BytesMut;
 use codec::frame::Frame;
 use flatbuffers::FlatBufferBuilder;
 use log::{trace, warn};

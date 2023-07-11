@@ -141,7 +141,7 @@ impl DefaultRangeAccumulator {
                         .await
                     {
                         Ok(records) => {
-                            if records.payload.len() == 0 {
+                            if records.payload.is_empty() {
                                 // read to end
                                 break;
                             }
