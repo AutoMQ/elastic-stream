@@ -1,9 +1,8 @@
-use log::{error, trace, warn};
-use std::collections::BTreeMap;
-
-use model::Batch;
-
 use crate::error::ServiceError;
+use local_sync::oneshot;
+use log::{error, trace, warn};
+use model::Batch;
+use std::collections::{BTreeMap, HashMap};
 
 /// Append Request Window ensures append requests of a stream range are dispatched to store in order.
 ///
@@ -33,6 +32,16 @@ pub(crate) struct Window {
 
     /// Submitted request offset to batch size.
     submitted: BTreeMap<u64, u32>,
+
+    /// Given that the tasks are executed out-of-order, it's possible commit with larger offset
+    /// attempts prior to the smaller one.
+    ///
+    /// According to the replication protocol, we must NOT acknowledge requests if their predecessors
+    /// have not been.
+    ///
+    /// To mitigate this issue, tasks with larger commit offset shall be suspended till all of their
+    /// prior records are acknowledged.
+    commit_queue: HashMap<u64, oneshot::Sender<u64>>,
 }
 
 impl Window {
@@ -43,6 +52,7 @@ impl Window {
             submitted: BTreeMap::new(),
             // The initial commit offset is the same as the next offset.
             committed: next,
+            commit_queue: HashMap::new(),
         }
     }
 
@@ -112,6 +122,61 @@ impl Window {
         Ok(())
     }
 
+    fn fast_commit(&mut self, offset: u64) -> Option<u64> {
+        if self.committed == offset {
+            if let Some((first_key, len)) = self.submitted.pop_first() {
+                debug_assert!(
+                    first_key == offset,
+                    "{}Unexpected commit call, the offset should be the first key of the submitted map, offset: {}, first_key: {}",
+                    self.log_ident,
+                    offset,
+                    first_key);
+
+                self.committed = offset + len as u64;
+                trace!(
+                    "{}-Window#committed advances to: {}",
+                    self.log_ident,
+                    self.committed
+                );
+            }
+
+            // Try to commit all prior commit attempts once they become continuous
+            while let Some(tx) = self.commit_queue.remove(&self.committed) {
+                match self.submitted.pop_first() {
+                    Some((offset, len)) => {
+                        debug_assert_eq!(
+                            offset, self.committed,
+                            "The first entry in submitted map should be the one to commit"
+                        );
+                        self.committed = offset + len as u64;
+                        trace!(
+                            "{}-Window#committed advances to: {}",
+                            self.log_ident,
+                            self.committed
+                        );
+                        let _ = tx.send(self.committed);
+                    }
+                    None => {
+                        warn!("Try to commit an offset without prior prepared submit");
+                        unreachable!();
+                    }
+                }
+            }
+            Some(self.committed)
+        } else {
+            None
+        }
+    }
+
+    /// Queue commit requests till they become continuous
+    fn queue_commit(&mut self, offset: u64, tx: oneshot::Sender<u64>) {
+        debug_assert!(
+            offset > self.committed,
+            "SHOULD use fast_commit before queue_commit"
+        );
+        self.commit_queue.insert(offset, tx);
+    }
+
     /// Commits the request with the given offset, and wakes up the subsequent request if exists.
     ///
     /// Note that this method will be called in the bootstrap phase to init the committed and next offset.
@@ -121,48 +186,21 @@ impl Window {
     ///
     /// # Return
     /// * the committed offset.
-    pub(crate) fn commit(&mut self, offset: u64) -> u64 {
+    pub(crate) async fn commit(&mut self, offset: u64) -> u64 {
         trace!("{}-Window tries to commit: {}", self.log_ident, offset);
-
-        if self.committed != offset {
-            warn!(
-                "{}-Window committed: {}, offset: {}",
-                self.log_ident, self.committed, offset
-            );
+        match self.fast_commit(offset) {
+            Some(committed) => committed,
+            None => {
+                let (tx, rx) = oneshot::channel();
+                self.queue_commit(offset, tx);
+                match rx.await {
+                    Ok(committed) => committed,
+                    Err(_e) => {
+                        unreachable!("internal oneshot channel never fails");
+                    }
+                }
+            }
         }
-
-        // The given offset to commit should be equal to the `committed` offset.
-        debug_assert!(
-            offset == self.committed,
-            "{}Unexpected commit call, the offset should be equal to the committed offset, offset: {}, committed: {}",
-            self.log_ident,
-            offset,
-            self.committed);
-
-        // The submitted map should not be empty.
-        debug_assert!(
-            !self.submitted.is_empty(),
-            "{}Must check-barrier prior to commit",
-            self.log_ident
-        );
-
-        if let Some((first_key, len)) = self.submitted.pop_first() {
-            debug_assert!(
-                first_key == offset,
-                "{}Unexpected commit call, the offset should be the first key of the submitted map, offset: {}, first_key: {}",
-                self.log_ident,
-                offset,
-                first_key);
-
-            self.committed = offset + len as u64;
-            trace!(
-                "{}-Window#committed is changed to: {}",
-                self.log_ident,
-                self.committed
-            );
-        }
-
-        self.committed
     }
 }
 
@@ -221,9 +259,9 @@ mod tests {
         assert_eq!(2, window.next());
     }
 
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn test_check_barrier() {
+    async fn test_check_barrier() {
         let mut window = super::Window::new(String::from(""), 0);
         let foo1 = Foo::new(0);
         let foo2 = Foo::new(2);
@@ -241,7 +279,7 @@ mod tests {
         assert!(window.check_barrier(&foo2).is_ok());
 
         // Commit foo2, and foo1 will be committed implicitly.
-        assert_eq!(4, window.commit(2));
+        assert_eq!(4, window.commit(2).await);
 
         // Now, foo1 will be rejected because the offset is already committed, the error is OffsetCommitted.
         assert!(matches!(

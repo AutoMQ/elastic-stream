@@ -2989,6 +2989,7 @@ dependencies = [
  "futures",
  "io-uring",
  "lazy_static",
+ "local-sync",
  "log",
  "log4rs",
  "minstant",

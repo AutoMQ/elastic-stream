@@ -151,54 +151,63 @@ impl Append {
                 detail: None,
             },
         );
-        let append_results: Vec<_> = res_from_store
-            .iter()
-            .map(|res| {
-                match res {
-                    Ok(result) => {
-                        if let Err(e) = unsafe { &mut *range_manager.get() }.commit(
+
+        let mut append_results: Vec<_> = vec![];
+        for res in &res_from_store {
+            match res {
+                Ok(result) => {
+                    let rm = unsafe { &mut *range_manager.get() };
+                    if let Err(e) = rm
+                        .commit(
                             result.stream_id,
                             result.range_index as i32,
                             result.offset as u64,
                             result.last_offset_delta,
                             result.bytes_len,
-                        ) {
-                            warn!(
-                                "Failed to ack offset on store completion to stream manager: {:?}",
-                                e
-                            );
-                        }
-                        let args = AppendResultEntryArgs {
-                            timestamp_ms: Utc::now().timestamp(),
-                            status: Some(ok_status),
-                        };
-                        protocol::rpc::header::AppendResultEntry::create(&mut builder, &args)
-                    }
-                    Err(e) => {
-                        // TODO: what to do with the offset on failure?
-                        warn!("Failed to append records to store: {:?}", e);
-
-                        let (err_code, error_message) = Self::convert_store_error(e);
-
-                        let error_message_fb = Some(builder.create_string(error_message.as_str()));
-                        let status = protocol::rpc::header::Status::create(
-                            &mut builder,
-                            &StatusArgs {
-                                code: err_code,
-                                message: error_message_fb,
-                                detail: None,
-                            },
+                        )
+                        .await
+                    {
+                        warn!(
+                            "Failed to ack offset on store completion to stream manager: {:?}",
+                            e
                         );
-
-                        let args = AppendResultEntryArgs {
-                            timestamp_ms: 0,
-                            status: Some(status),
-                        };
-                        protocol::rpc::header::AppendResultEntry::create(&mut builder, &args)
                     }
+                    let args = AppendResultEntryArgs {
+                        timestamp_ms: Utc::now().timestamp(),
+                        status: Some(ok_status),
+                    };
+                    append_results.push(protocol::rpc::header::AppendResultEntry::create(
+                        &mut builder,
+                        &args,
+                    ));
                 }
-            })
-            .collect();
+                Err(e) => {
+                    // TODO: what to do with the offset on failure?
+                    warn!("Failed to append records to store: {:?}", e);
+
+                    let (err_code, error_message) = Self::convert_store_error(e);
+
+                    let error_message_fb = Some(builder.create_string(error_message.as_str()));
+                    let status = protocol::rpc::header::Status::create(
+                        &mut builder,
+                        &StatusArgs {
+                            code: err_code,
+                            message: error_message_fb,
+                            detail: None,
+                        },
+                    );
+
+                    let args = AppendResultEntryArgs {
+                        timestamp_ms: 0,
+                        status: Some(status),
+                    };
+                    append_results.push(protocol::rpc::header::AppendResultEntry::create(
+                        &mut builder,
+                        &args,
+                    ));
+                }
+            }
+        }
 
         let append_results_fb = builder.create_vector(&append_results);
 

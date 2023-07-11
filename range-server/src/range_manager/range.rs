@@ -42,31 +42,34 @@ impl Range {
         }
     }
 
-    pub(crate) fn commit(&mut self, offset: u64) {
-        let offset = self.window_mut().map(|window| window.commit(offset));
-
-        if let Some(offset) = offset {
-            if let Some(ref mut committed) = self.committed {
-                if offset <= *committed {
-                    warn!(
-                        "{}Try to commit offset {}, which is less than current committed offset {}",
-                        self.log_ident, offset, *committed
-                    );
-                } else {
-                    trace!(
-                        "{}Committed offset changed from {} to {}",
-                        self.log_ident,
-                        *committed,
-                        offset
-                    );
-                    *committed = offset;
-                }
+    pub(crate) async fn commit(&mut self, offset: u64) {
+        let offset = match self.window_mut() {
+            Some(win) => win.commit(offset).await,
+            None => {
                 return;
             }
+        };
 
-            if offset >= self.metadata.start() {
-                self.committed = Some(offset);
+        if let Some(ref mut committed) = self.committed {
+            if offset <= *committed {
+                warn!(
+                    "{}Try to commit offset {}, which is less than current committed offset {}",
+                    self.log_ident, offset, *committed
+                );
+            } else {
+                trace!(
+                    "{}Committed offset changed from {} to {}",
+                    self.log_ident,
+                    *committed,
+                    offset
+                );
+                *committed = offset;
             }
+            return;
+        }
+
+        if offset >= self.metadata.start() {
+            self.committed = Some(offset);
         }
     }
 
@@ -148,27 +151,27 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_commit() -> Result<(), Box<dyn Error>> {
+    #[tokio::test]
+    async fn test_commit() -> Result<(), Box<dyn Error>> {
         let metadata = RangeMetadata::new(0, 0, 0, 0, None);
         let mut range = super::Range::new(metadata);
         range
             .window_mut()
             .and_then(|window| window.check_barrier(&Foo { offset: 0, len: 1 }).ok());
-        range.commit(0);
+        range.commit(0).await;
         assert_eq!(range.committed(), Some(1));
 
         Ok(())
     }
 
-    #[test]
-    fn test_seal() -> Result<(), Box<dyn Error>> {
+    #[tokio::test]
+    async fn test_seal() -> Result<(), Box<dyn Error>> {
         let metadata = RangeMetadata::new(0, 0, 0, 0, None);
         let mut range = super::Range::new(metadata.clone());
         range
             .window_mut()
             .and_then(|window| window.check_barrier(&Foo { offset: 0, len: 1 }).ok());
-        range.commit(0);
+        range.commit(0).await;
 
         let mut metadata = RangeMetadata::new(0, 0, 0, 0, Some(1));
         range.seal(&mut metadata);

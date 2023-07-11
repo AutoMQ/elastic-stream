@@ -166,8 +166,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_seal() -> Result<(), Box<dyn Error>> {
+    #[tokio::test]
+    async fn test_seal() -> Result<(), Box<dyn Error>> {
         let mut stream = StreamT::default();
         stream.stream_id = 1;
         stream.replica = 1;
@@ -188,7 +188,7 @@ mod tests {
                 })
                 .ok()
         });
-        range.commit(0);
+        range.commit(0).await;
         let mut metadata = RangeMetadata::new(1, 0, 0, 0, Some(50));
         stream.seal(&mut metadata)?;
 
