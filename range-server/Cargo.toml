@@ -26,6 +26,7 @@ flatbuffers = { workspace = true }
 futures = { workspace = true }
 io-uring = { workspace = true }
 lazy_static = { version = "1.4.0" }
+local-sync = { workspace = true }
 log = { workspace = true }
 log4rs = { workspace = true }
 minstant = { workspace = true }
@@ -47,7 +48,6 @@ tokio = { workspace = true }
 tokio-uring = { workspace = true }
 transport = { path = "../components/transport" }
 util = { path = "../components/util" }
-local-sync = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.5"
