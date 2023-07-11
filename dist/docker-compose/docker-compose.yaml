@@ -1,6 +1,6 @@
 services:
   range-server:
-    image: "elasticstream/range-server:0.2.1"
+    image: "elasticstream/range-server:0.2.2"
     ports:
       - "10911:10911"
     depends_on:
@@ -9,7 +9,7 @@ services:
     volumes:
       - rs_data:/data
   pd:
-    image: "elasticstream/pd-server:0.2.1"
+    image: "elasticstream/pd-server:0.2.2"
     ports:
       - "12378:12378"
     healthcheck:

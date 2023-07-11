@@ -23,7 +23,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Li Zhanhui <lizhanhui@gmail.com>", "Ning Yu", "Han Xu", "Daniel", "Ping'an Tian", "Curtis Wan"]
 description = "A Cloud-Native Distributed Storage System For Messaging and Streaming"
 license = "SSPL"
@@ -42,7 +42,7 @@ crc = "3.0"
 crc32fast = { version = "1.3", features = ["nightly"] }
 derivative = "2.2"
 futures ={ version = "0.3" }
-itertools = { version = "0.10.5" }
+itertools = { version = "0.11" }
 lazy_static = "1.4"
 io-uring = "0.5"
 tokio-uring = { git = "https://github.com/tokio-rs/tokio-uring.git", branch = "master", features = [
@@ -54,7 +54,7 @@ crossbeam = "0.8"
 num_cpus = "1"
 thiserror = "1.0"
 clap = { version = "4.0", features = ["derive", "env"] }
-num_enum = "0.5"
+num_enum = "0.6"
 
 flatbuffers = { git = "https://github.com/google/flatbuffers.git", tag = "v23.3.3" }
 
@@ -66,6 +66,7 @@ opendal = "0.38.0"
 log = { version = "0.4", features = [
     "max_level_trace",
     "release_max_level_info",
+    "kv_unstable_serde",
 ] }
 env_logger = "0.10"
 log4rs = "1.2"
@@ -80,7 +81,7 @@ rocksdb = { git = "https://github.com/AutoMQ/rust-rocksdb.git", branch = "develo
     "jemalloc",
 ] }
 
-pprof = { version = "0.11", features = ["flamegraph"] }
+pprof = { version = "0.12", features = ["flamegraph"] }
 
 rand = { version = "0.8" }
 uuid = { version = "1.3", features = [
@@ -97,7 +98,7 @@ gethostname = "0.4"
 
 ordinal = "0.3"
 
-criterion = "0.4"
+criterion = "0.5"
 
 minstant = "0.1"
 minitrace = "0.4"
