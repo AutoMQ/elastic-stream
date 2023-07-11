@@ -519,7 +519,7 @@ impl Wal {
         )
     }
 
-    fn alloc_segment(&mut self) -> Result<LogSegment, StoreError> {
+    fn alloc_segment(&self) -> Result<LogSegment, StoreError> {
         let offset = if self.segments.is_empty() {
             0
         } else if let Some(last) = self.segments.back() {
