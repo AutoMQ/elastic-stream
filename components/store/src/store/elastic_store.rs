@@ -11,17 +11,18 @@ use crate::{
     index::{driver::IndexDriver, MinOffset},
     io::{
         self,
+        record::RecordType,
         task::{
             IoTask::{self, Read, Write},
             WriteTask,
         },
-        ReadTask, record::RecordType,
+        ReadTask,
     },
     offset_manager::WalOffsetManager,
     option::{ReadOptions, WriteOptions},
     AppendRecordRequest, AppendResult, FetchResult, Store,
 };
-use bytes::{Buf, BytesMut, BufMut};
+use bytes::{Buf, BufMut, BytesMut};
 use client::PlacementDriverIdGenerator;
 use crossbeam::channel::Sender;
 use futures::future::join_all;
@@ -263,7 +264,7 @@ impl Store for ElasticStore {
                         let _type = length_type & 0xFF;
                         debug_assert_eq!(_type as u8, RecordType::Full.into());
                         let expected_length = length_type >> 8;
-                        let actual_length = res.payload.iter().map(|buf|buf.len()).sum::<usize>();
+                        let actual_length = res.payload.iter().map(|buf| buf.len()).sum::<usize>();
                         if expected_length != actual_length as u32 {
                             error!(
                                 "Data corrupted: Record length mismatch. Expected: {}, Actual: {}",
