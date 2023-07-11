@@ -12,6 +12,7 @@ use crate::{
     io::{
         self,
         record::RecordType,
+        segment::LogSegment,
         task::{
             IoTask::{self, Read, Write},
             WriteTask,
@@ -22,7 +23,7 @@ use crate::{
     option::{ReadOptions, WriteOptions},
     AppendRecordRequest, AppendResult, FetchResult, Store,
 };
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::Buf;
 use client::PlacementDriverIdGenerator;
 use crossbeam::channel::Sender;
 use futures::future::join_all;
@@ -273,19 +274,14 @@ impl Store for ElasticStore {
                             return Err(FetchError::DataCorrupted);
                         }
 
-                        // TODO: extract CRC32 calculation
-                        let payload_crc = util::crc32::crc32_vectored(res.payload.iter());
                         let segment_size = self.config.store.segment_size;
                         let base_file_offset = res.wal_offset as u64 / segment_size * segment_size;
-                        let mut buf = BytesMut::with_capacity(4 + 8);
-                        buf.put_u32(payload_crc);
-                        buf.put_u64(base_file_offset);
-                        let expected_crc = util::crc32::crc32(&buf[..]);
-
-                        if expected_crc != expected_crc32 {
+                        let actual_crc =
+                            LogSegment::calculate_record_crc32(&res.payload, base_file_offset);
+                        if actual_crc != expected_crc32 {
                             error!(
                                 "Data corrupted: CRC32 checksum failed. Expected: {}, Actual: {}",
-                                expected_crc32, payload_crc
+                                expected_crc32, actual_crc
                             );
                             return Err(FetchError::DataCorrupted);
                         }

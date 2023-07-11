@@ -27,7 +27,7 @@
 pub mod cursor;
 pub mod error;
 mod index;
-mod io;
+pub(crate) mod io;
 mod offset_manager;
 pub mod option;
 mod request;

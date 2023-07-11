@@ -306,16 +306,26 @@ impl LogSegment {
         }
     }
 
+    pub fn calculate_record_crc32<T, U>(payload: U, file_offset: u64) -> u32
+    where
+        U: AsRef<[T]>,
+        T: AsRef<[u8]>,
+    {
+        let io_vec = payload.as_ref().iter().map(|buf| buf.as_ref());
+
+        let payload_crc = util::crc32::crc32_vectored(io_vec);
+        let mut buf = BytesMut::with_capacity(4 + 8);
+        buf.put_u32(payload_crc);
+        buf.put_u64(file_offset);
+        util::crc32::crc32(&buf[..])
+    }
+
     pub(crate) fn append_record(
         &mut self,
         writer: &mut AlignedBufWriter,
         payload: &[u8],
     ) -> Result<u64, StoreError> {
-        let crc = util::crc32::crc32(payload);
-        let mut total_buf = BytesMut::with_capacity(4 + 8);
-        total_buf.put_u32(crc);
-        total_buf.put_u64(self.wal_offset);
-        let crc = util::crc32::crc32(total_buf);
+        let crc = Self::calculate_record_crc32(&[payload], self.wal_offset);
         let length_type = RecordType::Full.with_length(payload.len() as u32);
         writer.write_u32(crc)?;
         writer.write_u32(length_type)?;
