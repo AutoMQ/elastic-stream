@@ -325,7 +325,7 @@ impl LogSegment {
         writer: &mut AlignedBufWriter,
         payload: &[u8],
     ) -> Result<u64, StoreError> {
-        let crc = Self::calculate_record_crc32(&[payload], self.wal_offset);
+        let crc = Self::calculate_record_crc32([payload], self.wal_offset);
         let length_type = RecordType::Full.with_length(payload.len() as u32);
         writer.write_u32(crc)?;
         writer.write_u32(length_type)?;
