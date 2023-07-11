@@ -16,7 +16,7 @@ use crate::{
     ReplicationError,
 };
 
-use super::{cache::RecordBatchCache, object_reader::ObjectReader, Stream};
+use super::{cache::RecordBatchCache, object_reader::AsyncObjectReader, Stream};
 
 /// `StreamManager` is intended to be used in thread-per-core usage case. It is NOT `Send`.
 pub(crate) struct StreamManager {
@@ -24,7 +24,7 @@ pub(crate) struct StreamManager {
     round_robin: usize,
     streams: Rc<RefCell<HashMap<u64, Rc<ReplicationStream>>>>,
     cache: Rc<RecordBatchCache>,
-    object_reader: Rc<ObjectReader>,
+    object_reader: Rc<AsyncObjectReader>,
 }
 
 impl StreamManager {
@@ -40,7 +40,7 @@ impl StreamManager {
             clients.push(client);
         }
 
-        let object_reader = Rc::new(ObjectReader::new());
+        let object_reader = Rc::new(AsyncObjectReader::new());
 
         Self {
             clients,
@@ -102,15 +102,16 @@ impl StreamManager {
         let stream = self.streams.borrow().get(&request.stream_id).map(Rc::clone);
         if let Some(stream) = stream {
             tokio_uring::spawn(async move {
-                let result = stream
-                    .fetch(
-                        request.start_offset,
-                        request.end_offset,
-                        request.batch_max_bytes,
-                    )
-                    .await
-                    .map(|data| ReadResponse { data });
-                let _ = tx.send(result);
+                // FIXME: implement fetch
+                // let result = stream
+                //     .fetch(
+                //         request.start_offset,
+                //         request.end_offset,
+                //         request.batch_max_bytes,
+                //     )
+                //     .await
+                //     .map(|data| ReadResponse { data });
+                // let _ = tx.send(result);
             });
         } else {
             let _ = tx.send(Err(ReplicationError::StreamNotExist));
@@ -169,13 +170,8 @@ impl StreamManager {
         let object_reader = self.object_reader.clone();
         tokio_uring::spawn(async move {
             let client = Rc::downgrade(&client);
-            let stream = ReplicationStream::new(
-                request.stream_id as i64,
-                request.epoch,
-                client,
-                cache,
-                object_reader,
-            );
+            let stream =
+                ReplicationStream::new(request.stream_id as i64, request.epoch, client, cache);
             if let Err(e) = stream.open().await {
                 let _ = tx.send(Err(e));
                 return;

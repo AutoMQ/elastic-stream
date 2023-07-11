@@ -2,10 +2,10 @@ use crate::stream::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
 use super::cache::RecordBatchCache;
-use super::object_reader::ObjectReader;
+use super::object_reader::AsyncObjectReader;
 use super::replication_range::ReplicationRange;
+use super::FetchDataset;
 use super::Stream;
-use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
 use local_sync::{mpsc, oneshot};
@@ -38,9 +38,7 @@ pub(crate) struct ReplicationStream {
     shutdown_signal_tx: broadcast::Sender<()>,
     // stream closed mark.
     closed: Rc<RefCell<bool>>,
-
     cache: Rc<RecordBatchCache>,
-    object_reader: Rc<ObjectReader>,
 }
 
 impl ReplicationStream {
@@ -49,7 +47,6 @@ impl ReplicationStream {
         epoch: u64,
         client: Weak<Client>,
         cache: Rc<RecordBatchCache>,
-        object_reader: Rc<ObjectReader>,
     ) -> Rc<Self> {
         let (append_requests_tx, append_requests_rx) = mpsc::bounded::channel(1024);
         let (append_tasks_tx, append_tasks_rx) = mpsc::unbounded::channel();
@@ -68,7 +65,6 @@ impl ReplicationStream {
             shutdown_signal_tx,
             closed: Rc::new(RefCell::new(false)),
             cache,
-            object_reader,
         });
 
         *(this.weak_self.borrow_mut()) = Rc::downgrade(&this);
@@ -100,7 +96,6 @@ impl ReplicationStream {
                 self.weak_self.borrow().clone(),
                 self.client.clone(),
                 self.cache.clone(),
-                self.object_reader.clone(),
             );
             info!("{}Create new range: {:?}", range.metadata(), self.log_ident);
             self.ranges.borrow_mut().insert(start_offset, range.clone());
@@ -275,7 +270,6 @@ impl Stream for ReplicationStream {
                         self.weak_self.borrow().clone(),
                         self.client.clone(),
                         self.cache.clone(),
-                        self.object_reader.clone(),
                     ),
                 );
             });
@@ -379,13 +373,13 @@ impl Stream for ReplicationStream {
         start_offset: u64,
         end_offset: u64,
         batch_max_bytes: u32,
-    ) -> Result<Vec<Bytes>, ReplicationError> {
+    ) -> Result<FetchDataset, ReplicationError> {
         trace!(
             "{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes}",
             self.log_ident
         );
         if start_offset == end_offset {
-            return Ok(Vec::new());
+            return Ok(FetchDataset::Records(vec![]));
         }
         let last_range = match self.last_range.borrow().as_ref() {
             Some(range) => range.clone(),
@@ -420,26 +414,50 @@ impl Stream for ReplicationStream {
         if fetch_ranges.is_empty() || fetch_ranges[0].start_offset() > start_offset {
             return Err(ReplicationError::FetchOutOfRange);
         }
-        let mut records: Vec<Bytes> = Vec::new();
-        let mut max_bytes_hint = batch_max_bytes;
+        let mut first_object = true;
+        let mut remaining_size = batch_max_bytes;
+        let mut all_blocks = vec![];
+        let mut all_objects = vec![];
         for range in fetch_ranges {
-            if max_bytes_hint == 0 {
+            if remaining_size == 0 {
                 break;
             }
-            let mut range_records = range
+            let fetch_dataset = range
                 .fetch(
                     max(start_offset, range.start_offset()),
                     min(end_offset, range.confirm_offset()),
-                    max_bytes_hint,
+                    remaining_size,
                 )
                 .await?;
-            for bytes in range_records.iter() {
-                max_bytes_hint -= min(max_bytes_hint, bytes.len() as u32);
+            match fetch_dataset {
+                FetchDataset::Records(mut blocks) => {
+                    remaining_size -= min(blocks.iter().map(|b| b.len()).sum(), remaining_size);
+                    all_blocks.append(&mut blocks);
+                }
+                FetchDataset::Mixin(mut blocks, mut objects) => {
+                    remaining_size -= min(blocks.iter().map(|b| b.len()).sum(), remaining_size);
+                    all_blocks.append(&mut blocks);
+                    all_objects.append(&mut objects);
+
+                    let object_start = if first_object { 1 } else { 0 };
+                    if !objects.is_empty() {
+                        remaining_size -= min(
+                            objects[object_start..]
+                                .iter()
+                                .map(|o| o.data_len)
+                                .sum::<u32>(),
+                            remaining_size,
+                        );
+                    }
+                }
             }
-            // TODO: check data integrity.
-            records.append(&mut range_records);
+            first_object = false;
         }
-        Ok(records)
+        return if all_objects.is_empty() {
+            Ok(FetchDataset::Records(all_blocks))
+        } else {
+            Ok(FetchDataset::Mixin(all_blocks, all_objects))
+        };
     }
 
     async fn trim(&self, _new_start_offset: u64) -> Result<(), ReplicationError> {

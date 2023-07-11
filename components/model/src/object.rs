@@ -30,7 +30,7 @@ impl ObjectMetadata {
         }
     }
 
-    /// Find the position of the given offset which offset is after the position in the sparse index.
+    /// Try find the position of the given offset which offset is after the position in the sparse index.
     pub fn find_bound(
         &self,
         start_offset: u64,
@@ -49,8 +49,10 @@ impl ObjectMetadata {
         }
 
         // find bound start_position and end_position from sparse index
-        let mut end_position = None;
-        let start_position = if let Some(position) = position {
+        let mut end_position = self.data_len;
+        let start_position = if start_offset == self.start_offset {
+            0
+        } else if let Some(position) = position {
             position
         } else {
             let mut position = 0;
@@ -66,18 +68,14 @@ impl ObjectMetadata {
                 }
                 if let Some(end_offset) = end_offset {
                     if index_end_offset >= end_offset {
-                        end_position = Some(index_position);
+                        end_position = index_position;
                         break;
                     }
                 }
             }
             position
         };
-        let end_position = if let Some(end_position) = end_position {
-            end_position
-        } else {
-            min(self.data_len, start_position + Self::normalize(size_hint))
-        };
+        end_position = min(end_position, start_position + Self::normalize(size_hint));
         Some((start_position, end_position))
     }
 

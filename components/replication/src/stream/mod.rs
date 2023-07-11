@@ -1,16 +1,19 @@
-use bytes::Bytes;
-use model::RecordBatch;
+use model::{object::ObjectMetadata, RecordBatch};
 
 use crate::ReplicationError;
 
+use self::records_block::RecordsBlock;
+
 pub(crate) mod cache;
 pub(crate) mod object_reader;
+pub(crate) mod object_stream;
+pub(crate) mod records_block;
 pub(crate) mod replication_range;
 pub(crate) mod replication_stream;
 pub(crate) mod replicator;
 pub(crate) mod stream_manager;
 
-trait Stream {
+pub(crate) trait Stream {
     async fn open(&self) -> Result<(), ReplicationError>;
 
     async fn close(&self);
@@ -26,7 +29,12 @@ trait Stream {
         start_offset: u64,
         end_offset: u64,
         batch_max_bytes: u32,
-    ) -> Result<Vec<Bytes>, ReplicationError>;
+    ) -> Result<FetchDataset, ReplicationError>;
 
     async fn trim(&self, _new_start_offset: u64) -> Result<(), ReplicationError>;
+}
+
+pub(crate) enum FetchDataset {
+    Records(Vec<RecordsBlock>),
+    Mixin(Vec<RecordsBlock>, Vec<ObjectMetadata>),
 }
