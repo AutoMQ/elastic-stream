@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/pd/pkg/sbp/codec"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/operation"
 )
 
 func TestWriteScheduler(t *testing.T) {
@@ -66,7 +66,7 @@ func makeControlWriteRequest(streamID uint32) frameWriteRequest {
 
 func makeDataWriteRequest(streamID uint32) frameWriteRequest {
 	return frameWriteRequest{
-		f: codec.NewDataFrameReq(&codec.DataFrameContext{OpCode: operation.Operation{Code: operation.OpListRange}}, nil, nil),
+		f: codec.NewDataFrameReq(&codec.DataFrameContext{OpCode: rpcfb.OperationCodeLIST_RANGE}, nil, nil),
 		stream: &stream{
 			id: streamID,
 		},

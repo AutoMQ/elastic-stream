@@ -14,7 +14,6 @@ import (
 
 	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/pd/pkg/sbp/codec"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/operation"
 	"github.com/AutoMQ/pd/pkg/sbp/protocol"
 )
 
@@ -389,7 +388,7 @@ func (rl *connReadLoop) run() error {
 		case *codec.GoAwayFrame:
 			err = rl.processGoAway(f)
 		case *codec.DataFrame:
-			if f.OpCode.Code == operation.OpHeartbeat {
+			if f.OpCode == rpcfb.OperationCodeHEARTBEAT {
 				err = rl.processHeartbeat(f)
 			} else {
 				err = rl.processData(f)

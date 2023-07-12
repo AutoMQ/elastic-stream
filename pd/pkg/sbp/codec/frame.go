@@ -14,8 +14,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/operation"
 )
 
 const (
@@ -87,7 +87,7 @@ type Frame interface {
 //	|                         Payload Checksum (32)                         |
 //	+-----------------------------------------------------------------------+
 type baseFrame struct {
-	OpCode    operation.Operation // OpCode determines the format and semantics of the frame
+	OpCode    rpcfb.OperationCode // OpCode determines the format and semantics of the frame
 	Flag      Flags               // Flag is reserved for boolean flags specific to the frame type
 	StreamID  uint32              // StreamID identifies which stream the frame belongs to
 	HeaderFmt format.Format       // HeaderFmt identifies the format of the Header.
@@ -115,7 +115,7 @@ func (f baseFrame) Summarize() []zap.Field {
 func (f baseFrame) Info() []zap.Field {
 	fields := make([]zapcore.Field, 0, 5)
 	fields = append(fields, zap.Int("size", f.Size()))
-	fields = append(fields, zap.String("operation", f.OpCode.String()))
+	fields = append(fields, zap.String("operation", rpcfb.EnumNamesOperationCode[f.OpCode]))
 	fields = append(fields, zap.String("flag", fmt.Sprintf("%08b", f.Flag)))
 	fields = append(fields, zap.Uint32("streamID", f.StreamID))
 	fields = append(fields, zap.String("format", f.HeaderFmt.String()))
@@ -239,7 +239,7 @@ func (fr *Framer) ReadFrame() (frame Frame, free func(), err error) {
 	}
 
 	bFrame := baseFrame{
-		OpCode:    operation.Operation{Code: opCode},
+		OpCode:    rpcfb.OperationCode(opCode),
 		Flag:      Flags(flag),
 		StreamID:  streamID,
 		HeaderFmt: format.NewFormat(headerFmt),
@@ -250,10 +250,10 @@ func (fr *Framer) ReadFrame() (frame Frame, free func(), err error) {
 		logger.Debug("read frame", bFrame.Summarize()...)
 	}
 
-	switch bFrame.OpCode.Code {
-	case operation.OpPing:
+	switch bFrame.OpCode {
+	case rpcfb.OperationCodePING:
 		frame = &PingFrame{baseFrame: bFrame}
-	case operation.OpGoAway:
+	case rpcfb.OperationCodeGOAWAY:
 		frame = &GoAwayFrame{baseFrame: bFrame}
 	default:
 		frame = &DataFrame{baseFrame: bFrame}
@@ -314,7 +314,7 @@ func (fr *Framer) startWrite(frame baseFrame) {
 	fr.wbuf = fr.wbuf[:0]
 	fr.wbuf = binary.BigEndian.AppendUint32(fr.wbuf, 0) // 4 bytes of frame length, will be filled in endWrite
 	fr.wbuf = append(fr.wbuf, _magicCode)
-	fr.wbuf = binary.BigEndian.AppendUint16(fr.wbuf, frame.OpCode.Code)
+	fr.wbuf = binary.BigEndian.AppendUint16(fr.wbuf, uint16(frame.OpCode))
 	fr.wbuf = append(fr.wbuf, uint8(frame.Flag))
 	fr.wbuf = binary.BigEndian.AppendUint32(fr.wbuf, frame.StreamID)
 	fr.wbuf = append(fr.wbuf, frame.HeaderFmt.Code())
@@ -354,7 +354,7 @@ func NewPingFrameResp(ping *PingFrame) (*PingFrame, func()) {
 		mcache.Free(buf)
 	}
 	pong := &PingFrame{baseFrame{
-		OpCode:    operation.Operation{Code: operation.OpPing},
+		OpCode:    rpcfb.OperationCodePING,
 		Flag:      FlagResponse | FlagResponseEnd,
 		StreamID:  ping.StreamID,
 		HeaderFmt: ping.HeaderFmt,
@@ -374,7 +374,7 @@ type GoAwayFrame struct {
 // NewGoAwayFrame creates a new GoAway frame
 func NewGoAwayFrame(maxStreamID uint32, isResponse bool) *GoAwayFrame {
 	f := &GoAwayFrame{baseFrame{
-		OpCode:    operation.Operation{Code: operation.OpGoAway},
+		OpCode:    rpcfb.OperationCodeGOAWAY,
 		StreamID:  maxStreamID,
 		HeaderFmt: format.Default(),
 	}}
@@ -391,7 +391,7 @@ type DataFrame struct {
 
 // DataFrameContext is the context for DataFrame
 type DataFrameContext struct {
-	OpCode    operation.Operation
+	OpCode    rpcfb.OperationCode
 	HeaderFmt format.Format
 	StreamID  uint32
 }
@@ -400,7 +400,7 @@ type DataFrameContext struct {
 func NewHeartbeatFrameReq(streamID uint32, fmt format.Format, header []byte) *DataFrame {
 	// treat heartbeat as a special data frame
 	return &DataFrame{baseFrame{
-		OpCode:    operation.Operation{Code: operation.OpHeartbeat},
+		OpCode:    rpcfb.OperationCodeHEARTBEAT,
 		StreamID:  streamID,
 		HeaderFmt: fmt,
 		Header:    header,

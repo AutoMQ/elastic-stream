@@ -5,7 +5,6 @@ import (
 
 	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/operation"
 	"github.com/AutoMQ/pd/pkg/util/fbutil"
 )
 
@@ -35,7 +34,7 @@ type OutRequest interface {
 	marshaller
 
 	// Operation returns the operation of the request.
-	Operation() operation.Operation
+	Operation() rpcfb.OperationCode
 }
 
 // baseRequest is a base implementation of Request
@@ -95,8 +94,8 @@ func (hr *HeartbeatRequest) Unmarshal(fmt format.Format, data []byte) error {
 	return unmarshal(hr, fmt, data)
 }
 
-func (hr *HeartbeatRequest) Operation() operation.Operation {
-	return operation.Operation{Code: operation.OpHeartbeat}
+func (hr *HeartbeatRequest) Operation() rpcfb.OperationCode {
+	return rpcfb.OperationCodeHEARTBEAT
 }
 
 // IDAllocationRequest is a request to operation.OpAllocateID

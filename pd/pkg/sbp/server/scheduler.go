@@ -3,6 +3,7 @@ package server
 import (
 	"sync"
 
+	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/pd/pkg/sbp/codec"
 	"github.com/AutoMQ/pd/third_party/forked/eapache/queue"
 )
@@ -40,7 +41,7 @@ func newWriteScheduler() *writeScheduler {
 
 // Push queues a frame in the scheduler.
 func (ws *writeScheduler) Push(wr frameWriteRequest) {
-	if wr.f.Base().OpCode.IsControl() {
+	if isControl(wr.f) {
 		ws.ctrlQueue.Add(wr)
 		return
 	}
@@ -51,6 +52,10 @@ func (ws *writeScheduler) Push(wr frameWriteRequest) {
 		ws.queues[id] = q
 	}
 	q.Add(wr)
+}
+
+func isControl(f codec.Frame) bool {
+	return f.Base().OpCode == rpcfb.OperationCodeGOAWAY
 }
 
 // Pop dequeues the next frame to write. Returns false if no frames can
