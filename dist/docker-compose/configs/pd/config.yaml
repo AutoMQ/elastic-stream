@@ -1,0 +1,91 @@
+# PD Configuration.
+
+# urls for peer traffic
+peerUrls: http://127.0.0.1:12380
+# urls for client traffic
+clientUrls: http://0.0.0.0:12379
+# advertise urls for peer traffic
+advertisePeerUrls: http://127.0.0.1:12380
+# advertise urls for client traffic
+advertiseClientUrls: http://127.0.0.1:12379
+
+# human-readable name for this PD member
+name: pd
+# path to the data directory
+dataDir: pd.data
+# the initial cluster configuration for bootstrapping
+initialCluster: pd=http://127.0.0.1:12380
+# the address of PD
+pdAddr: 0.0.0.0:12378
+# advertise address of PD
+advertisePDAddr: pd:12378
+# expiration time of the leader, in seconds
+leaderLease: 3
+# time interval for checking the leader's priority
+leaderPriorityCheckInterval: 60000000000 # 1 minute
+
+etcd:
+  # set different tokens to prevent communication between PD nodes in different clusters
+  initialClusterToken: pd-cluster
+  # log level for etcd. One of: debug|info|warn|error|panic|fatal
+  logLevel: warn
+  # interpret 'auto-compaction-retention' one of: periodic|revision
+  autoCompactionMode: periodic
+  # auto compaction retention for mvcc key value store
+  autoCompactionRetention: 1h
+  # Any configuration in embed.Config can also be set here
+  #tickMs: 500
+  #electionMs: 3000
+  #...
+
+log:
+  # the minimum enabled logging level
+  level: INFO
+  # whether to enable log rotation
+  enableRotation: false
+  zap:
+    # a list of URLs or file paths to write logging output to
+    outputPaths:
+      - stderr
+    # a list of URLs to write internal logger errors to
+    errorOutputPaths:
+      - stderr
+    # the logger's encoding, "json" or "console"
+    encoding: json
+    # Any configuration in zap.Config can alse be set here
+    #disableCaller: false
+    #disableStacktrace: false
+    #encoderConfig:
+    #  messageKey: msg
+    # ...
+  rotate:
+    # maximum size in megabytes of the log file before it gets rotated
+    maxSize: 64
+    # maximum number of days to retain old log files based on the timestamp encoded in their filename
+    maxAge: 180
+    # maximum number of old log files to retain, default is to retain all old log files (though MaxAge may still cause them to get deleted)
+    maxBackups: 0
+    # whether the time used for formatting the timestamps in backup files is the computer's local time, default is to use UTC time
+    localTime: false
+    # whether the rotated log files should be compressed using gzip
+    compress: false
+
+cluster:
+  # seal request timeout in milliseconds
+  sealReqTimeoutMs: 1000
+  # timeout after which a range server is considered dead
+  rangeServerTimeout: 100s
+
+sbp:
+  server:
+    # time interval between sending heartbeats from client to server
+    heartbeatInterval: 5s
+    # number of consecutive heartbeats that the server can miss before considering the client to be unresponsive and terminating the connection
+    heartbeatMissCount: 3
+  client:
+    # time after which an idle connection closes itself (zero for no timeout)
+    idleConnTimeout: 0
+    # time after which a health check will be carried out (zero for no health checks)
+    readIdleTimeout: 5s
+    # time after which the client closes the connection if the server doesn't respond to a heartbeat request
+    heartbeatTimeout: 10s
