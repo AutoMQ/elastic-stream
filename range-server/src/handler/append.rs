@@ -6,7 +6,9 @@ use flatbuffers::FlatBufferBuilder;
 use futures::future::join_all;
 use log::{error, trace, warn};
 use model::payload::Payload;
-use protocol::rpc::header::{AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs};
+use protocol::rpc::header::{
+    AppendResponse, AppendResponseArgs, AppendResultEntryArgs, ErrorCode, StatusArgs,
+};
 use std::{cell::UnsafeCell, fmt, rc::Rc};
 use store::{error::AppendError, option::WriteOptions, AppendRecordRequest, AppendResult, Store};
 
@@ -217,8 +219,7 @@ impl Append {
             status: Some(ok_status),
         };
 
-        let response_header =
-            protocol::rpc::header::AppendResponse::create(&mut builder, &res_args);
+        let response_header = AppendResponse::create(&mut builder, &res_args);
 
         trace!("AppendResponseHeader: {:?}", response_header);
         let res_header = finish_response_builder(&mut builder, response_header);
