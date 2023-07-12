@@ -25,6 +25,7 @@ const (
 	OperationCodeTRIM_STREAM               OperationCode = 12293
 	OperationCodeREPORT_METRICS            OperationCode = 16385
 	OperationCodeDESCRIBE_PLACEMENT_DRIVER OperationCode = 16386
+	OperationCodeCOMMIT_OBJECT             OperationCode = 20481
 )
 
 var EnumNamesOperationCode = map[OperationCode]string{
@@ -46,6 +47,7 @@ var EnumNamesOperationCode = map[OperationCode]string{
 	OperationCodeTRIM_STREAM:               "TRIM_STREAM",
 	OperationCodeREPORT_METRICS:            "REPORT_METRICS",
 	OperationCodeDESCRIBE_PLACEMENT_DRIVER: "DESCRIBE_PLACEMENT_DRIVER",
+	OperationCodeCOMMIT_OBJECT:             "COMMIT_OBJECT",
 }
 
 var EnumValuesOperationCode = map[string]OperationCode{
@@ -67,6 +69,7 @@ var EnumValuesOperationCode = map[string]OperationCode{
 	"TRIM_STREAM":               OperationCodeTRIM_STREAM,
 	"REPORT_METRICS":            OperationCodeREPORT_METRICS,
 	"DESCRIBE_PLACEMENT_DRIVER": OperationCodeDESCRIBE_PLACEMENT_DRIVER,
+	"COMMIT_OBJECT":             OperationCodeCOMMIT_OBJECT,
 }
 
 func (v OperationCode) String() string {

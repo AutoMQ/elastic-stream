@@ -15,6 +15,7 @@ type RangeT struct {
 	Servers []*RangeServerT `json:"servers"`
 	ReplicaCount int8 `json:"replica_count"`
 	AckCount int8 `json:"ack_count"`
+	OffloadOwner *OffloadOwnerT `json:"offload_owner"`
 }
 
 func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
@@ -32,6 +33,7 @@ func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 		}
 		serversOffset = builder.EndVector(serversLength)
 	}
+	offloadOwnerOffset := t.OffloadOwner.Pack(builder)
 	RangeStart(builder)
 	RangeAddStreamId(builder, t.StreamId)
 	RangeAddEpoch(builder, t.Epoch)
@@ -41,6 +43,7 @@ func (t *RangeT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	RangeAddServers(builder, serversOffset)
 	RangeAddReplicaCount(builder, t.ReplicaCount)
 	RangeAddAckCount(builder, t.AckCount)
+	RangeAddOffloadOwner(builder, offloadOwnerOffset)
 	return RangeEnd(builder)
 }
 
@@ -59,6 +62,7 @@ func (rcv *Range) UnPackTo(t *RangeT) {
 	}
 	t.ReplicaCount = rcv.ReplicaCount()
 	t.AckCount = rcv.AckCount()
+	t.OffloadOwner = rcv.OffloadOwner(nil).UnPack()
 }
 
 func (rcv *Range) UnPack() *RangeT {
@@ -199,8 +203,21 @@ func (rcv *Range) MutateAckCount(n int8) bool {
 	return rcv._tab.MutateInt8Slot(18, n)
 }
 
+func (rcv *Range) OffloadOwner(obj *OffloadOwner) *OffloadOwner {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(20))
+	if o != 0 {
+		x := rcv._tab.Indirect(o + rcv._tab.Pos)
+		if obj == nil {
+			obj = new(OffloadOwner)
+		}
+		obj.Init(rcv._tab.Bytes, x)
+		return obj
+	}
+	return nil
+}
+
 func RangeStart(builder *flatbuffers.Builder) {
-	builder.StartObject(8)
+	builder.StartObject(9)
 }
 func RangeAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(0, streamId, -1)
@@ -228,6 +245,9 @@ func RangeAddReplicaCount(builder *flatbuffers.Builder, replicaCount int8) {
 }
 func RangeAddAckCount(builder *flatbuffers.Builder, ackCount int8) {
 	builder.PrependInt8Slot(7, ackCount, -1)
+}
+func RangeAddOffloadOwner(builder *flatbuffers.Builder, offloadOwner flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(8, flatbuffers.UOffsetT(offloadOwner), 0)
 }
 func RangeEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

@@ -164,6 +164,11 @@ enum OperationCode : short {
 
     // Describe placement driver cluster membership.
     DESCRIBE_PLACEMENT_DRIVER = 0x4002,
+
+    // 0x5000 ~ 0x5FFF is reserved for object management
+
+    // Commit an object after all its data has been written to the object storage.
+    COMMIT_OBJECT = 0x5001,
 }
 
 // The Status type defines a logical error model.
@@ -368,6 +373,14 @@ table ListRangeResponse {
     ranges: [Range] (id: 2, required);
 }
 
+table OffloadOwner {
+    // The server id of the owner.
+    server_id: int32 = -1 (id: 0);
+
+    // The epoch of the owner.
+    epoch: int64 = -1 (id: 1);
+}
+
 table Range {
     // The id of the stream
     stream_id: int64 = -1 (id: 0);
@@ -398,6 +411,9 @@ table Range {
 
     // The range replica ack count, only success ack > ack, then the write is success.
     ack_count: int8 = -1 (id: 7);
+
+    // The owner of the range which offloads the data to the object storage.
+    offload_owner: OffloadOwner (id: 8);
 }
 
 table CreateRangeRequest {
@@ -624,6 +640,44 @@ table DescribePlacementDriverClusterResponse {
     status: Status (id: 0, required);
 
     cluster: PlacementDriverCluster (id: 1, required);
+}
+
+table Object {
+    // The id of the stream.
+    stream_id: int64 = -1 (id: 0);
+
+    // The index of the range in the stream.
+    range_index: int32 = -1 (id: 1);
+
+    // The epoch of the range server that offloads the object.
+    epoch: int64 = -1 (id: 2);
+
+    // The start offset of the object in the range.
+    start_offset: int64 = -1 (id: 3);
+
+    // The difference between the start offset and the end offset.
+    end_offset_delta: int32 = -1 (id: 4);
+
+    // The length of the object in bytes.
+    data_len: int32 = -1 (id: 5);
+
+    // The sparse index of the object.
+    sparse_index: [ubyte] (id: 6);
+}
+
+table CommitObjectRequest {
+    // The timeout in milliseconds to wait for the response.
+    timeout_ms: int32 (id: 0);
+
+    // The object to commit.
+    object: Object (id: 1);
+}
+
+table CommitObjectResponse {
+    status: Status (id: 0, required);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 1);
 }
 
 table KeyValue {
