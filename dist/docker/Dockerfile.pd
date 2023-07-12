@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 RUN apt-get update \
-    && apt-get install -y wget \
+    && apt-get install -y wget telnet \
     && wget -q -O /tmp/pd.deb https://github.com/AutoMQ/elastic-stream/releases/download/v0.2.2/pd_0.2.2_amd64.deb \
     && dpkg -i /tmp/pd.deb \
     && rm /tmp/pd.deb

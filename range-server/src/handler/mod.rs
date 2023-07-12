@@ -17,6 +17,7 @@ use crate::{
 };
 use bytes::Bytes;
 use codec::frame::Frame;
+use local_sync::mpsc;
 use log::{trace, warn};
 use protocol::rpc::header::{StatusT, SystemErrorT};
 use std::{cell::UnsafeCell, rc::Rc};
@@ -32,7 +33,7 @@ pub(crate) struct ServerCall<S, M> {
     /// Sender for future response
     ///
     /// Note the receiver part is polled by `ChannelWriter` in a spawned task.
-    pub(crate) sender: tokio::sync::mpsc::UnboundedSender<Frame>,
+    pub(crate) sender: mpsc::unbounded::Tx<Frame>,
 
     /// `Store` to query, persist and replicate records.
     ///
@@ -120,10 +121,10 @@ where
                     self.request.stream_id
                 );
             }
-            Err(e) => {
+            Err(_e) => {
                 warn!(
-                    "Failed to send response[stream-id={}] to channel. Cause: {:?}",
-                    self.request.stream_id, e
+                    "Failed to send response[stream-id={}] to channel because rx of mpsc channel has been closed",
+                    self.request.stream_id
                 );
             }
         };

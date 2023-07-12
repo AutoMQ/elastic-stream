@@ -4189,6 +4189,7 @@ dependencies = [
  "local-sync",
  "log",
  "protocol",
+ "thiserror",
  "tokio",
  "tokio-uring",
 ]

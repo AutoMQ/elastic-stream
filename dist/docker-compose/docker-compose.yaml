@@ -14,8 +14,13 @@ services:
       - rs_data:/data
   pd:
     image: "elasticstream/pd-server:0.2.2"
+    configs:
+      - source: pd_config
+        target: /etc/pd/config.yaml
+        mode: 0440
     ports:
       - "12378:12378"
+      - "12379:12379"
     healthcheck:
       test: ["CMD-SHELL", "echo -e '\x1dclose\x0d' | telnet localhost 12378"]
       interval: 1m30s
@@ -31,3 +36,5 @@ volumes:
 configs:
   rs_config:
     file: ./configs/range-server/range-server.yaml
+  pd_config:
+    file: ./configs/pd/config.yaml
