@@ -26,6 +26,8 @@ const (
 	OperationCodeREPORT_METRICS            OperationCode = 16385
 	OperationCodeDESCRIBE_PLACEMENT_DRIVER OperationCode = 16386
 	OperationCodeCOMMIT_OBJECT             OperationCode = 20481
+	OperationCodeLIST_RESOURCE             OperationCode = 24577
+	OperationCodeWATCH_RESOURCE            OperationCode = 24578
 )
 
 var EnumNamesOperationCode = map[OperationCode]string{
@@ -48,6 +50,8 @@ var EnumNamesOperationCode = map[OperationCode]string{
 	OperationCodeREPORT_METRICS:            "REPORT_METRICS",
 	OperationCodeDESCRIBE_PLACEMENT_DRIVER: "DESCRIBE_PLACEMENT_DRIVER",
 	OperationCodeCOMMIT_OBJECT:             "COMMIT_OBJECT",
+	OperationCodeLIST_RESOURCE:             "LIST_RESOURCE",
+	OperationCodeWATCH_RESOURCE:            "WATCH_RESOURCE",
 }
 
 var EnumValuesOperationCode = map[string]OperationCode{
@@ -70,6 +74,8 @@ var EnumValuesOperationCode = map[string]OperationCode{
 	"REPORT_METRICS":            OperationCodeREPORT_METRICS,
 	"DESCRIBE_PLACEMENT_DRIVER": OperationCodeDESCRIBE_PLACEMENT_DRIVER,
 	"COMMIT_OBJECT":             OperationCodeCOMMIT_OBJECT,
+	"LIST_RESOURCE":             OperationCodeLIST_RESOURCE,
+	"WATCH_RESOURCE":            OperationCodeWATCH_RESOURCE,
 }
 
 func (v OperationCode) String() string {

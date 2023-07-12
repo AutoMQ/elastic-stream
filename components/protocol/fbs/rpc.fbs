@@ -169,6 +169,14 @@ enum OperationCode : short {
 
     // Commit an object after all its data has been written to the object storage.
     COMMIT_OBJECT = 0x5001,
+
+    // 0x6000 ~ 0x6FFF is reserved for resource management
+
+    // List resources from the PD.
+    LIST_RESOURCE = 0x6001,
+
+    // Watch resources with the given revision from the PD.
+    WATCH_RESOURCE = 0x6002,
 }
 
 // The Status type defines a logical error model.
@@ -678,6 +686,77 @@ table CommitObjectResponse {
 
     // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
     throttle_time_ms: int32 (id: 1);
+}
+
+enum ResourceType: byte {
+    UNKNOWN = 0,
+    STREAM = 1,
+    RANGE = 2,
+    OBJECT = 3,
+}
+
+table Resource {
+    type: ResourceType (id: 0);
+    stream: Stream (id: 1);
+    range: Range (id: 2);
+    object: Object (id: 3);
+}
+
+enum EventType: byte {
+    UNKNOWN = 0,
+    ADDED = 1,
+    MODIFIED = 2,
+    DELETED = 3,
+}
+
+table ResourceEvent {
+    type: EventType (id: 0);
+    resource: Resource (id: 1);
+}
+
+table ListResourceRequest {
+    // The timeout in milliseconds to wait for the response.
+    timeout_ms: int32 (id: 0);
+
+    // The type of the resource.
+    resource_type: ResourceType (id: 1);
+}
+
+table ListResourceResponse {
+    status: Status (id: 0, required);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 1);
+
+    // The list of the resources.
+    resources: [Resource] (id: 2);
+
+    // The resource version when the request is processed.
+    resource_version: int64 (id: 3);
+}
+
+table WatchResourceRequest {
+    // The timeout in milliseconds to wait for the response.
+    timeout_ms: int32 (id: 0);
+
+    // The type of the resource.
+    resource_type: ResourceType (id: 1);
+
+    // The resource version to watch. All changes with a version greater than the given version will be returned.
+    resource_version: int64 (id: 2);
+}
+
+table WatchResourceResponse {
+    status: Status (id: 0, required);
+
+    // The time in milliseconds to throttle the client, due to a quota violation or the server is too busy.
+    throttle_time_ms: int32 (id: 1);
+
+    // The list of the events.
+    events: [ResourceEvent] (id: 2);
+
+    // The resource version when the request is processed.
+    resource_version: int64 (id: 3);
 }
 
 table KeyValue {
