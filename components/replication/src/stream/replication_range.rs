@@ -6,26 +6,22 @@ use std::{
 };
 
 use crate::ReplicationError;
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use client::Client;
 use itertools::Itertools;
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
+
+use model::range::RangeMetadata;
 use model::record::{flat_record::FlatRecordBatch, RecordBatch};
-use model::{error::DecodeError, object::ObjectMetadata, range::RangeMetadata};
-use std::cmp::min;
+
 use tokio::sync::broadcast;
 
 use super::{
-    cache::RecordBatchCache,
-    object_reader::{
-        AsyncObjectReader, DefaultRangeObjectReader, ObjectMetadataManager, ObjectReader,
-    },
-    records_block::RecordsBlock,
-    replication_stream::ReplicationStream,
-    replicator::Replicator,
-    FetchDataset,
+    cache::RecordBatchCache, records_block::RecordsBlock, replication_stream::ReplicationStream,
+    replicator::Replicator, FetchDataset,
 };
-use protocol::{flat_model::records::RecordBatchMeta, rpc::header::SealKind};
+
+use protocol::rpc::header::SealKind;
 
 const CORRUPTED_FLAG: u32 = 1 << 0;
 const SEALING_FLAG: u32 = 1 << 1;
@@ -280,17 +276,21 @@ impl ReplicationRange {
             }
             // range server local records
             let local_records = fetch_result.payload.unwrap_or_default();
-            let blocks = RecordsBlock::new(local_records, 1024 * 1024, false).map_err(|e| {
-                error!(
-                    "{}Fetch [{}, {}) decode fail, err: {}",
-                    self.log_ident, start_offset, end_offset, e
-                );
-                ReplicationError::Internal
-            })?;
+            let blocks = if !local_records.is_empty() {
+                RecordsBlock::new(local_records, 1024 * 1024, false).map_err(|e| {
+                    error!(
+                        "{}Fetch [{}, {}) decode fail, err: {}",
+                        self.log_ident, start_offset, end_offset, e
+                    );
+                    ReplicationError::Internal
+                })?
+            } else {
+                vec![RecordsBlock::empty_block(end_offset)]
+            };
             return if let Some(object) = fetch_result.object_metadata_list {
                 Ok(FetchDataset::Mixin(blocks, object))
             } else {
-                Ok(FetchDataset::Records(blocks))
+                Ok(FetchDataset::Full(blocks))
             };
         }
         Err(ReplicationError::Internal)

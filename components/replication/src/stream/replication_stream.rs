@@ -2,7 +2,6 @@ use crate::stream::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
 use super::cache::RecordBatchCache;
-use super::object_reader::AsyncObjectReader;
 use super::replication_range::ReplicationRange;
 use super::FetchDataset;
 use super::Stream;
@@ -13,7 +12,7 @@ use log::{error, info, trace, warn};
 use model::RecordBatch;
 use std::cell::OnceCell;
 use std::cell::RefCell;
-use std::cmp::{max, min};
+use std::cmp::min;
 use std::collections::BTreeMap;
 use std::ops::Bound::Included;
 use std::rc::{Rc, Weak};
@@ -379,7 +378,7 @@ impl Stream for ReplicationStream {
             self.log_ident
         );
         if start_offset == end_offset {
-            return Ok(FetchDataset::Records(vec![]));
+            return Ok(FetchDataset::Partial(vec![]));
         }
         let last_range = match self.last_range.borrow().as_ref() {
             Some(range) => range.clone(),
@@ -395,69 +394,36 @@ impl Stream for ReplicationStream {
                 .fetch(start_offset, end_offset, batch_max_bytes)
                 .await;
         }
-
         // Slow path
-        // 1. find all ranges that intersect with the fetch range.
-        // 2. fetch from each range.
-        let mut fetch_ranges: Vec<Rc<ReplicationRange>> = Vec::new();
-        {
-            let ranges = self.ranges.borrow();
-            let mut cursor = ranges.upper_bound(Included(&start_offset));
-            while let Some(range) = cursor.value() {
-                if range.start_offset() >= end_offset {
-                    break;
-                }
-                fetch_ranges.push(range.clone());
-                cursor.move_next();
+        // 1. Find the *first* range which match the start_offset.
+        // 2. Fetch the range.
+        // 3. The invoker should loop invoke fetch util the Dataset fullfil the need.
+        let range = self
+            .ranges
+            .borrow()
+            .upper_bound(Included(&start_offset))
+            .value()
+            .cloned();
+        if let Some(range) = range {
+            if range.start_offset() > start_offset {
+                return Err(ReplicationError::FetchOutOfRange);
             }
-        }
-        if fetch_ranges.is_empty() || fetch_ranges[0].start_offset() > start_offset {
-            return Err(ReplicationError::FetchOutOfRange);
-        }
-        let mut first_object = true;
-        let mut remaining_size = batch_max_bytes;
-        let mut all_blocks = vec![];
-        let mut all_objects = vec![];
-        for range in fetch_ranges {
-            if remaining_size == 0 {
-                break;
-            }
-            let fetch_dataset = range
+            let dataset = match range
                 .fetch(
-                    max(start_offset, range.start_offset()),
+                    start_offset,
                     min(end_offset, range.confirm_offset()),
-                    remaining_size,
+                    batch_max_bytes,
                 )
-                .await?;
-            match fetch_dataset {
-                FetchDataset::Records(mut blocks) => {
-                    remaining_size -= min(blocks.iter().map(|b| b.len()).sum(), remaining_size);
-                    all_blocks.append(&mut blocks);
-                }
-                FetchDataset::Mixin(mut blocks, mut objects) => {
-                    remaining_size -= min(blocks.iter().map(|b| b.len()).sum(), remaining_size);
-                    all_blocks.append(&mut blocks);
-                    all_objects.append(&mut objects);
-
-                    let object_start = if first_object { 1 } else { 0 };
-                    if !objects.is_empty() {
-                        remaining_size -= min(
-                            objects[object_start..]
-                                .iter()
-                                .map(|o| o.data_len)
-                                .sum::<u32>(),
-                            remaining_size,
-                        );
-                    }
-                }
-            }
-            first_object = false;
-        }
-        return if all_objects.is_empty() {
-            Ok(FetchDataset::Records(all_blocks))
+                .await?
+            {
+                FetchDataset::Full(blocks) => FetchDataset::Partial(blocks),
+                FetchDataset::Partial(blocks) => FetchDataset::Partial(blocks),
+                FetchDataset::Mixin(blocks, objects) => FetchDataset::Mixin(blocks, objects),
+            };
+            Ok(dataset)
         } else {
-            Ok(FetchDataset::Mixin(all_blocks, all_objects))
-        };
+            Err(ReplicationError::FetchOutOfRange)
+        }
     }
 
     async fn trim(&self, _new_start_offset: u64) -> Result<(), ReplicationError> {

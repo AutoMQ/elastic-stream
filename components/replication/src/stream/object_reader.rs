@@ -1,6 +1,7 @@
 use std::{cell::RefCell, collections::BTreeMap, ops::Bound, rc::Rc};
 
 use bytes::Bytes;
+use log::debug;
 use model::object::ObjectMetadata;
 use opendal::{services::Fs, Operator};
 
@@ -20,17 +21,17 @@ pub(crate) trait ObjectReader {
 }
 
 #[derive(Debug)]
-pub(crate) struct DefaultRangeObjectReader {
+pub(crate) struct DefaultObjectReader {
     object_reader: Rc<AsyncObjectReader>,
 }
 
-impl DefaultRangeObjectReader {
+impl DefaultObjectReader {
     pub(crate) fn new(object_reader: Rc<AsyncObjectReader>) -> Self {
         Self { object_reader }
     }
 }
 
-impl ObjectReader for DefaultRangeObjectReader {
+impl ObjectReader for DefaultObjectReader {
     async fn read_first_object_blocks(
         &self,
         start_offset: u64,
@@ -49,6 +50,7 @@ impl ObjectReader for DefaultRangeObjectReader {
             )));
         };
         let mut position = range.0;
+        debug!("fetch {:?} blocks in range {:?}", object.key, range);
         let mut object_blocks = self.object_reader.read(&object, range).await?;
         if object_blocks.is_empty() {
             return Err(ObjectReadError::Unexpected(Error::new(
@@ -167,18 +169,14 @@ impl ObjectMetadataManager {
 
     fn find_first(
         &self,
-        mut start_offset: u64,
+        start_offset: u64,
         end_offset: Option<u64>,
-        mut size_hint: u32,
+        size_hint: u32,
     ) -> Option<(ObjectMetadata, (u32, u32))> {
         let metadata_map = self.metadata_map.borrow();
         let cursor = metadata_map.upper_bound(Bound::Included(&start_offset));
 
-        let object = if let Some(object) = cursor.value() {
-            object
-        } else {
-            return None;
-        };
+        let object = cursor.value()?;
 
         let object_end_offset = object.start_offset + object.end_offset_delta as u64;
         if object_end_offset <= start_offset {
@@ -193,9 +191,8 @@ impl ObjectMetadataManager {
             .filter(|(offset, _)| *offset >= &object.start_offset) // filter offset in current object
             .map(|(_, position)| position)
             .cloned();
-        let mut position = self.offset_to_position.borrow().get(&start_offset).cloned();
         if let Some(range) = object.find_bound(start_offset, end_offset, size_hint, position) {
-            return Some((object.clone(), range));
+            Some((object.clone(), range))
         } else {
             panic!("object#find_bound should not return None");
         }

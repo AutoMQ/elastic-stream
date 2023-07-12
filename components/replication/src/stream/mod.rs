@@ -35,6 +35,7 @@ pub(crate) trait Stream {
 }
 
 pub(crate) enum FetchDataset {
-    Records(Vec<RecordsBlock>),
+    Full(Vec<RecordsBlock>),
+    Partial(Vec<RecordsBlock>), // only partial data in dataset, should retry fetch again with new start_offset
     Mixin(Vec<RecordsBlock>, Vec<ObjectMetadata>),
 }
