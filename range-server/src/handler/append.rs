@@ -218,10 +218,7 @@ impl Append {
             entries: Some(append_results_fb),
             status: Some(ok_status),
         };
-
         let response_header = AppendResponse::create(&mut builder, &res_args);
-
-        trace!("AppendResponseHeader: {:?}", response_header);
         let res_header = finish_response_builder(&mut builder, response_header);
         response.header = Some(res_header);
     }
