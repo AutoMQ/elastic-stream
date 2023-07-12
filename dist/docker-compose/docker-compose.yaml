@@ -1,6 +1,10 @@
 services:
   range-server:
     image: "elasticstream/range-server:0.2.2"
+    configs:
+      - source: rs_config
+        target: /etc/range-server/range-server.yaml
+        mode: 0440
     ports:
       - "10911:10911"
     depends_on:
@@ -23,3 +27,7 @@ services:
 volumes:
   rs_data:
     driver: local
+
+configs:
+  rs_config:
+    file: ./configs/range-server/range-server.yaml
