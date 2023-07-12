@@ -12,8 +12,8 @@ bytes = { workspace = true }
 codec = { path = "../codec" }
 local-sync = { workspace = true }
 log = { workspace = true }
-tokio-uring = { workspace = true }
 thiserror = { workspace = true }
+tokio-uring = { workspace = true }
 
 [dev-dependencies]
 cargo-llvm-cov = { workspace = true }
