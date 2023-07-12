@@ -6,7 +6,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 
-	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
+	"github.com/AutoMQ/pd/pkg/sbp/codec"
 	"github.com/AutoMQ/pd/pkg/util/fbutil"
 )
 
@@ -16,7 +16,7 @@ func TestListRangeRequest_Unmarshal(t *testing.T) {
 	mockData := fbutil.Marshal(&mockListRangeRequest.ListRangeRequestT)
 
 	type args struct {
-		fmt  format.Format
+		fmt  codec.Format
 		data []byte
 	}
 	tests := []struct {
@@ -29,7 +29,7 @@ func TestListRangeRequest_Unmarshal(t *testing.T) {
 		{
 			name: "FlatBuffer",
 			args: args{
-				fmt:  format.FlatBuffer(),
+				fmt:  codec.FormatFlatBuffer,
 				data: mockData,
 			},
 			want: mockListRangeRequest,
@@ -37,7 +37,7 @@ func TestListRangeRequest_Unmarshal(t *testing.T) {
 		{
 			name: "FlatBuffer in wrong format",
 			args: args{
-				fmt:  format.FlatBuffer(),
+				fmt:  codec.FormatFlatBuffer,
 				data: []byte{'a', 'b', 'c'},
 			},
 			wantErr: true,
@@ -46,7 +46,7 @@ func TestListRangeRequest_Unmarshal(t *testing.T) {
 		{
 			name: "ProtoBuffer",
 			args: args{
-				fmt:  format.ProtoBuffer(),
+				fmt:  codec.FormatProtoBuffer,
 				data: []byte{},
 			},
 			wantErr: true,
@@ -55,7 +55,7 @@ func TestListRangeRequest_Unmarshal(t *testing.T) {
 		{
 			name: "JSON",
 			args: args{
-				fmt:  format.JSON(),
+				fmt:  codec.FormatJSON,
 				data: []byte{},
 			},
 			wantErr: true,
@@ -64,7 +64,7 @@ func TestListRangeRequest_Unmarshal(t *testing.T) {
 		{
 			name: "Unknown",
 			args: args{
-				fmt:  format.NewFormat(0),
+				fmt:  codec.Format(0),
 				data: []byte{},
 			},
 			wantErr: true,

@@ -6,7 +6,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 
-	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
+	"github.com/AutoMQ/pd/pkg/sbp/codec"
 	"github.com/AutoMQ/pd/pkg/util/fbutil"
 )
 
@@ -17,7 +17,7 @@ func TestListRangeResponse_Marshal(t *testing.T) {
 	tests := []struct {
 		name    string
 		resp    ListRangeResponse
-		fmt     format.Format
+		fmt     codec.Format
 		want    []byte
 		wantErr bool
 		errMsg  string
@@ -25,27 +25,27 @@ func TestListRangeResponse_Marshal(t *testing.T) {
 		{
 			name: "FlatBuffer",
 			resp: mockListRangeResponse,
-			fmt:  format.FlatBuffer(),
+			fmt:  codec.FormatFlatBuffer,
 			want: mockData,
 		},
 		{
 			name:    "ProtoBuffer",
 			resp:    mockListRangeResponse,
-			fmt:     format.ProtoBuffer(),
+			fmt:     codec.FormatProtoBuffer,
 			wantErr: true,
 			errMsg:  "unsupported format",
 		},
 		{
 			name:    "JSON",
 			resp:    mockListRangeResponse,
-			fmt:     format.JSON(),
+			fmt:     codec.FormatJSON,
 			wantErr: true,
 			errMsg:  "unsupported format",
 		},
 		{
 			name:    "Unknown",
 			resp:    mockListRangeResponse,
-			fmt:     format.NewFormat(0),
+			fmt:     codec.Format(0),
 			wantErr: true,
 			errMsg:  "unsupported format",
 		},

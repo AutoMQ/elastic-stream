@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/AutoMQ/pd/pkg/sbp/codec"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
 	"github.com/AutoMQ/pd/pkg/sbp/protocol"
 	"github.com/AutoMQ/pd/pkg/server/config"
 )
@@ -40,7 +39,7 @@ type Client interface {
 type SbpClient struct {
 	// Format is the format of the frames sent to the server.
 	// Default to format.FlatBuffer
-	Format format.Format
+	Format codec.Format
 	cfg    *config.SbpClient
 
 	id       string
@@ -158,11 +157,11 @@ func (c *SbpClient) heartbeatTimeout() time.Duration {
 	return _defaultHeartbeatTimeout
 }
 
-func (c *SbpClient) format() format.Format {
-	if c.Format.Valid() {
+func (c *SbpClient) format() codec.Format {
+	if _, ok := codec.EnumNamesFormat[c.Format]; ok {
 		return c.Format
 	}
-	return format.FlatBuffer()
+	return codec.DefaultFormat()
 }
 
 func newClientID() string {

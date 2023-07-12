@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
 )
 
 const (
@@ -90,7 +89,7 @@ type baseFrame struct {
 	OpCode    rpcfb.OperationCode // OpCode determines the format and semantics of the frame
 	Flag      Flags               // Flag is reserved for boolean flags specific to the frame type
 	StreamID  uint32              // StreamID identifies which stream the frame belongs to
-	HeaderFmt format.Format       // HeaderFmt identifies the format of the Header.
+	HeaderFmt Format              // HeaderFmt identifies the format of the Header.
 	Header    []byte              // nil for no extended header
 	Payload   []byte              // nil for no payload
 }
@@ -242,7 +241,7 @@ func (fr *Framer) ReadFrame() (frame Frame, free func(), err error) {
 		OpCode:    rpcfb.OperationCode(opCode),
 		Flag:      Flags(flag),
 		StreamID:  streamID,
-		HeaderFmt: format.NewFormat(headerFmt),
+		HeaderFmt: Format(headerFmt),
 		Header:    header,
 		Payload:   payload,
 	}
@@ -317,7 +316,7 @@ func (fr *Framer) startWrite(frame baseFrame) {
 	fr.wbuf = binary.BigEndian.AppendUint16(fr.wbuf, uint16(frame.OpCode))
 	fr.wbuf = append(fr.wbuf, uint8(frame.Flag))
 	fr.wbuf = binary.BigEndian.AppendUint32(fr.wbuf, frame.StreamID)
-	fr.wbuf = append(fr.wbuf, frame.HeaderFmt.Code())
+	fr.wbuf = append(fr.wbuf, uint8(frame.HeaderFmt))
 	headerLen := len(frame.Header)
 	fr.wbuf = append(fr.wbuf, byte(headerLen>>16), byte(headerLen>>8), byte(headerLen))
 }
@@ -376,7 +375,7 @@ func NewGoAwayFrame(maxStreamID uint32, isResponse bool) *GoAwayFrame {
 	f := &GoAwayFrame{baseFrame{
 		OpCode:    rpcfb.OperationCodeGOAWAY,
 		StreamID:  maxStreamID,
-		HeaderFmt: format.Default(),
+		HeaderFmt: DefaultFormat(),
 	}}
 	if isResponse {
 		f.Flag = FlagResponse | FlagResponseEnd
@@ -392,12 +391,12 @@ type DataFrame struct {
 // DataFrameContext is the context for DataFrame
 type DataFrameContext struct {
 	OpCode    rpcfb.OperationCode
-	HeaderFmt format.Format
+	HeaderFmt Format
 	StreamID  uint32
 }
 
 // NewHeartbeatFrameReq creates a new heartbeat request
-func NewHeartbeatFrameReq(streamID uint32, fmt format.Format, header []byte) *DataFrame {
+func NewHeartbeatFrameReq(streamID uint32, fmt Format, header []byte) *DataFrame {
 	// treat heartbeat as a special data frame
 	return &DataFrame{baseFrame{
 		OpCode:    rpcfb.OperationCodeHEARTBEAT,

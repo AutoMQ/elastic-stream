@@ -16,7 +16,6 @@ import (
 
 	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
 	"github.com/AutoMQ/pd/pkg/sbp/codec"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
 	"github.com/AutoMQ/pd/pkg/sbp/protocol"
 	"github.com/AutoMQ/pd/pkg/util/logutil"
 	"github.com/AutoMQ/pd/pkg/util/traceutil"
@@ -407,7 +406,7 @@ func (c *conn) processUnknownFrame(f codec.Frame, st *stream) error {
 	resp := &protocol.SystemErrorResponse{}
 	resp.Error(&rpcfb.StatusT{Code: rpcfb.ErrorCodeUNKNOWN_OPERATION, Message: "unknown operation"})
 
-	headerFmt := format.Default()
+	headerFmt := codec.FormatFlatBuffer
 	header, err := resp.Marshal(headerFmt)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal response")

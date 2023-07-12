@@ -3,7 +3,7 @@ package protocol
 import (
 	"github.com/pkg/errors"
 
-	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
+	"github.com/AutoMQ/pd/pkg/sbp/codec"
 )
 
 const (
@@ -18,7 +18,7 @@ type marshaller interface {
 	// Marshal encodes the Request (or Response) using the specified format.
 	// The returned byte slice is not nil when and only when the error is nil.
 	// The returned byte slice should be freed after use.
-	Marshal(fmt format.Format) ([]byte, error)
+	Marshal(fmt codec.Format) ([]byte, error)
 }
 
 type flatBufferMarshaller interface {
@@ -36,24 +36,24 @@ type jsonMarshaller interface {
 type baseMarshaller struct{}
 
 func (m *baseMarshaller) marshalFlatBuffer() ([]byte, error) {
-	return nil, errors.Errorf(_unsupportedFmtErrMsg, format.FlatBuffer())
+	return nil, errors.Errorf(_unsupportedFmtErrMsg, codec.FormatFlatBuffer)
 }
 
 func (m *baseMarshaller) marshalProtoBuffer() ([]byte, error) {
-	return nil, errors.Errorf(_unsupportedFmtErrMsg, format.ProtoBuffer())
+	return nil, errors.Errorf(_unsupportedFmtErrMsg, codec.FormatProtoBuffer)
 }
 
 func (m *baseMarshaller) marshalJSON() ([]byte, error) {
-	return nil, errors.Errorf(_unsupportedFmtErrMsg, format.JSON())
+	return nil, errors.Errorf(_unsupportedFmtErrMsg, codec.FormatJSON)
 }
 
-func marshal(m marshaller, fmt format.Format) ([]byte, error) {
+func marshal(m marshaller, fmt codec.Format) ([]byte, error) {
 	switch fmt {
-	case format.FlatBuffer():
+	case codec.FormatFlatBuffer:
 		return m.marshalFlatBuffer()
-	case format.ProtoBuffer():
+	case codec.FormatProtoBuffer:
 		return m.marshalProtoBuffer()
-	case format.JSON():
+	case codec.FormatJSON:
 		return m.marshalJSON()
 	default:
 		return nil, errors.Errorf(_unsupportedFmtErrMsg, fmt)
@@ -67,7 +67,7 @@ type unmarshaler interface {
 
 	// Unmarshal decodes data into the Request (or Response) using the specified format.
 	// data is expired after the call, so the implementation should copy the data if needed.
-	Unmarshal(fmt format.Format, data []byte) error
+	Unmarshal(fmt codec.Format, data []byte) error
 }
 
 type flatBufferUnmarshaler interface {
@@ -85,20 +85,20 @@ type jsonUnmarshaler interface {
 type baseUnmarshaler struct{}
 
 func (u *baseUnmarshaler) unmarshalFlatBuffer(_ []byte) error {
-	return errors.Errorf(_unsupportedFmtErrMsg, format.FlatBuffer())
+	return errors.Errorf(_unsupportedFmtErrMsg, codec.FormatFlatBuffer)
 }
 
 func (u *baseUnmarshaler) unmarshalProtoBuffer(_ []byte) error {
-	return errors.Errorf(_unsupportedFmtErrMsg, format.ProtoBuffer())
+	return errors.Errorf(_unsupportedFmtErrMsg, codec.FormatProtoBuffer)
 }
 
 func (u *baseUnmarshaler) unmarshalJSON(_ []byte) error {
-	return errors.Errorf(_unsupportedFmtErrMsg, format.JSON())
+	return errors.Errorf(_unsupportedFmtErrMsg, codec.FormatJSON)
 }
 
-func unmarshal(m unmarshaler, fmt format.Format, data []byte) (err error) {
+func unmarshal(m unmarshaler, fmt codec.Format, data []byte) (err error) {
 	switch fmt {
-	case format.FlatBuffer():
+	case codec.FormatFlatBuffer:
 		defer func() {
 			if r := recover(); r != nil {
 				switch r := r.(type) {
@@ -110,9 +110,9 @@ func unmarshal(m unmarshaler, fmt format.Format, data []byte) (err error) {
 			}
 		}()
 		return m.unmarshalFlatBuffer(data)
-	case format.ProtoBuffer():
+	case codec.FormatProtoBuffer:
 		return m.unmarshalProtoBuffer(data)
-	case format.JSON():
+	case codec.FormatJSON:
 		return m.unmarshalJSON(data)
 	default:
 		return errors.Errorf(_unsupportedFmtErrMsg, fmt)

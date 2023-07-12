@@ -2,7 +2,7 @@ package protocol
 
 import (
 	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
+	"github.com/AutoMQ/pd/pkg/sbp/codec"
 	"github.com/AutoMQ/pd/pkg/util/fbutil"
 )
 
@@ -60,7 +60,7 @@ func (se *SystemErrorResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&se.SystemErrorT), nil
 }
 
-func (se *SystemErrorResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (se *SystemErrorResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(se, fmt)
 }
 
@@ -69,7 +69,7 @@ func (se *SystemErrorResponse) unmarshalFlatBuffer(data []byte) error {
 	return nil
 }
 
-func (se *SystemErrorResponse) Unmarshal(fmt format.Format, data []byte) error {
+func (se *SystemErrorResponse) Unmarshal(fmt codec.Format, data []byte) error {
 	return unmarshal(se, fmt, data)
 }
 
@@ -95,7 +95,7 @@ func (hr *HeartbeatResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&hr.HeartbeatResponseT), nil
 }
 
-func (hr *HeartbeatResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (hr *HeartbeatResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(hr, fmt)
 }
 
@@ -104,7 +104,7 @@ func (hr *HeartbeatResponse) unmarshalFlatBuffer(data []byte) error {
 	return nil
 }
 
-func (hr *HeartbeatResponse) Unmarshal(fmt format.Format, data []byte) error {
+func (hr *HeartbeatResponse) Unmarshal(fmt codec.Format, data []byte) error {
 	return unmarshal(hr, fmt, data)
 }
 
@@ -128,7 +128,7 @@ func (ia *IDAllocationResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&ia.IdAllocationResponseT), nil
 }
 
-func (ia *IDAllocationResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (ia *IDAllocationResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(ia, fmt)
 }
 
@@ -154,7 +154,7 @@ func (lr *ListRangeResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&lr.ListRangeResponseT), nil
 }
 
-func (lr *ListRangeResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (lr *ListRangeResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(lr, fmt)
 }
 
@@ -182,7 +182,7 @@ func (sr *SealRangeResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&sr.SealRangeResponseT), nil
 }
 
-func (sr *SealRangeResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (sr *SealRangeResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(sr, fmt)
 }
 
@@ -206,7 +206,7 @@ func (cr *CreateRangeResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&cr.CreateRangeResponseT), nil
 }
 
-func (cr *CreateRangeResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (cr *CreateRangeResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(cr, fmt)
 }
 
@@ -230,7 +230,7 @@ func (cs *CreateStreamResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&cs.CreateStreamResponseT), nil
 }
 
-func (cs *CreateStreamResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (cs *CreateStreamResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(cs, fmt)
 }
 
@@ -254,7 +254,7 @@ func (ds *DeleteStreamResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&ds.DeleteStreamResponseT), nil
 }
 
-func (ds *DeleteStreamResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (ds *DeleteStreamResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(ds, fmt)
 }
 
@@ -278,7 +278,7 @@ func (us *UpdateStreamResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&us.UpdateStreamResponseT), nil
 }
 
-func (us *UpdateStreamResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (us *UpdateStreamResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(us, fmt)
 }
 
@@ -302,7 +302,7 @@ func (ds *DescribeStreamResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&ds.DescribeStreamResponseT), nil
 }
 
-func (ds *DescribeStreamResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (ds *DescribeStreamResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(ds, fmt)
 }
 
@@ -326,7 +326,7 @@ func (rm *ReportMetricsResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&rm.ReportMetricsResponseT), nil
 }
 
-func (rm *ReportMetricsResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (rm *ReportMetricsResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(rm, fmt)
 }
 
@@ -350,7 +350,7 @@ func (dpd *DescribePDClusterResponse) marshalFlatBuffer() ([]byte, error) {
 	return fbutil.Marshal(&dpd.DescribePlacementDriverClusterResponseT), nil
 }
 
-func (dpd *DescribePDClusterResponse) Marshal(fmt format.Format) ([]byte, error) {
+func (dpd *DescribePDClusterResponse) Marshal(fmt codec.Format) ([]byte, error) {
 	return marshal(dpd, fmt)
 }
 

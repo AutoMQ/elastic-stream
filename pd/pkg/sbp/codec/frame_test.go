@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/AutoMQ/pd/api/rpcfb/rpcfb"
-	"github.com/AutoMQ/pd/pkg/sbp/codec/format"
 )
 
 func TestNextID(t *testing.T) {
@@ -51,7 +50,7 @@ func TestReadFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodeLIST_RANGE,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    []byte{0x01, 0x02, 0x03, 0x04},
 				Payload:   []byte{0x05, 0x06, 0x07, 0x08},
 			}},
@@ -73,7 +72,7 @@ func TestReadFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodePING,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    nil,
 				Payload:   []byte{0x05, 0x06, 0x07, 0x08},
 			}},
@@ -95,7 +94,7 @@ func TestReadFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodePING,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    []byte{0x01, 0x02, 0x03, 0x04},
 				Payload:   nil,
 			}},
@@ -116,7 +115,7 @@ func TestReadFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodePING,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    nil,
 				Payload:   nil,
 			}},
@@ -270,7 +269,7 @@ func TestWriteFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodeLIST_RANGE,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    []byte{0x01, 0x02, 0x03, 0x04},
 				Payload:   []byte{0x05, 0x06, 0x07, 0x08},
 			}},
@@ -293,7 +292,7 @@ func TestWriteFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodePING,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    nil,
 				Payload:   []byte{0x05, 0x06, 0x07, 0x08},
 			}},
@@ -315,7 +314,7 @@ func TestWriteFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodePING,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    []byte{0x01, 0x02, 0x03, 0x04},
 				Payload:   nil,
 			}},
@@ -337,7 +336,7 @@ func TestWriteFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodePING,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    nil,
 				Payload:   nil,
 			}},
@@ -358,7 +357,7 @@ func TestWriteFrame(t *testing.T) {
 				OpCode:    rpcfb.OperationCodePING,
 				Flag:      3,
 				StreamID:  16909060,
-				HeaderFmt: format.FlatBuffer(),
+				HeaderFmt: FormatFlatBuffer,
 				Header:    nil,
 				Payload:   make([]byte, 16*1024*1024+1),
 			}},
@@ -401,7 +400,7 @@ func TestWriteFrameError(t *testing.T) {
 		OpCode:    rpcfb.OperationCodePING,
 		Flag:      3,
 		StreamID:  16909060,
-		HeaderFmt: format.FlatBuffer(),
+		HeaderFmt: FormatFlatBuffer,
 		Header:    nil,
 		Payload:   nil,
 	})
