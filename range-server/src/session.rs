@@ -6,9 +6,9 @@ use std::{
 };
 
 use config::Configuration;
+use local_sync::mpsc;
 use log::{info, trace, warn};
 use store::Store;
-use tokio::sync::mpsc;
 use tokio_uring::net::TcpStream;
 use transport::connection::Connection;
 
@@ -72,7 +72,7 @@ where
         server_config: Arc<Configuration>,
     ) {
         // Channel to transfer responses from handlers to the coroutine that is in charge of response write.
-        let (tx, mut rx) = mpsc::unbounded_channel();
+        let (tx, mut rx) = mpsc::unbounded::channel();
 
         // Put current connection into connection-tracker, such that when TERM/STOP signal is received,
         // servers send go-away frame to each connection, requesting clients to complete and migrate as soon
