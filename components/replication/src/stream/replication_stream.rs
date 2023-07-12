@@ -1,7 +1,7 @@
 use crate::stream::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
-use super::cache::RecordBatchCache;
+use super::cache::HotCache;
 use super::replication_range::ReplicationRange;
 use super::FetchDataset;
 use super::Stream;
@@ -37,16 +37,11 @@ pub(crate) struct ReplicationStream {
     shutdown_signal_tx: broadcast::Sender<()>,
     // stream closed mark.
     closed: Rc<RefCell<bool>>,
-    cache: Rc<RecordBatchCache>,
+    cache: Rc<HotCache>,
 }
 
 impl ReplicationStream {
-    pub(crate) fn new(
-        id: i64,
-        epoch: u64,
-        client: Weak<Client>,
-        cache: Rc<RecordBatchCache>,
-    ) -> Rc<Self> {
+    pub(crate) fn new(id: i64, epoch: u64, client: Weak<Client>, cache: Rc<HotCache>) -> Rc<Self> {
         let (append_requests_tx, append_requests_rx) = mpsc::bounded::channel(1024);
         let (append_tasks_tx, append_tasks_rx) = mpsc::unbounded::channel();
         let (shutdown_signal_tx, shutdown_signal_rx) = broadcast::channel(1);

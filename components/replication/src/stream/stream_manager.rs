@@ -22,21 +22,22 @@ use crate::{
 };
 
 use super::{
-    cache::RecordBatchCache,
+    cache::HotCache,
+    cache_stream::CacheStream,
     object_reader::{AsyncObjectReader, DefaultObjectReader},
     object_stream::ObjectStream,
     FetchDataset, Stream,
 };
 
 // final stream type
-type FStream = ObjectStream<ReplicationStream, DefaultObjectReader>;
+type FStream = CacheStream<ObjectStream<ReplicationStream, DefaultObjectReader>>;
 
 /// `StreamManager` is intended to be used in thread-per-core usage case. It is NOT `Send`.
 pub(crate) struct StreamManager {
     clients: Vec<Rc<Client>>,
     round_robin: usize,
     streams: Rc<RefCell<HashMap<u64, Rc<FStream>>>>,
-    cache: Rc<RecordBatchCache>,
+    cache: Rc<HotCache>,
     object_reader: Rc<AsyncObjectReader>,
 }
 
@@ -44,7 +45,7 @@ impl StreamManager {
     pub(crate) fn new(config: Arc<Configuration>) -> Self {
         let (shutdown, _rx) = broadcast::channel(1);
         let streams = Rc::new(RefCell::new(HashMap::new()));
-        let cache = Rc::new(RecordBatchCache::new(Self::get_max_cache_size()));
+        let cache = Rc::new(HotCache::new(Self::get_max_cache_size()));
 
         let mut clients = vec![];
         for _ in 0..config.replication.connection_pool_size {
@@ -115,7 +116,6 @@ impl StreamManager {
         let stream = self.streams.borrow().get(&request.stream_id).map(Rc::clone);
         if let Some(stream) = stream {
             tokio_uring::spawn(async move {
-                // FIXME: implement fetch
                 let result = stream
                     .fetch(
                         request.start_offset,
@@ -285,19 +285,22 @@ impl StreamManager {
         stream_id: u64,
         epoch: u64,
         client: Weak<Client>,
-        cache: Rc<RecordBatchCache>,
+        cache: Rc<HotCache>,
         object_reader: Rc<AsyncObjectReader>,
     ) -> Rc<FStream> {
-        let stream = ReplicationStream::new(stream_id as i64, epoch, client, cache);
+        let stream = ReplicationStream::new(stream_id as i64, epoch, client, cache.clone());
+
         let object_reader = DefaultObjectReader::new(object_reader);
-        ObjectStream::new(stream, object_reader)
+        let stream = ObjectStream::new(stream, object_reader);
+
+        CacheStream::new(stream_id, stream, cache)
     }
 
-    fn get_max_cache_size() -> usize {
+    fn get_max_cache_size() -> u64 {
         // get max cache size (MB) from system env
         std::env::var("ES_MAX_CACHE_SIZE")
             .unwrap_or_else(|_| "2048".to_string())
-            .parse::<usize>()
+            .parse::<u64>()
             .unwrap_or_else(|_| {
                 warn!("Failed to parse MAX_CACHE_SIZE, use default value 2048");
                 2048

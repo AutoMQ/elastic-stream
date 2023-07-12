@@ -17,7 +17,7 @@ use model::record::{flat_record::FlatRecordBatch, RecordBatch};
 use tokio::sync::broadcast;
 
 use super::{
-    cache::RecordBatchCache, records_block::RecordsBlock, replication_stream::ReplicationStream,
+    cache::HotCache, records_block::RecordsBlock, replication_stream::ReplicationStream,
     replicator::Replicator, FetchDataset,
 };
 
@@ -39,7 +39,7 @@ pub(crate) struct ReplicationRange {
 
     client: Weak<Client>,
 
-    cache: Rc<RecordBatchCache>,
+    cache: Rc<HotCache>,
 
     replicators: Rc<Vec<Rc<Replicator>>>,
 
@@ -59,7 +59,7 @@ impl ReplicationRange {
         open_for_write: bool,
         stream: Weak<ReplicationStream>,
         client: Weak<Client>,
-        cache: Rc<RecordBatchCache>,
+        cache: Rc<HotCache>,
     ) -> Rc<Self> {
         let confirm_offset = metadata.end().unwrap_or_else(|| metadata.start());
         let status = if metadata.end().is_some() {
@@ -207,7 +207,6 @@ impl ReplicationRange {
         let (flat_record_batch_bytes, _) = flat_record_batch.encode();
         self.cache.insert(
             self.metadata.stream_id() as u64,
-            self.metadata().index() as u32,
             base_offset,
             last_offset_delta,
             // deep copy record batch bytes cause of replication directly use the bytes passed from frontend which
@@ -229,29 +228,6 @@ impl ReplicationRange {
         end_offset: u64,
         batch_max_bytes: u32,
     ) -> Result<FetchDataset, ReplicationError> {
-        // TODO: move cache get to upper layer.
-        // loop {
-        //     // cache hit the fetch range, return data from cache.
-        //     if next_start_offset >= end_offset || next_batch_max_bytes == 0 {
-        //         trace!(
-        //             "{}Fetch [{}, {}) with batch_max_bytes[{}] fulfilled by cache",
-        //             self.log_ident,
-        //             start_offset,
-        //             end_offset,
-        //             batch_max_bytes
-        //         );
-        //         return Ok(fetch_data);
-        //     }
-        //     if let Some(cache_data) = self.cache.get(stream_id, range_index, next_start_offset) {
-        //         let mut data = cache_data.data.clone();
-        //         next_batch_max_bytes -= min(next_batch_max_bytes, data.len() as u32);
-        //         next_start_offset += cache_data.count as u64;
-        //         fetch_data.append(&mut data);
-        //     } else {
-        //         break;
-        //     }
-        // }
-
         let now = Instant::now();
         // TODO: select replica strategy.
         // - balance the read traffic.
@@ -277,7 +253,7 @@ impl ReplicationRange {
             // range server local records
             let local_records = fetch_result.payload.unwrap_or_default();
             let blocks = if !local_records.is_empty() {
-                RecordsBlock::new(local_records, 1024 * 1024, false).map_err(|e| {
+                RecordsBlock::parse(local_records, 1024 * 1024, false).map_err(|e| {
                     error!(
                         "{}Fetch [{}, {}) decode fail, err: {}",
                         self.log_ident, start_offset, end_offset, e

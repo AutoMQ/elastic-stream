@@ -36,7 +36,7 @@ impl RecordsBlock {
     }
 
     pub(crate) fn len(&self) -> u32 {
-        self.records.iter().map(|r| r.data.len()).sum::<usize>() as u32
+        self.records.iter().map(|r| r.len()).sum()
     }
 
     pub(crate) fn start_offset(&self) -> u64 {
@@ -63,7 +63,14 @@ impl RecordsBlock {
         }
     }
 
-    pub(crate) fn new(
+    pub(crate) fn new(records: Vec<BlockRecord>) -> Self {
+        Self {
+            records,
+            empty_block_offset: None,
+        }
+    }
+
+    pub(crate) fn parse(
         bytes: Bytes,
         block_size: u32,
         deep_copy: bool,
@@ -151,4 +158,14 @@ pub(crate) struct BlockRecord {
     pub start_offset: u64,
     pub end_offset_delta: u32,
     pub data: Vec<Bytes>,
+}
+
+impl BlockRecord {
+    pub(crate) fn len(&self) -> u32 {
+        self.data.iter().map(|d| d.len()).sum::<usize>() as u32
+    }
+
+    pub(crate) fn end_offset(&self) -> u64 {
+        self.start_offset + self.end_offset_delta as u64
+    }
 }

@@ -5,6 +5,7 @@ use crate::ReplicationError;
 use self::records_block::RecordsBlock;
 
 pub(crate) mod cache;
+pub(crate) mod cache_stream;
 pub(crate) mod object_reader;
 pub(crate) mod object_stream;
 pub(crate) mod records_block;

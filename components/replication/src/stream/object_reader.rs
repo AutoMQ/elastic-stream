@@ -119,7 +119,7 @@ impl AsyncObjectReader {
                 .range_read(&object_key, range.0 as u64..range.1 as u64)
                 .await;
             let rst = match rst {
-                Ok(b) => match RecordsBlock::new(Bytes::from(b), 1024 * 1024, true) {
+                Ok(b) => match RecordsBlock::parse(Bytes::from(b), 1024 * 1024, true) {
                     Ok(blocks) => Ok(blocks),
                     Err(_) => Err(ObjectReadError::Unexpected(Error::new(
                         0,
