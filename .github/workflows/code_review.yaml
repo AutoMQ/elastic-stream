@@ -16,5 +16,3 @@ jobs:
           LANGUAGE: English
           OPENAI_API_ENDPOINT: https://openai-proxy.devadmin-c97.workers.dev/
           MODEL: gpt-3.5-turbo
-          max_tokens: 100000
-          MAX_PATCH_LENGTH: 100000 # if the patch/diff length is large than MAX_PATCH_LENGTH, will be ignored and won't review. By default, with no MAX_PATCH_LENGTH set, there is also no limit for the patch/diff length.
