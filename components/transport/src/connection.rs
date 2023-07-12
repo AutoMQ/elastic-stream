@@ -1,15 +1,15 @@
+use crate::ConnectionError;
+use crate::WriteTask;
 use bytes::{Buf, BytesMut};
+use codec::error::FrameError;
+use codec::frame::Frame;
 use local_sync::{mpsc, oneshot};
 use log::{error, info, trace, warn};
 use std::cell::UnsafeCell;
 use std::io::Cursor;
+use std::net::Shutdown;
 use std::rc::Rc;
 use tokio_uring::net::TcpStream;
-
-use codec::error::FrameError;
-use codec::frame::Frame;
-
-use crate::WriteTask;
 
 const BUFFER_SIZE: usize = 4 * 1024;
 
@@ -36,16 +36,35 @@ impl Connection {
         let write_stream = Rc::clone(&stream);
         let target_address = peer_address.to_owned();
         tokio_uring::spawn(async move {
-            log::trace!("Start write coroutine loop for {}", &target_address);
+            trace!("Start write coroutine loop for {}", &target_address);
             loop {
                 match rx.recv().await {
                     Some(task) => {
-                        log::trace!(
+                        trace!(
                             "Write-frame-task[stream-id={}] received, start writing to {}",
                             task.frame.stream_id,
                             &target_address
                         );
-                        Self::write(&write_stream, task, &target_address).await;
+
+                        if let Err(e) =
+                            Self::write(&write_stream, &task.frame, &target_address).await
+                        {
+                            match e {
+                                ConnectionError::EncodeFrame(e) => {
+                                    error!("Failed to encode frame: {}", e.to_string());
+                                    let _ =
+                                        task.observer.send(Err(ConnectionError::EncodeFrame(e)));
+                                }
+
+                                ConnectionError::Network(e) => {
+                                    error!("Failed to write frame to network due to {}, closing underlying TcpStream", e.to_string());
+                                    let _ = write_stream.shutdown(Shutdown::Both);
+                                    break;
+                                }
+                            }
+                        } else {
+                            let _ = task.observer.send(Ok(()));
+                        }
                     }
                     None => {
                         log::info!(
@@ -66,20 +85,12 @@ impl Connection {
         }
     }
 
-    async fn write(stream: &Rc<TcpStream>, task: WriteTask, peer_address: &str) {
-        let mut buffers = match task.frame.encode().map_err(|e| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to encode frame. Cause: {:?}", e),
-            )
-        }) {
-            Ok(buffers) => buffers,
-            Err(e) => {
-                error!("Failed to encode Frame[stream-id={}]", task.frame.stream_id);
-                let _ = task.observer.send(Err(e));
-                return;
-            }
-        };
+    async fn write(
+        stream: &Rc<TcpStream>,
+        frame: &Frame,
+        peer_address: &str,
+    ) -> Result<(), ConnectionError> {
+        let mut buffers = frame.encode()?;
 
         let total = buffers.iter().map(|b| b.len()).sum::<usize>();
         trace!("Get {} bytes to write to: {}", total, peer_address);
@@ -87,66 +98,54 @@ impl Connection {
         loop {
             let (res, _buffers) = stream.writev(buffers).await;
             buffers = _buffers;
-            match res {
-                Ok(mut n) => {
-                    debug_assert!(n <= remaining, "Data written to socket buffer should be less than or equal to remaining bytes to write");
-                    if n == remaining {
-                        if remaining == total {
-                            // First time to write
-                            trace!("Wrote {}/{} bytes to {}", n, total, peer_address);
-                        } else {
-                            // Last time of writing: the remaining are all written.
-                            remaining -= n;
-                            trace!(
-                                "Wrote {}/{} bytes to {}. Overall, {}/{} is written.",
-                                n,
-                                total,
-                                peer_address,
-                                total - remaining,
-                                total
-                            );
-                        }
-                        break;
-                    } else {
-                        remaining -= n;
-                        trace!(
-                            "Wrote {} bytes to {}. Overall, {}/{} is written",
-                            n,
-                            peer_address,
-                            total - remaining,
-                            total,
-                        );
-                        // Drain/advance buffers that are already written.
-                        buffers
-                            .extract_if(|buffer| {
-                                if buffer.len() <= n {
-                                    n -= buffer.len();
-                                    // Remove it
-                                    true
-                                } else {
-                                    if n > 0 {
-                                        buffer.advance(n);
-                                        n = 0;
-                                    }
-                                    // Keep the buffer slice
-                                    false
-                                }
-                            })
-                            .count();
-                    }
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to write Frame[stream-id={}] to {peer_address}",
-                        task.frame.stream_id
+            let mut n = res?;
+            debug_assert!(n <= remaining, "Data written to socket buffer should be less than or equal to remaining bytes to write");
+            if n == remaining {
+                if remaining == total {
+                    // First time to write
+                    trace!("Wrote {}/{} bytes to {}", n, total, peer_address);
+                } else {
+                    // Last time of writing: the remaining are all written.
+                    remaining -= n;
+                    trace!(
+                        "Wrote {}/{} bytes to {}. Overall, {}/{} is written.",
+                        n,
+                        total,
+                        peer_address,
+                        total - remaining,
+                        total
                     );
-                    let _ = task.observer.send(Err(e));
-                    return;
                 }
-            };
+                break;
+            } else {
+                remaining -= n;
+                trace!(
+                    "Wrote {} bytes to {}. Overall, {}/{} is written",
+                    n,
+                    peer_address,
+                    total - remaining,
+                    total,
+                );
+                // Drain/advance buffers that are already written.
+                buffers
+                    .extract_if(|buffer| {
+                        if buffer.len() <= n {
+                            n -= buffer.len();
+                            // Remove it
+                            true
+                        } else {
+                            if n > 0 {
+                                buffer.advance(n);
+                                n = 0;
+                            }
+                            // Keep the buffer slice
+                            false
+                        }
+                    })
+                    .count();
+            }
         }
-
-        let _ = task.observer.send(Ok(()));
+        Ok(())
     }
 
     pub fn peer_address(&self) -> &str {
@@ -291,38 +290,25 @@ impl Connection {
         }
     }
 
-    pub async fn write_frame(&self, frame: Frame) -> Result<(), std::io::Error> {
+    pub async fn write_frame(&self, frame: Frame) -> Result<(), ConnectionError> {
         let (tx, rx) = oneshot::channel();
         let task = WriteTask {
             frame,
             observer: tx,
         };
-        self.tx.send(task).map_err(|e| {
+
+        self.tx.send(task).map_err(|_e| {
             warn!(
-                "Failed to send frame to connection's internal SPSC channel. Cause: {:?}",
-                e
+                "Failed to send frame to connection's internal MPSC channel. TcpStream has been closed",
             );
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!(
-                    "Connection's internal SPSC channel is closed. Cause: {:?}",
-                    e
-                ),
-            )
+            ConnectionError::Network(std::io::Error::new(std::io::ErrorKind::BrokenPipe, "Connection MPSC channel closed"))
         })?;
 
-        rx.await.map_err(|e| {
-            warn!(
-                "Failed to receive acknowledgement from oneshot channel. Cause: {:?}",
-                e
-            );
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!(
-                    "Connection's internal oneshot channel is closed. Cause: {:?}",
-                    e
-                ),
-            )
+        rx.await.map_err(|_e| {
+            ConnectionError::Network(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "Connection is closed",
+            ))
         })?
     }
 

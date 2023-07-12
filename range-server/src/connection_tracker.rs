@@ -1,9 +1,9 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use codec::frame::Frame;
+use local_sync::mpsc;
 use log::{info, warn};
 use protocol::rpc::header::{GoAwayFlags, OperationCode};
-use tokio::sync::mpsc::UnboundedSender;
 
 /// Track all existing connections and send the `GoAway` farewell frame to peers if graceful shutdown is desirable.
 pub(crate) struct ConnectionTracker {
@@ -11,7 +11,7 @@ pub(crate) struct ConnectionTracker {
     ///
     /// Note the reader half of the channel is the connection writer, responsible of writing
     /// frames to remote peer.
-    connections: HashMap<SocketAddr, UnboundedSender<Frame>>,
+    connections: HashMap<SocketAddr, mpsc::unbounded::Tx<Frame>>,
 }
 
 impl ConnectionTracker {
@@ -21,7 +21,7 @@ impl ConnectionTracker {
         }
     }
 
-    pub(crate) fn insert(&mut self, peer_address: SocketAddr, sender: UnboundedSender<Frame>) {
+    pub(crate) fn insert(&mut self, peer_address: SocketAddr, sender: mpsc::unbounded::Tx<Frame>) {
         self.connections.insert(peer_address, sender);
         info!("Start to track connection to {}", peer_address);
     }
