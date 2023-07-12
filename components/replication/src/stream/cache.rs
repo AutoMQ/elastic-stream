@@ -53,6 +53,7 @@ impl RecordBatchCache {
         map.insert(cache_key, cache_value);
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get(
         &self,
         stream_id: u64,
@@ -96,6 +97,7 @@ impl CacheKey {
 }
 
 pub(crate) struct CacheValue {
+    #[allow(dead_code)]
     pub count: u32,
     pub data: Vec<Bytes>,
 }

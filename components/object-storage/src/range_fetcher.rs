@@ -49,8 +49,7 @@ where
             max_bytes: max_size as i32,
         };
         let store_result = self.store.fetch(read_option).await?;
-        assert_eq!(store_result.results.len(), 1);
-        let payload: Vec<Bytes> = store_result.results[0].iter().cloned().collect();
+        let payload: Vec<Bytes> = store_result.results.into_iter().flatten().collect();
         Ok(RangeFetchResult { payload })
     }
 }

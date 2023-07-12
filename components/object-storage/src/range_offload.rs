@@ -118,7 +118,9 @@ where
 
     /// force inflight multi-part object to complete.
     pub fn flush(&self) {
-        todo!("flush multi-part object")
+        if let Some(multi_part_object) = self.multi_part_object.take() {
+            multi_part_object.close();
+        }
     }
 }
 

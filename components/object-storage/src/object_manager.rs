@@ -44,7 +44,15 @@ impl ObjectManager for MemoryObjectManager {
                     meta.start_offset < end_offset
                         && (meta.end_offset_delta as u64 + meta.start_offset) >= start_offset
                 })
-                .cloned()
+                .map(|meta| {
+                    let mut meta = meta.clone();
+                    let key = format!(
+                        "ess3test/{}-{}/{}",
+                        stream_id, range_index, meta.start_offset
+                    );
+                    meta.key = Some(key);
+                    meta
+                })
                 .collect()
         } else {
             vec![]

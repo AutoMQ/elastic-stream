@@ -1,5 +1,3 @@
-use std::cmp::min;
-
 use bytes::{Buf, Bytes};
 use protocol::rpc::header::ObjectMetadataT;
 
@@ -30,12 +28,12 @@ impl ObjectMetadata {
         }
     }
 
-    /// Find the position of the given offset which offset is after the position in the sparse index.
+    /// Try find the position of the given offset which offset is after the position in the sparse index.
     pub fn find_bound(
         &self,
         start_offset: u64,
         end_offset: Option<u64>,
-        size_hint: u32,
+        mut size_hint: u32,
         position: Option<u32>,
     ) -> Option<(u32, u32)> {
         let object_end_offset = self.start_offset + self.end_offset_delta as u64;
@@ -49,8 +47,9 @@ impl ObjectMetadata {
         }
 
         // find bound start_position and end_position from sparse index
-        let mut end_position = None;
-        let start_position = if let Some(position) = position {
+        let start_position = if start_offset == self.start_offset {
+            0
+        } else if let Some(position) = position {
             position
         } else {
             let mut position = 0;
@@ -63,27 +62,37 @@ impl ObjectMetadata {
                 let index_position = cursor.get_u32();
                 if index_end_offset <= start_offset {
                     position = index_position;
+                } else {
+                    // increment size hint by add previous sparse index range to cover start offset.
+                    size_hint += index_position - position;
                 }
-                if let Some(end_offset) = end_offset {
-                    if index_end_offset >= end_offset {
-                        end_position = Some(index_position);
-                        break;
-                    }
-                }
+            }
+            if position == 0 {
+                size_hint = self.data_len;
             }
             position
         };
-        let end_position = if let Some(end_position) = end_position {
-            end_position
-        } else {
-            min(self.data_len, start_position + Self::normalize(size_hint))
-        };
-        Some((start_position, end_position))
-    }
+        let mut end_position = self.data_len;
+        let mut cursor = self.sparse_index.clone();
+        loop {
+            if cursor.is_empty() {
+                break;
+            }
+            let index_end_offset = self.start_offset + cursor.get_u32() as u64;
+            let index_position = cursor.get_u32();
+            if let Some(end_offset) = end_offset {
+                if index_end_offset >= end_offset {
+                    end_position = index_position;
+                    break;
+                }
+            }
+            if index_position - start_position >= size_hint {
+                end_position = index_position;
+                break;
+            }
+        }
 
-    fn normalize(length: u32) -> u32 {
-        // normalize length to 1MB aligned
-        (length + 1024 * 1024 - 1) / (1024 * 1024) * 1024 * 1024
+        Some((start_position, end_position))
     }
 }
 

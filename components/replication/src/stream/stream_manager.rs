@@ -1,8 +1,13 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::{Rc, Weak},
+    sync::Arc,
+};
 
 use client::Client;
 use config::Configuration;
-use log::warn;
+use log::{error, warn};
 use model::{client_role::ClientRole, stream::StreamMetadata};
 use tokio::sync::{broadcast, oneshot};
 
@@ -16,15 +21,23 @@ use crate::{
     ReplicationError,
 };
 
-use super::{cache::RecordBatchCache, object_reader::ObjectReader, Stream};
+use super::{
+    cache::RecordBatchCache,
+    object_reader::{AsyncObjectReader, DefaultObjectReader},
+    object_stream::ObjectStream,
+    FetchDataset, Stream,
+};
+
+// final stream type
+type FStream = ObjectStream<ReplicationStream, DefaultObjectReader>;
 
 /// `StreamManager` is intended to be used in thread-per-core usage case. It is NOT `Send`.
 pub(crate) struct StreamManager {
     clients: Vec<Rc<Client>>,
     round_robin: usize,
-    streams: Rc<RefCell<HashMap<u64, Rc<ReplicationStream>>>>,
+    streams: Rc<RefCell<HashMap<u64, Rc<FStream>>>>,
     cache: Rc<RecordBatchCache>,
-    object_reader: Rc<ObjectReader>,
+    object_reader: Rc<AsyncObjectReader>,
 }
 
 impl StreamManager {
@@ -40,7 +53,7 @@ impl StreamManager {
             clients.push(client);
         }
 
-        let object_reader = Rc::new(ObjectReader::new());
+        let object_reader = Rc::new(AsyncObjectReader::new());
 
         Self {
             clients,
@@ -102,15 +115,33 @@ impl StreamManager {
         let stream = self.streams.borrow().get(&request.stream_id).map(Rc::clone);
         if let Some(stream) = stream {
             tokio_uring::spawn(async move {
+                // FIXME: implement fetch
                 let result = stream
                     .fetch(
                         request.start_offset,
                         request.end_offset,
                         request.batch_max_bytes,
                     )
-                    .await
-                    .map(|data| ReadResponse { data });
-                let _ = tx.send(result);
+                    .await;
+                let dataset = match result {
+                    Ok(dataset) => dataset,
+                    Err(e) => {
+                        let _ = tx.send(Err(e));
+                        return;
+                    }
+                };
+                if let FetchDataset::Full(blocks) = dataset {
+                    let mut data = vec![];
+                    for block in blocks {
+                        for record in block.records {
+                            data.extend_from_slice(&record.data);
+                        }
+                    }
+                    let _ = tx.send(Ok(ReadResponse { data }));
+                } else {
+                    error!("Fetch dataset should be full");
+                    let _ = tx.send(Err(ReplicationError::Internal));
+                }
             });
         } else {
             let _ = tx.send(Err(ReplicationError::StreamNotExist));
@@ -169,8 +200,8 @@ impl StreamManager {
         let object_reader = self.object_reader.clone();
         tokio_uring::spawn(async move {
             let client = Rc::downgrade(&client);
-            let stream = ReplicationStream::new(
-                request.stream_id as i64,
+            let stream = Self::new_stream(
+                request.stream_id,
                 request.epoch,
                 client,
                 cache,
@@ -248,6 +279,18 @@ impl StreamManager {
         } else {
             let _ = tx.send(Err(ReplicationError::StreamNotExist));
         }
+    }
+
+    fn new_stream(
+        stream_id: u64,
+        epoch: u64,
+        client: Weak<Client>,
+        cache: Rc<RecordBatchCache>,
+        object_reader: Rc<AsyncObjectReader>,
+    ) -> Rc<FStream> {
+        let stream = ReplicationStream::new(stream_id as i64, epoch, client, cache);
+        let object_reader = DefaultObjectReader::new(object_reader);
+        ObjectStream::new(stream, object_reader)
     }
 
     fn get_max_cache_size() -> usize {

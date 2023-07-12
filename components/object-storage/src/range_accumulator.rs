@@ -4,6 +4,7 @@ use std::{
     rc::Rc,
     time::{Duration, Instant},
 };
+use store::error::FetchError;
 use tokio::{
     sync::mpsc::{self, UnboundedReceiver},
     time::sleep,
@@ -147,14 +148,19 @@ impl DefaultRangeAccumulator {
                             }
                             next_offset = range_offload.write(next_offset, records.payload);
                         }
-                        Err(e) => {
-                            log::error!(
-                                "fetch range{stream_id}#{range_index} failed, retry later, {}",
-                                e
-                            );
-                            sleep(Duration::from_secs(1)).await;
-                            continue;
-                        }
+                        Err(e) => match e {
+                            FetchError::NoRecord => {
+                                break;
+                            }
+                            _ => {
+                                log::error!(
+                                    "fetch range{stream_id}#{range_index} failed, retry later, {}",
+                                    e
+                                );
+                                sleep(Duration::from_secs(1)).await;
+                                continue;
+                            }
+                        },
                     }
                 }
                 if force_flush {

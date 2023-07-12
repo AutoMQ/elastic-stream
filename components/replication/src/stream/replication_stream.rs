@@ -2,10 +2,9 @@ use crate::stream::replication_range::RangeAppendContext;
 use crate::ReplicationError;
 
 use super::cache::RecordBatchCache;
-use super::object_reader::ObjectReader;
 use super::replication_range::ReplicationRange;
+use super::FetchDataset;
 use super::Stream;
-use bytes::Bytes;
 use client::Client;
 use itertools::Itertools;
 use local_sync::{mpsc, oneshot};
@@ -13,7 +12,7 @@ use log::{error, info, trace, warn};
 use model::RecordBatch;
 use std::cell::OnceCell;
 use std::cell::RefCell;
-use std::cmp::{max, min};
+use std::cmp::min;
 use std::collections::BTreeMap;
 use std::ops::Bound::Included;
 use std::rc::{Rc, Weak};
@@ -38,9 +37,7 @@ pub(crate) struct ReplicationStream {
     shutdown_signal_tx: broadcast::Sender<()>,
     // stream closed mark.
     closed: Rc<RefCell<bool>>,
-
     cache: Rc<RecordBatchCache>,
-    object_reader: Rc<ObjectReader>,
 }
 
 impl ReplicationStream {
@@ -49,7 +46,6 @@ impl ReplicationStream {
         epoch: u64,
         client: Weak<Client>,
         cache: Rc<RecordBatchCache>,
-        object_reader: Rc<ObjectReader>,
     ) -> Rc<Self> {
         let (append_requests_tx, append_requests_rx) = mpsc::bounded::channel(1024);
         let (append_tasks_tx, append_tasks_rx) = mpsc::unbounded::channel();
@@ -68,7 +64,6 @@ impl ReplicationStream {
             shutdown_signal_tx,
             closed: Rc::new(RefCell::new(false)),
             cache,
-            object_reader,
         });
 
         *(this.weak_self.borrow_mut()) = Rc::downgrade(&this);
@@ -100,7 +95,6 @@ impl ReplicationStream {
                 self.weak_self.borrow().clone(),
                 self.client.clone(),
                 self.cache.clone(),
-                self.object_reader.clone(),
             );
             info!("{}Create new range: {:?}", range.metadata(), self.log_ident);
             self.ranges.borrow_mut().insert(start_offset, range.clone());
@@ -275,7 +269,6 @@ impl Stream for ReplicationStream {
                         self.weak_self.borrow().clone(),
                         self.client.clone(),
                         self.cache.clone(),
-                        self.object_reader.clone(),
                     ),
                 );
             });
@@ -379,13 +372,13 @@ impl Stream for ReplicationStream {
         start_offset: u64,
         end_offset: u64,
         batch_max_bytes: u32,
-    ) -> Result<Vec<Bytes>, ReplicationError> {
+    ) -> Result<FetchDataset, ReplicationError> {
         trace!(
             "{}Fetch [{start_offset}, {end_offset}) with batch_max_bytes={batch_max_bytes}",
             self.log_ident
         );
         if start_offset == end_offset {
-            return Ok(Vec::new());
+            return Ok(FetchDataset::Partial(vec![]));
         }
         let last_range = match self.last_range.borrow().as_ref() {
             Some(range) => range.clone(),
@@ -401,45 +394,36 @@ impl Stream for ReplicationStream {
                 .fetch(start_offset, end_offset, batch_max_bytes)
                 .await;
         }
-
         // Slow path
-        // 1. find all ranges that intersect with the fetch range.
-        // 2. fetch from each range.
-        let mut fetch_ranges: Vec<Rc<ReplicationRange>> = Vec::new();
-        {
-            let ranges = self.ranges.borrow();
-            let mut cursor = ranges.upper_bound(Included(&start_offset));
-            while let Some(range) = cursor.value() {
-                if range.start_offset() >= end_offset {
-                    break;
-                }
-                fetch_ranges.push(range.clone());
-                cursor.move_next();
+        // 1. Find the *first* range which match the start_offset.
+        // 2. Fetch the range.
+        // 3. The invoker should loop invoke fetch util the Dataset fullfil the need.
+        let range = self
+            .ranges
+            .borrow()
+            .upper_bound(Included(&start_offset))
+            .value()
+            .cloned();
+        if let Some(range) = range {
+            if range.start_offset() > start_offset {
+                return Err(ReplicationError::FetchOutOfRange);
             }
-        }
-        if fetch_ranges.is_empty() || fetch_ranges[0].start_offset() > start_offset {
-            return Err(ReplicationError::FetchOutOfRange);
-        }
-        let mut records: Vec<Bytes> = Vec::new();
-        let mut max_bytes_hint = batch_max_bytes;
-        for range in fetch_ranges {
-            if max_bytes_hint == 0 {
-                break;
-            }
-            let mut range_records = range
+            let dataset = match range
                 .fetch(
-                    max(start_offset, range.start_offset()),
+                    start_offset,
                     min(end_offset, range.confirm_offset()),
-                    max_bytes_hint,
+                    batch_max_bytes,
                 )
-                .await?;
-            for bytes in range_records.iter() {
-                max_bytes_hint -= min(max_bytes_hint, bytes.len() as u32);
-            }
-            // TODO: check data integrity.
-            records.append(&mut range_records);
+                .await?
+            {
+                FetchDataset::Full(blocks) => FetchDataset::Partial(blocks),
+                FetchDataset::Partial(blocks) => FetchDataset::Partial(blocks),
+                FetchDataset::Mixin(blocks, objects) => FetchDataset::Mixin(blocks, objects),
+            };
+            Ok(dataset)
+        } else {
+            Err(ReplicationError::FetchOutOfRange)
         }
-        Ok(records)
     }
 
     async fn trim(&self, _new_start_offset: u64) -> Result<(), ReplicationError> {
