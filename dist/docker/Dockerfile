@@ -7,6 +7,4 @@ RUN apt-get update \
     && dpkg -i *.deb \
     && rm -f *.deb
 
-COPY config/pd config/range-server /etc/
-
 CMD ["/usr/local/bin/pd", "--config", "/etc/pd/config.yaml"]
