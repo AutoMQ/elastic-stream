@@ -102,7 +102,7 @@ jobs:
       - name: Publish to Apache Maven Central
         working-directory: ./sdks/frontend-java
         run: |
-          mvn deploy
+          mvn -DargLine="--add-opens=java.base/java.nio=ALL-UNNAMED" deploy
         env:
           MAVEN_USERNAME: mooc9988
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_PASSWORD }}
