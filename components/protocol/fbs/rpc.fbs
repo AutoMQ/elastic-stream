@@ -733,7 +733,7 @@ table ListResourceRequest {
 
     // The token to continue listing resources from a previous request.
     // Since this value is determined by the server, clients may only use the continue token from a previous request.
-    continue: [ubyte] (id: 3);
+    continuation: [ubyte] (id: 3);
 }
 
 table ListResourceResponse {
@@ -750,7 +750,7 @@ table ListResourceResponse {
 
     // The token to continue listing resources from a previous request.
     // It may be set if clients set a limit and the server has more resources available.
-    continue: [ubyte] (id: 4);
+    continuation: [ubyte] (id: 4);
 }
 
 table WatchResourceRequest {

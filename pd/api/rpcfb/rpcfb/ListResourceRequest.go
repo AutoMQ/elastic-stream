@@ -10,7 +10,7 @@ type ListResourceRequestT struct {
 	TimeoutMs int32 `json:"timeout_ms"`
 	ResourceType []ResourceType `json:"resource_type"`
 	Limit int32 `json:"limit"`
-	Continue []byte `json:"continue"`
+	Continuation []byte `json:"continuation"`
 }
 
 func (t *ListResourceRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
@@ -24,15 +24,15 @@ func (t *ListResourceRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UO
 		}
 		resourceTypeOffset = builder.EndVector(resourceTypeLength)
 	}
-	continue_Offset := flatbuffers.UOffsetT(0)
-	if t.Continue != nil {
-		continue_Offset = builder.CreateByteString(t.Continue)
+	continuationOffset := flatbuffers.UOffsetT(0)
+	if t.Continuation != nil {
+		continuationOffset = builder.CreateByteString(t.Continuation)
 	}
 	ListResourceRequestStart(builder)
 	ListResourceRequestAddTimeoutMs(builder, t.TimeoutMs)
 	ListResourceRequestAddResourceType(builder, resourceTypeOffset)
 	ListResourceRequestAddLimit(builder, t.Limit)
-	ListResourceRequestAddContinue(builder, continue_Offset)
+	ListResourceRequestAddContinuation(builder, continuationOffset)
 	return ListResourceRequestEnd(builder)
 }
 
@@ -44,7 +44,7 @@ func (rcv *ListResourceRequest) UnPackTo(t *ListResourceRequestT) {
 		t.ResourceType[j] = rcv.ResourceType(j)
 	}
 	t.Limit = rcv.Limit()
-	t.Continue = rcv.ContinueBytes()
+	t.Continuation = rcv.ContinuationBytes()
 }
 
 func (rcv *ListResourceRequest) UnPack() *ListResourceRequestT {
@@ -131,7 +131,7 @@ func (rcv *ListResourceRequest) MutateLimit(n int32) bool {
 	return rcv._tab.MutateInt32Slot(8, n)
 }
 
-func (rcv *ListResourceRequest) Continue(j int) byte {
+func (rcv *ListResourceRequest) Continuation(j int) byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		a := rcv._tab.Vector(o)
@@ -140,7 +140,7 @@ func (rcv *ListResourceRequest) Continue(j int) byte {
 	return 0
 }
 
-func (rcv *ListResourceRequest) ContinueLength() int {
+func (rcv *ListResourceRequest) ContinuationLength() int {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
@@ -148,7 +148,7 @@ func (rcv *ListResourceRequest) ContinueLength() int {
 	return 0
 }
 
-func (rcv *ListResourceRequest) ContinueBytes() []byte {
+func (rcv *ListResourceRequest) ContinuationBytes() []byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		return rcv._tab.ByteVector(o + rcv._tab.Pos)
@@ -156,7 +156,7 @@ func (rcv *ListResourceRequest) ContinueBytes() []byte {
 	return nil
 }
 
-func (rcv *ListResourceRequest) MutateContinue(j int, n byte) bool {
+func (rcv *ListResourceRequest) MutateContinuation(j int, n byte) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		a := rcv._tab.Vector(o)
@@ -180,10 +180,10 @@ func ListResourceRequestStartResourceTypeVector(builder *flatbuffers.Builder, nu
 func ListResourceRequestAddLimit(builder *flatbuffers.Builder, limit int32) {
 	builder.PrependInt32Slot(2, limit, 0)
 }
-func ListResourceRequestAddContinue(builder *flatbuffers.Builder, continue_ flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(3, flatbuffers.UOffsetT(continue_), 0)
+func ListResourceRequestAddContinuation(builder *flatbuffers.Builder, continuation flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(3, flatbuffers.UOffsetT(continuation), 0)
 }
-func ListResourceRequestStartContinueVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func ListResourceRequestStartContinuationVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(1, numElems, 1)
 }
 func ListResourceRequestEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
