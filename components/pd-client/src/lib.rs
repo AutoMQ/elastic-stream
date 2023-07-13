@@ -25,6 +25,12 @@ impl<'a> PlacementDriverClient<'a> {
     }
 }
 
+impl<'a> Default for PlacementDriverClient<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
