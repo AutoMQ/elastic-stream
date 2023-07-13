@@ -8,29 +8,24 @@ import (
 
 type ResourceT struct {
 	Type ResourceType `json:"type"`
-	Stream *StreamT `json:"stream"`
-	Range *RangeT `json:"range"`
-	Object *ObjT `json:"object"`
+	Data []byte `json:"data"`
 }
 
 func (t *ResourceT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
-	streamOffset := t.Stream.Pack(builder)
-	range_Offset := t.Range.Pack(builder)
-	objectOffset := t.Object.Pack(builder)
+	dataOffset := flatbuffers.UOffsetT(0)
+	if t.Data != nil {
+		dataOffset = builder.CreateByteString(t.Data)
+	}
 	ResourceStart(builder)
 	ResourceAddType(builder, t.Type)
-	ResourceAddStream(builder, streamOffset)
-	ResourceAddRange(builder, range_Offset)
-	ResourceAddObject(builder, objectOffset)
+	ResourceAddData(builder, dataOffset)
 	return ResourceEnd(builder)
 }
 
 func (rcv *Resource) UnPackTo(t *ResourceT) {
 	t.Type = rcv.Type()
-	t.Stream = rcv.Stream(nil).UnPack()
-	t.Range = rcv.Range(nil).UnPack()
-	t.Object = rcv.Object(nil).UnPack()
+	t.Data = rcv.DataBytes()
 }
 
 func (rcv *Resource) UnPack() *ResourceT {
@@ -79,59 +74,51 @@ func (rcv *Resource) MutateType(n ResourceType) bool {
 	return rcv._tab.MutateInt8Slot(4, int8(n))
 }
 
-func (rcv *Resource) Stream(obj *Stream) *Stream {
+func (rcv *Resource) Data(j int) byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
-		x := rcv._tab.Indirect(o + rcv._tab.Pos)
-		if obj == nil {
-			obj = new(Stream)
-		}
-		obj.Init(rcv._tab.Bytes, x)
-		return obj
+		a := rcv._tab.Vector(o)
+		return rcv._tab.GetByte(a + flatbuffers.UOffsetT(j*1))
+	}
+	return 0
+}
+
+func (rcv *Resource) DataLength() int {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.VectorLen(o)
+	}
+	return 0
+}
+
+func (rcv *Resource) DataBytes() []byte {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.ByteVector(o + rcv._tab.Pos)
 	}
 	return nil
 }
 
-func (rcv *Resource) Range(obj *Range) *Range {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+func (rcv *Resource) MutateData(j int, n byte) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
-		x := rcv._tab.Indirect(o + rcv._tab.Pos)
-		if obj == nil {
-			obj = new(Range)
-		}
-		obj.Init(rcv._tab.Bytes, x)
-		return obj
+		a := rcv._tab.Vector(o)
+		return rcv._tab.MutateByte(a+flatbuffers.UOffsetT(j*1), n)
 	}
-	return nil
-}
-
-func (rcv *Resource) Object(obj *Obj) *Obj {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
-	if o != 0 {
-		x := rcv._tab.Indirect(o + rcv._tab.Pos)
-		if obj == nil {
-			obj = new(Obj)
-		}
-		obj.Init(rcv._tab.Bytes, x)
-		return obj
-	}
-	return nil
+	return false
 }
 
 func ResourceStart(builder *flatbuffers.Builder) {
-	builder.StartObject(4)
+	builder.StartObject(2)
 }
 func ResourceAddType(builder *flatbuffers.Builder, type_ ResourceType) {
 	builder.PrependInt8Slot(0, int8(type_), 0)
 }
-func ResourceAddStream(builder *flatbuffers.Builder, stream flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(stream), 0)
+func ResourceAddData(builder *flatbuffers.Builder, data flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(data), 0)
 }
-func ResourceAddRange(builder *flatbuffers.Builder, range_ flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(range_), 0)
-}
-func ResourceAddObject(builder *flatbuffers.Builder, object flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(3, flatbuffers.UOffsetT(object), 0)
+func ResourceStartDataVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+	return builder.StartVector(1, numElems, 1)
 }
 func ResourceEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

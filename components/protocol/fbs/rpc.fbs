@@ -697,9 +697,12 @@ enum ResourceType: byte {
 
 table Resource {
     type: ResourceType (id: 0);
-    stream: Stream (id: 1);
-    range: Range (id: 2);
-    object: Obj (id: 3);
+
+    // Depending on the type, the resource could be
+    // A Stream
+    // A Range
+    // An Obj
+    data: [ubyte] (id: 1);
 }
 
 enum EventType: byte {
