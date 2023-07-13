@@ -723,6 +723,17 @@ table ListResourceRequest {
 
     // The type of the resource.
     resource_type: [ResourceType] (id: 1);
+
+    // The maximum number of resources to return.
+    // If not set, the server will return all the resources.
+    // If more resources are available, the server will return a continue token.
+    // NOTE: The server may return fewer than the requested number of resources due to resource limits, and clients
+    // should ONLY use the presence of the continue field to determine whether more results are available.
+    limit: int32 (id: 2);
+
+    // The token to continue listing resources from a previous request.
+    // Since this value is determined by the server, clients may only use the continue token from a previous request.
+    continue: [ubyte] (id: 3);
 }
 
 table ListResourceResponse {
@@ -736,6 +747,10 @@ table ListResourceResponse {
 
     // The resource version when the request is processed.
     resource_version: int64 (id: 3);
+
+    // The token to continue listing resources from a previous request.
+    // It may be set if clients set a limit and the server has more resources available.
+    continue: [ubyte] (id: 4);
 }
 
 table WatchResourceRequest {

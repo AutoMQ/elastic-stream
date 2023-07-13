@@ -11,6 +11,7 @@ type ListResourceResponseT struct {
 	ThrottleTimeMs int32 `json:"throttle_time_ms"`
 	Resources []*ResourceT `json:"resources"`
 	ResourceVersion int64 `json:"resource_version"`
+	Continue []byte `json:"continue"`
 }
 
 func (t *ListResourceResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
@@ -29,11 +30,16 @@ func (t *ListResourceResponseT) Pack(builder *flatbuffers.Builder) flatbuffers.U
 		}
 		resourcesOffset = builder.EndVector(resourcesLength)
 	}
+	continue_Offset := flatbuffers.UOffsetT(0)
+	if t.Continue != nil {
+		continue_Offset = builder.CreateByteString(t.Continue)
+	}
 	ListResourceResponseStart(builder)
 	ListResourceResponseAddStatus(builder, statusOffset)
 	ListResourceResponseAddThrottleTimeMs(builder, t.ThrottleTimeMs)
 	ListResourceResponseAddResources(builder, resourcesOffset)
 	ListResourceResponseAddResourceVersion(builder, t.ResourceVersion)
+	ListResourceResponseAddContinue(builder, continue_Offset)
 	return ListResourceResponseEnd(builder)
 }
 
@@ -48,6 +54,7 @@ func (rcv *ListResourceResponse) UnPackTo(t *ListResourceResponseT) {
 		t.Resources[j] = x.UnPack()
 	}
 	t.ResourceVersion = rcv.ResourceVersion()
+	t.Continue = rcv.ContinueBytes()
 }
 
 func (rcv *ListResourceResponse) UnPack() *ListResourceResponseT {
@@ -141,8 +148,42 @@ func (rcv *ListResourceResponse) MutateResourceVersion(n int64) bool {
 	return rcv._tab.MutateInt64Slot(10, n)
 }
 
+func (rcv *ListResourceResponse) Continue(j int) byte {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
+	if o != 0 {
+		a := rcv._tab.Vector(o)
+		return rcv._tab.GetByte(a + flatbuffers.UOffsetT(j*1))
+	}
+	return 0
+}
+
+func (rcv *ListResourceResponse) ContinueLength() int {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
+	if o != 0 {
+		return rcv._tab.VectorLen(o)
+	}
+	return 0
+}
+
+func (rcv *ListResourceResponse) ContinueBytes() []byte {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
+	if o != 0 {
+		return rcv._tab.ByteVector(o + rcv._tab.Pos)
+	}
+	return nil
+}
+
+func (rcv *ListResourceResponse) MutateContinue(j int, n byte) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
+	if o != 0 {
+		a := rcv._tab.Vector(o)
+		return rcv._tab.MutateByte(a+flatbuffers.UOffsetT(j*1), n)
+	}
+	return false
+}
+
 func ListResourceResponseStart(builder *flatbuffers.Builder) {
-	builder.StartObject(4)
+	builder.StartObject(5)
 }
 func ListResourceResponseAddStatus(builder *flatbuffers.Builder, status flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(status), 0)
@@ -158,6 +199,12 @@ func ListResourceResponseStartResourcesVector(builder *flatbuffers.Builder, numE
 }
 func ListResourceResponseAddResourceVersion(builder *flatbuffers.Builder, resourceVersion int64) {
 	builder.PrependInt64Slot(3, resourceVersion, 0)
+}
+func ListResourceResponseAddContinue(builder *flatbuffers.Builder, continue_ flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(4, flatbuffers.UOffsetT(continue_), 0)
+}
+func ListResourceResponseStartContinueVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+	return builder.StartVector(1, numElems, 1)
 }
 func ListResourceResponseEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
