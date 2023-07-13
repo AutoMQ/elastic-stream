@@ -340,7 +340,7 @@ impl Wal {
             };
             self.segments.push_back(segment);
             Ok(())
-        } else {
+        } else if !self.is_full() {
             let status = segment.status;
             self.inflight_control_tasks.insert(offset, status);
             let sqe = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), segment.path.as_ptr())
@@ -356,23 +356,36 @@ impl Wal {
             };
             self.segments.push_back(segment);
             Ok(())
+        } else {
+            Err(StoreError::DiskFull(String::from(
+                self.config.store.path.wal_path().to_string_lossy(),
+            )))
         }
     }
-
-    pub(crate) fn check_expired_segment(&mut self) {
-        let max_segment_file_num =
-            self.config.store.total_segment_file_size / self.config.store.segment_size;
-        let cur_segment_file_num = self
+    /// Determine if there is sufficient space available to allocate a new segment file.
+    pub(crate) fn is_full(&self) -> bool {
+        let limit = self.config.store.total_segment_file_size / self.config.store.segment_size;
+        let read_write_file_sum = self
             .segments
             .iter()
-            .filter(|segment| segment.status == Status::Read)
-            .count() as u64;
-        if cur_segment_file_num > max_segment_file_num {
-            self.segments
+            .filter(|segment| segment.status == Status::ReadWrite)
+            .count();
+        self.segments.len() >= limit as usize
+            && read_write_file_sum <= self.config.store.pre_allocate_segment_file_number
+    }
+    pub(crate) fn check_mock(_segment: &LogSegment) -> bool {
+        // TODO: Check if a segment can be deleted
+        true
+    }
+    pub(crate) fn check_expired_segment(&mut self) {
+        if self.is_full() {
+            let segment = self
+                .segments
                 .iter_mut()
-                .filter(|segment| segment.status == Status::Read)
-                .take((cur_segment_file_num - max_segment_file_num) as usize)
-                .for_each(|segment| segment.status = Status::Close);
+                .find(|segment| segment.status == Status::Read && Self::check_mock(segment));
+            if let Some(segment) = segment {
+                segment.status = Status::Close
+            }
         }
     }
 

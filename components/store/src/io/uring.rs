@@ -1392,7 +1392,10 @@ impl IO {
                 if io.borrow().wal.writable_segment_count() > min_preallocated_segment_files {
                     break;
                 }
-                io.borrow_mut().wal.try_open_segment()?;
+                if io.borrow_mut().wal.try_open_segment().is_err() {
+                    // TODO: Modify current state and report it to pd
+                    break;
+                }
             }
 
             // check if we have expired segment files to close and delete
