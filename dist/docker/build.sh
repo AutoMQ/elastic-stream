@@ -1,6 +1,6 @@
 #!/bin/bash
-
-docker build -t elasticstream/range-server:0.2.2 -f Dockerfile.rs .
-docker push elasticstream/range-server:0.2.2
-docker build -t elasticstream/pd-server:0.2.2 -f Dockerfile.pd .
-docker push elasticstream/pd-server:0.2.2
+version=$(git describe --tags --always --dirty | sed -e 's/^[^0-9]*//')
+cp ../*.deb .
+cp ../../pd/distribution/*.deb .
+docker build -t elasticstream/elastic-stream:${version} -f Dockerfile .
+docker push elasticstream/elastic-stream:${version}

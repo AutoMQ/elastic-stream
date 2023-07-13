@@ -1,0 +1,94 @@
+refresh_rate: 30 seconds
+
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}"
+
+  store:
+    kind: rolling_file
+    path: "logs/store.log"
+    append: true
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}"
+    policy:
+      kind: compound
+      trigger:
+        kind: size
+        limit: 16 mb
+      roller:
+        kind: fixed_window
+        pattern: logs/archive/store.{}.log
+        count: 10
+        base: 0
+
+  range-server:
+    kind: rolling_file
+    path: "logs/range-server.log"
+    append: true
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {f}:{L} — {t} {m}{n}"
+    policy:
+      kind: compound
+      trigger:
+        kind: size
+        limit: 16 mb
+      roller:
+      roller:
+        kind: fixed_window
+        pattern: logs/archive/range-server.{}.log
+        count: 10
+        base: 0
+
+root:
+  level: trace
+  appenders:
+    - stdout
+
+loggers:
+  store:
+    level: trace
+    appenders:
+      - store
+    additive: false
+  range_server:
+    level: trace
+    appenders:
+      - range-server
+    additive: false
+  model:
+    level: trace
+    appenders:
+      - range-server
+    additive: false
+  codec:
+    level: trace
+    appenders:
+      - range-server
+    additive: false
+  transport:
+    level: trace
+    appenders:
+      - range-server
+    additive: false
+  config:
+    level: trace
+    appenders:
+      - range-server
+    additive: false
+  client:
+    level: trace
+    appenders:
+      - range-server
+    additive: false
+  util:
+    level: trace
+    appenders:
+      - range-server
+    additive: false
+  object_storage:
+    level: trace
+    appenders:
+      - range-server
+    additive: false

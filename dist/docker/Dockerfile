@@ -1,0 +1,12 @@
+FROM ubuntu:22.04
+
+ADD *.deb /root/
+
+RUN apt-get update \
+    && apt-get install -y wget telnet \
+    && dpkg -i *.deb \
+    && rm -f *.deb
+
+COPY config/pd config/range-server /etc/
+
+CMD ["/usr/local/bin/pd", "--config", "/etc/pd/config.yaml"]
