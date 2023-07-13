@@ -86,7 +86,7 @@ jobs:
           java-version: '17'
       - name: Build Packages
         working-directory: ./sdks/frontend-java
-        run: mvn clean package
+        run: mvn -DargLine="--add-opens=java.base/java.nio=ALL-UNNAMED" clean package
         env:
           GITHUB_TOKEN: ${{ github.token }} # GITHUB_TOKEN is the default env for the password
       - name: Set up Apache Maven Central
