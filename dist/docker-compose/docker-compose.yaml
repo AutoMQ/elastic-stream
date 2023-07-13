@@ -1,10 +1,17 @@
 services:
   range-server:
-    image: "elasticstream/range-server:0.2.2"
+    image: "elasticstream/elastic-stream:0.2.4"
     configs:
       - source: rs_config
         target: /etc/range-server/range-server.yaml
         mode: 0440
+    entrypoint:
+      - /usr/local/bin/range-server
+      - -c
+      - /etc/range-server/range-server.yaml
+      - -l
+      - /etc/range-server/range-server-log.yaml
+
     ports:
       - "10911:10911"
     depends_on:
@@ -13,7 +20,7 @@ services:
     volumes:
       - rs_data:/data
   pd:
-    image: "elasticstream/pd-server:0.2.2"
+    image: "elasticstream/elastic-stream:0.2.4"
     configs:
       - source: pd_config
         target: /etc/pd/config.yaml
