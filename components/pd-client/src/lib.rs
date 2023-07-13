@@ -1,5 +1,6 @@
 #![feature(fn_traits)]
 
+#[allow(clippy::type_complexity)]
 pub struct PlacementDriverClient<'a> {
     listeners: Vec<Box<dyn FnMut(&str) + 'a>>,
 }
