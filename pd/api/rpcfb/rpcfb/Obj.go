@@ -6,7 +6,7 @@ import (
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-type ObjectT struct {
+type ObjT struct {
 	StreamId int64 `json:"stream_id"`
 	RangeIndex int32 `json:"range_index"`
 	Epoch int64 `json:"epoch"`
@@ -16,24 +16,24 @@ type ObjectT struct {
 	SparseIndex []byte `json:"sparse_index"`
 }
 
-func (t *ObjectT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+func (t *ObjT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
 	sparseIndexOffset := flatbuffers.UOffsetT(0)
 	if t.SparseIndex != nil {
 		sparseIndexOffset = builder.CreateByteString(t.SparseIndex)
 	}
-	ObjectStart(builder)
-	ObjectAddStreamId(builder, t.StreamId)
-	ObjectAddRangeIndex(builder, t.RangeIndex)
-	ObjectAddEpoch(builder, t.Epoch)
-	ObjectAddStartOffset(builder, t.StartOffset)
-	ObjectAddEndOffsetDelta(builder, t.EndOffsetDelta)
-	ObjectAddDataLen(builder, t.DataLen)
-	ObjectAddSparseIndex(builder, sparseIndexOffset)
-	return ObjectEnd(builder)
+	ObjStart(builder)
+	ObjAddStreamId(builder, t.StreamId)
+	ObjAddRangeIndex(builder, t.RangeIndex)
+	ObjAddEpoch(builder, t.Epoch)
+	ObjAddStartOffset(builder, t.StartOffset)
+	ObjAddEndOffsetDelta(builder, t.EndOffsetDelta)
+	ObjAddDataLen(builder, t.DataLen)
+	ObjAddSparseIndex(builder, sparseIndexOffset)
+	return ObjEnd(builder)
 }
 
-func (rcv *Object) UnPackTo(t *ObjectT) {
+func (rcv *Obj) UnPackTo(t *ObjT) {
 	t.StreamId = rcv.StreamId()
 	t.RangeIndex = rcv.RangeIndex()
 	t.Epoch = rcv.Epoch()
@@ -43,41 +43,41 @@ func (rcv *Object) UnPackTo(t *ObjectT) {
 	t.SparseIndex = rcv.SparseIndexBytes()
 }
 
-func (rcv *Object) UnPack() *ObjectT {
+func (rcv *Obj) UnPack() *ObjT {
 	if rcv == nil { return nil }
-	t := &ObjectT{}
+	t := &ObjT{}
 	rcv.UnPackTo(t)
 	return t
 }
 
-type Object struct {
+type Obj struct {
 	_tab flatbuffers.Table
 }
 
-func GetRootAsObject(buf []byte, offset flatbuffers.UOffsetT) *Object {
+func GetRootAsObj(buf []byte, offset flatbuffers.UOffsetT) *Obj {
 	n := flatbuffers.GetUOffsetT(buf[offset:])
-	x := &Object{}
+	x := &Obj{}
 	x.Init(buf, n+offset)
 	return x
 }
 
-func GetSizePrefixedRootAsObject(buf []byte, offset flatbuffers.UOffsetT) *Object {
+func GetSizePrefixedRootAsObj(buf []byte, offset flatbuffers.UOffsetT) *Obj {
 	n := flatbuffers.GetUOffsetT(buf[offset+flatbuffers.SizeUint32:])
-	x := &Object{}
+	x := &Obj{}
 	x.Init(buf, n+offset+flatbuffers.SizeUint32)
 	return x
 }
 
-func (rcv *Object) Init(buf []byte, i flatbuffers.UOffsetT) {
+func (rcv *Obj) Init(buf []byte, i flatbuffers.UOffsetT) {
 	rcv._tab.Bytes = buf
 	rcv._tab.Pos = i
 }
 
-func (rcv *Object) Table() flatbuffers.Table {
+func (rcv *Obj) Table() flatbuffers.Table {
 	return rcv._tab
 }
 
-func (rcv *Object) StreamId() int64 {
+func (rcv *Obj) StreamId() int64 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
 	if o != 0 {
 		return rcv._tab.GetInt64(o + rcv._tab.Pos)
@@ -85,11 +85,11 @@ func (rcv *Object) StreamId() int64 {
 	return -1
 }
 
-func (rcv *Object) MutateStreamId(n int64) bool {
+func (rcv *Obj) MutateStreamId(n int64) bool {
 	return rcv._tab.MutateInt64Slot(4, n)
 }
 
-func (rcv *Object) RangeIndex() int32 {
+func (rcv *Obj) RangeIndex() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
@@ -97,11 +97,11 @@ func (rcv *Object) RangeIndex() int32 {
 	return -1
 }
 
-func (rcv *Object) MutateRangeIndex(n int32) bool {
+func (rcv *Obj) MutateRangeIndex(n int32) bool {
 	return rcv._tab.MutateInt32Slot(6, n)
 }
 
-func (rcv *Object) Epoch() int64 {
+func (rcv *Obj) Epoch() int64 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.GetInt64(o + rcv._tab.Pos)
@@ -109,11 +109,11 @@ func (rcv *Object) Epoch() int64 {
 	return -1
 }
 
-func (rcv *Object) MutateEpoch(n int64) bool {
+func (rcv *Obj) MutateEpoch(n int64) bool {
 	return rcv._tab.MutateInt64Slot(8, n)
 }
 
-func (rcv *Object) StartOffset() int64 {
+func (rcv *Obj) StartOffset() int64 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		return rcv._tab.GetInt64(o + rcv._tab.Pos)
@@ -121,11 +121,11 @@ func (rcv *Object) StartOffset() int64 {
 	return -1
 }
 
-func (rcv *Object) MutateStartOffset(n int64) bool {
+func (rcv *Obj) MutateStartOffset(n int64) bool {
 	return rcv._tab.MutateInt64Slot(10, n)
 }
 
-func (rcv *Object) EndOffsetDelta() int32 {
+func (rcv *Obj) EndOffsetDelta() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
@@ -133,11 +133,11 @@ func (rcv *Object) EndOffsetDelta() int32 {
 	return -1
 }
 
-func (rcv *Object) MutateEndOffsetDelta(n int32) bool {
+func (rcv *Obj) MutateEndOffsetDelta(n int32) bool {
 	return rcv._tab.MutateInt32Slot(12, n)
 }
 
-func (rcv *Object) DataLen() int32 {
+func (rcv *Obj) DataLen() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
 	if o != 0 {
 		return rcv._tab.GetInt32(o + rcv._tab.Pos)
@@ -145,11 +145,11 @@ func (rcv *Object) DataLen() int32 {
 	return -1
 }
 
-func (rcv *Object) MutateDataLen(n int32) bool {
+func (rcv *Obj) MutateDataLen(n int32) bool {
 	return rcv._tab.MutateInt32Slot(14, n)
 }
 
-func (rcv *Object) SparseIndex(j int) byte {
+func (rcv *Obj) SparseIndex(j int) byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
 	if o != 0 {
 		a := rcv._tab.Vector(o)
@@ -158,7 +158,7 @@ func (rcv *Object) SparseIndex(j int) byte {
 	return 0
 }
 
-func (rcv *Object) SparseIndexLength() int {
+func (rcv *Obj) SparseIndexLength() int {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
 	if o != 0 {
 		return rcv._tab.VectorLen(o)
@@ -166,7 +166,7 @@ func (rcv *Object) SparseIndexLength() int {
 	return 0
 }
 
-func (rcv *Object) SparseIndexBytes() []byte {
+func (rcv *Obj) SparseIndexBytes() []byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
 	if o != 0 {
 		return rcv._tab.ByteVector(o + rcv._tab.Pos)
@@ -174,7 +174,7 @@ func (rcv *Object) SparseIndexBytes() []byte {
 	return nil
 }
 
-func (rcv *Object) MutateSparseIndex(j int, n byte) bool {
+func (rcv *Obj) MutateSparseIndex(j int, n byte) bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
 	if o != 0 {
 		a := rcv._tab.Vector(o)
@@ -183,33 +183,33 @@ func (rcv *Object) MutateSparseIndex(j int, n byte) bool {
 	return false
 }
 
-func ObjectStart(builder *flatbuffers.Builder) {
+func ObjStart(builder *flatbuffers.Builder) {
 	builder.StartObject(7)
 }
-func ObjectAddStreamId(builder *flatbuffers.Builder, streamId int64) {
+func ObjAddStreamId(builder *flatbuffers.Builder, streamId int64) {
 	builder.PrependInt64Slot(0, streamId, -1)
 }
-func ObjectAddRangeIndex(builder *flatbuffers.Builder, rangeIndex int32) {
+func ObjAddRangeIndex(builder *flatbuffers.Builder, rangeIndex int32) {
 	builder.PrependInt32Slot(1, rangeIndex, -1)
 }
-func ObjectAddEpoch(builder *flatbuffers.Builder, epoch int64) {
+func ObjAddEpoch(builder *flatbuffers.Builder, epoch int64) {
 	builder.PrependInt64Slot(2, epoch, -1)
 }
-func ObjectAddStartOffset(builder *flatbuffers.Builder, startOffset int64) {
+func ObjAddStartOffset(builder *flatbuffers.Builder, startOffset int64) {
 	builder.PrependInt64Slot(3, startOffset, -1)
 }
-func ObjectAddEndOffsetDelta(builder *flatbuffers.Builder, endOffsetDelta int32) {
+func ObjAddEndOffsetDelta(builder *flatbuffers.Builder, endOffsetDelta int32) {
 	builder.PrependInt32Slot(4, endOffsetDelta, -1)
 }
-func ObjectAddDataLen(builder *flatbuffers.Builder, dataLen int32) {
+func ObjAddDataLen(builder *flatbuffers.Builder, dataLen int32) {
 	builder.PrependInt32Slot(5, dataLen, -1)
 }
-func ObjectAddSparseIndex(builder *flatbuffers.Builder, sparseIndex flatbuffers.UOffsetT) {
+func ObjAddSparseIndex(builder *flatbuffers.Builder, sparseIndex flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(6, flatbuffers.UOffsetT(sparseIndex), 0)
 }
-func ObjectStartSparseIndexVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+func ObjStartSparseIndexVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(1, numElems, 1)
 }
-func ObjectEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+func ObjEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }

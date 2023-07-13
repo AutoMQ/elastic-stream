@@ -8,7 +8,7 @@ import (
 
 type CommitObjectRequestT struct {
 	TimeoutMs int32 `json:"timeout_ms"`
-	Object *ObjectT `json:"object"`
+	Object *ObjT `json:"object"`
 }
 
 func (t *CommitObjectRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
@@ -71,12 +71,12 @@ func (rcv *CommitObjectRequest) MutateTimeoutMs(n int32) bool {
 	return rcv._tab.MutateInt32Slot(4, n)
 }
 
-func (rcv *CommitObjectRequest) Object(obj *Object) *Object {
+func (rcv *CommitObjectRequest) Object(obj *Obj) *Obj {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
-			obj = new(Object)
+			obj = new(Obj)
 		}
 		obj.Init(rcv._tab.Bytes, x)
 		return obj

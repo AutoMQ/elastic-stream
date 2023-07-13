@@ -650,7 +650,7 @@ table DescribePlacementDriverClusterResponse {
     cluster: PlacementDriverCluster (id: 1, required);
 }
 
-table Object {
+table Obj {
     // The id of the stream.
     stream_id: int64 = -1 (id: 0);
 
@@ -678,7 +678,7 @@ table CommitObjectRequest {
     timeout_ms: int32 (id: 0);
 
     // The object to commit.
-    object: Object (id: 1);
+    object: Obj (id: 1);
 }
 
 table CommitObjectResponse {
@@ -699,7 +699,7 @@ table Resource {
     type: ResourceType (id: 0);
     stream: Stream (id: 1);
     range: Range (id: 2);
-    object: Object (id: 3);
+    object: Obj (id: 3);
 }
 
 enum EventType: byte {

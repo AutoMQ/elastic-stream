@@ -10,7 +10,7 @@ type ResourceT struct {
 	Type ResourceType `json:"type"`
 	Stream *StreamT `json:"stream"`
 	Range *RangeT `json:"range"`
-	Object *ObjectT `json:"object"`
+	Object *ObjT `json:"object"`
 }
 
 func (t *ResourceT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
@@ -105,12 +105,12 @@ func (rcv *Resource) Range(obj *Range) *Range {
 	return nil
 }
 
-func (rcv *Resource) Object(obj *Object) *Object {
+func (rcv *Resource) Object(obj *Obj) *Obj {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
-			obj = new(Object)
+			obj = new(Obj)
 		}
 		obj.Init(rcv._tab.Bytes, x)
 		return obj
