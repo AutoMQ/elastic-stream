@@ -4,7 +4,7 @@ ADD *.deb /root/
 
 RUN apt-get update \
     && apt-get install -y wget telnet \
-    && dpkg -i *.deb \
+    && dpkg -R -i ./*.deb \
     && rm -f *.deb
 
 CMD ["/usr/local/bin/pd", "--config", "/etc/pd/config.yaml"]
