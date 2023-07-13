@@ -8,22 +8,35 @@ import (
 
 type WatchResourceRequestT struct {
 	TimeoutMs int32 `json:"timeout_ms"`
-	ResourceType ResourceType `json:"resource_type"`
+	ResourceType []ResourceType `json:"resource_type"`
 	ResourceVersion int64 `json:"resource_version"`
 }
 
 func (t *WatchResourceRequestT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	if t == nil { return 0 }
+	resourceTypeOffset := flatbuffers.UOffsetT(0)
+	if t.ResourceType != nil {
+		resourceTypeLength := len(t.ResourceType)
+		WatchResourceRequestStartResourceTypeVector(builder, resourceTypeLength)
+		for j := resourceTypeLength - 1; j >= 0; j-- {
+			builder.PrependInt8(int8(t.ResourceType[j]))
+		}
+		resourceTypeOffset = builder.EndVector(resourceTypeLength)
+	}
 	WatchResourceRequestStart(builder)
 	WatchResourceRequestAddTimeoutMs(builder, t.TimeoutMs)
-	WatchResourceRequestAddResourceType(builder, t.ResourceType)
+	WatchResourceRequestAddResourceType(builder, resourceTypeOffset)
 	WatchResourceRequestAddResourceVersion(builder, t.ResourceVersion)
 	return WatchResourceRequestEnd(builder)
 }
 
 func (rcv *WatchResourceRequest) UnPackTo(t *WatchResourceRequestT) {
 	t.TimeoutMs = rcv.TimeoutMs()
-	t.ResourceType = rcv.ResourceType()
+	resourceTypeLength := rcv.ResourceTypeLength()
+	t.ResourceType = make([]ResourceType, resourceTypeLength)
+	for j := 0; j < resourceTypeLength; j++ {
+		t.ResourceType[j] = rcv.ResourceType(j)
+	}
 	t.ResourceVersion = rcv.ResourceVersion()
 }
 
@@ -73,16 +86,30 @@ func (rcv *WatchResourceRequest) MutateTimeoutMs(n int32) bool {
 	return rcv._tab.MutateInt32Slot(4, n)
 }
 
-func (rcv *WatchResourceRequest) ResourceType() ResourceType {
+func (rcv *WatchResourceRequest) ResourceType(j int) ResourceType {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
-		return ResourceType(rcv._tab.GetInt8(o + rcv._tab.Pos))
+		a := rcv._tab.Vector(o)
+		return ResourceType(rcv._tab.GetInt8(a + flatbuffers.UOffsetT(j*1)))
 	}
 	return 0
 }
 
-func (rcv *WatchResourceRequest) MutateResourceType(n ResourceType) bool {
-	return rcv._tab.MutateInt8Slot(6, int8(n))
+func (rcv *WatchResourceRequest) ResourceTypeLength() int {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.VectorLen(o)
+	}
+	return 0
+}
+
+func (rcv *WatchResourceRequest) MutateResourceType(j int, n ResourceType) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		a := rcv._tab.Vector(o)
+		return rcv._tab.MutateInt8(a+flatbuffers.UOffsetT(j*1), int8(n))
+	}
+	return false
 }
 
 func (rcv *WatchResourceRequest) ResourceVersion() int64 {
@@ -103,8 +130,11 @@ func WatchResourceRequestStart(builder *flatbuffers.Builder) {
 func WatchResourceRequestAddTimeoutMs(builder *flatbuffers.Builder, timeoutMs int32) {
 	builder.PrependInt32Slot(0, timeoutMs, 0)
 }
-func WatchResourceRequestAddResourceType(builder *flatbuffers.Builder, resourceType ResourceType) {
-	builder.PrependInt8Slot(1, int8(resourceType), 0)
+func WatchResourceRequestAddResourceType(builder *flatbuffers.Builder, resourceType flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(resourceType), 0)
+}
+func WatchResourceRequestStartResourceTypeVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+	return builder.StartVector(1, numElems, 1)
 }
 func WatchResourceRequestAddResourceVersion(builder *flatbuffers.Builder, resourceVersion int64) {
 	builder.PrependInt64Slot(2, resourceVersion, 0)

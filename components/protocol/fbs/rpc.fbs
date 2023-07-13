@@ -722,7 +722,7 @@ table ListResourceRequest {
     timeout_ms: int32 (id: 0);
 
     // The type of the resource.
-    resource_type: ResourceType (id: 1);
+    resource_type: [ResourceType] (id: 1);
 }
 
 table ListResourceResponse {
@@ -743,7 +743,7 @@ table WatchResourceRequest {
     timeout_ms: int32 (id: 0);
 
     // The type of the resource.
-    resource_type: ResourceType (id: 1);
+    resource_type: [ResourceType] (id: 1);
 
     // The resource version to watch. All changes with a version greater than the given version will be returned.
     resource_version: int64 (id: 2);
