@@ -28,7 +28,9 @@ jobs:
         run: |
           ./scripts/install_deps.sh
       - name: Build Shared Library
-        run: cargo build -p frontend --release -Z unstable-options --out-dir=sdks/frontend-java/client/src/main/resources/META-INF/native/
+        run: |
+          cargo build -p frontend --release
+          cp ./target/release/libfrontend.so ./sdks/frontend-java/client/src/main/resources/META-INF/native/libfrontend_linux_x86_64.so
       - name: Set up JDK ${{ matrix.jdk }}
         uses: actions/setup-java@v3
         with:
