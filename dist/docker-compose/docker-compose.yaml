@@ -1,19 +1,28 @@
 services:
   range-server:
-    image: "elasticstream/range-server:0.2.2"
+    image: "elasticstream/elastic-stream:0.2.4"
     configs:
       - source: rs_config
         target: /etc/range-server/range-server.yaml
         mode: 0440
+    # https://docs.docker.com/compose/compose-file/05-services/#entrypoint
+    entrypoint:
+      - /usr/local/bin/range-server
+      - -c
+      - /etc/range-server/range-server.yaml
+      - -l
+      - /etc/range-server/range-server-log.yaml
+
     ports:
       - "10911:10911"
+    # https://docs.docker.com/compose/compose-file/05-services/#depends_on
     depends_on:
       pd:
         condition: service_started
     volumes:
       - rs_data:/data
   pd:
-    image: "elasticstream/pd-server:0.2.2"
+    image: "elasticstream/elastic-stream:0.2.4"
     configs:
       - source: pd_config
         target: /etc/pd/config.yaml
@@ -21,6 +30,8 @@ services:
     ports:
       - "12378:12378"
       - "12379:12379"
+    # https://docs.docker.com/compose/startup-order/
+    # https://docs.docker.com/compose/compose-file/05-services/#healthcheck
     healthcheck:
       test: ["CMD-SHELL", "echo -e '\x1dclose\x0d' | telnet localhost 12378"]
       interval: 1m30s
@@ -28,11 +39,12 @@ services:
       retries: 3
       start_period: 3s
 
-
+# https://docs.docker.com/compose/compose-file/07-volumes/
 volumes:
   rs_data:
     driver: local
 
+# https://docs.docker.com/compose/compose-file/08-configs/
 configs:
   rs_config:
     file: ./configs/range-server/range-server.yaml
