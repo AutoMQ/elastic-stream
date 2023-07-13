@@ -56,6 +56,6 @@ jobs:
           username: elasticstream
           password: ${{ secrets.DOCKERHUB_READ_WRITE_TOKEN }}
       - name: Build Docker Image
-        working-directory: ./dis/docker
+        working-directory: ./dist/docker
         run: |
           ./build.sh
