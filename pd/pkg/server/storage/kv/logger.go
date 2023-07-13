@@ -51,8 +51,8 @@ func (l Logger) BatchGet(ctx context.Context, keys [][]byte, inTxn bool) (kvs []
 	return
 }
 
-func (l Logger) GetByRange(ctx context.Context, r Range, limit int64, desc bool) (kvs []KeyValue, err error) {
-	kvs, err = l.KV.GetByRange(ctx, r, limit, desc)
+func (l Logger) GetByRange(ctx context.Context, r Range, limit int64, desc bool) (kvs []KeyValue, more bool, err error) {
+	kvs, more, err = l.KV.GetByRange(ctx, r, limit, desc)
 
 	logger := l.logger()
 	if logger.Core().Enabled(zap.DebugLevel) {
@@ -62,6 +62,7 @@ func (l Logger) GetByRange(ctx context.Context, r Range, limit int64, desc bool)
 			zap.ByteString("end-key", r.EndKey),
 			zap.Int64("limit", limit),
 			zap.Bool("desc", desc),
+			zap.Bool("more", more),
 			zap.Error(err),
 		}
 		for i, kv := range kvs {

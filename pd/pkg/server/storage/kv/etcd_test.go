@@ -266,12 +266,16 @@ func TestEtcd_GetByRange(t *testing.T) {
 		limit int64
 		desc  bool
 	}
+	type want struct {
+		kvs  []KeyValue
+		more bool
+	}
 	tests := []struct {
 		name    string
 		preset  map[string]string
 		fields  fields
 		args    args
-		want    []KeyValue
+		want    want
 		wantErr bool
 		errMsg  string
 	}{
@@ -281,7 +285,7 @@ func TestEtcd_GetByRange(t *testing.T) {
 			args: args{
 				r: Range{[]byte("key1"), []byte("key3")},
 			},
-			want: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}, {Key: []byte("key2"), Value: []byte("val2")}},
+			want: want{kvs: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}, {Key: []byte("key2"), Value: []byte("val2")}}},
 		},
 		{
 			name:   "get keys with prefix",
@@ -289,7 +293,7 @@ func TestEtcd_GetByRange(t *testing.T) {
 			args: args{
 				r: Range{[]byte("key"), []byte(clientv3.GetPrefixRangeEnd("key"))},
 			},
-			want: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}, {Key: []byte("key2"), Value: []byte("val2")}, {Key: []byte("key3"), Value: []byte("val3")}},
+			want: want{kvs: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}, {Key: []byte("key2"), Value: []byte("val2")}, {Key: []byte("key3"), Value: []byte("val3")}}},
 		},
 		{
 			name:   "get keys with limit",
@@ -298,7 +302,7 @@ func TestEtcd_GetByRange(t *testing.T) {
 				r:     Range{[]byte("key1"), []byte("key3")},
 				limit: 1,
 			},
-			want: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}},
+			want: want{kvs: []KeyValue{{Key: []byte("key1"), Value: []byte("val1")}}, more: true},
 		},
 		{
 			name:   "get keys with desc",
@@ -307,7 +311,7 @@ func TestEtcd_GetByRange(t *testing.T) {
 				r:    Range{[]byte("key1"), []byte("key3")},
 				desc: true,
 			},
-			want: []KeyValue{{Key: []byte("key2"), Value: []byte("val2")}, {Key: []byte("key1"), Value: []byte("val1")}},
+			want: want{kvs: []KeyValue{{Key: []byte("key2"), Value: []byte("val2")}, {Key: []byte("key1"), Value: []byte("val1")}}},
 		},
 
 		{
@@ -316,7 +320,7 @@ func TestEtcd_GetByRange(t *testing.T) {
 			args: args{
 				r: Range{[]byte("key3"), []byte("key1")},
 			},
-			want: []KeyValue{},
+			want: want{kvs: []KeyValue{}},
 		},
 		{
 			name:   "get keys with empty range",
@@ -324,7 +328,7 @@ func TestEtcd_GetByRange(t *testing.T) {
 			args: args{
 				r: Range{[]byte(""), []byte("")},
 			},
-			want: nil,
+			want: want{},
 		},
 		{
 			name:   "get when transaction failed",
@@ -359,14 +363,14 @@ func TestEtcd_GetByRange(t *testing.T) {
 			}
 
 			// run
-			got, err := etcd.GetByRange(context.Background(), tt.args.r, tt.args.limit, tt.args.desc)
+			kvs, more, err := etcd.GetByRange(context.Background(), tt.args.r, tt.args.limit, tt.args.desc)
 
 			// check
 			if tt.wantErr {
 				re.ErrorContains(err, tt.errMsg)
 			} else {
 				re.NoError(err)
-				re.Equal(tt.want, got)
+				re.Equal(tt.want, want{kvs: kvs, more: more})
 			}
 		})
 	}

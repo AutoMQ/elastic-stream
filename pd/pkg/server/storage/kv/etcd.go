@@ -159,9 +159,9 @@ func (e *Etcd) BatchGet(ctx context.Context, keys [][]byte, inTxn bool) ([]KeyVa
 }
 
 // GetByRange returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.
-func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) ([]KeyValue, error) {
+func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) ([]KeyValue, bool, error) {
 	if len(r.StartKey) == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	startKey := e.addPrefix(r.StartKey)
@@ -177,37 +177,27 @@ func (e *Etcd) GetByRange(ctx context.Context, r Range, limit int64, desc bool) 
 
 	resp, err := e.newTxnFunc(ctx).Then(clientv3.OpGet(string(startKey), opts...)).Commit()
 	if err != nil {
-		return nil, errors.Wrap(err, "kv get by range")
+		return nil, false, errors.Wrap(err, "kv get by range")
 	}
 	if !resp.Succeeded {
-		return nil, errors.Wrap(ErrTxnFailed, "kv get by range")
+		return nil, false, errors.Wrap(ErrTxnFailed, "kv get by range")
 	}
 
-	cnt := 0
-	for _, resp := range resp.Responses {
-		rangeResp := resp.GetResponseRange()
-		if rangeResp == nil {
+	// when the transaction succeeds, the number of responses is always 1 and is always a range response.
+	rangeResp := resp.Responses[0].GetResponseRange()
+
+	kvs := make([]KeyValue, 0, len(rangeResp.Kvs))
+	for _, kv := range rangeResp.Kvs {
+		if !e.hasPrefix(kv.Key) {
 			continue
 		}
-		cnt += len(rangeResp.Kvs)
+		kvs = append(kvs, KeyValue{
+			Key:   e.trimPrefix(kv.Key),
+			Value: kv.Value,
+		})
 	}
-	kvs := make([]KeyValue, 0, cnt)
-	for _, resp := range resp.Responses {
-		rangeResp := resp.GetResponseRange()
-		if rangeResp == nil {
-			continue
-		}
-		for _, kv := range rangeResp.Kvs {
-			if !e.hasPrefix(kv.Key) {
-				continue
-			}
-			kvs = append(kvs, KeyValue{
-				Key:   e.trimPrefix(kv.Key),
-				Value: kv.Value,
-			})
-		}
-	}
-	return kvs, nil
+
+	return kvs, rangeResp.More, nil
 }
 
 // Put returns ErrTxnFailed if EtcdParam.CmpFunc evaluates to false.

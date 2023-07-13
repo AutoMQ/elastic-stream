@@ -71,7 +71,7 @@ func (e *Endpoint) forEachRangeServerLimited(ctx context.Context, f func(rangeSe
 	logger := e.lg.With(traceutil.TraceLogField(ctx))
 
 	startKey := rangeServerPath(startID)
-	kvs, err := e.GetByRange(ctx, kv.Range{StartKey: startKey, EndKey: e.endRangeServerPath()}, limit, false)
+	kvs, more, err := e.GetByRange(ctx, kv.Range{StartKey: startKey, EndKey: e.endRangeServerPath()}, limit, false)
 	if err != nil {
 		logger.Error("failed to get range servers", zap.Int32("start-id", startID), zap.Int64("limit", limit), zap.Error(err))
 		return MinRangeServerID - 1, errors.Wrap(err, "get range servers")
@@ -86,7 +86,7 @@ func (e *Endpoint) forEachRangeServerLimited(ctx context.Context, f func(rangeSe
 		}
 	}
 
-	if int64(len(kvs)) < limit {
+	if !more {
 		// no more range servers
 		nextID = MinRangeServerID - 1
 	}

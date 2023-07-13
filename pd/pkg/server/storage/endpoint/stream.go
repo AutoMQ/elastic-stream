@@ -131,7 +131,7 @@ func (e *Endpoint) forEachStreamLimited(ctx context.Context, f func(stream *rpcf
 	logger := e.lg.With(traceutil.TraceLogField(ctx))
 
 	startKey := streamPath(startID)
-	kvs, err := e.GetByRange(ctx, kv.Range{StartKey: startKey, EndKey: e.endStreamPath()}, limit, false)
+	kvs, more, err := e.GetByRange(ctx, kv.Range{StartKey: startKey, EndKey: e.endStreamPath()}, limit, false)
 	if err != nil {
 		logger.Error("failed to get streams", zap.Int64("start-id", startID), zap.Int64("limit", limit), zap.Error(err))
 		return MinStreamID - 1, errors.Wrap(err, "get streams")
@@ -146,7 +146,7 @@ func (e *Endpoint) forEachStreamLimited(ctx context.Context, f func(stream *rpcf
 		}
 	}
 
-	if int64(len(kvs)) < limit {
+	if !more {
 		// no more streams
 		nextID = MinStreamID - 1
 	}

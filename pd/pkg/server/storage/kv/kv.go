@@ -52,8 +52,10 @@ type KV interface {
 	// and limits the number of results returned to "limit".
 	// If the Range.StartKey is empty, GetByRange returns nil and no error.
 	// If limit is 0, GetByRange will return all key-value pairs whose keys fall within the given range (r).
+	// If limit is greater than 0, GetByRange will return at most "limit" key-value pairs whose keys fall within the given range (r),
+	// and a boolean value indicating whether there are more keys in the range.
 	// If desc is true, GetByRange returns the key-value pairs in descending order.
-	GetByRange(ctx context.Context, r Range, limit int64, desc bool) ([]KeyValue, error)
+	GetByRange(ctx context.Context, r Range, limit int64, desc bool) (kvs []KeyValue, more bool, err error)
 
 	// Put sets the value for the given key.
 	// IF the key is empty, Put does nothing and returns no error.
