@@ -2587,6 +2587,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pd-client"
+version = "0.2.2"
+dependencies = [
+ "env_logger",
+ "log",
+]
+
+[[package]]
 name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

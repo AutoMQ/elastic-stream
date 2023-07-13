@@ -11,6 +11,7 @@ members = [
     "components/model",
     "components/object-storage",
     "components/observation",
+    "components/pd-client",
     "components/polling",
     "components/protocol",
     "components/replication",
